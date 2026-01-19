@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Web Minecraft: 繁花与沼泽</title>
+    <link rel="stylesheet" href="./components/style/global.css" />
+</head>
+<body>
+    <div id="crosshair"></div>
+    <div id="hud">
+        <b>繁花与沼泽更新</b><br>
+        WASD: 移动 | Z: 背包<br>
+        左键: 挖掘 | 右键: <b>虚空搭路/互动</b><br>
+        新群系: 杜鹃林(苔藓/花树), 沼泽(藤蔓/睡莲)
+    </div>
+    <div id="msg"></div>
+    <div id="hotbar"></div>
+
+    <div id="inventory-modal">
+        <div id="inventory-content">
+            <h2 style="margin:0">物品清单 (点击装备)</h2>
+            <div id="inventory-grid"></div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module" src="./components/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "mc-lite",
+  "version": "1.0.0",
+  "description": "妈妈不让我玩我的世界，所以我用 AI 做了一个，自己玩。",
+  "main": "index.js",
+  "scripts": {
+    "start": "node server-script/start-server.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "jayli",
+  "repository": "git@github.com:jayli/mc-lite.git",
+  "license": "ISC"
+}
