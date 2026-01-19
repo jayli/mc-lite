@@ -41,3 +41,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **Import Skill**: 实时遵循 `.claude/skills/*/skill.md` 中的指令。
 
+
+## Active Technologies
+- JavaScript (ES6+ Modules) + Three.js (via Import Map/CDN) (001-refactor-layered-design)
+- In-memory (runtime state), potentially localStorage for persistence (future) (001-refactor-layered-design)
+
+## Recent Changes
+- 001-refactor-layered-design: Added JavaScript (ES6+ Modules) + Three.js (via Import Map/CDN)
