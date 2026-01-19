@@ -376,6 +376,16 @@ export class Player {
         const maxDist = 5;
         const rayPos = origin.clone();
 
+        // 六个邻居方向：东、西、上、下、南、北
+        const neighborOffsets = [
+            [1, 0, 0],   // 东
+            [-1, 0, 0],  // 西
+            [0, 1, 0],   // 上
+            [0, -1, 0],  // 下
+            [0, 0, 1],   // 南（假设Z轴正向为南）
+            [0, 0, -1]   // 北
+        ];
+
         for(let d=0; d<maxDist; d+=step) {
             rayPos.add(direction.clone().multiplyScalar(step));
             const rx = Math.round(rayPos.x);
@@ -383,16 +393,37 @@ export class Player {
             const rz = Math.round(rayPos.z);
 
             if (!this.physics.isSolid(rx, ry, rz)) {
-                // Check neighbors
-                if (this.physics.isSolid(rx+1, ry, rz) || this.physics.isSolid(rx-1, ry, rz) ||
-                    this.physics.isSolid(rx, ry+1, rz) || this.physics.isSolid(rx, ry-1, rz) ||
-                    this.physics.isSolid(rx, ry, rz+1) || this.physics.isSolid(rx, ry, rz-1)) {
+                // 检查邻居中是否有实心方块，并且所有实心邻居的面都不可见
+                let hasSolidNeighbor = false;
+                let allInvisible = true;
+
+                for (const [dx, dy, dz] of neighborOffsets) {
+                    const nx = rx + dx;
+                    const ny = ry + dy;
+                    const nz = rz + dz;
+                    if (this.physics.isSolid(nx, ny, nz)) {
+                        hasSolidNeighbor = true;
+                        // 计算面的法线方向（从邻居指向空位置）
+                        const normal = new THREE.Vector3(dx, dy, dz).normalize();
+                        // 计算视线方向与法线的点积
+                        const dot = direction.dot(normal);
+                        // 如果点积大于0.01，表示面朝向玩家，可见
+                        if (dot > 0.01) {
+                            allInvisible = false;
+                            break; // 发现可见面，跳过此位置
+                        }
+                    }
+                }
+
+                // 如果有实心邻居且所有实心邻居的面都不可见，则放置方块
+                if (hasSolidNeighbor && allInvisible) {
                     if (this.tryPlaceBlock(rx, ry, rz, type)) {
                         this.swing();
                         return;
                     }
                 }
             } else {
+                // 遇到实心方块，停止射线步进
                 break;
             }
         }
