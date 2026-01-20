@@ -4,6 +4,7 @@ import { materials } from '../core/materials/MaterialManager.js';
 import { terrainGen } from './TerrainGen.js';
 import { Cloud } from './entities/Cloud.js';
 import { Tree } from './entities/Tree.js';
+import { RealisticTree } from './entities/RealisticTree.js';
 import { Island } from './entities/Island.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
@@ -107,7 +108,13 @@ export class Chunk {
 
                     // Vegetation
                     if (centerBiome === 'FOREST') {
-                        if (Math.random() < 0.05) Tree.generate(wx, h + 1, wz, this, 'big', d);
+                        if (Math.random() < 0.05) {
+                            if (Math.random() < 0.15) { // 15% chance for a realistic tree
+                                RealisticTree.generate(wx, h + 1, wz, this);
+                            } else {
+                                Tree.generate(wx, h + 1, wz, this, 'big', d);
+                            }
+                        }
                     } else if (centerBiome === 'AZALEA') {
                         if (Math.random() < 0.06) Tree.generate(wx, h + 1, wz, this, 'azalea', d);
                     } else if (centerBiome === 'SWAMP') {
@@ -230,7 +237,14 @@ export class Chunk {
     dispose() {
         this.group.children.forEach(c => {
             if (c.geometry) c.geometry.dispose();
-            // Shared materials, do not dispose
+            // Dispose material only for non-instanced meshes, as instanced ones share materials
+            if (!c.isInstancedMesh && c.material) {
+                if (Array.isArray(c.material)) {
+                    c.material.forEach(m => m.dispose());
+                } else {
+                    c.material.dispose();
+                }
+            }
         });
         this.group.clear();
     }

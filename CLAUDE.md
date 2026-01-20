@@ -45,6 +45,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Active Technologies
 - JavaScript (ES6+ Modules) + Three.js (via Import Map/CDN) (001-refactor-layered-design)
 - In-memory (runtime state), potentially localStorage for persistence (future) (001-refactor-layered-design)
+- JavaScript (ES6+) + Three.js (via CDN) (001-realistic-textured-trees)
+- N/A (Runtime state only) (001-realistic-textured-trees)
 
 ## Recent Changes
 - 001-refactor-layered-design: Added JavaScript (ES6+ Modules) + Three.js (via Import Map/CDN)

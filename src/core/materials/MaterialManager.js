@@ -5,7 +5,19 @@ export class MaterialManager {
     constructor() {
         this.materials = new Map();
         this.definitions = new Map();
+        this.textureLoader = new THREE.TextureLoader();
+        this.textureCache = new Map();
         this.defaultMaterial = new THREE.MeshStandardMaterial({ color: 0xff00ff });
+    }
+
+    preloadTextures(urls) {
+        return Promise.all(urls.map(url =>
+            this.textureLoader.loadAsync(url).then(texture => {
+                texture.magFilter = THREE.NearestFilter;
+                texture.colorSpace = THREE.SRGBColorSpace;
+                this.textureCache.set(url, texture);
+            })
+        ));
     }
 
     registerMaterial(type, definition) {
@@ -29,6 +41,21 @@ export class MaterialManager {
     }
 
     _createMaterial(def) {
+        if (def.textureUrl) {
+            const texture = this.textureCache.get(def.textureUrl);
+            if (!texture) {
+                console.warn(`Texture not preloaded: ${def.textureUrl}`);
+                return this.defaultMaterial;
+            }
+            return new THREE.MeshStandardMaterial({
+                map: texture,
+                transparent: def.transparent || false,
+                opacity: def.opacity || 1,
+                side: def.side || THREE.FrontSide,
+                alphaTest: def.alphaTest || 0
+            });
+        }
+
         if (def.textureGenerator) {
             const canvas = document.createElement('canvas');
             canvas.width = 64;
@@ -65,6 +92,14 @@ export class MaterialManager {
 }
 
 export const materials = new MaterialManager();
+
+// Function to initialize materials, including async texture loading
+export async function initializeMaterials() {
+    const textureUrls = [
+        './assets/minecraft/textures/block/oak_leaves_branch_medium.png'
+    ];
+    await materials.preloadTextures(textureUrls);
+}
 
 // Helper to create simple noise texture logic
 function mkMat(col, op=1) {
@@ -153,3 +188,23 @@ materials.registerMaterial('vine', mkDetailMat(null, '#355E3B', true, (ctx) => {
 materials.registerMaterial('lilypad', mkDetailMat(null, '#228B22', true, (ctx) => {
     ctx.beginPath(); ctx.arc(32,32,28,0.3, Math.PI*1.8); ctx.fill();
 }));
+
+materials.registerMaterial('realistic_trunk_procedural', {
+    color: '#5D4037', // Dark Brown
+    textureGenerator: (ctx) => {
+        // Add dark green dots
+        ctx.fillStyle = '#006400'; // Dark Green
+        for(let i = 0; i < 150; i++) {
+            ctx.fillRect(Math.random() * 64, Math.random() * 64, 2, 2);
+        }
+    }
+});
+
+// New tree materials
+materials.registerMaterial('realistic_oak_leaves', {
+    textureUrl: './assets/minecraft/textures/block/oak_leaves_branch_medium.png',
+    transparent: true,
+    alphaTest: 0.5,
+    side: THREE.DoubleSide
+});
+

@@ -192,7 +192,7 @@ export class Player {
             const slot = this.inventory.getSelected();
             const heldItem = slot ? slot.item : null;
 
-            if (hits.length > 0 && hits[0].distance < 5) {
+            if (hits.length > 0 && hits[0].distance < 9) {
                 const hit = hits[0];
                 const dummy = new THREE.Matrix4();
                 const m = hit.object;
@@ -238,7 +238,7 @@ export class Player {
                 this.doSkyPlace(heldItem);
             }
         } else if (button === 0) { // Left Click - Mine
-            if (hits.length > 0 && hits[0].distance < 5) {
+            if (hits.length > 0 && hits[0].distance < 9) {
                 const hit = hits[0];
                 const m = hit.object;
                 const instanceId = hit.instanceId;
@@ -343,7 +343,7 @@ export class Player {
                 this.inventory.add(type === 'grass' ? 'dirt' : type, 1);
             }
         } else {
-            // Standard Mesh (placed block)
+            // Standard Mesh (placed block or realistic tree parts)
             this.world.removeBlock(Math.round(m.position.x), Math.round(m.position.y), Math.round(m.position.z));
 
             // Spawn Particles
@@ -352,7 +352,15 @@ export class Player {
             m.parent.remove(m); // Remove from scene/chunk group
 
             // Give item
-            this.inventory.add(m.userData.type, 1);
+            const type = m.userData.type;
+            if (type === 'realistic_trunk') {
+                this.inventory.add('wood', 1);
+            } else if (type === 'realistic_leaves') {
+                // Chance to drop nothing, or an apple, etc. For now, just leaves.
+                if (Math.random() < 0.8) this.inventory.add('leaves', 1);
+            } else {
+                this.inventory.add(type, 1);
+            }
         }
     }
 
@@ -373,7 +381,7 @@ export class Player {
         this.camera.getWorldDirection(direction);
 
         const step = 0.1;
-        const maxDist = 5;
+        const maxDist = 9;
         const rayPos = origin.clone();
 
         // 六个邻居方向：东、西、上、下、南、北

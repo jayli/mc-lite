@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "": [
+      { "model": "minecraft:block/birch_leaves" },
+      { "model": "minecraft:block/birch_leaves_big" }
+    ] 
+  }
+}

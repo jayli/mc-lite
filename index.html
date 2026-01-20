@@ -34,12 +34,16 @@
 
     <script type="module">
         import { Game } from './src/core/Game.js';
+        import { initializeMaterials } from './src/core/materials/MaterialManager.js';
 
-        const game = new Game();
-        game.start();
+        async function main() {
+            await initializeMaterials();
+            const game = new Game();
+            game.start();
+            window.game = game; // Expose for debugging
+        }
 
-        // Expose for debugging if needed
-        window.game = game;
+        main();
     </script>
 </body>
 </html>

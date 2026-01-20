@@ -3,6 +3,7 @@ import { Engine } from './Engine.js';
 import { World } from '../world/World.js';
 import { UIManager } from '../ui/UIManager.js';
 import { Player } from '../entities/player/Player.js';
+import { realisticTreeManager } from '../world/entities/RealisticTreeManager.js';
 
 export class Game {
     constructor() {
@@ -14,6 +15,9 @@ export class Game {
         this.isRunning = false;
 
         this.lastTime = 0;
+
+        // Initialize Tree Manager
+        realisticTreeManager.init();
 
         // Initialize inventory with default items
         this.player.inventory.add('dirt', 1000);
