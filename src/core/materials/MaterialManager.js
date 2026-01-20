@@ -96,7 +96,7 @@ export const materials = new MaterialManager();
 // Function to initialize materials, including async texture loading
 export async function initializeMaterials() {
     const textureUrls = [
-        './assets/minecraft/textures/block/oak_leaves_branch_medium.png'
+        './src/world/assets/textures/oak_leaves_branch_medium.png'
     ];
     await materials.preloadTextures(textureUrls);
 }
@@ -202,7 +202,7 @@ materials.registerMaterial('realistic_trunk_procedural', {
 
 // New tree materials
 materials.registerMaterial('realistic_oak_leaves', {
-    textureUrl: './assets/minecraft/textures/block/oak_leaves_branch_medium.png',
+    textureUrl: './src/world/assets/textures/oak_leaves_branch_medium.png',
     transparent: true,
     alphaTest: 0.5,
     side: THREE.DoubleSide
