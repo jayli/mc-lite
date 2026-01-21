@@ -1,17 +1,13 @@
 <!--
 Sync Impact Report:
-- Version change: N/A -> 1.0.0
-- List of modified principles:
-  - [PRINCIPLE_1_NAME] -> I. 面向对象与逻辑分层 (OO Design & Layering)
-  - [PRINCIPLE_2_NAME] -> II. 内存效率与垃圾回收 (Memory Efficiency & GC)
-  - [PRINCIPLE_3_NAME] -> III. 主动资源释放 (Proactive Resource Release)
-  - [PRINCIPLE_4_NAME] -> IV. WebGL/Three.js 性能优化 (Performance Optimization)
-  - [PRINCIPLE_5_NAME] -> V. 简洁性与核心机制 (Simplicity & Core)
-- Added sections: 技术约束 (Technical Constraints), 开发流程 (Development Workflow)
+- Version change: 1.0.0 -> 1.1.0
+- List of modified principles: None
+- Added sections:
+  - VI. 资源管理与部署 (Resource Management & Deployment)
 - Removed sections: None
-- Templates requiring updates:
-  - ✅ .specify/templates/plan-template.md (Constitution Check reference)
-- Follow-up TODOs: None
+- Templates requiring updates: None
+- Follow-up TODOs:
+  - Update .gitignore to include minecraft-bundles/
 -->
 
 # Minecraft-lite Constitution
@@ -33,6 +29,9 @@ Sync Impact Report:
 ### V. 简洁性与核心机制 (Simplicity & Core)
 专注于核心 Minecraft 机制（挖掘、放置、生成），避免过度工程。保持代码简洁，易于理解，同时确保性能达到游戏级标准。遵循 YAGNI 原则，只实现当前需要的功能。
 
+### VI. 资源管理与部署 (Resource Management & Deployment)
+`minecraft-bundles` 目录存放原始游戏资源，仅用于分析和提取。所有在游戏中使用的资源（如纹理、模型）必须拷贝到 `src` 目录下的相应子目录中进行管理。`minecraft-bundles` 目录不得包含在最终的部署产物中，也必须在 `.gitignore` 中被忽略，禁止提交到版本控制系统。
+
 ## 技术约束 (Technical Constraints)
 
 - **运行时环境**: 现代 Web 浏览器，必须支持 WebGL 2.0。
@@ -47,4 +46,4 @@ Sync Impact Report:
 
 本宪法优先于所有其他开发实践。任何原则性的变更必须通过文档化、版本更新及同步影响评估。所有 Pull Request (PR) 的审查过程必须验证其是否符合上述内存管理和性能原则。
 
-**Version**: 1.0.0 | **Ratified**: 2026-01-19 | **Last Amended**: 2026-01-19
+**Version**: 1.1.0 | **Ratified**: 2026-01-19 | **Last Amended**: 2026-01-21
