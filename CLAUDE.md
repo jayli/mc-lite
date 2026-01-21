@@ -16,23 +16,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目架构
 
-本项目是一个简易的 Web 版《我的世界》（Minecraft）克隆。
+本项目是一个简易的 Web 版《我的世界》（Minecraft）克隆，现已重构为模块化的代码结构。
 
 ### 核心组件
-- **`index.html`**: 包含所有核心逻辑，包括：
-  - **场景初始化**: 设置 Three.js 场景、摄像机、渲染器、光照和雾效。
-  - **地形生成**: 使用基于正弦函数的简单噪声算法 (`noise` 函数) 实现程序化地形生成。支持多种生物群系（平原、森林、杜鹃林、沙漠、沼泽）。
-  - **Chunk 系统**: 按 16x16 的区块（Chunk）管理地形生成和销毁，以优化性能。
-  - **渲染优化**: 使用 `THREE.InstancedMesh` 来高效渲染大量方块。
-  - **玩家控制**: 自定义物理碰撞检测和移动逻辑（WASD 移动，空格跳跃）。
-  - **交互逻辑**: 实现方块挖掘（左键）和放置（右键，包含“虚空搭路”逻辑）。
-  - **UI/背包**: 基于 HTML/CSS 的 HUD、热力栏和背包界面。
+项目的核心逻辑被拆分到 `src/` 目录下的多个模块中：
+- **`src/core/Game.js`**: 游戏主循环和状态管理。
+- **`src/core/Engine.js`**: 封装 Three.js 的核心功能，如场景、摄像机、渲染器和光照。
+- **`src/world/World.js`**: 管理世界中的所有物体，包括地形（Chunks）和实体。
+- **`src/world/Chunk.js`**: 负责单个区块的生成、管理和渲染优化（InstancedMesh）。
+- **`src/world/TerrainGen.js`**: 程序化地形生成逻辑。
+- **`src/entities/player/Player.js`**: 玩家角色，包含控制和交互逻辑。
+- **`src/entities/player/Physics.js`**: 玩家的物理和碰撞检测。
+- **`src/ui/UIManager.js`**: 管理游戏的用户界面，包括 HUD 和背包。
 
 ### 目录结构
-- `components/style/global.css`: 存储 UI 相关的样式。
-- `components/main.js`: 预留的 JavaScript 模块文件（目前逻辑仍主要在 `index.html` 中）。
+- `src/core`: 游戏引擎和核心逻辑。
+- `src/entities`: 游戏中的实体，如玩家。
+- `src/style`: 全局 CSS 样式。
+- `src/ui`: UI 组件和管理器。
+- `src/utils`: 通用工具函数。
+- `src/world`: 世界生成、区块管理和环境实体。
+- `index.html`: 应用入口，负责加载脚本和初始化游戏。
 
 ### 技术栈
+- **JavaScript (ES6 Modules)**: 项目现在使用模块化的 JavaScript。
 - **Three.js**: 通过 CDN 加载，用于 3D 渲染。
 - **BufferGeometryUtils**: 用于合并几何体以优化渲染。
 - **Canvas API**: 动态生成方块纹理和图标。
