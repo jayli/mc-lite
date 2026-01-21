@@ -139,4 +139,4 @@ dist
 .pnp.*
 
 # Temporary asset directories
-assets/
+/assets/
