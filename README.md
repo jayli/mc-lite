@@ -9,4 +9,6 @@ npm run start
 <img width="4132" height="1908" alt="image" src="https://github.com/user-attachments/assets/2e27a612-f721-4985-8571-d1c0947b76cd" />
 
 
-live demo: <https://js-perf.cn>
+- live demo: <https://js-perf.cn>
+- 模型编辑器：<https://web.blockbench.net/>
+
