@@ -23,12 +23,12 @@ function buildCrossGeo(offsetY = -0.25) {
 const geoFlower = buildCrossGeo(-0.25);
 const geoVine = buildCrossGeo(0);
 // Hanging foliage (top aligned to 0.5 to touch block above)
-// Height 0.7 -> half height 0.35. Offset needed: 0.5 - 0.35 = 0.15
-// const geoHanging = buildCrossGeo(0.15); // Not used, replaced by geoAzaleaHangingCube
+// Height 1.0 -> half height 0.5. Offset needed: 0.5 - 0.5 = 0
+// const geoHanging = buildCrossGeo(0); // Not used, replaced by geoAzaleaHangingCube
 
 // Azalea hanging element - four vertical planes only (no top/bottom faces)
 const geoAzaleaHangingCube = (() => {
-    const faceSize = 0.7; // Square face to match texture aspect ratio (1:1)
+    const faceSize = 1.0; // Square face to match block size (1:1)
     const faceWidth = faceSize;
     const faceHeight = faceSize;
 
@@ -60,6 +60,7 @@ const geoAzaleaHangingCube = (() => {
     // Each plane's local origin is at its center, so top edge is at y = faceHeight/2
     // We want top at y = +0.5, so we need to shift up by:
     // shift = desired_top - current_top = 0.5 - faceHeight/2
+    // With faceHeight = 1.0, shift = 0.5 - 0.5 = 0 (no translation needed)
     merged.translate(0, 0.5 - faceHeight/2, 0);
 
     return merged;
