@@ -22,6 +22,9 @@ function buildCrossGeo(offsetY = -0.25) {
 }
 const geoFlower = buildCrossGeo(-0.25);
 const geoVine = buildCrossGeo(0);
+// Hanging foliage (top aligned to 0.5 to touch block above)
+// Height 0.7 -> half height 0.35. Offset needed: 0.5 - 0.35 = 0.15
+const geoHanging = buildCrossGeo(0.15);
 
 // Lilypad
 const geoLily = (() => {
@@ -45,6 +48,7 @@ const geoCactus = (() => {
 const geomMap = {
     'flower': geoFlower,
     'vine': geoVine,
+    'azalea_hanging': geoHanging,
     'lilypad': geoLily,
     'cactus': geoCactus,
     'default': new THREE.BoxGeometry(1, 1, 1)
@@ -65,7 +69,7 @@ export class Chunk {
         const d = {};
         const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'planks', 'leaves', 'water', 'cactus',
                          'flower', 'chest', 'bed', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
-                         'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'swamp_water',
+                         'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'azalea_hanging', 'swamp_water',
                          'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword'];
         for(const type of allTypes) {
             d[type] = [];
@@ -225,7 +229,7 @@ export class Chunk {
             mesh.instanceMatrix.needsUpdate = true;
 
             // 半透明和特殊模型不投阴影
-            if(!['water','swamp_water','cloud','vine','lilypad','flower'].includes(type)) {
+            if(!['water','swamp_water','cloud','vine','azalea_hanging','lilypad','flower'].includes(type)) {
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
             }
