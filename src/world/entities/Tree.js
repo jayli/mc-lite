@@ -41,27 +41,26 @@ export class Tree {
                 }
             }
 
-            // Generate hanging leaves
+            // Collect all blocks of this azalea tree
+            const blocks = [];
+            // Add trunk blocks
+            for (let i = 0; i < h; i++) {
+                blocks.push({x: x, y: y + i, z: z, type: 'azalea_log'});
+            }
+            // Add leaf blocks
             for (const leaf of leaves) {
-                // Check if there is a block directly below (leaf or log)
-                // Log is at x,z from y to y+h-1
-                const isLogBelow = (leaf.x === x && leaf.z === z && leaf.y - 1 >= y && leaf.y - 1 < y + h);
-                const isLeafBelow = leaves.some(l => l.x === leaf.x && l.y === leaf.y - 1 && l.z === leaf.z);
+                blocks.push({x: leaf.x, y: leaf.y, z: leaf.z, type: 'azalea_leaves'});
+            }
 
-                if (!isLogBelow && !isLeafBelow) {
-                    // This is an exposed bottom leaf
-                    // Check for exposed sides to match user's "edge" requirement loosely
-                    // If it has fewer than 4 neighbors on the same level, it's an edge
-                    let neighbors = 0;
-                    if (leaves.some(l => l.x === leaf.x+1 && l.y === leaf.y && l.z === leaf.z)) neighbors++;
-                    if (leaves.some(l => l.x === leaf.x-1 && l.y === leaf.y && l.z === leaf.z)) neighbors++;
-                    if (leaves.some(l => l.x === leaf.x && l.y === leaf.y && l.z === leaf.z+1)) neighbors++;
-                    if (leaves.some(l => l.x === leaf.x && l.y === leaf.y && l.z === leaf.z-1)) neighbors++;
-
-                    // If it's an edge leaf (neighbors < 4) or just random chance
-                    if (neighbors < 4 && Math.random() < 0.4) {
-                         chunk.add(leaf.x, leaf.y - 1, leaf.z, 'azalea_hanging', dObj, false);
-                    }
+            // Generate hanging blocks below any block that has air underneath
+            for (const block of blocks) {
+                const belowKey = `${Math.round(block.x)},${Math.round(block.y - 1)},${Math.round(block.z)}`;
+                // Check if there is any solid block below (including terrain or other tree blocks)
+                const hasBlockBelow = chunk.solidBlocks.has(belowKey) ||
+                                     blocks.some(b => b.x === block.x && b.y === block.y - 1 && b.z === block.z);
+                if (!hasBlockBelow) {
+                    // Add hanging block below this block
+                    chunk.add(block.x, block.y - 1, block.z, 'azalea_hanging', dObj, false);
                 }
             }
         } else if (type === 'swamp') {

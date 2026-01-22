@@ -24,7 +24,46 @@ const geoFlower = buildCrossGeo(-0.25);
 const geoVine = buildCrossGeo(0);
 // Hanging foliage (top aligned to 0.5 to touch block above)
 // Height 0.7 -> half height 0.35. Offset needed: 0.5 - 0.35 = 0.15
-const geoHanging = buildCrossGeo(0.15);
+// const geoHanging = buildCrossGeo(0.15); // Not used, replaced by geoAzaleaHangingCube
+
+// Azalea hanging element - four vertical planes only (no top/bottom faces)
+const geoAzaleaHangingCube = (() => {
+    const faceSize = 0.7; // Square face to match texture aspect ratio (1:1)
+    const faceWidth = faceSize;
+    const faceHeight = faceSize;
+
+    // Create four vertical planes facing outward
+    // +X facing plane (east)
+    const planeXPos = new THREE.PlaneGeometry(faceWidth, faceHeight);
+    planeXPos.rotateY(Math.PI / 2); // Face +X direction
+    planeXPos.translate(faceWidth / 2, 0, 0);
+
+    // -X facing plane (west)
+    const planeXNeg = new THREE.PlaneGeometry(faceWidth, faceHeight);
+    planeXNeg.rotateY(-Math.PI / 2); // Face -X direction
+    planeXNeg.translate(-faceWidth / 2, 0, 0);
+
+    // +Z facing plane (north)
+    const planeZPos = new THREE.PlaneGeometry(faceWidth, faceHeight);
+    // Already faces +Z by default
+    planeZPos.translate(0, 0, faceWidth / 2);
+
+    // -Z facing plane (south)
+    const planeZNeg = new THREE.PlaneGeometry(faceWidth, faceHeight);
+    planeZNeg.rotateY(Math.PI); // Face -Z direction
+    planeZNeg.translate(0, 0, -faceWidth / 2);
+
+    // Merge all planes
+    const merged = BufferGeometryUtils.mergeGeometries([planeXPos, planeXNeg, planeZPos, planeZNeg]);
+
+    // Position geometry so top edge aligns with block top (y = +0.5)
+    // Each plane's local origin is at its center, so top edge is at y = faceHeight/2
+    // We want top at y = +0.5, so we need to shift up by:
+    // shift = desired_top - current_top = 0.5 - faceHeight/2
+    merged.translate(0, 0.5 - faceHeight/2, 0);
+
+    return merged;
+})();
 
 // Lilypad
 const geoLily = (() => {
@@ -48,7 +87,7 @@ const geoCactus = (() => {
 const geomMap = {
     'flower': geoFlower,
     'vine': geoVine,
-    'azalea_hanging': geoHanging,
+    'azalea_hanging': geoAzaleaHangingCube,
     'lilypad': geoLily,
     'cactus': geoCactus,
     'default': new THREE.BoxGeometry(1, 1, 1)
