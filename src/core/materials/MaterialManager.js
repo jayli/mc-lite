@@ -42,11 +42,23 @@ export class MaterialManager {
 
     _createMaterial(def) {
         if (def.textureUrl) {
-            const texture = this.textureCache.get(def.textureUrl);
+            let texture = this.textureCache.get(def.textureUrl);
             if (!texture) {
                 console.warn(`Texture not preloaded: ${def.textureUrl}`);
                 return this.defaultMaterial;
             }
+
+            // Handle texture repetition if specified
+            if (def.repeat) {
+                texture = texture.clone();
+                texture.wrapS = THREE.RepeatWrapping;
+                texture.wrapT = THREE.RepeatWrapping;
+                texture.repeat.set(def.repeat[0], def.repeat[1]);
+                texture.magFilter = THREE.NearestFilter;
+                texture.colorSpace = THREE.SRGBColorSpace;
+                texture.needsUpdate = true;
+            }
+
             return new THREE.MeshStandardMaterial({
                 map: texture,
                 transparent: def.transparent || false,
@@ -96,7 +108,8 @@ export const materials = new MaterialManager();
 // Function to initialize materials, including async texture loading
 export async function initializeMaterials() {
     const textureUrls = [
-        './src/world/assets/textures/oak_leaves_branch_medium.png'
+        './src/world/assets/textures/oak_leaves_branch_medium.png',
+        './src/world/assets/textures/flowering_azalea_leaves.png'
     ];
     await materials.preloadTextures(textureUrls);
 }
@@ -168,12 +181,13 @@ materials.registerMaterial('flower', mkDetailMat('#000000', '#FF4444', true, (ct
     ctx.fillStyle='#FFD700'; ctx.beginPath(); ctx.arc(32,24,4,0,Math.PI*2); ctx.fill();
 }));
 
-materials.registerMaterial('azalea_leaves', mkDetailMat('#4A6B30', '#E066CC', false, (ctx) => {
-    for(let i=0; i<12; i++) {
-        const x = Math.random()*56; const y = Math.random()*56;
-        ctx.beginPath(); ctx.arc(x,y,3,0,Math.PI*2); ctx.fill();
-    }
-}));
+materials.registerMaterial('azalea_leaves', {
+    textureUrl: './src/world/assets/textures/flowering_azalea_leaves.png',
+    transparent: true,
+    alphaTest: 0.5,
+    side: THREE.DoubleSide,
+    repeat: [2, 2]
+});
 
 materials.registerMaterial('vine', mkDetailMat(null, '#355E3B', true, (ctx) => {
     ctx.strokeStyle = '#355E3B'; ctx.lineWidth = 3;
