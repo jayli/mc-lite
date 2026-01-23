@@ -175,7 +175,9 @@ export async function initializeMaterials() {
     './src/world/assets/textures/dirt.png',
     './src/world/assets/textures/dirt_podzol_side.png',
     './src/world/assets/textures/dirt_podzol_top.png',
-    './src/world/assets/textures/stone_diorite.png'
+    './src/world/assets/textures/stone_diorite.png',
+    './src/world/assets/textures/log_big_oak.png',
+    './src/world/assets/textures/log_big_oak_top.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -270,7 +272,20 @@ materials.registerMaterial('stone', {
 }); // 石头
 
 materials.registerMaterial('sand', mkMat('#e6c288')); // 沙地
-materials.registerMaterial('wood', mkMat('#4a3218')); // 木头
+
+const woodSide = { textureUrl: './src/world/assets/textures/log_big_oak.png' };
+const woodTopBottom = { textureUrl: './src/world/assets/textures/log_big_oak_top.png' };
+materials.registerMaterial('wood', {
+  faces: {
+    0: woodSide,
+    1: woodSide,
+    2: woodTopBottom,
+    3: woodTopBottom,
+    4: woodSide,
+    5: woodSide
+  }
+}); // 木头
+
 materials.registerMaterial('planks', { textureUrl: './src/world/assets/textures/planks_birch.png' }); // 木板
 materials.registerMaterial('oak_planks', { textureUrl: './src/world/assets/textures/planks_big_oak.png' }); // 大橡木木板
 materials.registerMaterial('leaves', mkMat('#386628', 0.9)); // 树叶
