@@ -1,4 +1,6 @@
 // src/world/World.js
+// 世界管理器模块
+// 负责区块的加载/卸载、粒子效果、方块放置/移除逻辑
 import * as THREE from 'three';
 import { Chunk } from './Chunk.js';
 import { materials } from '../core/materials/MaterialManager.js';
@@ -7,6 +9,10 @@ import { chestManager } from './entities/Chest.js';
 const CHUNK_SIZE = 16;
 const RENDER_DIST = 3;
 
+/**
+ * 世界管理器类
+ * 管理游戏世界中的所有区块、粒子效果和方块操作
+ */
 export class World {
     constructor(scene) {
         this.scene = scene;
@@ -14,11 +20,17 @@ export class World {
         this.activeParticles = [];
     }
 
+    /**
+     * 更新世界状态
+     * @param {THREE.Vector3} playerPos - 玩家当前位置
+     * @param {number} dt - 增量时间（秒）
+     */
     update(playerPos = new THREE.Vector3(), dt = 0) { // Default for safety
         const cx = Math.floor(playerPos.x / CHUNK_SIZE);
         const cz = Math.floor(playerPos.z / CHUNK_SIZE);
 
         // Load new chunks
+        // 加载新区块：根据玩家位置加载渲染距离内的区块
         for (let i = -RENDER_DIST; i <= RENDER_DIST; i++) {
             for (let j = -RENDER_DIST; j <= RENDER_DIST; j++) {
                 const key = `${cx + i},${cz + j}`;
@@ -31,6 +43,7 @@ export class World {
         }
 
         // Unload old chunks
+        // 卸载旧区块：卸载超出渲染距离的区块以节省内存
         for (const [key, chunk] of this.chunks) {
             if (Math.abs(chunk.cx - cx) > RENDER_DIST + 1 || Math.abs(chunk.cz - cz) > RENDER_DIST + 1) {
                 this.scene.remove(chunk.group);
@@ -40,6 +53,7 @@ export class World {
         }
 
         // Update particles
+        // 更新粒子效果：更新所有活跃粒子的生命周期、位置和缩放
         for (let i = this.activeParticles.length - 1; i >= 0; i--) {
             const p = this.activeParticles[i];
             p.userData.life -= 0.02;
@@ -57,13 +71,20 @@ export class World {
         }
 
         // Update chest animations
+        // 更新宝箱动画：通过宝箱管理器更新所有宝箱的动画状态
         chestManager.update(dt);
     }
 
+    /**
+     * 生成粒子效果
+     * @param {THREE.Vector3} pos - 粒子生成位置
+     * @param {string} type - 方块类型，用于确定粒子颜色
+     */
     spawnParticles(pos, type) {
         const matDef = materials.getMaterial(type);
         // Extract color from material if possible, or lookup
         // Simplified: just use a basic material with approximate color
+        // 从材质定义中提取颜色，或使用默认白色
         const color = matDef.color || 0xffffff;
         const mat = new THREE.MeshBasicMaterial({ color: color });
         const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1); // Small particle
@@ -77,6 +98,13 @@ export class World {
         }
     }
 
+    /**
+     * 判断指定位置是否为固体方块
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @param {number} z - Z坐标
+     * @returns {boolean} 是否为固体方块
+     */
     isSolid(x, y, z) {
         const cx = Math.floor(x / CHUNK_SIZE);
         const cz = Math.floor(z / CHUNK_SIZE);
@@ -88,6 +116,13 @@ export class World {
         return chunk.solidBlocks.has(blockKey);
     }
 
+    /**
+     * 在指定位置放置方块
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @param {number} z - Z坐标
+     * @param {string} type - 方块类型
+     */
     setBlock(x, y, z, type) {
         const cx = Math.floor(x / CHUNK_SIZE);
         const cz = Math.floor(z / CHUNK_SIZE);
@@ -97,6 +132,7 @@ export class World {
         if (!chunk) {
             // Should create chunk if doesn't exist? Or ignore?
             // Usually we only place in loaded chunks.
+            // 区块未加载，忽略放置操作
             return;
         }
 
@@ -108,9 +144,16 @@ export class World {
         // Dynamic blocks should probably be separate or managed.
         // Simple approach: Chunk.addBlock(x,y,z,type) -> adds single Mesh to group.
         // Rebuilding whole chunk instanced mesh is too expensive for single block place.
+        // 添加逻辑方块：调用区块的动态方块添加方法
         chunk.addBlockDynamic(x, y, z, type);
     }
 
+    /**
+     * 移除指定位置的方块
+     * @param {number} x - X坐标
+     * @param {number} y - Y坐标
+     * @param {number} z - Z坐标
+     */
     removeBlock(x, y, z) {
         const cx = Math.floor(x / CHUNK_SIZE);
         const cz = Math.floor(z / CHUNK_SIZE);
