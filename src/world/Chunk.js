@@ -149,7 +149,7 @@ export class Chunk {
     // 初始化所有可能的类型数组，类似原始代码中的逻辑
     // d 对象用于按类型收集方块位置，以便后续批量创建 InstancedMesh
     const d = {};
-    const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'planks', 'leaves', 'water', 'cactus',
+    const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'planks', 'oak_planks', 'leaves', 'water', 'cactus',
       'flower', 'chest', 'bed', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
       'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'azalea_hanging', 'swamp_water',
       'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword'];
@@ -306,14 +306,14 @@ export class Chunk {
         }
       }
 
-      // 3. 金字塔形屋顶：使用木块，从第4层开始逐渐缩小
+      // 3. 金字塔形屋顶：使用大橡木木板，从第4层开始逐渐缩小
       for (let h = 0; h < 3; h++) for (let i = -2 + h; i <= 2 - h; i++) {
-        this.add(x + i, y + 3 + h, z - 2 + h, 'wood', dObj);
-        this.add(x + i, y + 3 + h, z + 2 - h, 'wood', dObj);
+        this.add(x + i, y + 3 + h, z - 2 + h, 'oak_planks', dObj);
+        this.add(x + i, y + 3 + h, z + 2 - h, 'oak_planks', dObj);
       }
 
-      // 4. 屋顶顶部：一行木块
-      for (let j = -1; j <= 1; j++) this.add(x, y + 5, z + j, 'wood', dObj);
+      // 4. 屋顶顶部：一行大橡木木板
+      for (let j = -1; j <= 1; j++) this.add(x, y + 5, z + j, 'oak_planks', dObj);
 
       // 5. 内部家具：床和箱子
       this.add(x - 1, y, z - 1, 'bed', dObj, false);

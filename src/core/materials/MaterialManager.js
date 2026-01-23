@@ -165,8 +165,11 @@ export async function initializeMaterials() {
     './src/world/assets/textures/oak_leaves_branch_medium.png',
     './src/world/assets/textures/flowering_azalea_leaves.png',
     './src/world/assets/textures/flowering_azalea_side.png',
-    './minecraft-bundles/blocks/grass_carried.png',
-    './minecraft-bundles/blocks/grass_side_carried.png'
+    './src/world/assets/textures/grass_carried.png',
+    './src/world/assets/textures/grass_side_carried.png',
+    './src/world/assets/textures/moss_block.png',
+    './src/world/assets/textures/planks_birch.png',
+    './src/world/assets/textures/planks_big_oak.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -219,8 +222,8 @@ function mkDetailMat(baseCol, detailCol, isTransparent=false, drawFunc) {
 // ============================================
 
 // 基础方块材质
-const grassSide = { textureUrl: './minecraft-bundles/blocks/grass_side_carried.png' };
-const grassTop = { textureUrl: './minecraft-bundles/blocks/grass_carried.png' };
+const grassSide = { textureUrl: './src/world/assets/textures/grass_side_carried.png' };
+const grassTop = { textureUrl: './src/world/assets/textures/grass_carried.png' };
 const grassBottom = mkMat('#559944');
 
 materials.registerMaterial('grass', {
@@ -233,26 +236,27 @@ materials.registerMaterial('grass', {
     5: grassSide
   }
 });
-materials.registerMaterial('dirt', mkMat('#5d4037'));
-materials.registerMaterial('stone', mkMat('#757575'));
-materials.registerMaterial('sand', mkMat('#e6c288'));
-materials.registerMaterial('wood', mkMat('#4a3218'));
-materials.registerMaterial('planks', mkMat('#a07545'));
-materials.registerMaterial('leaves', mkMat('#386628', 0.9));
-materials.registerMaterial('water', mkMat('#205099', 0.6));
-materials.registerMaterial('swamp_water', mkMat('#2F4F4F', 0.7));
-materials.registerMaterial('swamp_grass', mkMat('#4C5E34'));
-materials.registerMaterial('cactus', mkMat('#2E8B57'));
-materials.registerMaterial('bed', mkMat('#cc0000'));
-materials.registerMaterial('carBody', mkMat('#FFD700'));
-materials.registerMaterial('wheel', mkMat('#222222'));
-materials.registerMaterial('cloud', mkMat('#FFFFFF', 0.9));
-materials.registerMaterial('sky_stone', mkMat('#DDDDDD'));
-materials.registerMaterial('sky_grass', mkMat('#88CCFF'));
-materials.registerMaterial('sky_wood', mkMat('#DDA0DD'));
-materials.registerMaterial('sky_leaves', mkMat('#FF69B4', 0.9));
-materials.registerMaterial('moss', mkMat('#4B6E31'));
-materials.registerMaterial('azalea_log', mkMat('#635338'));
+materials.registerMaterial('dirt', mkMat('#5d4037')); // 土
+materials.registerMaterial('stone', mkMat('#757575')); // 石头
+materials.registerMaterial('sand', mkMat('#e6c288')); // 沙地
+materials.registerMaterial('wood', mkMat('#4a3218')); // 木头
+materials.registerMaterial('planks', { textureUrl: './src/world/assets/textures/planks_birch.png' }); // 木板
+materials.registerMaterial('oak_planks', { textureUrl: './src/world/assets/textures/planks_big_oak.png' }); // 大橡木木板
+materials.registerMaterial('leaves', mkMat('#386628', 0.9)); // 树叶
+materials.registerMaterial('water', mkMat('#205099', 0.6)); // 水
+materials.registerMaterial('swamp_water', mkMat('#2F4F4F', 0.7)); // 沼泽水
+materials.registerMaterial('swamp_grass', mkMat('#4C5E34')); // 沼泽草
+materials.registerMaterial('cactus', mkMat('#2E8B57')); // 仙人掌
+materials.registerMaterial('bed', mkMat('#cc0000')); // 床
+materials.registerMaterial('carBody', mkMat('#FFD700')); // 汽车
+materials.registerMaterial('wheel', mkMat('#222222')); // 轮子
+materials.registerMaterial('cloud', mkMat('#FFFFFF', 0.9)); // 云
+materials.registerMaterial('sky_stone', mkMat('#DDDDDD')); // 天空石头
+materials.registerMaterial('sky_grass', mkMat('#88CCFF')); // 天空草
+materials.registerMaterial('sky_wood', mkMat('#DDA0DD')); // 天空木头
+materials.registerMaterial('sky_leaves', mkMat('#FF69B4', 0.9)); // 天空树叶
+materials.registerMaterial('moss', { textureUrl: './src/world/assets/textures/moss_block.png' }); // 苔藓
+materials.registerMaterial('azalea_log', mkMat('#635338')); // 杜鹃花
 materials.registerMaterial('chest', { color: 0xFFA500 }); // 目前使用简单颜色
 
 // 额外物品材质
