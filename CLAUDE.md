@@ -7,47 +7,99 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 本项目是一个基于 Three.js 的纯前端项目，不包含复杂的构建系统。
 
 - **运行项目**: 使用以下命令启动静态服务器：
-  - `npm start` (推荐)
-  - `npx serve .`
-  - `python3 -m http.server`
-- **构建**: 无需构建，直接修改 `index.html` 或 `components/` 下的文件。
+  - `npm start` (推荐) - 使用自定义 Node.js 服务器，支持本地和网络访问
+  - `npx serve .` - 使用 serve 静态服务器
+  - `python3 -m http.server` - 使用 Python 内置服务器
+- **构建**: 无需构建，直接修改 `index.html` 或 `src/` 下的文件。
 - **测试**: 本项目目前没有自动化测试。
 - **代码检查**: 本项目目前没有配置 lint 工具。
 
 ## 项目架构
 
-本项目是一个简易的 Web 版《我的世界》（Minecraft）克隆，现已重构为模块化的代码结构。
+本项目是一个简易的 Web 版《我的世界》（Minecraft）克隆，采用模块化架构设计。
 
-### 核心组件
-项目的核心逻辑被拆分到 `src/` 目录下的多个模块中：
-- **`src/core/Game.js`**: 游戏主循环和状态管理。
-- **`src/core/Engine.js`**: 封装 Three.js 的核心功能，如场景、摄像机、渲染器和光照。
-- **`src/world/World.js`**: 管理世界中的所有物体，包括地形（Chunks）和实体。
-- **`src/world/Chunk.js`**: 负责单个区块的生成、管理和渲染优化（InstancedMesh）。
-- **`src/world/TerrainGen.js`**: 程序化地形生成逻辑。
-- **`src/entities/player/Player.js`**: 玩家角色，包含控制和交互逻辑。
-- **`src/entities/player/Physics.js`**: 玩家的物理和碰撞检测。
-- **`src/ui/UIManager.js`**: 管理游戏的用户界面，包括 HUD 和背包。
+### 核心架构模式
 
-### 目录结构
-- `src/core`: 游戏引擎和核心逻辑。
-- `src/entities`: 游戏中的实体，如玩家。
-- `src/style`: 全局 CSS 样式。
-- `src/ui`: UI 组件和管理器。
-- `src/utils`: 通用工具函数。
-- `src/world`: 世界生成、区块管理和环境实体。
-- `index.html`: 应用入口，负责加载脚本和初始化游戏。
+**分层架构**：
+1. **表示层**：`Engine.js` (Three.js渲染)，`UIManager.js` (UI系统)
+2. **业务逻辑层**：`Game.js` (游戏主循环)，`Player.js` (玩家控制)，`Physics.js` (物理系统)
+3. **数据层**：`World.js` (世界管理)，`Chunk.js` (区块管理)，`TerrainGen.js` (地形生成)
+
+**依赖关系**：
+```
+index.html → Game.js → Engine.js + World.js + Player.js + UIManager.js
+World.js → Chunk.js → TerrainGen.js + MaterialManager.js + 实体系统
+Player.js → Physics.js + Slots.js (背包系统)
+UIManager.js → HUD.js + Inventory.js
+```
+
+### 关键系统设计
+
+**游戏循环系统** (`Game.js`):
+- 使用 `requestAnimationFrame` 实现主循环
+- 每帧计算时间差 `dt`，调用 `update(dt)` 和 `render()`
+- 协调所有子系统的更新和渲染
+
+**区块管理系统** (`World.js` + `Chunk.js`):
+- **动态加载**：基于玩家位置动态加载/卸载区块，渲染距离为3个区块
+- **性能优化**：使用 `THREE.InstancedMesh` 优化相同类型方块的渲染
+- **碰撞检测**：通过 `solidBlocks` Set 存储实心方块位置
+- **区块尺寸**：每个区块 16×16 方块
+
+**地形生成系统** (`TerrainGen.js` + `MathUtils.js`):
+- **生物群系**：基于温度和湿度噪声生成森林、沙漠、沼泽、杜鹃林、平原
+- **程序化生成**：使用多层噪声函数生成高度图
+- **植被系统**：根据生物群系生成不同类型的树木、植物和结构
+
+**材质管理系统** (`MaterialManager.js`):
+- 集中管理所有方块材质
+- 支持纹理预加载和程序化纹理生成
+- 材质缓存避免重复创建
+
+### 性能优化策略
+
+1. **实例化网格**：`Chunk.js` 中为每种方块类型创建 `InstancedMesh`，显著减少 draw calls
+2. **几何体共享**：预定义共享几何体（花、藤蔓、睡莲、仙人掌等）
+3. **动态资源管理**：区块卸载时清理几何体和材质资源
+4. **粒子系统优化**：使用简单几何体，生命周期结束后清理
+
+### 游戏机制实现
+
+**玩家系统** (`Player.js` + `Physics.js`):
+- **第一人称控制**：WASD移动，鼠标视角控制
+- **物理碰撞**：基于方块网格的碰撞检测
+- **交互系统**：鼠标左键挖掘，右键放置方块
+- **背包系统**：9个物品槽，快捷栏选择
+
+**UI系统** (`UIManager.js`):
+- **HUD**：显示快捷栏和消息提示
+- **背包界面**：按Z键切换，显示所有物品
+- **物品渲染**：使用Canvas动态生成物品图标
+
+### 生物群系特征
+
+1. **森林**：5%几率生成树木（15%真实感树木，85%大型树木）
+2. **杜鹃林**：6%几率生成杜鹃花树（带垂落效果）
+3. **沼泽**：3%几率生成沼泽树，8%几率生成睡莲
+4. **沙漠**：1%几率生成仙人掌，0.1%几率生成火星车
+5. **平原**：0.5%几率生成默认树木，5%几率生成花朵，0.1%几率生成房屋
+
+### 特殊结构生成
+
+- **房屋**：5×5地基 + 3层墙壁 + 金字塔屋顶 + 床和箱子
+- **火星车**：4个轮子 + 3×4车身 + 顶部箱子
+- **沉船**：5×7船体 + 5层桅杆 + 船头箱子（深水区0.3%几率）
+- **天空岛**：15%几率生成，高度40-70
 
 ### 技术栈
-- **JavaScript (ES6 Modules)**: 项目现在使用模块化的 JavaScript。
-- **Three.js**: 通过 CDN 加载，用于 3D 渲染。
-- **BufferGeometryUtils**: 用于合并几何体以优化渲染。
-- **Canvas API**: 动态生成方块纹理和图标。
+- **JavaScript (ES6 Modules)**: 模块化代码结构
+- **Three.js**: 通过 CDN 加载，用于 3D 渲染
+- **BufferGeometryUtils**: 用于合并几何体以优化渲染
+- **Canvas API**: 动态生成方块纹理和UI图标
 
 # Project Rules & Skills
 
 - **Import Skill**: 实时遵循 `.claude/skills/*/skill.md` 中的指令。
-
 
 ## Active Technologies
 - JavaScript (ES6+ Modules) + Three.js (via Import Map/CDN) (001-refactor-layered-design)
