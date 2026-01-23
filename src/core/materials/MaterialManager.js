@@ -174,7 +174,8 @@ export async function initializeMaterials() {
     './src/world/assets/textures/stone.png',
     './src/world/assets/textures/dirt.png',
     './src/world/assets/textures/dirt_podzol_side.png',
-    './src/world/assets/textures/dirt_podzol_top.png'
+    './src/world/assets/textures/dirt_podzol_top.png',
+    './src/world/assets/textures/stone_diorite.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -255,8 +256,8 @@ materials.registerMaterial('dirt', {
   }
 }); // 土
 
-const stoneSide = { textureUrl: './src/world/assets/textures/stone_andesite.png' };
-const stoneTopBottom = { textureUrl: './src/world/assets/textures/stone.png' };
+const stoneSide = { textureUrl: './src/world/assets/textures/stone_diorite.png' };
+const stoneTopBottom = { textureUrl: './src/world/assets/textures/stone_andesite.png' };
 materials.registerMaterial('stone', {
   faces: {
     0: stoneSide,
@@ -266,7 +267,7 @@ materials.registerMaterial('stone', {
     4: stoneSide,
     5: stoneSide
   }
-});
+}); // 石头
 
 materials.registerMaterial('sand', mkMat('#e6c288')); // 沙地
 materials.registerMaterial('wood', mkMat('#4a3218')); // 木头
