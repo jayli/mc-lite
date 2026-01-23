@@ -9,135 +9,135 @@ import * as THREE from 'three';
  * 提供材质注册、获取、纹理预加载和缓存功能
  */
 export class MaterialManager {
-    /**
-     * 构造函数，初始化材质管理器
-     */
-    constructor() {
-        this.materials = new Map();        // 已创建的材质缓存
-        this.definitions = new Map();      // 材质定义注册表
-        this.textureLoader = new THREE.TextureLoader(); // Three.js 纹理加载器
-        this.textureCache = new Map();     // 纹理缓存
-        this.defaultMaterial = new THREE.MeshStandardMaterial({ color: 0xff00ff }); // 默认材质（洋红色，用于调试）
+  /**
+   * 构造函数，初始化材质管理器
+   */
+  constructor() {
+    this.materials = new Map();        // 已创建的材质缓存
+    this.definitions = new Map();      // 材质定义注册表
+    this.textureLoader = new THREE.TextureLoader(); // Three.js 纹理加载器
+    this.textureCache = new Map();     // 纹理缓存
+    this.defaultMaterial = new THREE.MeshStandardMaterial({ color: 0xff00ff }); // 默认材质（洋红色，用于调试）
+  }
+
+  /**
+   * 预加载纹理文件并缓存
+   * @param {string[]} urls - 纹理文件的URL数组
+   * @returns {Promise} 当所有纹理加载完成时解析的Promise
+   */
+  preloadTextures(urls) {
+    return Promise.all(urls.map(url =>
+      this.textureLoader.loadAsync(url).then(texture => {
+        texture.magFilter = THREE.NearestFilter; // 设置纹理放大过滤器为最近邻（保持像素风格）
+        texture.colorSpace = THREE.SRGBColorSpace; // 设置颜色空间为SRGB
+        this.textureCache.set(url, texture); // 将纹理存入缓存
+      })
+    ));
+  }
+
+  /**
+   * 注册材质定义
+   * @param {string} type - 材质类型标识符（如 'grass', 'stone'）
+   * @param {Object} definition - 材质定义对象
+   */
+  registerMaterial(type, definition) {
+    this.definitions.set(type, definition);
+  }
+
+  /**
+   * 获取指定类型的材质（如果未创建则创建并缓存）
+   * @param {string} type - 材质类型标识符
+   * @returns {THREE.Material} Three.js 材质对象
+   */
+  getMaterial(type) {
+    // 如果材质已缓存，直接返回
+    if (this.materials.has(type)) {
+      return this.materials.get(type);
     }
 
-    /**
-     * 预加载纹理文件并缓存
-     * @param {string[]} urls - 纹理文件的URL数组
-     * @returns {Promise} 当所有纹理加载完成时解析的Promise
-     */
-    preloadTextures(urls) {
-        return Promise.all(urls.map(url =>
-            this.textureLoader.loadAsync(url).then(texture => {
-                texture.magFilter = THREE.NearestFilter; // 设置纹理放大过滤器为最近邻（保持像素风格）
-                texture.colorSpace = THREE.SRGBColorSpace; // 设置颜色空间为SRGB
-                this.textureCache.set(url, texture); // 将纹理存入缓存
-            })
-        ));
+    // 获取材质定义
+    const def = this.definitions.get(type);
+    if (!def) {
+      // console.warn(`Material definition not found for type: ${type}`);
+      return this.defaultMaterial; // 返回默认材质
     }
 
-    /**
-     * 注册材质定义
-     * @param {string} type - 材质类型标识符（如 'grass', 'stone'）
-     * @param {Object} definition - 材质定义对象
-     */
-    registerMaterial(type, definition) {
-        this.definitions.set(type, definition);
+    // 创建材质并缓存
+    const mat = this._createMaterial(def);
+    this.materials.set(type, mat);
+    return mat;
+  }
+
+  /**
+   * 根据材质定义创建 Three.js 材质（私有方法）
+   * @param {Object} def - 材质定义对象
+   * @returns {THREE.Material} 创建的 Three.js 材质
+   */
+  _createMaterial(def) {
+    // 情况1：使用纹理URL（预加载的纹理文件）
+    if (def.textureUrl) {
+      let texture = this.textureCache.get(def.textureUrl);
+      if (!texture) {
+        console.warn(`Texture not preloaded: ${def.textureUrl}`);
+        return this.defaultMaterial;
+      }
+
+      // 处理纹理重复（如果指定了repeat参数）
+      if (def.repeat) {
+        texture = texture.clone(); // 克隆纹理以避免修改缓存中的原始纹理
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        texture.repeat.set(def.repeat[0], def.repeat[1]);
+        texture.magFilter = THREE.NearestFilter;
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.needsUpdate = true;
+      }
+
+      return new THREE.MeshStandardMaterial({
+        map: texture,
+        transparent: def.transparent || false,
+        opacity: def.opacity || 1,
+        side: def.side || THREE.FrontSide,
+        alphaTest: def.alphaTest || 0
+      });
     }
 
-    /**
-     * 获取指定类型的材质（如果未创建则创建并缓存）
-     * @param {string} type - 材质类型标识符
-     * @returns {THREE.Material} Three.js 材质对象
-     */
-    getMaterial(type) {
-        // 如果材质已缓存，直接返回
-        if (this.materials.has(type)) {
-            return this.materials.get(type);
-        }
+    // 情况2：使用纹理生成器（程序化纹理）
+    if (def.textureGenerator) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
 
-        // 获取材质定义
-        const def = this.definitions.get(type);
-        if (!def) {
-            // console.warn(`Material definition not found for type: ${type}`);
-            return this.defaultMaterial; // 返回默认材质
-        }
+      // 如果定义了颜色且fillBackground不为false，填充背景色
+      if (def.color && def.fillBackground !== false) {
+        ctx.fillStyle = def.color;
+        ctx.fillRect(0, 0, 64, 64);
+      }
 
-        // 创建材质并缓存
-        const mat = this._createMaterial(def);
-        this.materials.set(type, mat);
-        return mat;
+      // 调用纹理生成器函数绘制纹理
+      def.textureGenerator(ctx);
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.magFilter = THREE.NearestFilter;
+      texture.colorSpace = THREE.SRGBColorSpace;
+
+      return new THREE.MeshStandardMaterial({
+        map: texture,
+        transparent: def.transparent || false,
+        opacity: def.opacity || 1,
+        side: def.side || THREE.FrontSide,
+        alphaTest: def.alphaTest || 0
+      });
     }
 
-    /**
-     * 根据材质定义创建 Three.js 材质（私有方法）
-     * @param {Object} def - 材质定义对象
-     * @returns {THREE.Material} 创建的 Three.js 材质
-     */
-    _createMaterial(def) {
-        // 情况1：使用纹理URL（预加载的纹理文件）
-        if (def.textureUrl) {
-            let texture = this.textureCache.get(def.textureUrl);
-            if (!texture) {
-                console.warn(`Texture not preloaded: ${def.textureUrl}`);
-                return this.defaultMaterial;
-            }
-
-            // 处理纹理重复（如果指定了repeat参数）
-            if (def.repeat) {
-                texture = texture.clone(); // 克隆纹理以避免修改缓存中的原始纹理
-                texture.wrapS = THREE.RepeatWrapping;
-                texture.wrapT = THREE.RepeatWrapping;
-                texture.repeat.set(def.repeat[0], def.repeat[1]);
-                texture.magFilter = THREE.NearestFilter;
-                texture.colorSpace = THREE.SRGBColorSpace;
-                texture.needsUpdate = true;
-            }
-
-            return new THREE.MeshStandardMaterial({
-                map: texture,
-                transparent: def.transparent || false,
-                opacity: def.opacity || 1,
-                side: def.side || THREE.FrontSide,
-                alphaTest: def.alphaTest || 0
-            });
-        }
-
-        // 情况2：使用纹理生成器（程序化纹理）
-        if (def.textureGenerator) {
-            const canvas = document.createElement('canvas');
-            canvas.width = 64;
-            canvas.height = 64;
-            const ctx = canvas.getContext('2d');
-
-            // 如果定义了颜色且fillBackground不为false，填充背景色
-            if (def.color && def.fillBackground !== false) {
-                ctx.fillStyle = def.color;
-                ctx.fillRect(0, 0, 64, 64);
-            }
-
-            // 调用纹理生成器函数绘制纹理
-            def.textureGenerator(ctx);
-
-            const texture = new THREE.CanvasTexture(canvas);
-            texture.magFilter = THREE.NearestFilter;
-            texture.colorSpace = THREE.SRGBColorSpace;
-
-            return new THREE.MeshStandardMaterial({
-                map: texture,
-                transparent: def.transparent || false,
-                opacity: def.opacity || 1,
-                side: def.side || THREE.FrontSide,
-                alphaTest: def.alphaTest || 0
-            });
-        }
-
-        // 情况3：纯颜色材质（无纹理）
-        return new THREE.MeshStandardMaterial({
-            color: def.color || 0xffffff,
-            transparent: def.transparent || false,
-            opacity: def.opacity || 1
-        });
-    }
+    // 情况3：纯颜色材质（无纹理）
+    return new THREE.MeshStandardMaterial({
+      color: def.color || 0xffffff,
+      transparent: def.transparent || false,
+      opacity: def.opacity || 1
+    });
+  }
 }
 
 /**
@@ -150,12 +150,12 @@ export const materials = new MaterialManager();
  * @returns {Promise} 当所有纹理加载完成时解析的Promise
  */
 export async function initializeMaterials() {
-    const textureUrls = [
-        './src/world/assets/textures/oak_leaves_branch_medium.png',
-        './src/world/assets/textures/flowering_azalea_leaves.png',
-        './src/world/assets/textures/flowering_azalea_side.png'
-    ];
-    await materials.preloadTextures(textureUrls); // 预加载纹理
+  const textureUrls = [
+    './src/world/assets/textures/oak_leaves_branch_medium.png',
+    './src/world/assets/textures/flowering_azalea_leaves.png',
+    './src/world/assets/textures/flowering_azalea_side.png'
+  ];
+  await materials.preloadTextures(textureUrls); // 预加载纹理
 }
 
 /**
@@ -165,18 +165,18 @@ export async function initializeMaterials() {
  * @returns {Object} 材质定义对象
  */
 function mkMat(col, op=1) {
-    return {
-        color: col,
-        opacity: op,
-        transparent: op < 1, // 当不透明度小于1时启用透明
-        textureGenerator: (ctx) => {
-             // 添加随机噪点以增加纹理细节
-             for(let i=0;i<100;i++){
-                 ctx.fillStyle=`rgba(0,0,0,${Math.random()*0.15})`; // 黑色噪点，随机透明度
-                 ctx.fillRect(Math.random()*64,Math.random()*64,2,2); // 随机位置绘制2x2像素
-             }
-        }
-    };
+  return {
+    color: col,
+    opacity: op,
+    transparent: op < 1, // 当不透明度小于1时启用透明
+    textureGenerator: (ctx) => {
+      // 添加随机噪点以增加纹理细节
+      for(let i=0;i<100;i++){
+        ctx.fillStyle=`rgba(0,0,0,${Math.random()*0.15})`; // 黑色噪点，随机透明度
+        ctx.fillRect(Math.random()*64,Math.random()*64,2,2); // 随机位置绘制2x2像素
+      }
+    }
+  };
 }
 
 /**
@@ -188,17 +188,17 @@ function mkMat(col, op=1) {
  * @returns {Object} 材质定义对象
  */
 function mkDetailMat(baseCol, detailCol, isTransparent=false, drawFunc) {
-    return {
-        color: baseCol,
-        transparent: true, // 总是启用透明，因为可能有细节绘图
-        side: isTransparent ? THREE.DoubleSide : THREE.FrontSide, // 透明材质需要双面渲染
-        alphaTest: 0.5, // 设置alpha测试阈值
-        fillBackground: !isTransparent, // 非透明材质填充背景色
-        textureGenerator: (ctx) => {
-             ctx.fillStyle = detailCol; // 设置细节绘图颜色
-             drawFunc(ctx); // 调用自定义绘图函数
-        }
-    };
+  return {
+    color: baseCol,
+    transparent: true, // 总是启用透明，因为可能有细节绘图
+    side: isTransparent ? THREE.DoubleSide : THREE.FrontSide, // 透明材质需要双面渲染
+    alphaTest: 0.5, // 设置alpha测试阈值
+    fillBackground: !isTransparent, // 非透明材质填充背景色
+    textureGenerator: (ctx) => {
+      ctx.fillStyle = detailCol; // 设置细节绘图颜色
+      drawFunc(ctx); // 调用自定义绘图函数
+    }
+  };
 }
 
 // ============================================
@@ -238,56 +238,56 @@ materials.registerMaterial('gold_apple', mkMat('#FFD700'));
 
 // 复杂材质（使用细节绘图函数）
 materials.registerMaterial('flower', mkDetailMat('#000000', '#FF4444', true, (ctx)=>{
-    ctx.fillStyle='#2E8B57'; ctx.fillRect(30,24,4,40);
-    ctx.fillStyle='#FF4444'; ctx.beginPath(); ctx.arc(32,24,12,0,Math.PI*2); ctx.fill();
-    ctx.fillStyle='#FFD700'; ctx.beginPath(); ctx.arc(32,24,4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#2E8B57'; ctx.fillRect(30,24,4,40);
+  ctx.fillStyle='#FF4444'; ctx.beginPath(); ctx.arc(32,24,12,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#FFD700'; ctx.beginPath(); ctx.arc(32,24,4,0,Math.PI*2); ctx.fill();
 }));
 
 materials.registerMaterial('azalea_leaves', {
-    textureUrl: './src/world/assets/textures/flowering_azalea_leaves.png',
-    transparent: true,
-    alphaTest: 0.5,
-    side: THREE.DoubleSide,
-    repeat: [2, 2]
+  textureUrl: './src/world/assets/textures/flowering_azalea_leaves.png',
+  transparent: true,
+  alphaTest: 0.5,
+  side: THREE.DoubleSide,
+  repeat: [2, 2]
 });
 
 materials.registerMaterial('azalea_hanging', {
-    textureUrl: './src/world/assets/textures/flowering_azalea_side.png',
-    transparent: true,
-    alphaTest: 0.5,
-    side: THREE.DoubleSide
+  textureUrl: './src/world/assets/textures/flowering_azalea_side.png',
+  transparent: true,
+  alphaTest: 0.5,
+  side: THREE.DoubleSide
 });
 
 materials.registerMaterial('vine', mkDetailMat(null, '#355E3B', true, (ctx) => {
-    ctx.strokeStyle = '#355E3B'; ctx.lineWidth = 3;
-    for(let i=0; i<5; i++) {
-        ctx.beginPath();
-        ctx.moveTo(10+i*10, 0);
-        ctx.bezierCurveTo(Math.random()*64, 20, Math.random()*64, 40, 10+i*10, 64);
-        ctx.stroke();
-    }
+  ctx.strokeStyle = '#355E3B'; ctx.lineWidth = 3;
+  for(let i=0; i<5; i++) {
+    ctx.beginPath();
+    ctx.moveTo(10+i*10, 0);
+    ctx.bezierCurveTo(Math.random()*64, 20, Math.random()*64, 40, 10+i*10, 64);
+    ctx.stroke();
+  }
 }));
 
 materials.registerMaterial('lilypad', mkDetailMat(null, '#228B22', true, (ctx) => {
-    ctx.beginPath(); ctx.arc(32,32,28,0.3, Math.PI*1.8); ctx.fill();
+  ctx.beginPath(); ctx.arc(32,32,28,0.3, Math.PI*1.8); ctx.fill();
 }));
 
 materials.registerMaterial('realistic_trunk_procedural', {
-    color: '#5D4037', // 深棕色
-    textureGenerator: (ctx) => {
-        // 添加深绿色斑点
-        ctx.fillStyle = '#006400'; // 深绿色
-        for(let i = 0; i < 150; i++) {
-            ctx.fillRect(Math.random() * 64, Math.random() * 64, 2, 2);
-        }
+  color: '#5D4037', // 深棕色
+  textureGenerator: (ctx) => {
+    // 添加深绿色斑点
+    ctx.fillStyle = '#006400'; // 深绿色
+    for(let i = 0; i < 150; i++) {
+      ctx.fillRect(Math.random() * 64, Math.random() * 64, 2, 2);
     }
+  }
 });
 
 // 新树木材质（使用预加载纹理）
 materials.registerMaterial('realistic_oak_leaves', {
-    textureUrl: './src/world/assets/textures/oak_leaves_branch_medium.png',
-    transparent: true,
-    alphaTest: 0.5,
-    side: THREE.DoubleSide
+  textureUrl: './src/world/assets/textures/oak_leaves_branch_medium.png',
+  transparent: true,
+  alphaTest: 0.5,
+  side: THREE.DoubleSide
 });
 
