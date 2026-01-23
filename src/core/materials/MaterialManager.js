@@ -74,6 +74,17 @@ export class MaterialManager {
    * @returns {THREE.Material} 创建的 Three.js 材质
    */
   _createMaterial(def) {
+    // 情况0：多面材质（用于立方体不同面使用不同材质）
+    if (def.faces) {
+      // Three.js BoxGeometry 面的顺序：px, nx, py, ny, pz, nz (0-5)
+      const mats = [];
+      for (let i = 0; i < 6; i++) {
+        const faceDef = def.faces[i] || def.faces.all || def;
+        mats.push(this._createMaterial(faceDef));
+      }
+      return mats;
+    }
+
     // 情况1：使用纹理URL（预加载的纹理文件）
     if (def.textureUrl) {
       let texture = this.textureCache.get(def.textureUrl);
@@ -153,7 +164,9 @@ export async function initializeMaterials() {
   const textureUrls = [
     './src/world/assets/textures/oak_leaves_branch_medium.png',
     './src/world/assets/textures/flowering_azalea_leaves.png',
-    './src/world/assets/textures/flowering_azalea_side.png'
+    './src/world/assets/textures/flowering_azalea_side.png',
+    './minecraft-bundles/blocks/grass_carried.png',
+    './minecraft-bundles/blocks/grass_side_carried.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -206,7 +219,20 @@ function mkDetailMat(baseCol, detailCol, isTransparent=false, drawFunc) {
 // ============================================
 
 // 基础方块材质
-materials.registerMaterial('grass', mkMat('#559944'));
+const grassSide = { textureUrl: './minecraft-bundles/blocks/grass_side_carried.png' };
+const grassTop = { textureUrl: './minecraft-bundles/blocks/grass_carried.png' };
+const grassBottom = mkMat('#559944');
+
+materials.registerMaterial('grass', {
+  faces: {
+    0: grassSide,
+    1: grassSide,
+    2: grassTop,
+    3: grassBottom,
+    4: grassSide,
+    5: grassSide
+  }
+});
 materials.registerMaterial('dirt', mkMat('#5d4037'));
 materials.registerMaterial('stone', mkMat('#757575'));
 materials.registerMaterial('sand', mkMat('#e6c288'));
