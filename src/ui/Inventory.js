@@ -1,4 +1,9 @@
 // src/ui/Inventory.js
+
+/**
+ * 物品颜色配置表（与HUD.js中的相同）
+ * 确保UI中物品颜色的一致性
+ */
 const ITEMS = {
     'dirt': { col: '#5D4037' }, 'stone': { col: '#757575' }, 'wood': { col: '#5D4037' },
     'sand': { col: '#E6C288' }, 'planks': { col: '#C19A6B' }, 'cactus': { col: '#2E8B57' },
@@ -10,7 +15,15 @@ const ITEMS = {
     'vine': { col: '#355E3B' }, 'lilypad': { col: '#228B22' }
 };
 
+/**
+ * 背包界面管理器
+ * 负责背包的打开/关闭、渲染和交互
+ */
 export class InventoryUI {
+    /**
+     * 创建背包界面实例
+     * @param {Object} game - 游戏主对象
+     */
     constructor(game) {
         this.game = game;
         this.modalEl = document.getElementById('inventory-modal');
@@ -20,61 +33,73 @@ export class InventoryUI {
         this.setupEvents();
     }
 
+    /**
+     * 设置键盘事件监听
+     * - Z键：切换背包打开/关闭
+     * - 数字键1-5：选择快捷栏物品
+     */
     setupEvents() {
         window.addEventListener('keydown', (e) => {
             if (e.code === 'KeyZ') this.toggle();
-            // Hotbar selection keys
+            // 快捷栏选择键（数字键1-5）
             if (['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].includes(e.code)) {
                 if (this.game.player) {
                     this.game.player.inventory.selectedSlot = parseInt(e.code.replace('Digit', '')) - 1;
-                    // Trigger UI update? Done in loop for HUD, manual for Inventory
+                    // 如果背包打开，重新渲染以更新选中状态
                     if (this.isOpen) this.render();
                 }
             }
         });
     }
 
+    /**
+     * 切换背包的打开/关闭状态
+     * 打开时解除指针锁定，关闭时重新锁定
+     */
     toggle() {
         this.isOpen = !this.isOpen;
         if (this.isOpen) {
-            document.exitPointerLock();
+            document.exitPointerLock(); // 解除指针锁定，允许鼠标操作UI
             if (this.modalEl) this.modalEl.style.display = 'flex';
-            this.render();
+            this.render(); // 渲染背包内容
         } else {
             if (this.modalEl) this.modalEl.style.display = 'none';
-            document.body.requestPointerLock();
+            document.body.requestPointerLock(); // 重新锁定指针，恢复游戏控制
         }
     }
 
+    /**
+     * 渲染背包网格
+     * 显示所有非空的物品槽，允许点击选择物品
+     */
     render() {
-        if (!this.isOpen || !this.gridEl || !this.game.player) return;
+        if (!this.isOpen || !this.gridEl || !this.game.player) return; // 检查背包是否打开且元素存在
 
         const inventory = this.game.player.inventory;
         this.gridEl.innerHTML = '';
 
         inventory.slots.forEach((slot, idx) => {
-            // Only render non-empty slots or placeholders?
-            // Original rendered all keys in `inventory` object.
-            // Here we have fixed slots. Let's render all non-empty for the grid to look populated?
-            // Or just the first N slots.
-            // Let's render all slots that have items.
+            // 只渲染非空的物品槽
             if (slot.isEmpty()) return;
 
             const div = document.createElement('div');
             div.className = 'slot';
             if (idx === inventory.selectedSlot) div.style.borderColor = '#FFFF00';
 
+            // 使用Canvas生成物品图标（与HUD相同）
             const c = document.createElement('canvas');
             c.width = 32;
             c.height = 32;
             const ctx = c.getContext('2d');
-            const itemDef = ITEMS[slot.item] || { col: '#fff' };
+            const itemDef = ITEMS[slot.item] || { col: '#fff' }; // 获取物品颜色配置，默认白色
 
+            // 绘制物品图标（基于颜色配置）
             ctx.fillStyle = itemDef.col;
             ctx.fillRect(4, 4, 24, 24);
             ctx.strokeStyle = '#000';
             ctx.strokeRect(4, 4, 24, 24);
 
+            // 创建图像元素和数量显示
             const img = document.createElement('img');
             img.src = c.toDataURL();
 
@@ -82,9 +107,10 @@ export class InventoryUI {
             countSpan.className = 'count';
             countSpan.innerText = slot.count;
 
+            // 点击物品槽选择该物品
             div.onclick = () => {
                 inventory.selectedSlot = idx;
-                this.render();
+                this.render(); // 重新渲染以更新选中状态
             };
 
             div.append(img, countSpan);
