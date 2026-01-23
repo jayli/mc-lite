@@ -169,7 +169,12 @@ export async function initializeMaterials() {
     './src/world/assets/textures/grass_side_carried.png',
     './src/world/assets/textures/moss_block.png',
     './src/world/assets/textures/planks_birch.png',
-    './src/world/assets/textures/planks_big_oak.png'
+    './src/world/assets/textures/planks_big_oak.png',
+    './src/world/assets/textures/stone_andesite.png',
+    './src/world/assets/textures/stone.png',
+    './src/world/assets/textures/dirt.png',
+    './src/world/assets/textures/dirt_podzol_side.png',
+    './src/world/assets/textures/dirt_podzol_top.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -236,8 +241,33 @@ materials.registerMaterial('grass', {
     5: grassSide
   }
 });
-materials.registerMaterial('dirt', mkMat('#5d4037')); // 土
-materials.registerMaterial('stone', mkMat('#757575')); // 石头
+
+const dirtSide = { textureUrl: './src/world/assets/textures/dirt.png' };
+const dirtTopBottom = { textureUrl: './src/world/assets/textures/dirt_podzol_top.png' };
+materials.registerMaterial('dirt', {
+  faces: {
+    0: dirtSide,
+    1: dirtSide,
+    2: dirtTopBottom,
+    3: dirtTopBottom,
+    4: dirtSide,
+    5: dirtSide
+  }
+}); // 土
+
+const stoneSide = { textureUrl: './src/world/assets/textures/stone_andesite.png' };
+const stoneTopBottom = { textureUrl: './src/world/assets/textures/stone.png' };
+materials.registerMaterial('stone', {
+  faces: {
+    0: stoneSide,
+    1: stoneSide,
+    2: stoneTopBottom,
+    3: stoneTopBottom,
+    4: stoneSide,
+    5: stoneSide
+  }
+});
+
 materials.registerMaterial('sand', mkMat('#e6c288')); // 沙地
 materials.registerMaterial('wood', mkMat('#4a3218')); // 木头
 materials.registerMaterial('planks', { textureUrl: './src/world/assets/textures/planks_birch.png' }); // 木板
@@ -255,7 +285,20 @@ materials.registerMaterial('sky_stone', mkMat('#DDDDDD')); // 天空石头
 materials.registerMaterial('sky_grass', mkMat('#88CCFF')); // 天空草
 materials.registerMaterial('sky_wood', mkMat('#DDA0DD')); // 天空木头
 materials.registerMaterial('sky_leaves', mkMat('#FF69B4', 0.9)); // 天空树叶
-materials.registerMaterial('moss', { textureUrl: './src/world/assets/textures/moss_block.png' }); // 苔藓
+
+const mossSide = { textureUrl: './src/world/assets/textures/dirt_podzol_side.png' };
+const mossTopBottom = { textureUrl: './src/world/assets/textures/moss_block.png' };
+materials.registerMaterial('moss', {
+  faces: {
+    0: mossSide,
+    1: mossSide,
+    2: mossTopBottom,
+    3: mossTopBottom,
+    4: mossSide,
+    5: mossSide
+  }
+}); // 苔藓
+
 materials.registerMaterial('azalea_log', mkMat('#635338')); // 杜鹃花
 materials.registerMaterial('chest', { color: 0xFFA500 }); // 目前使用简单颜色
 
