@@ -172,6 +172,8 @@ export async function initializeMaterials() {
     './src/world/assets/textures/planks_big_oak.png',
     './src/world/assets/textures/stone_andesite.png',
     './src/world/assets/textures/stone.png',
+    './src/world/assets/textures/sand.png',
+    './src/world/assets/textures/sand_side.png',
     './src/world/assets/textures/dirt.png',
     './src/world/assets/textures/dirt_podzol_side.png',
     './src/world/assets/textures/dirt_podzol_top.png',
@@ -277,7 +279,18 @@ materials.registerMaterial('stone', {
   }
 }); // 石头
 
-materials.registerMaterial('sand', mkMat('#e6c288')); // 沙地
+const sandSide = { textureUrl: './src/world/assets/textures/sand_side.png' };
+const sandTopBottom = { textureUrl: './src/world/assets/textures/sand.png' };
+materials.registerMaterial('sand', {
+  faces: {
+    0: sandSide,
+    1: sandSide,
+    2: sandTopBottom,
+    3: sandTopBottom,
+    4: sandSide,
+    5: sandSide
+  }
+}); // 沙地
 
 const woodSide = { textureUrl: './src/world/assets/textures/log_big_oak.png' };
 const woodTopBottom = { textureUrl: './src/world/assets/textures/log_big_oak_top.png' };
