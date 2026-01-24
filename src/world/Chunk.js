@@ -206,8 +206,8 @@ export class Chunk {
       }
     }
 
-    // 天空岛生成 - 15%的几率在当前区块生成天空岛
-    if (Math.random() < 0.15) {
+    // 天空岛生成 - 8%的几率在当前区块生成天空岛
+    if (Math.random() < 0.08) {
       const islandY = 40 + Math.floor(Math.random() * 30);  // 随机高度在40-70之间
       const centerWx = this.cx * CHUNK_SIZE + 8;           // 区块中心世界坐标X
       const centerWz = this.cz * CHUNK_SIZE + 8;           // 区块中心世界坐标Z
