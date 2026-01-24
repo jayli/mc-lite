@@ -115,7 +115,7 @@ export class Chunk {
     const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'planks', 'oak_planks', 'leaves', 'water', 'cactus',
       'flower', 'short_grass', 'chest', 'bookbox', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
       'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'azalea_flowers', 'swamp_water',
-      'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'gold_ore'];
+      'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'gold_ore', 'calcite', 'bricks'];
     for(const type of allTypes) {
       d[type] = [];
     }
@@ -285,21 +285,24 @@ export class Chunk {
     if (type === 'house') {
       // 房屋结构：5x5地基 + 3层高墙壁 + 金字塔形屋顶 + 内部家具
 
+      // 决定墙体材质：1/3 概率为砖块，否则为木板
+      const wallMat = Math.random() < 0.33 ? 'bricks' : 'planks';
+
       // 1. 地基：5x5的石头地基
       for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) this.add(x + i, y - 1, z + j, 'stone', dObj);
 
-      // 2. 墙壁：外围5x5的木板墙，高度3层
+      // 2. 墙壁：外围5x5的墙，高度3层
       for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
         if (Math.abs(i) === 2 || Math.abs(j) === 2) {  // 只在外围生成
           if (i === 0 && j === 2) continue;  // 留出前门位置
           if ((i === -2 || i === 2) && j === 0) {
-            // 侧面中间位置：第一层和第三层是木板，中间（第二层）是玻璃窗户
-            this.add(x + i, y, z + j, 'planks', dObj);
+            // 侧面中间位置：第一层和第三层是墙体材质，中间（第二层）是玻璃窗户
+            this.add(x + i, y, z + j, wallMat, dObj);
             this.add(x + i, y + 1, z + j, 'glass_block', dObj, false); // 玻璃非实心方块，便于透视
-            this.add(x + i, y + 2, z + j, 'planks', dObj);
+            this.add(x + i, y + 2, z + j, wallMat, dObj);
           } else {
             // 其他位置：生成完整的3层墙壁
-            for (let h = 0; h < 3; h++) this.add(x + i, y + h, z + j, 'planks', dObj);
+            for (let h = 0; h < 3; h++) this.add(x + i, y + h, z + j, wallMat, dObj);
           }
         }
       }
