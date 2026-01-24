@@ -27,21 +27,27 @@ export class Engine {
     this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
     // 启用渲染器的阴影贴图
     this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    // --- 氛围渲染优化 ---
+    // 设置电影级色调映射，使高亮部分不过曝成纯白，而是有自然的色彩过渡
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.25; // 提升全局曝光，让阳光感更强
 
     // --- 灯光与天空设置 ---
     this.sunDirection = new THREE.Vector3(1, 0.8, 0.5).normalize();
-    this.sunColor = 0xffcc74; // 暖黄色
-    this.lightColor = 0xfdf7ec; // 暖白色
+    this.sunColor = 0xfff3a0; // 温暖的金黄色
+    this.lightColor = 0xfffaf0; // 极亮的暖白色
 
     // 创建一个平行光
-    const light = new THREE.DirectionalLight(this.lightColor, 1.2);
+    const light = new THREE.DirectionalLight(this.lightColor, 2.2); // 强度大幅提升
     // 关键优化：将 light.target 直接添加到场景中，方便后续同步
     this.scene.add(light.target);
 
     // 允许此光源投射阴影
     light.castShadow = true;
     // 设置阴影贴图的分辨率（根据需要调整：512, 1024, 2048）
-    light.shadow.mapSize.set(1024, 1024);
+    light.shadow.mapSize.set(412, 412);
     // 设置平行光阴影相机的视锥体范围
     light.shadow.camera.left = -40;
     light.shadow.camera.right = 40;
@@ -49,11 +55,12 @@ export class Engine {
     light.shadow.camera.bottom = -40;
     light.shadow.camera.near = 0.1;
     light.shadow.camera.far = 200;
-    light.shadow.bias = -0.001;
+    light.shadow.bias = -0.000;
     light.shadow.normalBias = 0.02;
 
     this.scene.add(light);
-    this.scene.add(new THREE.AmbientLight(0xfff6f6, 0.8));
+    // 环境光：使用微弱的冷蓝色（天空散射光），与暖色阳光形成对比，增加画面的层次感
+    this.scene.add(new THREE.AmbientLight(0xddeeff, 0.9));
 
     this.light = light;
 
