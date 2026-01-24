@@ -35,6 +35,7 @@ export class Game {
     this.player.inventory.add('dirt', 1000);
     this.player.inventory.add('planks', 1000);
     this.player.inventory.add('wood', 1000);
+    this.player.inventory.add('glass_block', 1000);
   }
 
   /**
