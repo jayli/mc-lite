@@ -177,7 +177,8 @@ export async function initializeMaterials() {
     './src/world/assets/textures/dirt_podzol_top.png',
     './src/world/assets/textures/stone_diorite.png',
     './src/world/assets/textures/log_big_oak.png',
-    './src/world/assets/textures/log_big_oak_top.png'
+    './src/world/assets/textures/log_big_oak_top.png',
+    './src/world/assets/textures/leaves.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -288,7 +289,11 @@ materials.registerMaterial('wood', {
 
 materials.registerMaterial('planks', { textureUrl: './src/world/assets/textures/planks_birch.png' }); // 木板
 materials.registerMaterial('oak_planks', { textureUrl: './src/world/assets/textures/planks_big_oak.png' }); // 大橡木木板
-materials.registerMaterial('leaves', mkMat('#386628', 0.9)); // 树叶
+materials.registerMaterial('leaves', {
+  textureUrl: './src/world/assets/textures/leaves.png',
+  transparent: true,
+  alphaTest: 0.3
+}); // 树叶
 materials.registerMaterial('water', mkMat('#205099', 0.6)); // 水
 materials.registerMaterial('swamp_water', mkMat('#2F4F4F', 0.7)); // 沼泽水
 materials.registerMaterial('swamp_grass', mkMat('#4C5E34')); // 沼泽草
