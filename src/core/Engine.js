@@ -11,7 +11,7 @@ export class Engine {
     // 场景背景设为 null，因为我们将使用天空球
     this.scene.background = null;
     // 在场景中添加雾效，颜色与地平线相同，从距离20开始，到距离90完全遮挡
-    this.scene.fog = new THREE.Fog(0x6ebfe0, 20, 90);
+    this.scene.fog = new THREE.Fog(0x62b4d5, 20, 90);
 
     // 创建一个透视相机
     // 参数分别为：视野角度(FOV)，宽高比，近裁剪面，远裁剪面
@@ -39,7 +39,7 @@ export class Engine {
     this.sunColor = 0xfff3a0; // 温暖的金黄色
     this.lightColor = 0xfffaf0; // 极亮的暖白色
     this.zenithColor = 0x87CEEB;  // 顶点颜色 (深蓝)
-    this.horizonColor = 0xa6def4; // 地平线颜色 (浅蓝)
+    this.horizonColor = 0xb2e0f2; // 地平线颜色 (浅蓝)
 
     // 创建一个平行光
     const light = new THREE.DirectionalLight(this.lightColor, 2.2); // 强度大幅提升
