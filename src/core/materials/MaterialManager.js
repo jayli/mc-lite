@@ -186,7 +186,8 @@ export async function initializeMaterials() {
     './src/world/assets/textures/Bookshelf_texture_JE2_BE2.png',
     './src/world/assets/textures/Bone_Block_side_texture_JE2_BE2.png',
     './src/world/assets/textures/Bone_Block_top_texture_JE2_BE2.png',
-    './src/world/assets/textures/double_plant_grass_carried.png'
+    './src/world/assets/textures/double_plant_grass_carried.png',
+    './src/world/assets/textures/Glass.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -308,6 +309,12 @@ materials.registerMaterial('wood', {
 
 materials.registerMaterial('planks', { textureUrl: './src/world/assets/textures/planks_birch.png' }); // 木板
 materials.registerMaterial('oak_planks', { textureUrl: './src/world/assets/textures/planks_big_oak.png' }); // 大橡木木板
+materials.registerMaterial('glass_block', {
+  textureUrl: './src/world/assets/textures/Glass.png',
+  transparent: true,
+  alphaTest: 0.1,
+  side: THREE.DoubleSide
+}); // 玻璃
 materials.registerMaterial('leaves', {
   textureUrl: './src/world/assets/textures/leaves.png',
   transparent: true,

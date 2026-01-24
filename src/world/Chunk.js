@@ -115,7 +115,7 @@ export class Chunk {
     const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'planks', 'oak_planks', 'leaves', 'water', 'cactus',
       'flower', 'short_grass', 'chest', 'bookbox', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
       'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'azalea_flowers', 'swamp_water',
-      'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword'];
+      'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block'];
     for(const type of allTypes) {
       d[type] = [];
     }
@@ -289,8 +289,9 @@ export class Chunk {
         if (Math.abs(i) === 2 || Math.abs(j) === 2) {  // 只在外围生成
           if (i === 0 && j === 2) continue;  // 留出前门位置
           if ((i === -2 || i === 2) && j === 0) {
-            // 侧面中间位置：只生成第一层和第三层，留出窗户
+            // 侧面中间位置：第一层和第三层是木板，中间（第二层）是玻璃窗户
             this.add(x + i, y, z + j, 'planks', dObj);
+            this.add(x + i, y + 1, z + j, 'glass_block', dObj, false); // 玻璃非实心方块，便于透视
             this.add(x + i, y + 2, z + j, 'planks', dObj);
           } else {
             // 其他位置：生成完整的3层墙壁
