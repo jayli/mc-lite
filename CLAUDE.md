@@ -28,9 +28,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **依赖关系**：
 ```
 index.html → Game.js → Engine.js + World.js + Player.js + UIManager.js
-World.js → Chunk.js → TerrainGen.js + MaterialManager.js + 实体系统
+World.js → Chunk.js → TerrainGen.js + MaterialManager.js + PersistenceService.js + 实体系统
 Player.js → Physics.js + Slots.js (背包系统)
 UIManager.js → HUD.js + Inventory.js
+PersistenceService.js → IndexedDB API
 ```
 
 ### 关键系统设计
@@ -40,8 +41,9 @@ UIManager.js → HUD.js + Inventory.js
 - 每帧计算时间差 `dt`，调用 `update(dt)` 和 `render()`
 - 协调所有子系统的更新和渲染
 
-**区块管理系统** (`World.js` + `Chunk.js`):
+**区块管理系统** (`World.js` + `Chunk.js` + `PersistenceService.js`):
 - **动态加载**：基于玩家位置动态加载/卸载区块，渲染距离为3个区块
+- **持久化机制**：使用 IndexedDB 存储玩家对世界的增量修改（Deltas），区块卸载时自动 Flush，加载时异步应用。
 - **性能优化**：使用 `THREE.InstancedMesh` 优化相同类型方块的渲染
 - **碰撞检测**：通过 `solidBlocks` Set 存储实心方块位置
 - **区块尺寸**：每个区块 16×16 方块
@@ -112,6 +114,8 @@ UIManager.js → HUD.js + Inventory.js
 - In-memory (runtime state), potentially localStorage for persistence (future) (001-refactor-layered-design)
 - JavaScript (ES6+) + Three.js (via CDN) (001-realistic-textured-trees)
 - N/A (Runtime state only) (001-realistic-textured-trees)
+- JavaScript (ES6+ Modules) + Three.js (WebGL 2.0), IndexedDB API (001-world-persistence)
+- IndexedDB (Primary), LocalStorage (Fallback) (001-world-persistence)
 
 ## Recent Changes
 - 001-refactor-layered-design: Added JavaScript (ES6+ Modules) + Three.js (via Import Map/CDN)

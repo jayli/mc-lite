@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import { Chunk } from './Chunk.js';
 import { materials } from '../core/materials/MaterialManager.js';
 import { chestManager } from './entities/Chest.js';
+import { persistenceService } from '../services/PersistenceService.js';
+import { noise } from '../utils/MathUtils.js';
 
 const CHUNK_SIZE = 16;
 const RENDER_DIST = 3;
@@ -47,6 +49,8 @@ export class World {
     for (const [key, chunk] of this.chunks) {
       if (Math.abs(chunk.cx - cx) > RENDER_DIST + 1 || Math.abs(chunk.cz - cz) > RENDER_DIST + 1) {
         this.scene.remove(chunk.group);
+        // 持久化区块修改
+        persistenceService.flush(chunk.cx, chunk.cz);
         chunk.dispose();
         this.chunks.delete(key);
       }
@@ -110,7 +114,14 @@ export class World {
     const cz = Math.floor(z / CHUNK_SIZE);
     const key = `${cx},${cz}`;
     const chunk = this.chunks.get(key);
-    if (!chunk) return false;
+
+    // 如果区块正在加载中，使用简单的噪声高度图作为物理占位，防止玩家掉入虚空
+    if (!chunk || !chunk.isReady) {
+      // 使用与 TerrainGen 类似的比例来估算高度
+      const h = Math.floor(noise(x, z, 0.08) + noise(x, z, 0.02) * 3);
+      // 允许一点点误差，确保玩家不会卡在土里
+      return y <= h;
+    }
 
     const blockKey = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
     return chunk.solidBlocks.has(blockKey);
@@ -146,6 +157,8 @@ export class World {
     // Rebuilding whole chunk instanced mesh is too expensive for single block place.
     // 添加逻辑方块：调用区块的动态方块添加方法
     chunk.addBlockDynamic(x, y, z, type);
+    // 记录持久化变更
+    persistenceService.recordChange(x, y, z, type);
   }
 
   /**

@@ -11,6 +11,7 @@ import { Tree } from './entities/Tree.js';
 import { RealisticTree } from './entities/RealisticTree.js';
 import { Island } from './entities/Island.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+import { persistenceService } from '../services/PersistenceService.js';
 
 /** 区块尺寸 - 每个区块在X和Z方向上的方块数量 */
 const CHUNK_SIZE = 16;
@@ -94,6 +95,7 @@ export class Chunk {
     this.group = new THREE.Group();  // Three.js 组，包含区块内所有网格
     this.keys = [];                  // 区块标识符（当前未使用）
     this.solidBlocks = new Set();    // 实心方块的集合，用于碰撞检测
+    this.isReady = false;            // 区块是否已完成生成
     this.gen();                      // 生成区块内容
   }
 
@@ -102,7 +104,11 @@ export class Chunk {
    * 包括地形生成、植被生成、水体生成、天空岛生成等
    * 根据生物群系决定地形特征和植被类型
    */
-  gen() {
+  async gen() {
+    // 0. 加载持久化增量数据
+    const deltas = await persistenceService.getDeltas(this.cx, this.cz);
+    this._tempDeltas = deltas; // 暂存以供 add() 方法使用
+
     // 初始化所有可能的类型数组，类似原始代码中的逻辑
     // d 对象用于按类型收集方块位置，以便后续批量创建 InstancedMesh
     const d = {};
@@ -214,8 +220,26 @@ export class Chunk {
       Island.generate(centerWx, islandY, centerWz, this, d);
     }
 
+    // 叠加持久化修改 (优化后的逻辑：在生成过程中通过 add() 自动过滤，此处仅负责添加新增块)
+    for (const [blockKey, delta] of deltas) {
+      if (delta.type !== 'air') {
+        const [bx, by, bz] = blockKey.split(',').map(Number);
+        if (!d[delta.type]) d[delta.type] = [];
+        d[delta.type].push({ x: bx, y: by, z: bz });
+
+        // 简单逻辑：假设所有非 air 持久化块都是实心的（除非是花/水等，遵循 add 逻辑）
+        if (!['water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass'].includes(delta.type)) {
+          this.solidBlocks.add(blockKey);
+        }
+      }
+    }
+
+    // 清理临时增量缓存
+    this._tempDeltas = null;
+
     // 构建所有网格 - 将收集的方块位置转换为 Three.js 网格
     this.buildMeshes(d);
+    this.isReady = true; // 标记准备就绪
   }
 
   /**
@@ -228,15 +252,21 @@ export class Chunk {
     * @param {boolean} solid - 是否为实心方块（影响碰撞检测）
     */
   add(x, y, z, type, dObj = null, solid = true) {
+    // 生成方块的唯一键（用于碰撞检测和持久化覆盖检查）
+    const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+
+    // 如果该位置在当前区块生成期间有持久化增量覆盖，则跳过原始生成逻辑
+    if (this._tempDeltas && this._tempDeltas.has(key)) return;
+
     // 如果提供了数据收集对象，将方块位置按类型分类存储
     if (dObj) {
       if (!dObj[type]) dObj[type] = [];
       dObj[type].push({ x, y, z });
     }
-    // 生成方块的唯一键（用于碰撞检测）
-    const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
     // 如果是实心方块，添加到实心方块集合中
-    if (solid) this.solidBlocks.add(key);
+    if (solid) {
+      this.solidBlocks.add(key);
+    }
   }
 
   /**
@@ -343,19 +373,19 @@ export class Chunk {
         mesh.userData.chests = {};
       }
 
-      // 为每个实例设置位置矩阵
-      d[type].forEach((pos, i) => {
-        dummy.position.set(pos.x, pos.y, pos.z);  // 设置虚拟对象位置
-        dummy.updateMatrix();                     // 更新变换矩阵
-        mesh.setMatrixAt(i, dummy.matrix);        // 设置实例矩阵
-        // 如果是箱子，初始化该箱子的状态
-        if (type === 'chest') {
-          mesh.userData.chests[i] = { open: false };
-        }
-      });
+    // 为每个实例设置位置矩阵
+    d[type].forEach((pos, i) => {
+      dummy.position.set(pos.x, pos.y, pos.z);  // 设置虚拟对象位置
+      dummy.updateMatrix();                     // 更新变换矩阵
+      mesh.setMatrixAt(i, dummy.matrix);        // 设置实例矩阵
+      // 如果是箱子，初始化该箱子的状态
+      if (type === 'chest') {
+        mesh.userData.chests[i] = { open: false };
+      }
+    });
 
-      // 重要：设置完所有实例矩阵后标记需要更新
-      mesh.instanceMatrix.needsUpdate = true;
+    // 重要：设置完所有实例矩阵后标记需要更新
+    mesh.instanceMatrix.needsUpdate = true;
 
       // 设置阴影：半透明和特殊模型不投射/接收阴影
       if(!['water','swamp_water','cloud','vine','lilypad','flower','short_grass'].includes(type)) {
@@ -431,6 +461,8 @@ export class Chunk {
     // 从实心方块集合中移除（碰撞检测）
     const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
     this.solidBlocks.delete(key);
+    // 记录持久化变更
+    persistenceService.recordChange(x, y, z, 'air');
     // 视觉移除逻辑由玩家/游戏交互处理（通过游戏循环更新场景）
   }
 }
