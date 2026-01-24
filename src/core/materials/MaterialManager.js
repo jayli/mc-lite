@@ -178,7 +178,9 @@ export async function initializeMaterials() {
     './src/world/assets/textures/stone_diorite.png',
     './src/world/assets/textures/log_big_oak.png',
     './src/world/assets/textures/log_big_oak_top.png',
-    './src/world/assets/textures/leaves.png'
+    './src/world/assets/textures/leaves.png',
+    './minecraft-bundles/box_side.png',
+    './minecraft-bundles/box_top.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -321,7 +323,18 @@ materials.registerMaterial('moss', {
 }); // 苔藓
 
 materials.registerMaterial('azalea_log', mkMat('#635338')); // 杜鹃花
-materials.registerMaterial('chest', { color: 0xFFA500 }); // 目前使用简单颜色
+const chestSide = { textureUrl: './minecraft-bundles/box_side.png' };
+const chestTop = { textureUrl: './minecraft-bundles/box_top.png' };
+materials.registerMaterial('chest', {
+  faces: {
+    0: chestSide,
+    1: chestSide,
+    2: chestTop,
+    3: chestSide,
+    4: chestSide,
+    5: chestSide
+  }
+}); // 宝箱
 
 // 额外物品材质
 materials.registerMaterial('diamond', mkMat('#00FFFF'));
