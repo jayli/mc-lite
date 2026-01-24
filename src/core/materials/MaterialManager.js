@@ -179,8 +179,11 @@ export async function initializeMaterials() {
     './src/world/assets/textures/log_big_oak.png',
     './src/world/assets/textures/log_big_oak_top.png',
     './src/world/assets/textures/leaves.png',
-    './minecraft-bundles/box_side.png',
-    './minecraft-bundles/box_top.png'
+    './src/world/assets/textures/box_side.png',
+    './src/world/assets/textures/box_top.png',
+    './src/world/assets/textures/Bookshelf_texture_JE2_BE2.png',
+    './src/world/assets/textures/Bone_Block_side_texture_JE2_BE2.png',
+    './src/world/assets/textures/Bone_Block_top_texture_JE2_BE2.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -300,7 +303,20 @@ materials.registerMaterial('water', mkMat('#205099', 0.6)); // 水
 materials.registerMaterial('swamp_water', mkMat('#2F4F4F', 0.7)); // 沼泽水
 materials.registerMaterial('swamp_grass', mkMat('#4C5E34')); // 沼泽草
 materials.registerMaterial('cactus', mkMat('#2E8B57')); // 仙人掌
-materials.registerMaterial('bookbox', mkMat('#cc0000')); // 书架
+const bookboxFront = { textureUrl: './src/world/assets/textures/Bookshelf_texture_JE2_BE2.png' };
+const bookboxSide = { textureUrl: './src/world/assets/textures/Bone_Block_side_texture_JE2_BE2.png' };
+const bookboxTopBottom = { textureUrl: './src/world/assets/textures/Bone_Block_top_texture_JE2_BE2.png' };
+materials.registerMaterial('bookbox', {
+  faces: {
+    0: bookboxSide,
+    1: bookboxSide,
+    2: bookboxTopBottom,
+    3: bookboxTopBottom,
+    4: bookboxFront,
+    5: bookboxSide
+  }
+}); // 书架
+
 materials.registerMaterial('carBody', mkMat('#FFD700')); // 汽车
 materials.registerMaterial('wheel', mkMat('#222222')); // 轮子
 materials.registerMaterial('cloud', mkMat('#FFFFFF', 0.9)); // 云
@@ -323,8 +339,8 @@ materials.registerMaterial('moss', {
 }); // 苔藓
 
 materials.registerMaterial('azalea_log', mkMat('#635338')); // 杜鹃花
-const chestSide = { textureUrl: './minecraft-bundles/box_side.png' };
-const chestTop = { textureUrl: './minecraft-bundles/box_top.png' };
+const chestSide = { textureUrl: './src/world/assets/textures/box_side.png' };
+const chestTop = { textureUrl: './src/world/assets/textures/box_top.png' };
 materials.registerMaterial('chest', {
   faces: {
     0: chestSide,
