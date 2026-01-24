@@ -307,13 +307,16 @@ export class Chunk {
         }
       }
 
-      // 3. 金字塔形屋顶：使用大橡木木板，从第4层开始逐渐缩小
-      for (let h = 0; h < 3; h++) for (let i = -2 + h; i <= 2 - h; i++) {
-        this.add(x + i, y + 3 + h, z - 2 + h, 'oak_planks', dObj);
-        this.add(x + i, y + 3 + h, z + 2 - h, 'oak_planks', dObj);
+      // 3. 金字塔形屋顶：使用大橡木木板，从第4层开始逐渐缩小并填实
+      for (let h = 0; h < 3; h++) {
+        for (let i = -2 + h; i <= 2 - h; i++) {
+          for (let j = -2 + h; j <= 2 - h; j++) {
+            this.add(x + i, y + 3 + h, z + j, 'oak_planks', dObj);
+          }
+        }
       }
 
-      // 4. 屋顶顶部：一行大橡木木板
+      // 4. 屋顶顶部：一行大橡木木板，确保顶部平整
       for (let j = -1; j <= 1; j++) this.add(x, y + 5, z + j, 'oak_planks', dObj);
 
       // 5. 内部家具：床和箱子
