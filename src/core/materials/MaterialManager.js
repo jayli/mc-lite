@@ -382,9 +382,7 @@ materials.registerMaterial('flower', mkDetailMat('#000000', '#FF4444', true, (ct
 materials.registerMaterial('azalea_leaves', {
   textureUrl: './src/world/assets/textures/flowering_azalea_leaves.png',
   transparent: true,
-  alphaTest: 0.5,
-  side: THREE.DoubleSide,
-  repeat: [2, 2]
+  alphaTest: 0.5
 });
 
 materials.registerMaterial('vine', mkDetailMat(null, '#355E3B', true, (ctx) => {
