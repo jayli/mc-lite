@@ -302,7 +302,7 @@ export class Player {
         this.game.ui.hud.showMessage(`发现天域宝藏！获得: 钻石, 神剑, 金苹果!`);
       }
     } else {
-      const possible = ['diamond', 'gold', 'apple', 'bed', 'planks'];
+      const possible = ['diamond', 'gold', 'apple', 'bookbox', 'planks'];
       const item = possible[Math.floor(Math.random() * possible.length)];
       drops = [item, item];
       if (this.game && this.game.ui && this.game.ui.hud) {

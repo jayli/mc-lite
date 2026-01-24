@@ -300,7 +300,7 @@ materials.registerMaterial('water', mkMat('#205099', 0.6)); // 水
 materials.registerMaterial('swamp_water', mkMat('#2F4F4F', 0.7)); // 沼泽水
 materials.registerMaterial('swamp_grass', mkMat('#4C5E34')); // 沼泽草
 materials.registerMaterial('cactus', mkMat('#2E8B57')); // 仙人掌
-materials.registerMaterial('bed', mkMat('#cc0000')); // 床
+materials.registerMaterial('bookbox', mkMat('#cc0000')); // 书架
 materials.registerMaterial('carBody', mkMat('#FFD700')); // 汽车
 materials.registerMaterial('wheel', mkMat('#222222')); // 轮子
 materials.registerMaterial('cloud', mkMat('#FFFFFF', 0.9)); // 云

@@ -150,7 +150,7 @@ export class Chunk {
     // d 对象用于按类型收集方块位置，以便后续批量创建 InstancedMesh
     const d = {};
     const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'planks', 'oak_planks', 'leaves', 'water', 'cactus',
-      'flower', 'chest', 'bed', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
+      'flower', 'chest', 'bookbox', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
       'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'azalea_hanging', 'swamp_water',
       'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword'];
     for(const type of allTypes) {
@@ -316,7 +316,7 @@ export class Chunk {
       for (let j = -1; j <= 1; j++) this.add(x, y + 5, z + j, 'oak_planks', dObj);
 
       // 5. 内部家具：床和箱子
-      this.add(x - 1, y, z - 1, 'bed', dObj, false);
+      this.add(x - 1, y, z - 1, 'bookbox', dObj, false);
       this.add(x + 1, y, z - 1, 'chest', dObj);
     } else if (type === 'rover') {
       // 火星车结构：4个轮子 + 车身 + 顶部箱子
