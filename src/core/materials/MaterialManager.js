@@ -163,6 +163,7 @@ export const materials = new MaterialManager();
 export async function initializeMaterials() {
   const textureUrls = [
     './src/world/assets/textures/oak_leaves_branch_medium.png',
+    './src/world/assets/textures/azalea_leaves.png',
     './src/world/assets/textures/flowering_azalea_leaves.png',
     './src/world/assets/textures/grass_carried.png',
     './src/world/assets/textures/grass_side_carried.png',
@@ -380,6 +381,12 @@ materials.registerMaterial('flower', mkDetailMat('#000000', '#FF4444', true, (ct
 }));
 
 materials.registerMaterial('azalea_leaves', {
+  textureUrl: './src/world/assets/textures/azalea_leaves.png',
+  transparent: true,
+  alphaTest: 0.5
+});
+
+materials.registerMaterial('azalea_flowers', {
   textureUrl: './src/world/assets/textures/flowering_azalea_leaves.png',
   transparent: true,
   alphaTest: 0.5

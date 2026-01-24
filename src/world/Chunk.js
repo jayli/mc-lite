@@ -108,7 +108,7 @@ export class Chunk {
     const d = {};
     const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'planks', 'oak_planks', 'leaves', 'water', 'cactus',
       'flower', 'short_grass', 'chest', 'bookbox', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
-      'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'swamp_water',
+      'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'azalea_flowers', 'swamp_water',
       'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword'];
     for(const type of allTypes) {
       d[type] = [];

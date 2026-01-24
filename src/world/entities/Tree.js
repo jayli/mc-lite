@@ -63,7 +63,8 @@ export class Tree {
               // 边缘随机稀疏化，使其看起来更自然
               const dist = Math.abs(lx - x) + Math.abs(lz - z);
               if (dist <= 2 && Math.random() > 0.2) {
-                chunk.add(lx, ly, lz, 'azalea_leaves', dObj);
+                const leafType = Math.random() < 0.3 ? 'azalea_flowers' : 'azalea_leaves';
+                chunk.add(lx, ly, lz, leafType, dObj);
               }
             }
           }
