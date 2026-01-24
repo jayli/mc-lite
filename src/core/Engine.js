@@ -36,7 +36,7 @@ export class Engine {
 
     // --- 灯光与天空设置 ---
     this.sunDirection = new THREE.Vector3(1, 0.8, 0.5).normalize();
-    this.sunColor = 0xfff3a0; // 温暖的金黄色
+    this.sunColor = 0xfff7c2; // 温暖的金黄色
     this.lightColor = 0xfffaf0; // 极亮的暖白色
     this.zenithColor = 0x87CEEB;  // 顶点颜色 (深蓝)
     this.horizonColor = 0xb2e0f2; // 地平线颜色 (浅蓝)
