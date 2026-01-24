@@ -114,6 +114,7 @@ const geoCactus = (() => {
  */
 const geomMap = {
   'flower': geoFlower,
+  'short_grass': geoFlower,
   'vine': geoVine,
   'azalea_hanging': geoAzaleaHangingCube,
   'lilypad': geoLily,
@@ -150,7 +151,7 @@ export class Chunk {
     // d 对象用于按类型收集方块位置，以便后续批量创建 InstancedMesh
     const d = {};
     const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'planks', 'oak_planks', 'leaves', 'water', 'cactus',
-      'flower', 'chest', 'bookbox', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
+      'flower', 'short_grass', 'chest', 'bookbox', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
       'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'azalea_hanging', 'swamp_water',
       'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword'];
     for(const type of allTypes) {
@@ -228,9 +229,15 @@ export class Chunk {
           } else {
             // 其他生物群系（平原等）：
             // 0.5%的几率生成默认树木
-            if (Math.random() < 0.005) Tree.generate(wx, h + 1, wz, this, 'default', d);
-            // 5%的几率生成花朵
-            if (Math.random() < 0.05) this.add(wx, h + 1, wz, 'flower', d, false);
+            if (Math.random() < 0.005) {
+              Tree.generate(wx, h + 1, wz, this, 'default', d);
+            }
+            const randPlant = Math.random();
+            if (randPlant < 0.05) { // 生成草的几率
+              this.add(wx, h + 1, wz, 'short_grass', d, false);
+            } else if (randPlant < 0.10) { // 生成花的几率
+              this.add(wx, h + 1, wz, 'flower', d, false);
+            }
             // 0.1%的几率生成房屋结构
             if (Math.random() < 0.001) this.structure('house', wx, h + 1, wz, d);
           }
@@ -395,7 +402,7 @@ export class Chunk {
       mesh.instanceMatrix.needsUpdate = true;
 
       // 设置阴影：半透明和特殊模型不投射/接收阴影
-      if(!['water','swamp_water','cloud','vine','azalea_hanging','lilypad','flower'].includes(type)) {
+      if(!['water','swamp_water','cloud','vine','azalea_hanging','lilypad','flower','short_grass'].includes(type)) {
         mesh.castShadow = true;    // 投射阴影
         mesh.receiveShadow = true; // 接收阴影
       }

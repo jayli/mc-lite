@@ -8,7 +8,7 @@ const ITEMS = {
   'dirt': { col: '#5D4037' }, 'stone': { col: '#757575' }, 'wood': { col: '#5D4037' },
   'sand': { col: '#E6C288' }, 'planks': { col: '#C19A6B' }, 'cactus': { col: '#2E8B57' },
   'diamond': { col: '#00FFFF' }, 'gold': { col: '#FFD700' }, 'apple': { col: '#FF0000' },
-  'flower': { col: '#FF4444' }, 'car': { col: '#333333' },
+  'flower': { col: '#FF4444' }, 'short_grass': { col: '#559944' }, 'car': { col: '#333333' },
   'cloud': { col: '#FFFFFF' }, 'sky_stone': { col: '#DDDDDD' }, 'sky_wood': { col: '#DDA0DD' },
   'gold_apple': { col: '#FFD700' }, 'god_sword': { col: '#9400D3' },
   'moss': { col: '#4B6E31' }, 'azalea_log': { col: '#635338' }, 'azalea_leaves': { col: '#4A6B30' },

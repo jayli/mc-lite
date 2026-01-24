@@ -185,7 +185,8 @@ export async function initializeMaterials() {
     './src/world/assets/textures/box_top.png',
     './src/world/assets/textures/Bookshelf_texture_JE2_BE2.png',
     './src/world/assets/textures/Bone_Block_side_texture_JE2_BE2.png',
-    './src/world/assets/textures/Bone_Block_top_texture_JE2_BE2.png'
+    './src/world/assets/textures/Bone_Block_top_texture_JE2_BE2.png',
+    './src/world/assets/textures/double_plant_grass_carried.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -422,6 +423,13 @@ materials.registerMaterial('realistic_trunk_procedural', {
 // 新树木材质（使用预加载纹理）
 materials.registerMaterial('realistic_oak_leaves', {
   textureUrl: './src/world/assets/textures/oak_leaves_branch_medium.png',
+  transparent: true,
+  alphaTest: 0.5,
+  side: THREE.DoubleSide
+});
+
+materials.registerMaterial('short_grass', {
+  textureUrl: './src/world/assets/textures/double_plant_grass_carried.png',
   transparent: true,
   alphaTest: 0.5,
   side: THREE.DoubleSide
