@@ -54,40 +54,19 @@ export class Tree {
       const h = 4 + Math.floor(Math.random() * 3);
       for (let i = 0; i < h; i++) chunk.add(x, y + i, z, 'azalea_log', dObj);
 
-      const leaves = [];
-      // 在树干顶部生成球形树叶
+      // 在树干顶部生成类似森林树木的簇状树叶
       for (let lx = x - 2; lx <= x + 2; lx++) {
         for (let ly = y + h - 2; ly <= y + h; ly++) {
           for (let lz = z - 2; lz <= z + 2; lz++) {
-            // 使用曼哈顿距离创建球形树叶分布
-            if (Math.abs(lx - x) + Math.abs(ly - (y + h)) + Math.abs(lz - z) <= 2.5) {
-              chunk.add(lx, ly, lz, 'azalea_leaves', dObj);
-              leaves.push({x: lx, y: ly, z: lz});
+            // 避免在树干内部位置重复生成（除非在顶部以上），并增加随机性
+            if (lx !== x || lz !== z || ly >= y + h) {
+              // 边缘随机稀疏化，使其看起来更自然
+              const dist = Math.abs(lx - x) + Math.abs(lz - z);
+              if (dist <= 2 && Math.random() > 0.2) {
+                chunk.add(lx, ly, lz, 'azalea_leaves', dObj);
+              }
             }
           }
-        }
-      }
-
-      // 收集杜鹃花树的所有方块（用于后续悬挂方块生成）
-      const blocks = [];
-      // 添加树干方块
-      for (let i = 0; i < h; i++) {
-        blocks.push({x: x, y: y + i, z: z, type: 'azalea_log'});
-      }
-      // 添加树叶方块
-      for (const leaf of leaves) {
-        blocks.push({x: leaf.x, y: leaf.y, z: leaf.z, type: 'azalea_leaves'});
-      }
-
-      // 为下方有空隙的方块生成悬挂方块
-      for (const block of blocks) {
-        const belowKey = `${Math.round(block.x)},${Math.round(block.y - 1)},${Math.round(block.z)}`;
-        // 检查下方是否有固体方块（包括地形或其他树木方块）
-        const hasBlockBelow = chunk.solidBlocks.has(belowKey) ||
-          blocks.some(b => b.x === block.x && b.y === block.y - 1 && b.z === block.z);
-        if (!hasBlockBelow) {
-          // 在此方块下方添加悬挂方块
-          chunk.add(block.x, block.y - 1, block.z, 'azalea_hanging', dObj, false);
         }
       }
     } else if (type === 'swamp') {

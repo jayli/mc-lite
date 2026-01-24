@@ -164,7 +164,6 @@ export async function initializeMaterials() {
   const textureUrls = [
     './src/world/assets/textures/oak_leaves_branch_medium.png',
     './src/world/assets/textures/flowering_azalea_leaves.png',
-    './src/world/assets/textures/flowering_azalea_side.png',
     './src/world/assets/textures/grass_carried.png',
     './src/world/assets/textures/grass_side_carried.png',
     './src/world/assets/textures/moss_block.png',
@@ -386,13 +385,6 @@ materials.registerMaterial('azalea_leaves', {
   alphaTest: 0.5,
   side: THREE.DoubleSide,
   repeat: [2, 2]
-});
-
-materials.registerMaterial('azalea_hanging', {
-  textureUrl: './src/world/assets/textures/flowering_azalea_side.png',
-  transparent: true,
-  alphaTest: 0.5,
-  side: THREE.DoubleSide
 });
 
 materials.registerMaterial('vine', mkDetailMat(null, '#355E3B', true, (ctx) => {

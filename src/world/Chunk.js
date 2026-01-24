@@ -38,50 +38,7 @@ const geoVine = buildCrossGeo(0);
 
 // 垂落叶片的几何体（顶部对齐到0.5以接触上方方块）
 // 高度1.0 -> 半高0.5。需要的偏移：0.5 - 0.5 = 0
-// const geoHanging = buildCrossGeo(0); // 未使用，被 geoAzaleaHangingCube 替代
-
-/**
- * 杜鹃花垂落元素几何体 - 仅四个垂直平面（无顶面和底面）
- * 模拟杜鹃花垂落效果，由四个向外的垂直平面组成
- */
-const geoAzaleaHangingCube = (() => {
-  const faceSize = 1.0; // 正方形面片，匹配方块尺寸 (1:1)
-  const faceWidth = faceSize;
-  const faceHeight = faceSize;
-
-  // 创建四个面向外的垂直平面
-  // +X方向的平面（东面）
-  const planeXPos = new THREE.PlaneGeometry(faceWidth, faceHeight);
-  planeXPos.rotateY(Math.PI / 2); // 面向+X方向
-  planeXPos.translate(faceWidth / 2, 0, 0);
-
-  // -X方向的平面（西面）
-  const planeXNeg = new THREE.PlaneGeometry(faceWidth, faceHeight);
-  planeXNeg.rotateY(-Math.PI / 2); // 面向-X方向
-  planeXNeg.translate(-faceWidth / 2, 0, 0);
-
-  // +Z方向的平面（北面）
-  const planeZPos = new THREE.PlaneGeometry(faceWidth, faceHeight);
-  // 默认面向+Z方向
-  planeZPos.translate(0, 0, faceWidth / 2);
-
-  // -Z方向的平面（南面）
-  const planeZNeg = new THREE.PlaneGeometry(faceWidth, faceHeight);
-  planeZNeg.rotateY(Math.PI); // 面向-Z方向
-  planeZNeg.translate(0, 0, -faceWidth / 2);
-
-  // 合并所有平面
-  const merged = BufferGeometryUtils.mergeGeometries([planeXPos, planeXNeg, planeZPos, planeZNeg]);
-
-  // 定位几何体，使顶部边缘与方块顶部对齐（y = +0.5）
-  // 每个平面的局部原点在其中心，因此顶部边缘在 y = faceHeight/2
-  // 我们希望顶部在 y = +0.5，所以需要向上移动：
-  // 偏移量 = 期望的顶部 - 当前顶部 = 0.5 - faceHeight/2
-  // 当 faceHeight = 1.0 时，偏移量 = 0.5 - 0.5 = 0（不需要平移）
-  merged.translate(0, 0.5 - faceHeight/2, 0);
-
-  return merged;
-})();
+// const geoHanging = buildCrossGeo(0); // 未使用
 
 /**
  * 睡莲几何体 - 一个旋转为水平方向的平面
@@ -116,7 +73,6 @@ const geomMap = {
   'flower': geoFlower,
   'short_grass': geoFlower,
   'vine': geoVine,
-  'azalea_hanging': geoAzaleaHangingCube,
   'lilypad': geoLily,
   'cactus': geoCactus,
   'default': new THREE.BoxGeometry(1, 1, 1)
@@ -152,7 +108,7 @@ export class Chunk {
     const d = {};
     const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'planks', 'oak_planks', 'leaves', 'water', 'cactus',
       'flower', 'short_grass', 'chest', 'bookbox', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
-      'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'azalea_hanging', 'swamp_water',
+      'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'swamp_water',
       'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword'];
     for(const type of allTypes) {
       d[type] = [];
@@ -402,7 +358,7 @@ export class Chunk {
       mesh.instanceMatrix.needsUpdate = true;
 
       // 设置阴影：半透明和特殊模型不投射/接收阴影
-      if(!['water','swamp_water','cloud','vine','azalea_hanging','lilypad','flower','short_grass'].includes(type)) {
+      if(!['water','swamp_water','cloud','vine','lilypad','flower','short_grass'].includes(type)) {
         mesh.castShadow = true;    // 投射阴影
         mesh.receiveShadow = true; // 接收阴影
       }
