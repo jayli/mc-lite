@@ -77,11 +77,19 @@ this.render();   // 渲染场景
         if (this.world && this.player) this.world.update(this.player.position, dt); // 更新世界状态（区块加载等）
         if (this.ui) this.ui.update(dt); // 更新UI
 
-  // 更新光源位置使其跟随玩家（从旧版逻辑移植）
-  if (this.engine.light && this.player) {
-    this.engine.light.position.set(this.player.position.x + 20, this.player.position.y + 40, this.player.position.z + 20);
-    this.engine.light.target.position.copy(this.player.position);
-    this.engine.light.target.updateMatrixWorld();
+  // 更新光源与太阳位置使其跟随玩家
+  if (this.player) {
+    // 太阳位置：玩家位置 + 太阳方向 * 150 (保持在远景)
+    if (this.engine.sunSprite) {
+      this.engine.sunSprite.position.copy(this.player.position).addScaledVector(this.engine.sunDirection, 150);
+    }
+
+    // 光源位置：玩家位置 + 太阳方向 * 50 (确保阴影覆盖玩家周围区域)
+    if (this.engine.light) {
+      this.engine.light.position.copy(this.player.position).addScaledVector(this.engine.sunDirection, 50);
+      this.engine.light.target.position.copy(this.player.position);
+      this.engine.light.target.updateMatrixWorld();
+    }
   }
     }
 

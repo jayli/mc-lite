@@ -28,9 +28,15 @@ export class Engine {
     // 启用渲染器的阴影贴图
     this.renderer.shadowMap.enabled = true;
 
-    // --- 灯光设置 ---
+    // --- 灯光与天空设置 ---
+    // 太阳方向 (归一化向量)
+    this.sunDirection = new THREE.Vector3(1, 0.8, 0.5).normalize();
+    // 太阳颜色与光照颜色
+    this.sunColor = 0xFFE4B5; // 鹿皮色 (温暖的黄橙色)
+    this.lightColor = 0xFFF4E0; // 暖白色
+
     // 创建一个平行光
-    const light = new THREE.DirectionalLight(0xffffff, 1.2);
+    const light = new THREE.DirectionalLight(this.lightColor, 1.2);
     // 允许此光源投射阴影
     light.castShadow = true;
     // 设置阴影贴图的分辨率为 1024x1024
@@ -40,16 +46,55 @@ export class Engine {
     light.shadow.camera.right = 30;
     light.shadow.camera.top = 30;
     light.shadow.camera.bottom = -30;
+    light.shadow.camera.near = 0.1;
+    light.shadow.camera.far = 100;
+    light.shadow.bias = -0.005; // 减少阴影失真 (Shadow Acne)
     // 将平行光添加到场景中
     this.scene.add(light);
-    // 添加一个环境光，为整个场景提供基础照明
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+    // 添加一个环境光，为整个场景提供基础照明 (稍微调暖一点)
+    this.scene.add(new THREE.AmbientLight(0xFFF0E0, 0.5));
 
     // 将平行光实例暴露出来，以便在玩家位置更新时可以更新光源位置
     this.light = light;
 
+    // 创建太阳
+    this.createSun();
+
     // 调用初始化方法
     this.init();
+  }
+
+  // 创建太阳 Sprite
+  createSun() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const context = canvas.getContext('2d');
+
+    // 创建径向渐变
+    const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 64);
+    const sunColor = new THREE.Color(this.sunColor);
+    const r = Math.floor(sunColor.r * 255);
+    const g = Math.floor(sunColor.g * 255);
+    const b = Math.floor(sunColor.b * 255);
+
+    gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 1)`);
+    gradient.addColorStop(0.3, `rgba(${r}, ${g}, ${b}, 0.8)`);
+    gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, 128, 128);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const sunMaterial = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false // 确保太阳不会被云彩或其他远距离物体遮挡 (模拟无限远)
+    });
+
+    this.sunSprite = new THREE.Sprite(sunMaterial);
+    this.sunSprite.scale.set(30, 30, 1);
+    this.scene.add(this.sunSprite);
   }
 
   // 初始化方法
