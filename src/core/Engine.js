@@ -93,9 +93,11 @@ export class Engine {
     const g = Math.floor(sunColor.g * 255);
     const b = Math.floor(sunColor.b * 255);
 
-    gradient.addColorStop(0, `rgba(${r}, ${g}, ${b}, 1)`);
-    gradient.addColorStop(0.3, `rgba(${r}, ${g}, ${b}, 0.8)`);
-    gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+    // 优化渐变：添加白色核心，提升亮度
+    gradient.addColorStop(0, `rgba(255, 205, 177, 1)`); // 核心纯白
+    gradient.addColorStop(0.1, `rgba(255, 182, 142, 1)`); // 亮色过渡
+    gradient.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.7)`); // 太阳原色，开始变淡
+    gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`); // 边缘全透明
 
     context.fillStyle = gradient;
     context.fillRect(0, 0, 128, 128);
@@ -104,11 +106,12 @@ export class Engine {
     const sunMaterial = new THREE.SpriteMaterial({
       map: texture,
       transparent: true,
-      depthTest: false // 确保太阳不会被云彩或其他远距离物体遮挡 (模拟无限远)
+      fog: false, // 太阳不受雾效影响，保持明亮
+      depthTest: true // 开启深度测试，允许被方块遮挡
     });
 
     this.sunSprite = new THREE.Sprite(sunMaterial);
-    this.sunSprite.scale.set(30, 30, 1);
+    this.sunSprite.scale.set(20, 20, 1);
     this.scene.add(this.sunSprite);
   }
 
