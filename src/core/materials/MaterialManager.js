@@ -457,3 +457,5 @@ materials.registerMaterial('allium', {
   side: THREE.DoubleSide
 });
 
+materials.registerMaterial('chimney', mkMat('#7f5b37')); // 深棕色烟囱
+

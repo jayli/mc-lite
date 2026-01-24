@@ -66,9 +66,11 @@ const geoCactus = (() => {
   return BufferGeometryUtils.mergeGeometries(geoms);
 })();
 
+/** 烟囱几何体 - 一个略窄的圆柱体 */
+const geoChimney = new THREE.CylinderGeometry(0.15, 0.15, 2, 8);
+
 /**
  * 几何体映射表 - 将方块类型映射到对应的几何体
- * 用于在构建网格时快速获取几何体
  */
 const geomMap = {
   'flower': geoFlower,
@@ -77,6 +79,7 @@ const geomMap = {
   'vine': geoVine,
   'lilypad': geoLily,
   'cactus': geoCactus,
+  'chimney': geoChimney,
   'default': new THREE.BoxGeometry(1, 1, 1)
 };
 
@@ -116,7 +119,7 @@ export class Chunk {
     const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'planks', 'oak_planks', 'leaves', 'water', 'cactus',
       'flower', 'short_grass', 'chest', 'bookbox', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
       'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'azalea_flowers', 'swamp_water',
-      'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'gold_ore', 'calcite', 'bricks', 'allium'];
+      'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'gold_ore', 'calcite', 'bricks', 'allium', 'chimney'];
     for(const type of allTypes) {
       d[type] = [];
     }
@@ -311,18 +314,36 @@ export class Chunk {
       }
 
       // 3. 金字塔形屋顶：使用大橡木木板，从第4层开始逐渐缩小并填实
+      const roofBlocks = []; // 记录屋顶方块位置
       for (let h = 0; h < 3; h++) {
         for (let i = -2 + h; i <= 2 - h; i++) {
           for (let j = -2 + h; j <= 2 - h; j++) {
             this.add(x + i, y + 3 + h, z + j, 'oak_planks', dObj);
+            // 如果不是被上一层完全覆盖的内部方块，则可能是暴露的
+            if (h === 2 || Math.abs(i) === 2 - h || Math.abs(j) === 2 - h) {
+              roofBlocks.push({ x: x + i, y: y + 3 + h, z: z + j });
+            }
           }
         }
       }
 
       // 4. 屋顶顶部：一行大橡木木板，确保顶部平整
-      for (let j = -1; j <= 1; j++) this.add(x, y + 5, z + j, 'oak_planks', dObj);
+      for (let j = -1; j <= 1; j++) {
+        this.add(x, y + 5, z + j, 'oak_planks', dObj);
+        roofBlocks.push({ x: x, y: y + 5, z: z + j });
+      }
 
-      // 5. 内部家具：床和箱子
+      // 5. 烟囱：1/3 的几率生成烟囱，随机选择一个非最高点的暴露屋顶方块上方放置
+      if (Math.random() < 0.33) {
+        const lowerRoofBlocks = roofBlocks.filter(b => b.y < y + 5);
+        const targetPool = lowerRoofBlocks.length > 0 ? lowerRoofBlocks : roofBlocks;
+        if (targetPool.length > 0) {
+          const pos = targetPool[Math.floor(Math.random() * targetPool.length)];
+          this.add(pos.x, pos.y + 1, pos.z, 'chimney', dObj, false);
+        }
+      }
+
+      // 6. 内部家具：床和箱子
       this.add(x - 1, y, z - 1, 'bookbox', dObj, false);
       this.add(x + 1, y, z - 1, 'chest', dObj);
     } else if (type === 'rover') {
