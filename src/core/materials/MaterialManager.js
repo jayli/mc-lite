@@ -189,7 +189,8 @@ export async function initializeMaterials() {
     './src/world/assets/textures/double_plant_grass_carried.png',
     './src/world/assets/textures/Glass.png',
     './src/world/assets/textures/Deepslate_Gold.png',
-    './src/world/assets/textures/Bricks.png'
+    './src/world/assets/textures/Bricks.png',
+    './src/world/assets/textures/flower_Allium.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -444,6 +445,13 @@ materials.registerMaterial('realistic_oak_leaves', {
 
 materials.registerMaterial('short_grass', {
   textureUrl: './src/world/assets/textures/double_plant_grass_carried.png',
+  transparent: true,
+  alphaTest: 0.5,
+  side: THREE.DoubleSide
+});
+
+materials.registerMaterial('allium', {
+  textureUrl: './src/world/assets/textures/flower_Allium.png',
   transparent: true,
   alphaTest: 0.5,
   side: THREE.DoubleSide

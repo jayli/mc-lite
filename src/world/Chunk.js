@@ -73,6 +73,7 @@ const geoCactus = (() => {
 const geomMap = {
   'flower': geoFlower,
   'short_grass': geoFlower,
+  'allium': geoFlower,
   'vine': geoVine,
   'lilypad': geoLily,
   'cactus': geoCactus,
@@ -115,7 +116,7 @@ export class Chunk {
     const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'planks', 'oak_planks', 'leaves', 'water', 'cactus',
       'flower', 'short_grass', 'chest', 'bookbox', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
       'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'azalea_flowers', 'swamp_water',
-      'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'gold_ore', 'calcite', 'bricks'];
+      'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'gold_ore', 'calcite', 'bricks', 'allium'];
     for(const type of allTypes) {
       d[type] = [];
     }
@@ -202,7 +203,9 @@ export class Chunk {
             if (randPlant < 0.05) { // 生成草的几率
               this.add(wx, h + 1, wz, 'short_grass', d, false);
             } else if (randPlant < 0.10) { // 生成花的几率
-              this.add(wx, h + 1, wz, 'flower', d, false);
+              // 1/3 的几率生成紫色小花 (allium)
+              const flowerType = Math.random() < 0.33 ? 'allium' : 'flower';
+              this.add(wx, h + 1, wz, flowerType, d, false);
             }
             // 0.1%的几率生成房屋结构
             if (Math.random() < 0.001) this.structure('house', wx, h + 1, wz, d);
