@@ -187,7 +187,8 @@ export async function initializeMaterials() {
     './src/world/assets/textures/Bone_Block_side_texture_JE2_BE2.png',
     './src/world/assets/textures/Bone_Block_top_texture_JE2_BE2.png',
     './src/world/assets/textures/double_plant_grass_carried.png',
-    './src/world/assets/textures/Glass.png'
+    './src/world/assets/textures/Glass.png',
+    './src/world/assets/textures/Deepslate_Gold.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -280,6 +281,10 @@ materials.registerMaterial('stone', {
     5: stoneSide
   }
 }); // 石头
+
+materials.registerMaterial('gold_ore', {
+  textureUrl: './src/world/assets/textures/Deepslate_Gold.png'
+}); // 黄金矿石
 
 const sandSide = { textureUrl: './src/world/assets/textures/sand_side.png' };
 const sandTopBottom = { textureUrl: './src/world/assets/textures/sand.png' };

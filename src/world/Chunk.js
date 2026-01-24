@@ -115,7 +115,7 @@ export class Chunk {
     const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'planks', 'oak_planks', 'leaves', 'water', 'cactus',
       'flower', 'short_grass', 'chest', 'bookbox', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
       'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'azalea_flowers', 'swamp_water',
-      'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block'];
+      'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'gold_ore'];
     for(const type of allTypes) {
       d[type] = [];
     }
@@ -165,7 +165,11 @@ export class Chunk {
           // 生成地表方块和地下方块
           this.add(wx, h, wz, surf, d);          // 地表方块
           this.add(wx, h - 1, wz, sub, d);       // 地表下方第一层（泥土或沙子）
-          for (let k = 2; k <= 12; k++) this.add(wx, h - k, wz, 'stone', d);  // 再往下11层石头
+          for (let k = 2; k <= 12; k++) {
+            // 10% 的几率将石头替换为黄金矿石
+            const blockType = Math.random() < 0.1 ? 'gold_ore' : 'stone';
+            this.add(wx, h - k, wz, blockType, d);
+          }
 
           // 植被生成 - 根据生物群系决定植物类型和生成概率
           if (centerBiome === 'FOREST') {
