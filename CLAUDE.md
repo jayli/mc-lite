@@ -59,7 +59,7 @@ UIManager.js → HUD.js + Inventory.js
 **光照与天空系统** (`Engine.js` + `Game.js`):
 - **太阳表现**: 使用 `THREE.Sprite` 配合 Canvas 径向渐变纹理实现柔和太阳
 - **同步机制**: 太阳位置始终保持在相对于玩家的无限远处（150单位）
-- **平行光同步**: `DirectionalLight` 的方向与太阳方位严格对齐，提供温暖的光照色调 (`0xFFF4E0`)
+- **平行光同步**: `DirectionalLight` 的方向与太阳方位严格对齐，提供温暖的光照色调
 - **阴影优化**: 阴影相机范围 `[-30, 30]`，采用负 bias 减少失真
 
 ### 性能优化策略

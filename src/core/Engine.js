@@ -32,15 +32,16 @@ export class Engine {
     // 太阳方向 (归一化向量)
     this.sunDirection = new THREE.Vector3(1, 0.8, 0.5).normalize();
     // 太阳颜色与光照颜色
-    this.sunColor = 0xFFE4B5; // 鹿皮色 (温暖的黄橙色)
-    this.lightColor = 0xFFF4E0; // 暖白色
+    // this.sunColor = 0xFFE4B5; // 鹿皮色 (温暖的黄橙色)
+    this.sunColor = 0xffcc74; // 暖黄色
+    this.lightColor = 0xfdf7ec; // 暖白色，影响色温
 
     // 创建一个平行光
     const light = new THREE.DirectionalLight(this.lightColor, 1.2);
     // 允许此光源投射阴影
     light.castShadow = true;
     // 设置阴影贴图的分辨率为 1024x1024
-    light.shadow.mapSize.set(1024, 1024);
+    light.shadow.mapSize.set(512, 512);
     // 设置平行光阴影相机的视锥体范围
     light.shadow.camera.left = -30;
     light.shadow.camera.right = 30;
@@ -48,11 +49,12 @@ export class Engine {
     light.shadow.camera.bottom = -30;
     light.shadow.camera.near = 0.1;
     light.shadow.camera.far = 100;
-    light.shadow.bias = -0.005; // 减少阴影失真 (Shadow Acne)
+    light.shadow.bias = -0.000; // 减少阴影失真 (Shadow Acne)
     // 将平行光添加到场景中
     this.scene.add(light);
     // 添加一个环境光，为整个场景提供基础照明 (稍微调暖一点)
-    this.scene.add(new THREE.AmbientLight(0xFFF0E0, 0.5));
+    // 环境光是必要的，否则就会亮的过亮，暗的过暗
+    this.scene.add(new THREE.AmbientLight(0xfff6f6, 0.8));
 
     // 将平行光实例暴露出来，以便在玩家位置更新时可以更新光源位置
     this.light = light;
