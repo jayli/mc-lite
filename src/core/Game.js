@@ -77,20 +77,30 @@ this.render();   // 渲染场景
         if (this.world && this.player) this.world.update(this.player.position, dt); // 更新世界状态（区块加载等）
         if (this.ui) this.ui.update(dt); // 更新UI
 
-  // 更新光源与太阳位置使其跟随玩家
-  if (this.player) {
-    // 太阳位置：玩家位置 + 太阳方向 * 150 (保持在远景)
-    if (this.engine.sunSprite) {
-      this.engine.sunSprite.position.copy(this.player.position).addScaledVector(this.engine.sunDirection, 150);
-    }
+    // 更新光源与太阳位置使其跟随玩家
+    if (this.player) {
+      // 性能优化：只有当玩家移动超过一定阈值时才更新灯光位置
+      // 这可以减少每帧的矩阵计算，并减少阴影抖动
+      const distSq = this.player.position.distanceToSquared(this.engine._lastUpdatePos);
+      if (distSq > 25) { // 移动5个单位再重新计算阴影，提高运行时性能 (5 * 5 = 25)
 
-    // 光源位置：玩家位置 + 太阳方向 * 50 (确保阴影覆盖玩家周围区域)
-    if (this.engine.light) {
-      this.engine.light.position.copy(this.player.position).addScaledVector(this.engine.sunDirection, 50);
-      this.engine.light.target.position.copy(this.player.position);
-      this.engine.light.target.updateMatrixWorld();
+        // 太阳位置：直接使用预分配向量
+        if (this.engine.sunSprite) {
+          this.engine.sunSprite.position.copy(this.player.position)
+            .addScaledVector(this.engine.sunDirection, 150);
+        }
+
+        // 光源位置：同步移动
+        if (this.engine.light) {
+          this.engine.light.position.copy(this.player.position)
+            .addScaledVector(this.engine.sunDirection, 60);
+          this.engine.light.target.position.copy(this.player.position);
+
+          // 更新上次同步的位置
+          this.engine._lastUpdatePos.copy(this.player.position);
+        }
+      }
     }
-  }
     }
 
   /**
