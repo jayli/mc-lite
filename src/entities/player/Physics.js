@@ -14,7 +14,7 @@ export class Physics {
     this.gravity = -0.015;      // 重力加速度
     this.terminalVelocity = -1.0; // 终端速度（最大下落速度）
     this.playerHeight = 1.5;     // 玩家碰撞高度
-    this.jumpForce = 0.25;       // 跳跃力
+    this.jumpForce = 0.22;       // 跳跃力
     this.speed = 0.12;           // 移动速度
   }
 
