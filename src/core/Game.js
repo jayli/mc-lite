@@ -90,6 +90,11 @@ this.render();   // 渲染场景
             .addScaledVector(this.engine.sunDirection, 150);
         }
 
+        // 天空位置：始终跟随玩家中心
+        if (this.engine.skyMesh) {
+          this.engine.skyMesh.position.copy(this.player.position);
+        }
+
         // 光源位置：同步移动
         if (this.engine.light) {
           this.engine.light.position.copy(this.player.position)

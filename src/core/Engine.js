@@ -8,9 +8,9 @@ export class Engine {
   constructor() {
     // 创建一个新的 Three.js 场景
     this.scene = new THREE.Scene();
-    // 设置场景的背景颜色为天蓝色
-    this.scene.background = new THREE.Color(0x87CEEB);
-    // 在场景中添加雾效，颜色与背景色相同，从距离20开始，到距离90完全遮挡
+    // 场景背景设为 null，因为我们将使用天空球
+    this.scene.background = null;
+    // 在场景中添加雾效，颜色与地平线相同，从距离20开始，到距离90完全遮挡
     this.scene.fog = new THREE.Fog(0x87CEEB, 20, 90);
 
     // 创建一个透视相机
@@ -38,6 +38,8 @@ export class Engine {
     this.sunDirection = new THREE.Vector3(1, 0.8, 0.5).normalize();
     this.sunColor = 0xfff3a0; // 温暖的金黄色
     this.lightColor = 0xfffaf0; // 极亮的暖白色
+    this.zenithColor = 0x87CEEB;  // 顶点颜色 (深蓝)
+    this.horizonColor = 0xa6def4; // 地平线颜色 (浅蓝)
 
     // 创建一个平行光
     const light = new THREE.DirectionalLight(this.lightColor, 2.2); // 强度大幅提升
@@ -54,13 +56,13 @@ export class Engine {
     light.shadow.camera.top = 40;
     light.shadow.camera.bottom = -40;
     light.shadow.camera.near = 0.1;
-    light.shadow.camera.far = 200;
+    light.shadow.camera.far = 400;
     light.shadow.bias = -0.000;
     light.shadow.normalBias = 0.02;
 
     this.scene.add(light);
     // 环境光：使用微弱的冷蓝色（天空散射光），与暖色阳光形成对比，增加画面的层次感
-    this.scene.add(new THREE.AmbientLight(0xddeeff, 0.9));
+    this.scene.add(new THREE.AmbientLight(0xddeeff, 1));
 
     this.light = light;
 
@@ -70,6 +72,8 @@ export class Engine {
 
     // 创建太阳
     this.createSun();
+    // 创建渐变天空
+    this.createSky();
 
     // 调用初始化方法
     this.init();
@@ -106,6 +110,43 @@ export class Engine {
     this.sunSprite = new THREE.Sprite(sunMaterial);
     this.sunSprite.scale.set(30, 30, 1);
     this.scene.add(this.sunSprite);
+  }
+
+  // 创建渐变天空球
+  createSky() {
+    const skyGeo = new THREE.SphereGeometry(180, 32, 15);
+    const skyMat = new THREE.ShaderMaterial({
+      uniforms: {
+        topColor: { value: new THREE.Color(this.zenithColor) },
+        bottomColor: { value: new THREE.Color(this.horizonColor) },
+        offset: { value: 33 },
+        exponent: { value: 0.6 }
+      },
+      vertexShader: `
+        varying vec3 vWorldPosition;
+        void main() {
+          vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
+          vWorldPosition = worldPosition.xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 topColor;
+        uniform vec3 bottomColor;
+        uniform float offset;
+        uniform float exponent;
+        varying vec3 vWorldPosition;
+        void main() {
+          float h = normalize( vWorldPosition + offset ).y;
+          gl_FragColor = vec4( mix( bottomColor, topColor, max( pow( max( h, 0.0 ), exponent ), 0.0 ) ), 1.0 );
+        }
+      `,
+      side: THREE.BackSide,
+      depthWrite: false
+    });
+
+    this.skyMesh = new THREE.Mesh(skyGeo, skyMat);
+    this.scene.add(this.skyMesh);
   }
 
   // 初始化方法
