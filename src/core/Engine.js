@@ -11,7 +11,7 @@ export class Engine {
     // 场景背景设为 null，因为我们将使用天空球
     this.scene.background = null;
     // 在场景中添加雾效，颜色与地平线相同，从距离20开始，到距离90完全遮挡
-    this.scene.fog = new THREE.Fog(0x7dc7e5, 20, 90);
+    this.scene.fog = new THREE.Fog(0x6ebfe0, 20, 90);
 
     // 创建一个透视相机
     // 参数分别为：视野角度(FOV)，宽高比，近裁剪面，远裁剪面
