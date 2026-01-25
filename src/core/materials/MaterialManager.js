@@ -204,7 +204,9 @@ export async function initializeMaterials() {
     './src/world/assets/textures/Birch_Log_top.png',
     './src/world/assets/textures/Birch_Log_side.png',
     './src/world/assets/textures/Obsidian.png',
-    './src/world/assets/textures/diamond.png'
+    './src/world/assets/textures/diamond.png',
+    './src/world/assets/textures/gold.png',
+    './src/world/assets/textures/glass_blink.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -391,6 +393,12 @@ materials.registerMaterial('glass_block', {
   alphaTest: 0.1,
   side: THREE.DoubleSide
 }); // 玻璃
+materials.registerMaterial('glass_blink', {
+  textureUrl: './src/world/assets/textures/glass_blink.png',
+  transparent: true,
+  alphaTest: 0.1,
+  side: THREE.DoubleSide
+}); // 闪闪玻璃
 materials.registerMaterial('leaves', {
   textureUrl: './src/world/assets/textures/leaves.png',
   transparent: true,
@@ -464,7 +472,7 @@ materials.registerMaterial('chest', {
 
 // 额外物品材质
 materials.registerMaterial('diamond', { textureUrl: './src/world/assets/textures/diamond.png' });
-materials.registerMaterial('gold', mkMat('#FFD700'));
+materials.registerMaterial('gold', { textureUrl: './src/world/assets/textures/gold.png' });
 materials.registerMaterial('apple', mkMat('#FF0000'));
 materials.registerMaterial('god_sword', mkMat('#9400D3'));
 materials.registerMaterial('gold_apple', mkMat('#FFD700'));

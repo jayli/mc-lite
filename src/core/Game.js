@@ -38,6 +38,7 @@ export class Game {
     this.player.inventory.add('glass_block', 1000);
     this.player.inventory.add('cobblestone', 1000);
     this.player.inventory.add('blue_planks', 1000);
+    this.player.inventory.add('glass_blink', 1000);
     this.player.inventory.add('end_stone', 1000);
     this.player.inventory.add('green_planks', 1000);
     this.player.inventory.add('hay_bale', 1000);
@@ -50,7 +51,9 @@ export class Game {
     this.player.inventory.add('white_planks', 1000);
     this.player.inventory.add('birch_log', 1000);
     this.player.inventory.add('obsidian', 1000);
+    this.player.inventory.add('sand', 1000);
     this.player.inventory.add('diamond', 1000);
+    this.player.inventory.add('gold', 1000);
   }
 
   /**
