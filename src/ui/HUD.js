@@ -36,6 +36,20 @@ export class HUD {
     this.game = game;
     this.hotbarEl = document.getElementById('hotbar');
     this.msgEl = document.getElementById('msg');
+    this.hudEl = document.getElementById('hud');
+
+    // FPS 相关变量
+    this.lastTime = performance.now();
+    this.frames = 0;
+    this.fps = 0;
+
+    // 创建 FPS 显示元素
+    if (this.hudEl) {
+      this.fpsEl = document.createElement('div');
+      this.fpsEl.style.color = '#ffff00'; // 使用黄色使其显眼
+      this.fpsEl.style.fontWeight = 'bold';
+      this.hudEl.appendChild(this.fpsEl);
+    }
   }
 
   /**
@@ -44,7 +58,37 @@ export class HUD {
    */
   update() {
     if (!this.game.player) return; // 确保玩家对象存在
+
+    // 计算并更新 FPS
+    this.updateFPS();
+
     this.renderHotbar();           // 渲染快捷栏
+  }
+
+  /**
+   * 计算帧率并每秒更新一次显示
+   */
+  updateFPS() {
+    this.frames++;
+    const now = performance.now();
+
+    if (now >= this.lastTime + 1000) {
+      this.fps = Math.round((this.frames * 1000) / (now - this.lastTime));
+
+      let statsText = `FPS: ${this.fps}`;
+
+      // 尝试获取内存信息 (仅限 Chromium 浏览器)
+      if (performance.memory) {
+        const memoryUsed = Math.round(performance.memory.usedJSHeapSize / 1048576); // 转换为 MB
+        statsText += ` | Mem: ${memoryUsed}MB`;
+      }
+
+      if (this.fpsEl) {
+        this.fpsEl.textContent = statsText;
+      }
+      this.frames = 0;
+      this.lastTime = now;
+    }
   }
 
   /**
