@@ -449,7 +449,7 @@ materials.registerMaterial('bookbox', {
 
 materials.registerMaterial('carBody', mkMat('#FFD700')); // 汽车
 materials.registerMaterial('wheel', mkMat('#222222')); // 轮子
-materials.registerMaterial('cloud', mkMat('#FFFFFF', 0.9)); // 云
+materials.registerMaterial('cloud', mkMat('#FFFFFF', 1)); // 云
 materials.registerMaterial('sky_stone', mkMat('#DDDDDD')); // 天空石头
 materials.registerMaterial('sky_grass', mkMat('#88CCFF')); // 天空草
 materials.registerMaterial('sky_wood', mkMat('#DDA0DD')); // 天空木头
