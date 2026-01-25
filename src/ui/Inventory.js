@@ -50,7 +50,7 @@ export class InventoryUI {
    */
   setupEvents() {
     window.addEventListener('keydown', (e) => {
-      if (e.code === 'KeyZ') this.toggle();
+      if (e.code === 'KeyZ' || (e.code === 'Escape' && this.isOpen)) this.toggle();
       // 快捷栏选择键（数字键1-5）
       if (['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].includes(e.code)) {
         if (this.game.player) {
