@@ -193,7 +193,11 @@ export async function initializeMaterials() {
     './src/world/assets/textures/flower_Allium.png',
     './src/world/assets/textures/Cobblestone.png',
     './src/world/assets/textures/Blue_Wood_Planks.png',
-    './src/world/assets/textures/End_Stone.png'
+    './src/world/assets/textures/End_Stone.png',
+    './src/world/assets/textures/Green_Wood_Planks.png',
+    './src/world/assets/textures/Hay_Bale.png',
+    './src/world/assets/textures/Hay_Bale_top.png',
+    './src/world/assets/textures/Mossy_Cobblestone.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -299,6 +303,10 @@ materials.registerMaterial('cobblestone', {
   textureUrl: './src/world/assets/textures/Cobblestone.png'
 }); // 鹅卵石
 
+materials.registerMaterial('mossy_stone', {
+  textureUrl: './src/world/assets/textures/Mossy_Cobblestone.png'
+}); // 苔藓石
+
 materials.registerMaterial('blue_planks', {
   textureUrl: './src/world/assets/textures/Blue_Wood_Planks.png'
 }); // 蓝色木板
@@ -306,6 +314,23 @@ materials.registerMaterial('blue_planks', {
 materials.registerMaterial('end_stone', {
   textureUrl: './src/world/assets/textures/End_Stone.png'
 }); // 末端石头
+
+materials.registerMaterial('green_planks', {
+  textureUrl: './src/world/assets/textures/Green_Wood_Planks.png'
+}); // 绿色木板
+
+const hayBaleSide = { textureUrl: './src/world/assets/textures/Hay_Bale.png' };
+const hayBaleTopBottom = { textureUrl: './src/world/assets/textures/Hay_Bale_top.png' };
+materials.registerMaterial('hay_bale', {
+  faces: {
+    0: hayBaleSide,
+    1: hayBaleSide,
+    2: hayBaleTopBottom,
+    3: hayBaleTopBottom,
+    4: hayBaleSide,
+    5: hayBaleSide
+  }
+}); // 干草堆
 
 const sandSide = { textureUrl: './src/world/assets/textures/sand_side.png' };
 const sandTopBottom = { textureUrl: './src/world/assets/textures/sand.png' };

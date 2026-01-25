@@ -14,8 +14,11 @@ const ITEMS = {
   'gold_apple': { col: '#FFD700' }, 'god_sword': { col: '#9400D3' },
   'moss': { col: '#4B6E31' }, 'azalea_log': { col: '#635338' },
   'cobblestone': { col: '#8B8B8B' },
+  'mossy_stone': { col: '#6B8E23' },
   'blue_planks': { col: '#4A90E2' },
   'end_stone': { col: '#DEE0A3' },
+  'green_planks': { col: '#4B6E31' },
+  'hay_bale': { col: '#F5DEB3' },
   'azalea_leaves': { col: '#4A6B30' }, 'azalea_flowers': { col: '#7A9B50' },
   'vine': { col: '#355E3B' }, 'lilypad': { col: '#228B22' }
 };
