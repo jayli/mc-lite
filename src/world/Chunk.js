@@ -235,6 +235,15 @@ export class Chunk {
       Island.generate(centerWx, islandY, centerWz, this, d);
     }
 
+    // --- 新增：低空簇状云生成 ---
+    // 每个区块有 10% 的几率生成一朵由 20-40 个方块组成的低空云 (Y=45)
+    if (Math.random() < 0.10) {
+      const startX = this.cx * CHUNK_SIZE + Math.floor(Math.random() * CHUNK_SIZE);
+      const startZ = this.cz * CHUNK_SIZE + Math.floor(Math.random() * CHUNK_SIZE);
+      const size = 20 + Math.floor(Math.random() * 21); // 20-40 随机大小
+      Cloud.generateCluster(startX, 45, startZ, size, this, d);
+    }
+
     // 叠加持久化修改 (优化后的逻辑：在生成过程中通过 add() 自动过滤，此处仅负责添加新增块)
     for (const [blockKey, delta] of deltas) {
       if (delta.type !== 'air') {
