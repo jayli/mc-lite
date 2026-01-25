@@ -1,4 +1,5 @@
 // src/ui/Inventory.js
+import { materials } from '../core/materials/MaterialManager.js';
 
 /**
  * 物品颜色配置表（与HUD.js中的相同）
@@ -94,9 +95,26 @@ export class InventoryUI {
       const ctx = c.getContext('2d');
       const itemDef = ITEMS[slot.item] || { col: '#fff' }; // 获取物品颜色配置，默认白色
 
-      // 绘制物品图标（基于颜色配置）
-      ctx.fillStyle = itemDef.col;
-      ctx.fillRect(4, 4, 24, 24);
+      // 尝试从材质管理器获取贴图
+      let iconDrawn = false;
+      const mat = materials.getMaterial(slot.item);
+      if (mat) {
+        const texture = Array.isArray(mat) ? mat[0].map : mat.map;
+        if (texture) {
+          const imgObj = texture.image || (texture.source && texture.source.data);
+          if (imgObj) {
+            ctx.drawImage(imgObj, 4, 4, 24, 24);
+            iconDrawn = true;
+          }
+        }
+      }
+
+      if (!iconDrawn) {
+        // 绘制物品图标（基于颜色配置 fallback）
+        ctx.fillStyle = itemDef.col;
+        ctx.fillRect(4, 4, 24, 24);
+      }
+
       ctx.strokeStyle = '#000';
       ctx.strokeRect(4, 4, 24, 24);
 
