@@ -169,7 +169,7 @@ export async function initializeMaterials() {
     './src/world/assets/textures/grass_side_carried.png',
     './src/world/assets/textures/moss_block.png',
     './src/world/assets/textures/planks_birch.png',
-    './src/world/assets/textures/planks_big_oak.png',
+    './src/world/assets/textures/dark_planks.png',
     './src/world/assets/textures/stone_andesite.png',
     './src/world/assets/textures/stone.png',
     './src/world/assets/textures/sand.png',
@@ -315,6 +315,10 @@ materials.registerMaterial('cobblestone', {
 materials.registerMaterial('obsidian', {
   textureUrl: './src/world/assets/textures/Obsidian.png'
 }); // 黑曜石
+
+materials.registerMaterial('dark_planks', {
+  textureUrl: './src/world/assets/textures/dark_planks.png'
+}); // 深木板
 
 materials.registerMaterial('mossy_stone', {
   textureUrl: './src/world/assets/textures/Mossy_Cobblestone.png'

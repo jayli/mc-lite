@@ -52,6 +52,7 @@ export class Game {
     this.player.inventory.add('birch_log', 1000);
     this.player.inventory.add('obsidian', 1000);
     this.player.inventory.add('sand', 1000);
+    this.player.inventory.add('dark_planks', 1000);
     this.player.inventory.add('diamond', 1000);
     this.player.inventory.add('gold', 1000);
   }
