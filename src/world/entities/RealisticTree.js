@@ -2,6 +2,7 @@
 // 真实树木生成模块
 // 使用预定义的模板创建树干和树叶
 import { realisticTreeManager } from './RealisticTreeManager.js';
+import { materials } from '../../core/materials/MaterialManager.js';
 
 /**
  * 真实树木生成器类

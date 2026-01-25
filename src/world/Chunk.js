@@ -179,13 +179,16 @@ export class Chunk {
           if (centerBiome === 'FOREST') {
             // 森林生物群系：5%的几率生成树木
             if (Math.random() < 0.05) {
-              const isBirch = Math.random() < 0.1; // 10% 的几率生成桦木树干
-              const logType = isBirch ? 'birch_log' : null;
-
-              if (Math.random() < 0.15) { // 15%的几率生成真实感树木
-                RealisticTree.generate(wx, h + 1, wz, this, logType);
-              } else {
-                Tree.generate(wx, h + 1, wz, this, 'big', d, logType);  // 85%的几率生成大型树木
+              try {
+                if (Math.random() < 0.15) { // 15%的几率生成真实感树木
+                  RealisticTree.generate(wx, h + 1, wz, this, null); // 真实树木不使用桦木替换
+                } else {
+                  const isBirch = Math.random() < 0.1; // 10% 的几率生成桦木树干
+                  const logType = isBirch ? 'birch_log' : null;
+                  Tree.generate(wx, h + 1, wz, this, 'big', d, logType);  // 85%的几率生成大型树木，且支持桦木替换
+                }
+              } catch (e) {
+                console.error("Tree generation failed at", wx, wz, e);
               }
             }
           } else if (centerBiome === 'AZALEA') {
