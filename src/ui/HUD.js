@@ -12,6 +12,7 @@ const ITEMS = {
   'gold_apple': { col: '#FFD700' }, 'god_sword': { col: '#9400D3' },
   'moss': { col: '#4B6E31' }, 'azalea_log': { col: '#635338' },
   'cobblestone': { col: '#8B8B8B' },
+  'obsidian': { col: '#2E2E2E' },
   'mossy_stone': { col: '#6B8E23' },
   'blue_planks': { col: '#4A90E2' },
   'end_stone': { col: '#DEE0A3' },

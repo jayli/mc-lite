@@ -116,7 +116,7 @@ export class Chunk {
     // 初始化所有可能的类型数组，类似原始代码中的逻辑
     // d 对象用于按类型收集方块位置，以便后续批量创建 InstancedMesh
     const d = {};
-    const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'birch_log', 'planks', 'oak_planks', 'white_planks', 'leaves', 'water', 'cactus',
+    const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'birch_log', 'planks', 'oak_planks', 'white_planks', 'obsidian', 'leaves', 'water', 'cactus',
       'flower', 'short_grass', 'allium', 'chest', 'bookbox', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
       'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'azalea_flowers', 'swamp_water',
       'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'gold_ore', 'calcite', 'bricks', 'chimney'];

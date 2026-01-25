@@ -202,7 +202,9 @@ export async function initializeMaterials() {
     './src/world/assets/textures/Oak_Planks.png',
     './src/world/assets/textures/White_Wood_Planks.png',
     './src/world/assets/textures/Birch_Log_top.png',
-    './src/world/assets/textures/Birch_Log_side.png'
+    './src/world/assets/textures/Birch_Log_side.png',
+    './src/world/assets/textures/Obsidian.png',
+    './src/world/assets/textures/diamond.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -307,6 +309,10 @@ materials.registerMaterial('bricks', {
 materials.registerMaterial('cobblestone', {
   textureUrl: './src/world/assets/textures/Cobblestone.png'
 }); // 鹅卵石
+
+materials.registerMaterial('obsidian', {
+  textureUrl: './src/world/assets/textures/Obsidian.png'
+}); // 黑曜石
 
 materials.registerMaterial('mossy_stone', {
   textureUrl: './src/world/assets/textures/Mossy_Cobblestone.png'
@@ -457,7 +463,7 @@ materials.registerMaterial('chest', {
 }); // 宝箱
 
 // 额外物品材质
-materials.registerMaterial('diamond', mkMat('#00FFFF'));
+materials.registerMaterial('diamond', { textureUrl: './src/world/assets/textures/diamond.png' });
 materials.registerMaterial('gold', mkMat('#FFD700'));
 materials.registerMaterial('apple', mkMat('#FF0000'));
 materials.registerMaterial('god_sword', mkMat('#9400D3'));
