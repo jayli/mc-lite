@@ -166,14 +166,23 @@ export class Engine {
         uColor: { value: new THREE.Color(0x4488ff) },
         uSunDirection: { value: this.sunDirection },
         uOpacity: { value: 0.6 },
-        uSeed: { value: SEED }
+        uSeed: { value: SEED },
+        uFogColor: { value: new THREE.Color(0x62b4d5) },
+        uFogNear: { value: 20 },
+        uFogFar: { value: 90 }
       },
       vertexShader: `
         varying vec3 vWorldPosition;
+        varying float vDepth;
         void main() {
           vec4 worldPosition = modelMatrix * vec4(position, 1.0);
           vWorldPosition = worldPosition.xyz;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+
+          // 计算相对于相机的深度
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          vDepth = -mvPosition.z;
+
+          gl_Position = projectionMatrix * mvPosition;
         }
       `,
       fragmentShader: `
@@ -182,7 +191,11 @@ export class Engine {
         uniform vec3 uSunDirection;
         uniform float uOpacity;
         uniform float uSeed;
+        uniform vec3 uFogColor;
+        uniform float uFogNear;
+        uniform float uFogFar;
         varying vec3 vWorldPosition;
+        varying float vDepth;
 
         float getNoise(float x, float z, float scale) {
           return sin((x + uSeed) * scale) * 2.0 + cos((z + uSeed) * scale) * 2.0;
@@ -204,14 +217,11 @@ export class Engine {
           float dist = length(vWorldPosition.xz - cameraPosition.xz);
 
           // --- 陆地/海洋显示逻辑 ---
-          // 在近处 (dist < 60) 执行离岸检测，防止陆地深坑出水
-          // 在远处 (dist >= 60) 始终显示水面，以填充地平线并消除色差
           if (dist < 60.0) {
             bool nearOcean = false;
             if (getHeight(pos.x, pos.y) < -1.8) {
               nearOcean = true;
             } else {
-              // 采样周围 4 个单位
               if (getHeight(pos.x + 4.0, pos.y) < -1.8) nearOcean = true;
               else if (getHeight(pos.x - 4.0, pos.y) < -1.8) nearOcean = true;
               else if (getHeight(pos.x, pos.y + 4.0) < -1.8) nearOcean = true;
@@ -225,38 +235,39 @@ export class Engine {
             }
           }
 
-          // 1. 距离掩码 (扩展到 50 单位)
+          // 1. 距离掩码 (控制波纹细节)
           float detailMask = smoothstep(50.0, 30.0, dist);
 
-          // 2. 波动计算 (更窄、更急促、更杂乱)
-          // 基础层：提高频率系数使波纹变窄 (0.8 -> 1.5)，加快时间系数使震动急促 (1.5 -> 5.5)
+          // 2. 波动计算
           float waves = sin(pos.x * 1.5 + uTime * 5.5) * 0.1 + sin(pos.y * 1.3 - uTime * 3.2) * 0.1;
-
           if (detailMask > 0.0) {
-             // 视口范围内增加多层杂乱干扰波
-             waves += sin(pos.x * 2.8 + pos.y * 2.2 + uTime * 3.5) * 0.08 * detailMask; // 窄且快的斜向波
-             waves += sin(pos.x * -2.1 + pos.y * 3.7 + uTime * 2.8) * 0.06 * detailMask; // 另一向干扰
-             waves += sin((pos.x + pos.y) * 5.0 + uTime * 4.5) * 0.04 * detailMask; // 极窄碎波
+             waves += sin(pos.x * 2.8 + pos.y * 2.2 + uTime * 3.5) * 0.08 * detailMask;
+             waves += sin(pos.x * -2.1 + pos.y * 3.7 + uTime * 2.8) * 0.06 * detailMask;
+             waves += sin((pos.x + pos.y) * 5.0 + uTime * 4.5) * 0.04 * detailMask;
           }
 
           vec3 normal = normalize(vec3(waves * 2.0, 1.0, waves * 2.0));
 
-          // 3. 太阳镜面反射 (Specular) - 限制在视口范围内 (与 detailMask 同步)
+          // 3. 太阳镜面反射
           vec3 halfDir = normalize(uSunDirection + viewDir);
           float spec = pow(max(dot(normal, halfDir), 0.0), 100.0) * 8.0 * detailMask;
 
-          // 4. 漫反射与背景散射 (仅在视口范围内保留)
+          // 4. 漫反射与背景散射
           float diffuse = max(dot(normal, uSunDirection), 0.0) * 0.15 * detailMask;
           float scatter = (max(0.0, normal.y) * 0.08 + (waves * 0.05)) * detailMask;
 
           // 5. 菲涅尔
           float fresnel = pow(1.0 - max(dot(vec3(0.0, 1.0, 0.0), viewDir), 0.0), 3.0);
 
-          // 最终混合
+          // 最终颜色混合
           vec3 highlightColor = vec3(0.95, 0.98, 1.0);
           vec3 finalColor = uColor + highlightColor * (diffuse + scatter + spec + fresnel * 0.1);
 
-          gl_FragColor = vec4(finalColor, uOpacity);
+          // --- 雾效计算 ---
+          float fogFactor = smoothstep(uFogNear, uFogFar, vDepth);
+          vec3 colorWithFog = mix(finalColor, uFogColor, fogFactor);
+
+          gl_FragColor = vec4(colorWithFog, uOpacity);
         }
       `,
       transparent: true,
@@ -343,6 +354,12 @@ export class Engine {
         this.scene.fog.near = 0.1;
         this.scene.fog.far = 15;
         this.isUnderwater = true;
+
+        if (this.waterMaterial) {
+          this.waterMaterial.uniforms.uFogColor.value.set(0x103060);
+          this.waterMaterial.uniforms.uFogNear.value = 0.1;
+          this.waterMaterial.uniforms.uFogFar.value = 15;
+        }
       }
     } else {
       if (this.isUnderwater) {
@@ -350,6 +367,12 @@ export class Engine {
         this.scene.fog.near = 20;
         this.scene.fog.far = 90;
         this.isUnderwater = false;
+
+        if (this.waterMaterial) {
+          this.waterMaterial.uniforms.uFogColor.value.set(0x62b4d5);
+          this.waterMaterial.uniforms.uFogNear.value = 20;
+          this.waterMaterial.uniforms.uFogFar.value = 90;
+        }
       }
     }
 
