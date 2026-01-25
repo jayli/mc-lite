@@ -255,9 +255,6 @@ export class Player {
         const instanceId = hit.instanceId;
         const type = m.userData.type || 'unknown';
 
-        // 云不能被挖掘
-        if (type === 'cloud') return;
-
         // 处理箱子挖掘（如果未打开则直接打开）
         if (type === 'chest' && m.isInstancedMesh) {
           let targetPos = new THREE.Vector3();

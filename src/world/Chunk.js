@@ -242,7 +242,7 @@ export class Chunk {
         if (!d[delta.type]) d[delta.type] = [];
         d[delta.type].push({ x: bx, y: by, z: bz });
 
-        // 简单逻辑：假设所有非 air 持久化块都是实心的（除非是花/水等，遵循 add 逻辑）
+        // 简单逻辑：部分方块非实心
         if (!['water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass'].includes(delta.type)) {
           this.solidBlocks.add(blockKey);
         }
@@ -498,13 +498,15 @@ export class Chunk {
 
     // 添加到实心方块集合（用于碰撞检测）
     const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
-    if (!['water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass'].includes(type)) {
+    const nonSolidTypes = ['air', 'water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass', 'allium'];
+
+    if (!nonSolidTypes.includes(type)) {
       this.solidBlocks.add(key);
     } else {
       this.solidBlocks.delete(key);
     }
 
-    if (type === 'air') return; // 如果是空气，则只负责移除
+    if (type === 'air') return;
 
     // 获取几何体和材质
     const geometry = geomMap[type] || geomMap['default'];
@@ -515,7 +517,7 @@ export class Chunk {
     mesh.userData = { type: type };              // 存储方块类型
 
     // 设置阴影
-    if(!['water','swamp_water','cloud','vine','lilypad','flower','short_grass'].includes(type)) {
+    if(!nonSolidTypes.includes(type)) {
       mesh.castShadow = true;
       mesh.receiveShadow = true;
     }
