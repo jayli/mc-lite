@@ -207,7 +207,14 @@ export async function initializeMaterials() {
     './src/world/assets/textures/Obsidian.png',
     './src/world/assets/textures/diamond.png',
     './src/world/assets/textures/gold.png',
-    './src/world/assets/textures/glass_blink.png'
+    './src/world/assets/textures/glass_blink.png',
+    './src/world/assets/textures/gold_block.png',
+    './src/world/assets/textures/emerald.png',
+    './src/world/assets/textures/amethyst.png',
+    './src/world/assets/textures/Ancient_Debris_top.png',
+    './src/world/assets/textures/Ancient_Debris_side.png',
+    './src/world/assets/textures/iron.png',
+    './src/world/assets/textures/Iron_Ore.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -550,4 +557,24 @@ materials.registerMaterial('allium', {
 });
 
 materials.registerMaterial('chimney', mkMat('#7f5b37')); // 深棕色烟囱
+
+// 新增金属与宝石方块
+materials.registerMaterial('gold_block', { textureUrl: './src/world/assets/textures/gold_block.png' });
+materials.registerMaterial('emerald', { textureUrl: './src/world/assets/textures/emerald.png' });
+materials.registerMaterial('amethyst', { textureUrl: './src/world/assets/textures/amethyst.png' });
+materials.registerMaterial('iron', { textureUrl: './src/world/assets/textures/iron.png' });
+materials.registerMaterial('iron_ore', { textureUrl: './src/world/assets/textures/Iron_Ore.png' });
+
+const debrisSide = { textureUrl: './src/world/assets/textures/Ancient_Debris_side.png' };
+const debrisTop = { textureUrl: './src/world/assets/textures/Ancient_Debris_top.png' };
+materials.registerMaterial('debris', {
+  faces: {
+    0: debrisSide,
+    1: debrisSide,
+    2: debrisTop,
+    3: debrisTop,
+    4: debrisSide,
+    5: debrisSide
+  }
+});
 
