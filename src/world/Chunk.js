@@ -319,12 +319,13 @@ export class Chunk {
         }
       }
 
-      // 3. 金字塔形屋顶：使用大橡木木板，从第4层开始逐渐缩小并填实
+      // 3. 金字塔形屋顶：50% 概率使用深色木板，否则使用大橡木木板
+      const roofMat = Math.random() < 0.5 ? 'dark_planks' : 'oak_planks';
       const roofBlocks = []; // 记录屋顶方块位置
       for (let h = 0; h < 3; h++) {
         for (let i = -2 + h; i <= 2 - h; i++) {
           for (let j = -2 + h; j <= 2 - h; j++) {
-            this.add(x + i, y + 3 + h, z + j, 'oak_planks', dObj);
+            this.add(x + i, y + 3 + h, z + j, roofMat, dObj);
             // 如果不是被上一层完全覆盖的内部方块，则可能是暴露的
             if (h === 2 || Math.abs(i) === 2 - h || Math.abs(j) === 2 - h) {
               roofBlocks.push({ x: x + i, y: y + 3 + h, z: z + j });
@@ -333,9 +334,9 @@ export class Chunk {
         }
       }
 
-      // 4. 屋顶顶部：一行大橡木木板，确保顶部平整
+      // 4. 屋顶顶部：一行同样的木板，确保顶部平整
       for (let j = -1; j <= 1; j++) {
-        this.add(x, y + 5, z + j, 'oak_planks', dObj);
+        this.add(x, y + 5, z + j, roofMat, dObj);
         roofBlocks.push({ x: x, y: y + 5, z: z + j });
       }
 
