@@ -11,8 +11,8 @@ export class Engine {
     this.scene = new THREE.Scene();
     // 场景背景设为 null，因为我们将使用天空球
     this.scene.background = null;
-    // 在场景中添加雾效，颜色与地平线相同，从距离20开始，到距离90完全遮挡
-    this.scene.fog = new THREE.Fog(0x62b4d5, 20, 90);
+    // 在场景中添加雾效，颜色与地平线相同，从距离20开始，到距离70完全遮挡
+    this.scene.fog = new THREE.Fog(0x62b4d5, 20, 70);
 
     // 创建一个透视相机
     // 参数分别为：视野角度(FOV)，宽高比，近裁剪面，远裁剪面
@@ -158,7 +158,7 @@ export class Engine {
 
   // 创建全局水面平面
   createWaterPlane() {
-    const waterGeo = new THREE.PlaneGeometry(1000, 1000);
+    const waterGeo = new THREE.PlaneGeometry(800, 800);
 
     this.waterMaterial = new THREE.ShaderMaterial({
       uniforms: {
@@ -167,9 +167,9 @@ export class Engine {
         uSunDirection: { value: this.sunDirection },
         uOpacity: { value: 0.6 },
         uSeed: { value: SEED },
-        uFogColor: { value: new THREE.Color(0x62b4d5) },
+        uFogColor: { value: new THREE.Color(0xa7d1e2) },
         uFogNear: { value: 20 },
-        uFogFar: { value: 90 }
+        uFogFar: { value: 70 }
       },
       vertexShader: `
         varying vec3 vWorldPosition;
@@ -365,13 +365,13 @@ export class Engine {
       if (this.isUnderwater) {
         this.scene.fog.color.set(0x62b4d5);
         this.scene.fog.near = 20;
-        this.scene.fog.far = 90;
+        this.scene.fog.far = 60;
         this.isUnderwater = false;
 
         if (this.waterMaterial) {
           this.waterMaterial.uniforms.uFogColor.value.set(0x62b4d5);
           this.waterMaterial.uniforms.uFogNear.value = 20;
-          this.waterMaterial.uniforms.uFogFar.value = 90;
+          this.waterMaterial.uniforms.uFogFar.value = 60;
         }
       }
     }
