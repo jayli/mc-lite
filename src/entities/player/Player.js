@@ -368,7 +368,7 @@ export class Player {
       // 处理标准网格方块
       this.world.removeBlock(Math.round(m.position.x), Math.round(m.position.y), Math.round(m.position.z));
       this.spawnParticles(m.position, m.userData.type);
-      m.parent.remove(m);
+      if (m.parent) m.parent.remove(m);
 
       const type = m.userData.type;
       if (type === 'realistic_trunk') {

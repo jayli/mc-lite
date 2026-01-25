@@ -159,6 +159,7 @@ export class World {
     chunk.addBlockDynamic(x, y, z, type);
     // 记录持久化变更
     persistenceService.recordChange(x, y, z, type);
+    persistenceService.flush(cx, cz);
   }
 
   /**
@@ -174,6 +175,8 @@ export class World {
     const chunk = this.chunks.get(key);
     if (chunk) {
       chunk.removeBlock(x, y, z);
+      // 立即持久化删除操作
+      persistenceService.flush(cx, cz);
     }
   }
 }
