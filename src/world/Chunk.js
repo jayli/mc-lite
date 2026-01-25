@@ -153,7 +153,7 @@ export class Chunk {
           if (centerBiome === 'SWAMP' && Math.random() < 0.08) {
             this.add(wx, wLvl + 0.1, wz, 'lilypad', d, false); // 睡莲位置稍微调高一点
           }
-          // 深水区有0.3%的几率生成沉船结构（水深低于-6时）
+          // 深水区有0.1%的几率生成沉船结构（水深低于-6时）
           if (h < -6 && Math.random() < 0.001) {
             this.structure('ship', wx, h + 1, wz, d);
           }
@@ -176,8 +176,8 @@ export class Chunk {
 
           // 植被生成 - 根据生物群系决定植物类型和生成概率
           if (centerBiome === 'FOREST') {
-            // 森林生物群系：5%的几率生成树木
-            if (Math.random() < 0.05) {
+            // 森林生物群系：4%的几率生成树木
+            if (Math.random() < 0.04) {
               try {
                 if (Math.random() < 0.15) { // 15%的几率生成真实感树木
                   RealisticTree.generate(wx, h + 1, wz, this, null); // 真实树木不使用桦木替换
@@ -191,8 +191,8 @@ export class Chunk {
               }
             }
           } else if (centerBiome === 'AZALEA') {
-            // 杜鹃花森林：6%的几率生成杜鹃花树
-            if (Math.random() < 0.06) Tree.generate(wx, h + 1, wz, this, 'azalea', d);
+            // 杜鹃花森林：4.5%的几率生成杜鹃花树
+            if (Math.random() < 0.045) Tree.generate(wx, h + 1, wz, this, 'azalea', d);
           } else if (centerBiome === 'SWAMP') {
             // 沼泽：3%的几率生成沼泽树
             if (Math.random() < 0.03) Tree.generate(wx, h + 1, wz, this, 'swamp', d);

@@ -31,12 +31,12 @@ export class Player {
       const tz = (Math.random() - 0.5) * 20000;
       // 尝试在森林或平原生物群系出生
       if (getBiome(tx, tz) === 'FOREST' || getBiome(tx, tz) === 'PLAINS') {
-        this.position.set(tx, 60, tz);
+        this.position.set(tx, 70, tz);
         spawnFound = true;
         break;
       }
     }
-    if (!spawnFound) this.position.set(0, 60, 0);
+    if (!spawnFound) this.position.set(0, 70, 0);
 
     this.velocity = new THREE.Vector3();
     this.jumping = false;
