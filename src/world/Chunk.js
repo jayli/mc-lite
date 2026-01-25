@@ -238,14 +238,22 @@ export class Chunk {
 
     // 叠加持久化修改 (优化后的逻辑：在生成过程中通过 add() 自动过滤，此处仅负责添加新增块)
     for (const [blockKey, delta] of deltas) {
+      const [bx, by, bz] = blockKey.split(',').map(Number);
       if (delta.type !== 'air') {
-        const [bx, by, bz] = blockKey.split(',').map(Number);
         if (!d[delta.type]) d[delta.type] = [];
         d[delta.type].push({ x: bx, y: by, z: bz });
 
         // 简单逻辑：假设所有非 air 持久化块都是实心的（除非是花/水等，遵循 add 逻辑）
         if (!['water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass'].includes(delta.type)) {
           this.solidBlocks.add(blockKey);
+        }
+      } else {
+        // 如果持久化记录为 air，且在海平面以下，则自动补全水（实现挖掘后自动填充水）
+        const wLvl = -2;
+        if (by <= wLvl) {
+          const waterType = terrainGen.getBiome(bx, bz) === 'SWAMP' ? 'swamp_water' : 'water';
+          if (!d[waterType]) d[waterType] = [];
+          d[waterType].push({ x: bx, y: by, z: bz });
         }
       }
     }
@@ -472,21 +480,54 @@ export class Chunk {
    * @param {number} z - 世界坐标Z
    * @param {string} type - 方块类型
    */
+  /**
+   * 动态添加单个方块（与批量生成相对）
+   * 用于游戏运行时玩家放置方块
+   * @param {number} x - 世界坐标X
+   * @param {number} y - 世界坐标Y
+   * @param {number} z - 世界坐标Z
+   * @param {string} type - 方块类型
+   */
   addBlockDynamic(x, y, z, type) {
+    // 检查并移除该位置已有的动态方块（实现位移/替换逻辑）
+    for (let i = this.group.children.length - 1; i >= 0; i--) {
+      const child = this.group.children[i];
+      if (!child.isInstancedMesh &&
+          Math.round(child.position.x) === Math.round(x) &&
+          Math.round(child.position.y) === Math.round(y) &&
+          Math.round(child.position.z) === Math.round(z)) {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material && !child.isInstancedMesh) {
+          if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+          else child.material.dispose();
+        }
+        this.group.remove(child);
+      }
+    }
+
     // 添加到实心方块集合（用于碰撞检测）
     const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
-    this.solidBlocks.add(key);
+    if (!['water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass'].includes(type)) {
+      this.solidBlocks.add(key);
+    } else {
+      this.solidBlocks.delete(key);
+    }
+
+    if (type === 'air') return; // 如果是空气，则只负责移除
 
     // 获取几何体和材质
     const geometry = geomMap[type] || geomMap['default'];
     const material = materials.getMaterial(type);
-    // 创建单个网格（非实例网格，因为动态添加的方块数量较少）
+    // 创建单个网格
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(x, y, z);                  // 设置位置
     mesh.userData = { type: type };              // 存储方块类型
-    // 根据材质透明度决定是否投射/接收阴影
-    mesh.castShadow = !material.transparent;
-    mesh.receiveShadow = !material.transparent;
+
+    // 设置阴影
+    if(!['water','swamp_water','cloud','vine','lilypad','flower','short_grass'].includes(type)) {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+    }
 
     // 添加到区块组中
     this.group.add(mesh);
@@ -494,7 +535,6 @@ export class Chunk {
 
   /**
    * 移除方块
-   * 主要从碰撞检测中移除，视觉移除由玩家/游戏交互处理
    * @param {number} x - 世界坐标X
    * @param {number} y - 世界坐标Y
    * @param {number} z - 世界坐标Z
@@ -503,8 +543,20 @@ export class Chunk {
     // 从实心方块集合中移除（碰撞检测）
     const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
     this.solidBlocks.delete(key);
-    // 记录持久化变更
-    persistenceService.recordChange(x, y, z, 'air');
-    // 视觉移除逻辑由玩家/游戏交互处理（通过游戏循环更新场景）
+
+    // 检查海平面自动填充逻辑
+    const wLvl = -2;
+    if (y <= wLvl) {
+      // 如果在海平面以下，移除后自动填充水
+      const centerBiome = terrainGen.getBiome(x, z);
+      const waterType = centerBiome === 'SWAMP' ? 'swamp_water' : 'water';
+      persistenceService.recordChange(x, y, z, waterType);
+      this.addBlockDynamic(x, y, z, waterType);
+    } else {
+      // 正常移除
+      persistenceService.recordChange(x, y, z, 'air');
+      // 移除可能存在的动态方块
+      this.addBlockDynamic(x, y, z, 'air');
+    }
   }
 }

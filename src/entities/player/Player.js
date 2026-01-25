@@ -236,9 +236,11 @@ export class Player {
             targetPos.copy(m.position);
           }
 
-          const px = Math.round(targetPos.x + normal.x);
-          const py = Math.round(targetPos.y + normal.y);
-          const pz = Math.round(targetPos.z + normal.z);
+          // 如果点击的是水，则直接在水的位置放置（替换/位移水）
+          const isWater = type === 'water' || type === 'swamp_water';
+          const px = Math.round(targetPos.x + (isWater ? 0 : normal.x));
+          const py = Math.round(targetPos.y + (isWater ? 0 : normal.y));
+          const pz = Math.round(targetPos.z + (isWater ? 0 : normal.z));
 
           if (this.tryPlaceBlock(px, py, pz, heldItem)) {
             this.swing();
@@ -254,6 +256,9 @@ export class Player {
         const m = hit.object;
         const instanceId = hit.instanceId;
         const type = m.userData.type || 'unknown';
+
+        // 水和云不能被挖掘
+        if (type === 'water' || type === 'swamp_water' || type === 'cloud') return;
 
         // 处理箱子挖掘（如果未打开则直接打开）
         if (type === 'chest' && m.isInstancedMesh) {
