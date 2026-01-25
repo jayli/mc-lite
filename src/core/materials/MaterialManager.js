@@ -214,7 +214,8 @@ export async function initializeMaterials() {
     './src/world/assets/textures/Ancient_Debris_top.png',
     './src/world/assets/textures/Ancient_Debris_side.png',
     './src/world/assets/textures/iron.png',
-    './src/world/assets/textures/Iron_Ore.png'
+    './src/world/assets/textures/Iron_Ore.png',
+    './src/world/assets/textures/leaves_yellow.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -542,6 +543,12 @@ materials.registerMaterial('realistic_oak_leaves', {
   side: THREE.DoubleSide
 });
 
+materials.registerMaterial('realistic_yellow_leaves', {
+  textureUrl: './src/world/assets/textures/leaves_yellow.png',
+  transparent: true,
+  alphaTest: 0.3
+});
+
 materials.registerMaterial('short_grass', {
   textureUrl: './src/world/assets/textures/double_plant_grass_carried.png',
   transparent: true,
@@ -576,5 +583,11 @@ materials.registerMaterial('debris', {
     4: debrisSide,
     5: debrisSide
   }
+});
+
+materials.registerMaterial('yellow_leaves', {
+  textureUrl: './src/world/assets/textures/leaves_yellow.png',
+  transparent: true,
+  alphaTest: 0.3
 });
 

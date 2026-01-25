@@ -174,17 +174,18 @@ export class Chunk {
             this.add(wx, h - k, wz, blockType, d);
           }
 
-          // 植被生成 - 根据生物群系决定植物类型和生成概率
           if (centerBiome === 'FOREST') {
             // 森林生物群系：4%的几率生成树木
             if (Math.random() < 0.04) {
               try {
                 if (Math.random() < 0.15) { // 15%的几率生成真实感树木
-                  RealisticTree.generate(wx, h + 1, wz, this, null); // 真实树木不使用桦木替换
+                  RealisticTree.generate(wx, h + 1, wz, this, null); // 真实树木不使用参数
                 } else {
+                  const isYellow = Math.random() < 0.1; // 10% 的几率生成黄色树叶的树 (仅限 Tree)
+                  const leafType = isYellow ? 'yellow_leaves' : null;
                   const isBirch = Math.random() < 0.1; // 10% 的几率生成桦木树干
                   const logType = isBirch ? 'birch_log' : null;
-                  Tree.generate(wx, h + 1, wz, this, 'big', d, logType);  // 85%的几率生成大型树木，且支持桦木替换
+                  Tree.generate(wx, h + 1, wz, this, 'big', d, logType, leafType);  // 85%的几率生成大型树木
                 }
               } catch (e) {
                 console.error("Tree generation failed at", wx, wz, e);
