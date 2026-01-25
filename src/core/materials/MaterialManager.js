@@ -190,7 +190,10 @@ export async function initializeMaterials() {
     './src/world/assets/textures/Glass.png',
     './src/world/assets/textures/Deepslate_Gold.png',
     './src/world/assets/textures/Bricks.png',
-    './src/world/assets/textures/flower_Allium.png'
+    './src/world/assets/textures/flower_Allium.png',
+    './src/world/assets/textures/Cobblestone.png',
+    './src/world/assets/textures/Blue_Wood_Planks.png',
+    './src/world/assets/textures/End_Stone.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -291,6 +294,18 @@ materials.registerMaterial('gold_ore', {
 materials.registerMaterial('bricks', {
   textureUrl: './src/world/assets/textures/Bricks.png'
 }); // 砖块
+
+materials.registerMaterial('cobblestone', {
+  textureUrl: './src/world/assets/textures/Cobblestone.png'
+}); // 鹅卵石
+
+materials.registerMaterial('blue_planks', {
+  textureUrl: './src/world/assets/textures/Blue_Wood_Planks.png'
+}); // 蓝色木板
+
+materials.registerMaterial('end_stone', {
+  textureUrl: './src/world/assets/textures/End_Stone.png'
+}); // 末端石头
 
 const sandSide = { textureUrl: './src/world/assets/textures/sand_side.png' };
 const sandTopBottom = { textureUrl: './src/world/assets/textures/sand.png' };

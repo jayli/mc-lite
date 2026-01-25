@@ -36,6 +36,9 @@ export class Game {
     this.player.inventory.add('planks', 1000);
     this.player.inventory.add('wood', 1000);
     this.player.inventory.add('glass_block', 1000);
+    this.player.inventory.add('cobblestone', 1000);
+    this.player.inventory.add('blue_planks', 1000);
+    this.player.inventory.add('end_stone', 1000);
   }
 
   /**
