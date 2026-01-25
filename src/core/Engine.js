@@ -1,6 +1,7 @@
 // src/core/Engine.js
 // 引入 Three.js 库
 import * as THREE from 'three';
+import { SEED } from '../utils/MathUtils.js';
 
 // 定义并导出 Engine 类，用于管理游戏的核心渲染引擎
 export class Engine {
@@ -164,7 +165,8 @@ export class Engine {
         uTime: { value: 0 },
         uColor: { value: new THREE.Color(0x4488ff) },
         uSunDirection: { value: this.sunDirection },
-        uOpacity: { value: 0.6 }
+        uOpacity: { value: 0.6 },
+        uSeed: { value: SEED }
       },
       vertexShader: `
         varying vec3 vWorldPosition;
@@ -179,12 +181,49 @@ export class Engine {
         uniform vec3 uColor;
         uniform vec3 uSunDirection;
         uniform float uOpacity;
+        uniform float uSeed;
         varying vec3 vWorldPosition;
+
+        float getNoise(float x, float z, float scale) {
+          return sin((x + uSeed) * scale) * 2.0 + cos((z + uSeed) * scale) * 2.0;
+        }
+
+        float getHeight(float x, float z) {
+          float h = getNoise(x, z, 0.08) + getNoise(x, z, 0.02) * 3.0;
+          float temp = getNoise(x, z, 0.01);
+          float hum = getNoise(x + 1000.0, z + 1000.0, 0.015);
+
+          if (temp < -1.5) return h * 0.5 + 2.0; // DESERT
+          if (temp > -1.5 && temp < -0.8 && hum > 0.5) return h * 0.3 - 2.0; // SWAMP
+          return h;
+        }
 
         void main() {
           vec2 pos = vWorldPosition.xz;
           vec3 viewDir = normalize(cameraPosition - vWorldPosition);
           float dist = length(vWorldPosition.xz - cameraPosition.xz);
+
+          // --- 陆地/海洋显示逻辑 ---
+          // 在近处 (dist < 60) 执行离岸检测，防止陆地深坑出水
+          // 在远处 (dist >= 60) 始终显示水面，以填充地平线并消除色差
+          if (dist < 60.0) {
+            bool nearOcean = false;
+            if (getHeight(pos.x, pos.y) < -1.8) {
+              nearOcean = true;
+            } else {
+              // 采样周围 4 个单位
+              if (getHeight(pos.x + 4.0, pos.y) < -1.8) nearOcean = true;
+              else if (getHeight(pos.x - 4.0, pos.y) < -1.8) nearOcean = true;
+              else if (getHeight(pos.x, pos.y + 4.0) < -1.8) nearOcean = true;
+              else if (getHeight(pos.x, pos.y - 4.0) < -1.8) nearOcean = true;
+              else if (getHeight(pos.x + 3.0, pos.y + 3.0) < -1.8) nearOcean = true;
+              else if (getHeight(pos.x - 3.0, pos.y - 3.0) < -1.8) nearOcean = true;
+            }
+
+            if (!nearOcean) {
+              discard;
+            }
+          }
 
           // 1. 距离掩码 (扩展到 50 单位)
           float detailMask = smoothstep(50.0, 30.0, dist);
@@ -267,10 +306,38 @@ export class Engine {
     }
 
     // 动态水下雾效更新
+    const camX = this.camera.position.x;
     const camY = this.camera.position.y;
+    const camZ = this.camera.position.z;
     const waterLevel = -2.0;
 
-    if (camY < waterLevel) {
+    // --- 模拟高度计算以判断是否在“近海”区域 ---
+    const getNoise = (x, z, scale) => {
+      const nx = x + SEED, nz = z + SEED;
+      return Math.sin(nx * scale) * 2 + Math.cos(nz * scale) * 2;
+    };
+
+    const getHeight = (x, z) => {
+      const h = getNoise(x, z, 0.08) + getNoise(x, z, 0.02) * 3;
+      const temp = getNoise(x, z, 0.01);
+      const hum = getNoise(x + 1000, z + 1000, 0.015);
+      if (temp < -1.5) return h * 0.5 + 2;
+      if (temp > -1.5 && temp < -0.8 && hum > 0.5) return h * 0.3 - 2;
+      return h;
+    };
+
+    let isNearOcean = false;
+    if (getHeight(camX, camZ) < -1.8) {
+      isNearOcean = true;
+    } else {
+      // 检查周围 4 个单位
+      if (getHeight(camX + 4, camZ) < -1.8 || getHeight(camX - 4, camZ) < -1.8 ||
+          getHeight(camX, camZ + 4) < -1.8 || getHeight(camX, camZ - 4) < -1.8) {
+        isNearOcean = true;
+      }
+    }
+
+    if (camY < waterLevel && isNearOcean) {
       if (!this.isUnderwater) {
         this.scene.fog.color.set(0x103060);
         this.scene.fog.near = 0.1;
