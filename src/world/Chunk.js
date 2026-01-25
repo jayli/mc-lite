@@ -154,7 +154,7 @@ export class Chunk {
             this.add(wx, wLvl + 0.1, wz, 'lilypad', d, false); // 睡莲位置稍微调高一点
           }
           // 深水区有0.3%的几率生成沉船结构（水深低于-6时）
-          if (h < -6 && Math.random() < 0.003) {
+          if (h < -6 && Math.random() < 0.001) {
             this.structure('ship', wx, h + 1, wz, d);
           }
         } else {
