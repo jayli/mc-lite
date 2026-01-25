@@ -66,6 +66,9 @@ export class Engine {
 
     this.light = light;
 
+    // 创建全局水面
+    this.createWaterPlane();
+
     // 预分配向量以优化性能，避免在主循环中产生垃圾回收
     this._tmpVec = new THREE.Vector3();
     this._lastUpdatePos = new THREE.Vector3(Infinity, Infinity, Infinity);
@@ -152,6 +155,23 @@ export class Engine {
     this.scene.add(this.skyMesh);
   }
 
+  // 创建全局水面平面
+  createWaterPlane() {
+    const waterGeo = new THREE.PlaneGeometry(1000, 1000); // 足够大的平面
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: 0x4488ff,
+      transparent: true,
+      opacity: 0.6,
+      depthWrite: false, // 透明物体不写入深度，防止重叠变黑
+      side: THREE.DoubleSide
+    });
+
+    this.waterPlane = new THREE.Mesh(waterGeo, waterMat);
+    this.waterPlane.rotation.x = -Math.PI / 2; // 水平放置
+    this.waterPlane.position.y = -2.15; // 放在水位线稍微下方一点，避免和刚好在-2的方块闪烁
+    this.scene.add(this.waterPlane);
+  }
+
   // 初始化方法
   init() {
     // 设置渲染器的尺寸为窗口的内部宽高
@@ -175,6 +195,32 @@ export class Engine {
 
   // 渲染方法
   render() {
+    // 水面跟随相机移动（保持在相机下方，模拟无限大水面）
+    if (this.waterPlane) {
+      this.waterPlane.position.x = this.camera.position.x;
+      this.waterPlane.position.z = this.camera.position.z;
+    }
+
+    // 动态水下雾效更新
+    const camY = this.camera.position.y;
+    const waterLevel = -2.0;
+
+    if (camY < waterLevel) {
+      // 水下：深蓝色雾，视距非常短
+      if (this.scene.fog instanceof THREE.Fog) {
+        this.scene.fog.color.set(0x103060);
+        this.scene.fog.near = 0.1;
+        this.scene.fog.far = 15; // 水中只能看15个单位远
+      }
+    } else {
+      // 陆地：浅蓝色雾，视距较远
+      if (this.scene.fog instanceof THREE.Fog) {
+        this.scene.fog.color.set(0x62b4d5);
+        this.scene.fog.near = 20;
+        this.scene.fog.far = 90;
+      }
+    }
+
     // 使用指定的场景和相机来渲染一帧
     this.renderer.render(this.scene, this.camera);
   }

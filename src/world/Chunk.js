@@ -141,18 +141,16 @@ export class Chunk {
         // 根据高度判断是水下还是地表
         if (h < wLvl) {
           // 水下地形处理
-          // 根据生物群系决定水体类型：沼泽为沼泽水，其他为普通水
-          const water = centerBiome === 'SWAMP' ? 'swamp_water' : 'water';
           // 生成海底（沙子）
           this.add(wx, h, wz, 'sand', d);
           // 生成海底下方的沙子层（3层）
           for (let k = 1; k <= 3; k++) this.add(wx, h - k, wz, 'sand', d);
-          // 生成从海底到水位线之间的水体
-          for (let y = h + 1; y <= wLvl; y++) this.add(wx, y, wz, water, d, false);
+
+          // 不再循环生成水方块，水将由 Engine.js 中的全局平面渲染
 
           // 沼泽生物群系有8%的几率生成睡莲
           if (centerBiome === 'SWAMP' && Math.random() < 0.08) {
-            this.add(wx, wLvl + 1, wz, 'lilypad', d, false);
+            this.add(wx, wLvl + 0.1, wz, 'lilypad', d, false); // 睡莲位置稍微调高一点
           }
           // 深水区有0.3%的几率生成沉船结构（水深低于-6时）
           if (h < -6 && Math.random() < 0.003) {
@@ -238,22 +236,14 @@ export class Chunk {
 
     // 叠加持久化修改 (优化后的逻辑：在生成过程中通过 add() 自动过滤，此处仅负责添加新增块)
     for (const [blockKey, delta] of deltas) {
-      const [bx, by, bz] = blockKey.split(',').map(Number);
       if (delta.type !== 'air') {
+        const [bx, by, bz] = blockKey.split(',').map(Number);
         if (!d[delta.type]) d[delta.type] = [];
         d[delta.type].push({ x: bx, y: by, z: bz });
 
         // 简单逻辑：假设所有非 air 持久化块都是实心的（除非是花/水等，遵循 add 逻辑）
         if (!['water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass'].includes(delta.type)) {
           this.solidBlocks.add(blockKey);
-        }
-      } else {
-        // 如果持久化记录为 air，且在海平面以下，则自动补全水（实现挖掘后自动填充水）
-        const wLvl = -2;
-        if (by <= wLvl) {
-          const waterType = terrainGen.getBiome(bx, bz) === 'SWAMP' ? 'swamp_water' : 'water';
-          if (!d[waterType]) d[waterType] = [];
-          d[waterType].push({ x: bx, y: by, z: bz });
         }
       }
     }
@@ -543,20 +533,9 @@ export class Chunk {
     // 从实心方块集合中移除（碰撞检测）
     const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
     this.solidBlocks.delete(key);
-
-    // 检查海平面自动填充逻辑
-    const wLvl = -2;
-    if (y <= wLvl) {
-      // 如果在海平面以下，移除后自动填充水
-      const centerBiome = terrainGen.getBiome(x, z);
-      const waterType = centerBiome === 'SWAMP' ? 'swamp_water' : 'water';
-      persistenceService.recordChange(x, y, z, waterType);
-      this.addBlockDynamic(x, y, z, waterType);
-    } else {
-      // 正常移除
-      persistenceService.recordChange(x, y, z, 'air');
-      // 移除可能存在的动态方块
-      this.addBlockDynamic(x, y, z, 'air');
-    }
+    // 记录持久化变更
+    persistenceService.recordChange(x, y, z, 'air');
+    // 移除可能存在的动态方块
+    this.addBlockDynamic(x, y, z, 'air');
   }
 }
