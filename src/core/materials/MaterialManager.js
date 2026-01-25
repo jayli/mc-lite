@@ -197,7 +197,10 @@ export async function initializeMaterials() {
     './src/world/assets/textures/Green_Wood_Planks.png',
     './src/world/assets/textures/Hay_Bale.png',
     './src/world/assets/textures/Hay_Bale_top.png',
-    './src/world/assets/textures/Mossy_Cobblestone.png'
+    './src/world/assets/textures/Mossy_Cobblestone.png',
+    './src/world/assets/textures/Mossy_Cobblestone_side.png',
+    './src/world/assets/textures/Oak_Planks.png',
+    './src/world/assets/textures/White_Wood_Planks.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -359,7 +362,8 @@ materials.registerMaterial('wood', {
 }); // 木头
 
 materials.registerMaterial('planks', { textureUrl: './src/world/assets/textures/planks_birch.png' }); // 木板
-materials.registerMaterial('oak_planks', { textureUrl: './src/world/assets/textures/planks_big_oak.png' }); // 大橡木木板
+materials.registerMaterial('oak_planks', { textureUrl: './src/world/assets/textures/Oak_Planks.png' }); // 大橡木木板
+materials.registerMaterial('white_planks', { textureUrl: './src/world/assets/textures/White_Wood_Planks.png' }); // 白色木板
 materials.registerMaterial('glass_block', {
   textureUrl: './src/world/assets/textures/Glass.png',
   transparent: true,
@@ -373,7 +377,20 @@ materials.registerMaterial('leaves', {
 }); // 树叶
 materials.registerMaterial('water', mkMat('#205099', 0.6)); // 水
 materials.registerMaterial('swamp_water', mkMat('#2F4F4F', 0.7)); // 沼泽水
-materials.registerMaterial('swamp_grass', mkMat('#4C5E34')); // 沼泽草
+
+const swampGrassSide = { textureUrl: './src/world/assets/textures/Mossy_Cobblestone_side.png' };
+const swampGrassTopBottom = mkMat('#4C5E34');
+materials.registerMaterial('swamp_grass', {
+  faces: {
+    0: swampGrassSide,
+    1: swampGrassSide,
+    2: swampGrassTopBottom,
+    3: swampGrassTopBottom,
+    4: swampGrassSide,
+    5: swampGrassSide
+  }
+}); // 沼泽草
+
 materials.registerMaterial('cactus', mkMat('#2E8B57')); // 仙人掌
 const bookboxFront = { textureUrl: './src/world/assets/textures/Bookshelf_texture_JE2_BE2.png' };
 const bookboxSide = { textureUrl: './src/world/assets/textures/Bone_Block_side_texture_JE2_BE2.png' };

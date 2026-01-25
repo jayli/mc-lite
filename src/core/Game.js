@@ -42,7 +42,12 @@ export class Game {
     this.player.inventory.add('green_planks', 1000);
     this.player.inventory.add('hay_bale', 1000);
     this.player.inventory.add('moss', 1000);
+    this.player.inventory.add('bookbox', 1000);
     this.player.inventory.add('mossy_stone', 1000);
+    this.player.inventory.add('oak_planks', 1000);
+    this.player.inventory.add('swamp_grass', 1000);
+    this.player.inventory.add('bricks', 1000);
+    this.player.inventory.add('white_planks', 1000);
   }
 
   /**
