@@ -190,8 +190,8 @@ export class Engine {
           float detailMask = smoothstep(50.0, 30.0, dist);
 
           // 2. 波动计算 (更窄、更急促、更杂乱)
-          // 基础层：提高频率系数使波纹变窄 (0.8 -> 1.5)，加快时间系数使震动急促 (1.5 -> 2.5)
-          float waves = sin(pos.x * 1.5 + uTime * 2.5) * 0.1 + sin(pos.y * 1.3 - uTime * 2.2) * 0.1;
+          // 基础层：提高频率系数使波纹变窄 (0.8 -> 1.5)，加快时间系数使震动急促 (1.5 -> 5.5)
+          float waves = sin(pos.x * 1.5 + uTime * 5.5) * 0.1 + sin(pos.y * 1.3 - uTime * 3.2) * 0.1;
 
           if (detailMask > 0.0) {
              // 视口范围内增加多层杂乱干扰波
