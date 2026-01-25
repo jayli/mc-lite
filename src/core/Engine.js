@@ -157,18 +157,77 @@ export class Engine {
 
   // 创建全局水面平面
   createWaterPlane() {
-    const waterGeo = new THREE.PlaneGeometry(1000, 1000); // 足够大的平面
-    const waterMat = new THREE.MeshStandardMaterial({
-      color: 0x4488ff,
+    const waterGeo = new THREE.PlaneGeometry(1000, 1000);
+
+    // 自定义波光粼粼材质
+    this.waterMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uColor: { value: new THREE.Color(0x4488ff) }, // 保持浅蓝色
+        uSunDirection: { value: this.sunDirection },
+        uOpacity: { value: 0.6 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        varying vec3 vWorldPosition;
+        void main() {
+          vUv = uv;
+          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+          vWorldPosition = worldPosition.xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform vec3 uColor;
+        uniform vec3 uSunDirection;
+        uniform float uOpacity;
+        varying vec3 vWorldPosition;
+
+        // 生成细碎波纹的伪随机函数
+        float hash(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+        }
+
+        void main() {
+          vec2 pos = vWorldPosition.xz;
+
+          // 1. 多层高频波纹叠加，模拟细碎水纹
+          float waves = 0.0;
+          waves += sin(pos.x * 3.0 + uTime * 2.5) * 0.15;
+          waves += sin(pos.y * 2.8 - uTime * 2.0) * 0.15;
+          waves += sin((pos.x + pos.y) * 4.5 + uTime * 3.0) * 0.1;
+          waves += sin(pos.x * 12.0 - uTime * 5.0) * 0.05;
+          waves += sin(pos.y * 15.0 + uTime * 6.0) * 0.05;
+
+          // 2. 计算法线扰动 (增强以捕捉更多角度的光线)
+          vec3 normal = normalize(vec3(waves * 1.5, 1.0, waves * 1.5));
+
+          // 3. 模拟镜面反射 (Specular Highlights) - 使用 Blinn-Phong 以便在看向太阳方向时闪烁
+          vec3 viewDir = normalize(cameraPosition - vWorldPosition);
+          vec3 halfDir = normalize(uSunDirection + viewDir);
+          float spec = pow(max(dot(normal, halfDir), 0.0), 180.0) * 12.0;
+
+          // 4. 增加密集的“波光粼粼”闪烁感 (Glitter / Sparkles)
+          // 增加频率并使用 discrete 步进产生颗粒感
+          float glitterNoise = hash(floor(vWorldPosition.xz * 18.0) + floor(uTime * 18.0));
+          float glitter = pow(glitterNoise, 60.0) * 5.0;
+
+          // 混合基色与高亮反光
+          vec3 highlightColor = vec3(0.95, 0.98, 1.0);
+          vec3 finalColor = uColor + (highlightColor * (spec + glitter));
+
+          gl_FragColor = vec4(finalColor, uOpacity);
+        }
+      `,
       transparent: true,
-      opacity: 0.6,
-      depthWrite: false, // 透明物体不写入深度，防止重叠变黑
+      depthWrite: false,
       side: THREE.DoubleSide
     });
 
-    this.waterPlane = new THREE.Mesh(waterGeo, waterMat);
-    this.waterPlane.rotation.x = -Math.PI / 2; // 水平放置
-    this.waterPlane.position.y = -2.15; // 放在水位线稍微下方一点，避免和刚好在-2的方块闪烁
+    this.waterPlane = new THREE.Mesh(waterGeo, this.waterMaterial);
+    this.waterPlane.rotation.x = -Math.PI / 2;
+    this.waterPlane.position.y = -2.15;
     this.scene.add(this.waterPlane);
   }
 
@@ -195,6 +254,11 @@ export class Engine {
 
   // 渲染方法
   render() {
+    // 更新水面动画时间
+    if (this.waterMaterial) {
+      this.waterMaterial.uniforms.uTime.value += 0.015; // 稍微加快一点波光流动速度
+    }
+
     // 水面跟随相机移动（保持在相机下方，模拟无限大水面）
     if (this.waterPlane) {
       this.waterPlane.position.x = this.camera.position.x;
