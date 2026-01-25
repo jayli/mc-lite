@@ -200,7 +200,9 @@ export async function initializeMaterials() {
     './src/world/assets/textures/Mossy_Cobblestone.png',
     './src/world/assets/textures/Mossy_Cobblestone_side.png',
     './src/world/assets/textures/Oak_Planks.png',
-    './src/world/assets/textures/White_Wood_Planks.png'
+    './src/world/assets/textures/White_Wood_Planks.png',
+    './src/world/assets/textures/Birch_Log_top.png',
+    './src/world/assets/textures/Birch_Log_side.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -360,6 +362,19 @@ materials.registerMaterial('wood', {
     5: woodSide
   }
 }); // 木头
+
+const birchLogSide = { textureUrl: './src/world/assets/textures/Birch_Log_side.png' };
+const birchLogTopBottom = { textureUrl: './src/world/assets/textures/Birch_Log_top.png' };
+materials.registerMaterial('birch_log', {
+  faces: {
+    0: birchLogSide,
+    1: birchLogSide,
+    2: birchLogTopBottom,
+    3: birchLogTopBottom,
+    4: birchLogSide,
+    5: birchLogSide
+  }
+}); // 桦木树干
 
 materials.registerMaterial('planks', { textureUrl: './src/world/assets/textures/planks_birch.png' }); // 木板
 materials.registerMaterial('oak_planks', { textureUrl: './src/world/assets/textures/Oak_Planks.png' }); // 大橡木木板

@@ -116,10 +116,10 @@ export class Chunk {
     // 初始化所有可能的类型数组，类似原始代码中的逻辑
     // d 对象用于按类型收集方块位置，以便后续批量创建 InstancedMesh
     const d = {};
-    const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'planks', 'oak_planks', 'leaves', 'water', 'cactus',
-      'flower', 'short_grass', 'chest', 'bookbox', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
+    const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'birch_log', 'planks', 'oak_planks', 'white_planks', 'leaves', 'water', 'cactus',
+      'flower', 'short_grass', 'allium', 'chest', 'bookbox', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
       'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'azalea_flowers', 'swamp_water',
-      'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'gold_ore', 'calcite', 'bricks', 'allium', 'chimney'];
+      'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'gold_ore', 'calcite', 'bricks', 'chimney'];
     for(const type of allTypes) {
       d[type] = [];
     }
@@ -179,10 +179,13 @@ export class Chunk {
           if (centerBiome === 'FOREST') {
             // 森林生物群系：5%的几率生成树木
             if (Math.random() < 0.05) {
+              const isBirch = Math.random() < 0.1; // 10% 的几率生成桦木树干
+              const logType = isBirch ? 'birch_log' : null;
+
               if (Math.random() < 0.15) { // 15%的几率生成真实感树木
-                RealisticTree.generate(wx, h + 1, wz, this);
+                RealisticTree.generate(wx, h + 1, wz, this, logType);
               } else {
-                Tree.generate(wx, h + 1, wz, this, 'big', d);  // 85%的几率生成大型树木
+                Tree.generate(wx, h + 1, wz, this, 'big', d, logType);  // 85%的几率生成大型树木
               }
             }
           } else if (centerBiome === 'AZALEA') {

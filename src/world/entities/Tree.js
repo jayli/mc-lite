@@ -15,11 +15,12 @@ export class Tree {
    * @param {Chunk} chunk - 目标区块对象
    * @param {string} [type='default'] - 树木类型：'default'、'skyTree'、'big'、'azalea'、'swamp'
    * @param {Object} [dObj=null] - 可选的数据对象
+   * @param {string} [customLogType=null] - 可选的自定义树干类型
    */
-  static generate(x, y, z, chunk, type = 'default', dObj = null) {
+  static generate(x, y, z, chunk, type = 'default', dObj = null, customLogType = null) {
     // 默认树木或天空树
     if (type === 'default' || type === 'skyTree') {
-      const wT = type === 'skyTree' ? 'sky_wood' : 'wood';
+      const wT = customLogType || (type === 'skyTree' ? 'sky_wood' : 'wood');
       const lT = type === 'skyTree' ? 'sky_leaves' : 'leaves';
 
       // 生成4格高的树干
@@ -39,7 +40,8 @@ export class Tree {
     } else if (type === 'big') {
       // 大型树木：随机高度6-13格
       const h = 6 + Math.floor(Math.random() * 8);
-      for (let i = 0; i < h; i++) chunk.add(x, y + i, z, 'wood', dObj);
+      const logMat = customLogType || 'wood';
+      for (let i = 0; i < h; i++) chunk.add(x, y + i, z, logMat, dObj);
 
       // 在树干顶部生成密集的树叶立方体
       for (let lx = x - 2; lx <= x + 2; lx++) {
@@ -73,7 +75,8 @@ export class Tree {
     } else if (type === 'swamp') {
       // 沼泽树：高度5-8格
       const h = 5 + Math.floor(Math.random() * 4);
-      for (let i = 0; i < h; i++) chunk.add(x, y + i, z, 'wood', dObj);
+      const logMat = customLogType || 'wood';
+      for (let i = 0; i < h; i++) chunk.add(x, y + i, z, logMat, dObj);
 
       // 在树干顶部生成宽阔的树叶层
       for (let lx = x - 3; lx <= x + 3; lx++) {
