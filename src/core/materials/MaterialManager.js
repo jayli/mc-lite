@@ -183,6 +183,7 @@ export async function initializeMaterials() {
     './src/world/assets/textures/leaves.png',
     './src/world/assets/textures/box_side.png',
     './src/world/assets/textures/box_top.png',
+    './src/world/assets/textures/box_face.png',
     './src/world/assets/textures/Bookshelf_texture_JE2_BE2.png',
     './src/world/assets/textures/Bone_Block_side_texture_JE2_BE2.png',
     './src/world/assets/textures/Bone_Block_top_texture_JE2_BE2.png',
@@ -463,13 +464,14 @@ materials.registerMaterial('moss', {
 materials.registerMaterial('azalea_log', mkMat('#635338')); // 杜鹃花
 const chestSide = { textureUrl: './src/world/assets/textures/box_side.png' };
 const chestTop = { textureUrl: './src/world/assets/textures/box_top.png' };
+const chestFront = { textureUrl: './src/world/assets/textures/box_face.png' };
 materials.registerMaterial('chest', {
   faces: {
     0: chestSide,
     1: chestSide,
     2: chestTop,
     3: chestSide,
-    4: chestSide,
+    4: chestFront,
     5: chestSide
   }
 }); // 宝箱
