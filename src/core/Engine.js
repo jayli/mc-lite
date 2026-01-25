@@ -50,7 +50,7 @@ export class Engine {
     // 允许此光源投射阴影
     light.castShadow = true;
     // 设置阴影贴图的分辨率（根据需要调整：512, 1024, 2048）
-    light.shadow.mapSize.set(412, 412);
+    light.shadow.mapSize.set(612, 612);
     // 设置平行光阴影相机的视锥体范围
     light.shadow.camera.left = -40;
     light.shadow.camera.right = 40;

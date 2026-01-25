@@ -43,12 +43,21 @@ export class HUD {
     this.frames = 0;
     this.fps = 0;
 
-    // 创建 FPS 显示元素
-    if (this.hudEl) {
-      this.fpsEl = document.createElement('div');
-      this.fpsEl.style.color = '#ffff00'; // 使用黄色使其显眼
-      this.fpsEl.style.fontWeight = 'bold';
-      this.hudEl.appendChild(this.fpsEl);
+    // 性能监控变量
+    this.jankCount = 0;
+    this.longTaskCount = 0;
+    this.lastFrameTime = performance.now();
+
+    // 监听主线程长任务 (Long Tasks)
+    if (window.PerformanceObserver) {
+      const observer = new PerformanceObserver((list) => {
+        this.longTaskCount += list.getEntries().length;
+      });
+      try {
+        observer.observe({ entryTypes: ['longtask'] });
+      } catch (e) {
+        console.warn('PerformanceObserver longtask observation not supported');
+      }
     }
   }
 
@@ -58,6 +67,14 @@ export class HUD {
    */
   update() {
     if (!this.game.player) return; // 确保玩家对象存在
+
+    // 检测 Jank (掉帧)
+    const now = performance.now();
+    const frameDuration = now - this.lastFrameTime;
+    if (frameDuration > 33.3) { // 低于 30FPS 的帧视为 Jank
+      this.jankCount++;
+    }
+    this.lastFrameTime = now;
 
     // 计算并更新 FPS
     this.updateFPS();
@@ -83,10 +100,18 @@ export class HUD {
         statsText += ` | Mem: ${memoryUsed}MB`;
       }
 
-      if (this.fpsEl) {
-        this.fpsEl.textContent = statsText;
+      // 紧跟在 Mem 后面显示性能指标
+      if (this.msgEl) {
+        const info = this.game.engine.renderer.info.render;
+        const perfText = ` | Smoothness: Jank: ${this.jankCount} | LongTasks: ${this.longTaskCount} | Calls: ${info.calls} | Tris: ${info.triangles}`;
+        this.msgEl.textContent = statsText + perfText;
+        this.msgEl.style.opacity = 1; // 确保可见
       }
+
+      // 重置计数器
       this.frames = 0;
+      this.jankCount = 0;
+      this.longTaskCount = 0;
       this.lastTime = now;
     }
   }
