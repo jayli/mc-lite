@@ -14,5 +14,4 @@ npm run start
 
 - live demo: <https://js-perf.cn>
 
-> - 原始素材包：<https://minecraft.wiki/w/Category:Block_textures>
 
