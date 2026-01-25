@@ -189,19 +189,22 @@ export class Engine {
           // 1. 距离掩码 (扩展到 50 单位)
           float detailMask = smoothstep(50.0, 30.0, dist);
 
-          // 2. 波动计算 (全局波动以支撑全局反射)
-          float waves = sin(pos.x * 0.8 + uTime * 1.5) * 0.15 + sin(pos.y * 0.7 - uTime * 1.2) * 0.15;
+          // 2. 波动计算 (更窄、更急促、更杂乱)
+          // 基础层：提高频率系数使波纹变窄 (0.8 -> 1.5)，加快时间系数使震动急促 (1.5 -> 2.5)
+          float waves = sin(pos.x * 1.5 + uTime * 2.5) * 0.1 + sin(pos.y * 1.3 - uTime * 2.2) * 0.1;
 
           if (detailMask > 0.0) {
-             // 视口范围内增加更急促的干扰
-             waves += sin((pos.x * 1.8 + pos.y * 1.5) + uTime * 3.0) * 0.1 * detailMask;
+             // 视口范围内增加多层杂乱干扰波
+             waves += sin(pos.x * 2.8 + pos.y * 2.2 + uTime * 3.5) * 0.08 * detailMask; // 窄且快的斜向波
+             waves += sin(pos.x * -2.1 + pos.y * 3.7 + uTime * 2.8) * 0.06 * detailMask; // 另一向干扰
+             waves += sin((pos.x + pos.y) * 5.0 + uTime * 4.5) * 0.04 * detailMask; // 极窄碎波
           }
 
-          vec3 normal = normalize(vec3(waves * 1.5, 1.0, waves * 1.5));
+          vec3 normal = normalize(vec3(waves * 2.0, 1.0, waves * 2.0));
 
-          // 3. 太阳镜面反射 (Specular) - 全局可见 (不受视距影响)
+          // 3. 太阳镜面反射 (Specular) - 限制在视口范围内 (与 detailMask 同步)
           vec3 halfDir = normalize(uSunDirection + viewDir);
-          float spec = pow(max(dot(normal, halfDir), 0.0), 100.0) * 8.0;
+          float spec = pow(max(dot(normal, halfDir), 0.0), 100.0) * 8.0 * detailMask;
 
           // 4. 漫反射与背景散射 (仅在视口范围内保留)
           float diffuse = max(dot(normal, uSunDirection), 0.0) * 0.15 * detailMask;
