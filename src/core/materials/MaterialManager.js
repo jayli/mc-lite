@@ -404,13 +404,13 @@ materials.registerMaterial('glass_block', {
   textureUrl: './src/world/assets/textures/Glass.png',
   transparent: true,
   alphaTest: 0.1,
-  side: THREE.DoubleSide
+  // side: THREE.DoubleSide
 }); // 玻璃
 materials.registerMaterial('glass_blink', {
   textureUrl: './src/world/assets/textures/glass_blink.png',
   transparent: true,
   alphaTest: 0.1,
-  side: THREE.DoubleSide
+  // side: THREE.DoubleSide
 }); // 闪闪玻璃
 materials.registerMaterial('leaves', {
   textureUrl: './src/world/assets/textures/leaves.png',
@@ -540,7 +540,7 @@ materials.registerMaterial('realistic_oak_leaves', {
   textureUrl: './src/world/assets/textures/oak_leaves_branch_medium.png',
   transparent: true,
   alphaTest: 0.5,
-  side: THREE.DoubleSide
+  // side: THREE.DoubleSide
 });
 
 materials.registerMaterial('realistic_yellow_leaves', {
