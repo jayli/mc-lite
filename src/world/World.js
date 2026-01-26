@@ -19,7 +19,31 @@ export class World {
   constructor(scene) {
     this.scene = scene;
     this.chunks = new Map(); // Key: "cx,cz" -> Chunk
-    this.activeParticles = [];
+
+    // 粒子系统优化：使用 InstancedMesh 替换独立 Mesh
+    this.MAX_PARTICLES = 1000;
+    this.particleGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+    this.particleMaterial = new THREE.MeshBasicMaterial();
+    this.particleMesh = new THREE.InstancedMesh(this.particleGeometry, this.particleMaterial, this.MAX_PARTICLES);
+    this.particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.particleMesh.frustumCulled = false; // 防止因边界球未更新导致的裁剪
+    // 预先创建颜色属性
+    this.particleMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.MAX_PARTICLES * 3), 3);
+    this.scene.add(this.particleMesh);
+
+    this.particlesData = [];
+    for (let i = 0; i < this.MAX_PARTICLES; i++) {
+      this.particlesData.push({
+        active: false,
+        vel: new THREE.Vector3(),
+        life: 0,
+        pos: new THREE.Vector3()
+      });
+      // 初始隐藏所有实例
+      this.particleMesh.setMatrixAt(i, new THREE.Matrix4().makeScale(0, 0, 0));
+    }
+    this.particleNextIndex = 0;
+    this.dummy = new THREE.Object3D(); // 用于辅助计算矩阵
   }
 
   /**
@@ -57,21 +81,31 @@ export class World {
     }
 
     // Update particles
-    // 更新粒子效果：更新所有活跃粒子的生命周期、位置和缩放
-    for (let i = this.activeParticles.length - 1; i >= 0; i--) {
-      const p = this.activeParticles[i];
-      p.userData.life -= 0.02;
-      p.position.add(p.userData.vel);
-      p.userData.vel.y -= 0.01;
-      p.scale.setScalar(p.userData.life);
-      if (p.userData.life <= 0) {
-        this.scene.remove(p);
-        // p.geometry.dispose(); // Shared geometry, do not dispose
-        // p.material.dispose(); // Shared material, do not dispose (if using manager)
-        // Actually, particles use basic material created on fly often.
-        if (p.material.dispose) p.material.dispose();
-        this.activeParticles.splice(i, 1);
+    // 更新粒子效果：使用 InstancedMesh 统一更新所有粒子的物理状态和矩阵
+    let needsUpdate = false;
+    for (let i = 0; i < this.MAX_PARTICLES; i++) {
+      const p = this.particlesData[i];
+      if (!p.active) continue;
+
+      p.life -= 0.02;
+      p.pos.add(p.vel);
+      p.vel.y -= 0.01;
+
+      if (p.life <= 0) {
+        p.active = false;
+        this.dummy.scale.setScalar(0);
+      } else {
+        this.dummy.position.copy(p.pos);
+        this.dummy.scale.setScalar(p.life);
       }
+
+      this.dummy.updateMatrix();
+      this.particleMesh.setMatrixAt(i, this.dummy.matrix);
+      needsUpdate = true;
+    }
+
+    if (needsUpdate) {
+      this.particleMesh.instanceMatrix.needsUpdate = true;
     }
 
     // Update chest animations
@@ -85,21 +119,42 @@ export class World {
    * @param {string} type - 方块类型，用于确定粒子颜色
    */
   spawnParticles(pos, type) {
-    const matDef = materials.getMaterial(type);
-    // Extract color from material if possible, or lookup
-    // Simplified: just use a basic material with approximate color
-    // 从材质定义中提取颜色，或使用默认白色
-    const color = matDef.color || 0xffffff;
-    const mat = new THREE.MeshBasicMaterial({ color: color });
-    const geometry = new THREE.BoxGeometry(0.1, 0.1, 0.1); // Small particle
+    let material = materials.getMaterial(type);
+    if (Array.isArray(material)) material = material[0];
 
-    for (let i = 0; i < 5; i++) {
-      const p = new THREE.Mesh(geometry, mat);
-      p.position.copy(pos).addScalar((Math.random() - 0.5) * 0.8);
-      p.userData = { vel: new THREE.Vector3((Math.random() - 0.5) * 0.2, Math.random() * 0.2, (Math.random() - 0.5) * 0.2), life: 1.0 };
-      this.scene.add(p);
-      this.activeParticles.push(p);
+    // 从材质中提取颜色，如果是 MeshStandardMaterial 则有 color 属性 (THREE.Color)
+    const color = (material && material.color) ? material.color.clone() : new THREE.Color(0xffffff);
+
+    for (let i = 0; i < 8; i++) { // 稍微增加粒子数量
+      const idx = this.particleNextIndex;
+      const p = this.particlesData[idx];
+
+      p.active = true;
+      p.pos.copy(pos).add(new THREE.Vector3(
+        (Math.random() - 0.5) * 0.5,
+        (Math.random() - 0.5) * 0.5,
+        (Math.random() - 0.5) * 0.5
+      ));
+      p.vel.set(
+        (Math.random() - 0.5) * 0.1,
+        Math.random() * 0.15 + 0.05,
+        (Math.random() - 0.5) * 0.1
+      );
+      p.life = 1.0;
+
+      this.dummy.position.copy(p.pos);
+      this.dummy.scale.setScalar(p.life);
+      this.dummy.rotation.set(0, 0, 0); // 重置旋转
+      this.dummy.updateMatrix();
+
+      this.particleMesh.setMatrixAt(idx, this.dummy.matrix);
+      this.particleMesh.setColorAt(idx, color);
+
+      this.particleNextIndex = (this.particleNextIndex + 1) % this.MAX_PARTICLES;
     }
+
+    this.particleMesh.instanceMatrix.needsUpdate = true;
+    if (this.particleMesh.instanceColor) this.particleMesh.instanceColor.needsUpdate = true;
   }
 
   /**
