@@ -540,7 +540,7 @@ materials.registerMaterial('realistic_oak_leaves', {
   textureUrl: './src/world/assets/textures/oak_leaves_branch_medium.png',
   transparent: true,
   alphaTest: 0.5,
-  // side: THREE.DoubleSide
+  side: THREE.DoubleSide
 });
 
 materials.registerMaterial('realistic_yellow_leaves', {
