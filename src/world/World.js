@@ -214,7 +214,8 @@ export class World {
     chunk.addBlockDynamic(x, y, z, type);
     // 记录持久化变更
     persistenceService.recordChange(x, y, z, type);
-    persistenceService.flush(cx, cz);
+    // 性能考虑先关闭，后面再打开
+    // persistenceService.flush(cx, cz);
   }
 
   /**
@@ -231,7 +232,8 @@ export class World {
     if (chunk) {
       chunk.removeBlock(x, y, z);
       // 立即持久化删除操作
-      persistenceService.flush(cx, cz);
+      // 性能考虑先关闭，后面再打开
+      // persistenceService.flush(cx, cz);
     }
   }
 }
