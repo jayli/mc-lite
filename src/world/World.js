@@ -10,6 +10,8 @@ import { noise } from '../utils/MathUtils.js';
 
 const CHUNK_SIZE = 16;
 const RENDER_DIST = 3;
+// 默认为白色
+const white_color = new THREE.Color(0xffffff);
 
 /**
  * 世界管理器类
@@ -21,7 +23,7 @@ export class World {
     this.chunks = new Map(); // Key: "cx,cz" -> Chunk
 
     // 粒子系统优化：使用 InstancedMesh 替换独立 Mesh
-    this.MAX_PARTICLES = 1000;
+    this.MAX_PARTICLES = 8;
     this.particleGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
     this.particleMaterial = new THREE.MeshBasicMaterial();
     this.particleMesh = new THREE.InstancedMesh(this.particleGeometry, this.particleMaterial, this.MAX_PARTICLES);
@@ -122,8 +124,7 @@ export class World {
     let material = materials.getMaterial(type);
     if (Array.isArray(material)) material = material[0];
 
-    // 从材质中提取颜色，如果是 MeshStandardMaterial 则有 color 属性 (THREE.Color)
-    const color = (material && material.color) ? material.color.clone() : new THREE.Color(0xffffff);
+    const color = white_color;
 
     for (let i = 0; i < 4; i++) { // 粒子数量减半 (原为 8)
       const idx = this.particleNextIndex;
@@ -132,7 +133,7 @@ export class World {
       p.active = true;
       p.pos.copy(pos).add(new THREE.Vector3(
         (Math.random() - 0.5) * 0.5,
-        (Math.random() - 0.5) * 0.5,
+        (Math.random() - 0.1) * 0.5,
         (Math.random() - 0.5) * 0.5
       ));
       p.vel.set(
