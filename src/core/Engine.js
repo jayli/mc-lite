@@ -32,7 +32,7 @@ export class Engine {
     // 启用渲染器的阴影贴图
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.setPixelRatio(0.8);
+    this.renderer.setPixelRatio(0.6);
 
     // --- 氛围渲染优化 ---
     // 设置电影级色调映射，使高亮部分不过曝成纯白，而是有自然的色彩过渡
