@@ -10,6 +10,7 @@ import { noise } from '../utils/MathUtils.js';
 
 const CHUNK_SIZE = 16;
 const RENDER_DIST = 3;
+// 默认为白色
 const white_color = new THREE.Color(0xffffff);
 
 /**
@@ -88,7 +89,7 @@ export class World {
       const p = this.particlesData[i];
       if (!p.active) continue;
 
-      p.life -= 0.02;
+      p.life -= 0.04; // 消失速度快一倍 (原为 0.02)
       p.pos.add(p.vel);
       p.vel.y -= 0.01;
 
