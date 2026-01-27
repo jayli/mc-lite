@@ -1,5 +1,9 @@
 // src/utils/MathUtils.js
-export const SEED = Math.random() * 9999;
+export let SEED = Math.random() * 9999;
+
+export function setSeed(s) {
+  SEED = s;
+}
 
 export function noise(x, z, scale = 0.05) {
   const nx = x + SEED, nz = z + SEED;

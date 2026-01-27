@@ -5,16 +5,30 @@
  */
 import * as THREE from 'three';
 import { materials } from '../core/materials/MaterialManager.js';
-import { terrainGen } from './TerrainGen.js';
-import { Cloud } from './entities/Cloud.js';
-import { Tree } from './entities/Tree.js';
 import { RealisticTree } from './entities/RealisticTree.js';
-import { Island } from './entities/Island.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { persistenceService } from '../services/PersistenceService.js';
+import { SEED } from '../utils/MathUtils.js';
 
 /** 区块尺寸 - 每个区块在X和Z方向上的方块数量 */
 const CHUNK_SIZE = 16;
+
+// --- Worker 设置 ---
+const worldWorker = new Worker(new URL('./WorldWorker.js', import.meta.url), { type: 'module' });
+const workerCallbacks = new Map();
+
+worldWorker.onmessage = (e) => {
+  const { cx, cz, d, solidBlocks, realisticTrees } = e.data;
+  const key = `${cx},${cz}`;
+  if (workerCallbacks.has(key)) {
+    workerCallbacks.get(key)({ d, solidBlocks, realisticTrees });
+    workerCallbacks.delete(key);
+  }
+};
+
+worldWorker.onerror = (e) => {
+  console.error('WorldWorker Error:', e);
+};
 
 // 共享几何体定义 - 用于优化渲染性能，避免重复创建相同几何体
 
@@ -105,166 +119,44 @@ export class Chunk {
 
   /**
    * 生成区块内容
-   * 包括地形生成、植被生成、水体生成、天空岛生成等
-   * 根据生物群系决定地形特征和植被类型
+   * 将计算压力较大的地形和结构生成逻辑分解到 Worker 线程中执行
    */
   async gen() {
     // 0. 加载持久化增量数据
-    const deltas = await persistenceService.getDeltas(this.cx, this.cz);
-    this._tempDeltas = deltas; // 暂存以供 add() 方法使用
+    const deltasMap = await persistenceService.getDeltas(this.cx, this.cz);
+    // 将 Map 转换为对象以便通过 postMessage 发送
+    const deltas = Object.fromEntries(deltasMap);
 
-    // 初始化所有可能的类型数组，类似原始代码中的逻辑
-    // d 对象用于按类型收集方块位置，以便后续批量创建 InstancedMesh
-    const d = {};
-    const allTypes = ['grass', 'dirt', 'stone', 'sand', 'wood', 'birch_log', 'planks', 'oak_planks', 'white_planks', 'obsidian', 'leaves', 'water', 'cactus',
-      'flower', 'short_grass', 'allium', 'chest', 'bookbox', 'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass',
-      'sky_wood', 'sky_leaves', 'moss', 'azalea_log', 'azalea_leaves', 'azalea_flowers', 'swamp_water',
-      'swamp_grass', 'vine', 'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'glass_blink', 'gold_ore', 'calcite', 'bricks', 'chimney',
-      'gold_block', 'emerald', 'amethyst', 'debris', 'iron', 'iron_ore'];
-    for(const type of allTypes) {
-      d[type] = [];
-    }
+    return new Promise((resolve) => {
+      const callbackKey = `${this.cx},${this.cz}`;
 
-    // 获取区块中心位置的生物群系，决定地形特征和植被类型
-    const centerBiome = terrainGen.getBiome(this.cx * CHUNK_SIZE, this.cz * CHUNK_SIZE);
+      // 注册 Worker 回调
+      workerCallbacks.set(callbackKey, (data) => {
+        const { d, solidBlocks, realisticTrees } = data;
 
-    // 遍历区块内的每个位置（16x16 网格）
-    for (let x = 0; x < CHUNK_SIZE; x++) {
-      for (let z = 0; z < CHUNK_SIZE; z++) {
-        // 将区块坐标转换为世界坐标
-        const wx = this.cx * CHUNK_SIZE + x;
-        const wz = this.cz * CHUNK_SIZE + z;
+        // 1. 同步实心方块数据 (用于碰撞检测)
+        solidBlocks.forEach(k => this.solidBlocks.add(k));
 
-        // 生成该位置的地形高度
-        const h = terrainGen.generateHeight(wx, wz, centerBiome);
-        const wLvl = -2;  // 水位线高度
+        // 2. 构建渲染网格 (InstancedMesh)
+        this.buildMeshes(d);
 
-        // 根据高度判断是水下还是地表
-        if (h < wLvl) {
-          // 水下地形处理
-          // 生成海底（沙子）
-          this.add(wx, h, wz, 'sand', d);
-          // 生成海底下方的沙子层（3层）
-          for (let k = 1; k <= 3; k++) this.add(wx, h - k, wz, 'sand', d);
+        // 3. 处理真实感树木 (在主线程生成，因为涉及复杂 Mesh 克隆)
+        realisticTrees.forEach(pos => {
+          RealisticTree.generate(pos.x, pos.y, pos.z, this, null);
+        });
 
-          // 不再循环生成水方块，水将由 Engine.js 中的全局平面渲染
+        this.isReady = true;
+        resolve();
+      });
 
-          // 沼泽生物群系有8%的几率生成睡莲
-          if (centerBiome === 'SWAMP' && Math.random() < 0.08) {
-            this.add(wx, wLvl + 0.1, wz, 'lilypad', d, false); // 睡莲位置稍微调高一点
-          }
-          // 深水区有0.1%的几率生成沉船结构（水深低于-6时）
-          if (h < -6 && Math.random() < 0.001) {
-            this.structure('ship', wx, h + 1, wz, d);
-          }
-        } else {
-          // 地表地形处理
-          // 根据生物群系决定地表和地下方块类型
-          let surf = 'grass', sub = 'dirt';  // 默认：草方块和泥土
-          if (centerBiome === 'DESERT') { surf = 'sand'; sub = 'sand'; }      // 沙漠：沙子
-          if (centerBiome === 'AZALEA') { surf = 'moss'; sub = 'dirt'; }      // 杜鹃花森林：苔藓和泥土
-          if (centerBiome === 'SWAMP') { surf = 'swamp_grass'; sub = 'dirt'; } // 沼泽：沼泽草和泥土
-
-          // 生成地表方块和地下方块
-          this.add(wx, h, wz, surf, d);          // 地表方块
-          this.add(wx, h - 1, wz, sub, d);       // 地表下方第一层（泥土或沙子）
-          for (let k = 2; k <= 12; k++) {
-            // 10% 的几率将石头替换为黄金矿石
-            const blockType = Math.random() < 0.1 ? 'gold_ore' : 'stone';
-            this.add(wx, h - k, wz, blockType, d);
-          }
-
-          if (centerBiome === 'FOREST') {
-            // 森林生物群系：4%的几率生成树木
-            if (Math.random() < 0.04) {
-              try {
-                if (Math.random() < 0.15) { // 15%的几率生成真实感树木
-                  RealisticTree.generate(wx, h + 1, wz, this, null); // 真实树木不使用参数
-                } else {
-                  const isYellow = Math.random() < 0.1; // 10% 的几率生成黄色树叶的树 (仅限 Tree)
-                  const leafType = isYellow ? 'yellow_leaves' : null;
-                  const isBirch = Math.random() < 0.1; // 10% 的几率生成桦木树干
-                  const logType = isBirch ? 'birch_log' : null;
-                  Tree.generate(wx, h + 1, wz, this, 'big', d, logType, leafType);  // 85%的几率生成大型树木
-                }
-              } catch (e) {
-                console.error("Tree generation failed at", wx, wz, e);
-              }
-            }
-          } else if (centerBiome === 'AZALEA') {
-            // 杜鹃花森林：4.5%的几率生成杜鹃花树
-            if (Math.random() < 0.045) Tree.generate(wx, h + 1, wz, this, 'azalea', d);
-          } else if (centerBiome === 'SWAMP') {
-            // 沼泽：3%的几率生成沼泽树
-            if (Math.random() < 0.03) Tree.generate(wx, h + 1, wz, this, 'swamp', d);
-          } else if (centerBiome === 'DESERT') {
-            // 沙漠：1%的几率生成仙人掌
-            if (Math.random() < 0.01) this.add(wx, h + 1, wz, 'cactus', d);
-            // 0.1%的几率生成火星车结构
-            if (Math.random() < 0.001) this.structure('rover', wx, h + 1, wz, d);
-          } else {
-            // 其他生物群系（平原等）：
-            // 0.5%的几率生成默认树木
-            if (Math.random() < 0.005) {
-              Tree.generate(wx, h + 1, wz, this, 'default', d);
-            }
-            const randPlant = Math.random();
-            if (randPlant < 0.05) { // 生成草的几率
-              this.add(wx, h + 1, wz, 'short_grass', d, false);
-            } else if (randPlant < 0.10) { // 生成花的几率
-              // 1/3 的几率生成紫色小花 (allium)
-              const flowerType = Math.random() < 0.33 ? 'allium' : 'flower';
-              this.add(wx, h + 1, wz, flowerType, d, false);
-            }
-            // 0.1%的几率生成房屋结构
-            if (Math.random() < 0.001) this.structure('house', wx, h + 1, wz, d);
-          }
-        }
-
-        // 根据地形生成器的判断决定是否生成云
-        if (terrainGen.shouldGenerateCloud(wx, wz)) {
-          Cloud.generate(wx, 55, wz, this, d);  // 云生成在Y=55高度
-        }
-      }
-    }
-
-    // 天空岛生成 - 8%的几率在当前区块生成天空岛
-    if (Math.random() < 0.08) {
-      const islandY = 40 + Math.floor(Math.random() * 30);  // 随机高度在40-70之间
-      const centerWx = this.cx * CHUNK_SIZE + 8;           // 区块中心世界坐标X
-      const centerWz = this.cz * CHUNK_SIZE + 8;           // 区块中心世界坐标Z
-      Island.generate(centerWx, islandY, centerWz, this, d);
-    }
-
-    // --- 新增：低空簇状云生成 ---
-    // 每个区块有 10% 的几率生成一朵由 20-40 个方块组成的低空云 (Y=45)
-    if (Math.random() < 0.10) {
-      const startX = this.cx * CHUNK_SIZE + Math.floor(Math.random() * CHUNK_SIZE);
-      const startZ = this.cz * CHUNK_SIZE + Math.floor(Math.random() * CHUNK_SIZE);
-      const size = 20 + Math.floor(Math.random() * 21); // 20-40 随机大小
-      Cloud.generateCluster(startX, 45, startZ, size, this, d);
-    }
-
-    // 叠加持久化修改 (优化后的逻辑：在生成过程中通过 add() 自动过滤，此处仅负责添加新增块)
-    for (const [blockKey, delta] of deltas) {
-      if (delta.type !== 'air') {
-        const [bx, by, bz] = blockKey.split(',').map(Number);
-        if (!d[delta.type]) d[delta.type] = [];
-        d[delta.type].push({ x: bx, y: by, z: bz });
-
-        // 简单逻辑：部分方块非实心
-        if (!['water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass'].includes(delta.type)) {
-          this.solidBlocks.add(blockKey);
-        }
-      }
-    }
-
-    // 清理临时增量缓存
-    this._tempDeltas = null;
-
-    // 构建所有网格 - 将收集的方块位置转换为 Three.js 网格
-    this.buildMeshes(d);
-    this.isReady = true; // 标记准备就绪
+      // 4. 发送生成请求到 Worker
+      worldWorker.postMessage({
+        cx: this.cx,
+        cz: this.cz,
+        seed: SEED,
+        deltas
+      });
+    });
   }
 
   /**
@@ -291,111 +183,6 @@ export class Chunk {
     // 如果是实心方块，添加到实心方块集合中
     if (solid) {
       this.solidBlocks.add(key);
-    }
-  }
-
-  /**
-   * 生成预制结构
-   * @param {string} type - 结构类型：'house'（房屋）、'rover'（火星车）、'ship'（沉船）
-   * @param {number} x - 结构中心世界坐标X
-   * @param {number} y - 结构基础高度世界坐标Y
-   * @param {number} z - 结构中心世界坐标Z
-   * @param {Object} dObj - 数据收集对象
-   */
-  structure(type, x, y, z, dObj) {
-    if (type === 'house') {
-      // 房屋结构：5x5地基 + 3层高墙壁 + 金字塔形屋顶 + 内部家具
-
-      // 决定墙体材质：1/3 概率为砖块，否则为木板
-      const wallMat = Math.random() < 0.33 ? 'bricks' : 'planks';
-
-      // 1. 地基：5x5的石头地基
-      for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) this.add(x + i, y - 1, z + j, 'stone', dObj);
-
-      // 2. 墙壁：外围5x5的墙，高度3层
-      for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
-        if (Math.abs(i) === 2 || Math.abs(j) === 2) {  // 只在外围生成
-          if (i === 0 && j === 2) continue;  // 留出前门位置
-          if ((i === -2 || i === 2) && j === 0) {
-            // 侧面中间位置：第一层和第三层是墙体材质，中间（第二层）是玻璃窗户
-            this.add(x + i, y, z + j, wallMat, dObj);
-            this.add(x + i, y + 1, z + j, 'glass_block', dObj, false); // 玻璃非实心方块，便于透视
-            this.add(x + i, y + 2, z + j, wallMat, dObj);
-          } else {
-            // 其他位置：生成完整的3层墙壁
-            for (let h = 0; h < 3; h++) this.add(x + i, y + h, z + j, wallMat, dObj);
-          }
-        }
-      }
-
-      // 3. 金字塔形屋顶：50% 概率使用深色木板，否则使用大橡木木板
-      const roofMat = Math.random() < 0.5 ? 'dark_planks' : 'oak_planks';
-      const roofBlocks = []; // 记录屋顶方块位置
-      for (let h = 0; h < 3; h++) {
-        for (let i = -2 + h; i <= 2 - h; i++) {
-          for (let j = -2 + h; j <= 2 - h; j++) {
-            this.add(x + i, y + 3 + h, z + j, roofMat, dObj);
-            // 如果不是被上一层完全覆盖的内部方块，则可能是暴露的
-            if (h === 2 || Math.abs(i) === 2 - h || Math.abs(j) === 2 - h) {
-              roofBlocks.push({ x: x + i, y: y + 3 + h, z: z + j });
-            }
-          }
-        }
-      }
-
-      // 4. 屋顶顶部：一行同样的木板，确保顶部平整
-      for (let j = -1; j <= 1; j++) {
-        this.add(x, y + 5, z + j, roofMat, dObj);
-        roofBlocks.push({ x: x, y: y + 5, z: z + j });
-      }
-
-      // 5. 烟囱：1/3 的几率生成烟囱，随机选择一个非最高点的暴露屋顶方块上方放置
-      if (Math.random() < 0.33) {
-        const lowerRoofBlocks = roofBlocks.filter(b => b.y < y + 5);
-        const targetPool = lowerRoofBlocks.length > 0 ? lowerRoofBlocks : roofBlocks;
-        if (targetPool.length > 0) {
-          const pos = targetPool[Math.floor(Math.random() * targetPool.length)];
-          this.add(pos.x, pos.y + 1, pos.z, 'chimney', dObj, false);
-        }
-      }
-
-      // 6. 内部家具：床和箱子
-      this.add(x - 1, y, z - 1, 'bookbox', dObj, false);
-      this.add(x + 1, y, z - 1, 'chest', dObj);
-    } else if (type === 'rover') {
-      // 火星车结构：4个轮子 + 车身 + 顶部箱子
-
-      // 1. 四个轮子：放置在四个角
-      this.add(x - 1, y, z - 1, 'wheel', dObj);
-      this.add(x + 1, y, z - 1, 'wheel', dObj);
-      this.add(x - 1, y, z + 1, 'wheel', dObj);
-      this.add(x + 1, y, z + 1, 'wheel', dObj);
-
-      // 2. 车身：3x4的汽车车身，高度1层
-      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 2; dz++) this.add(x + dx, y + 1, z + dz, 'carBody', dObj);
-
-      // 3. 顶部箱子：放置在车身中央上方
-      this.add(x, y + 2, z, 'chest', dObj);
-    } else if (type === 'ship') {
-      // 沉船结构：船体 + 船舷 + 桅杆 + 箱子
-
-      // 1. 船体：5x7的木板船底和船舷
-      for (let dz = -3; dz <= 3; dz++) for (let dx = -2; dx <= 2; dx++) {
-        if (Math.abs(dx) === 2 || Math.abs(dz) === 3) {
-          // 船舷：外围用木块，高度2层
-          this.add(x + dx, y + 1, z + dz, 'wood', dObj);
-          this.add(x + dx, y + 2, z + dz, 'planks', dObj);
-        } else {
-          // 船底：内部用木板，高度1层
-          this.add(x + dx, y, z + dz, 'planks', dObj);
-        }
-      }
-
-      // 2. 桅杆：中央的5层高木柱
-      for (let i = 0; i < 5; i++) this.add(x, y + i, z, 'wood', dObj);
-
-      // 3. 箱子：放置在船头位置
-      this.add(x, y + 1, z + 2, 'chest', dObj);
     }
   }
 
