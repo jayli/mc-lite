@@ -87,7 +87,7 @@ export class World {
       const p = this.particlesData[i];
       if (!p.active) continue;
 
-      p.life -= 0.02;
+      p.life -= 0.04; // 消失速度快一倍 (原为 0.02)
       p.pos.add(p.vel);
       p.vel.y -= 0.01;
 
@@ -125,7 +125,7 @@ export class World {
     // 从材质中提取颜色，如果是 MeshStandardMaterial 则有 color 属性 (THREE.Color)
     const color = (material && material.color) ? material.color.clone() : new THREE.Color(0xffffff);
 
-    for (let i = 0; i < 8; i++) { // 稍微增加粒子数量
+    for (let i = 0; i < 4; i++) { // 粒子数量减半 (原为 8)
       const idx = this.particleNextIndex;
       const p = this.particlesData[idx];
 
