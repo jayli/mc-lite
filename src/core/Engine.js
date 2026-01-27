@@ -47,7 +47,7 @@ export class Engine {
     this.horizonColor = 0xb2e0f2; // 地平线颜色 (浅蓝)
 
     // 创建一个平行光
-    const light = new THREE.DirectionalLight(this.lightColor, 2.2); // 强度大幅提升
+    const light = new THREE.DirectionalLight(this.lightColor, 3.2); // 强度大幅提升 2.2 -> 3.2
     // 关键优化：将 light.target 直接添加到场景中，方便后续同步
     this.scene.add(light.target);
 
