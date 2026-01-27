@@ -23,7 +23,7 @@ export class World {
     this.chunks = new Map(); // Key: "cx,cz" -> Chunk
 
     // 粒子系统优化：使用 InstancedMesh 替换独立 Mesh
-    this.MAX_PARTICLES = 8;
+    this.MAX_PARTICLES = 4;
     this.particleGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
     this.particleMaterial = new THREE.MeshBasicMaterial();
     this.particleMesh = new THREE.InstancedMesh(this.particleGeometry, this.particleMaterial, this.MAX_PARTICLES);
@@ -127,7 +127,7 @@ export class World {
     // 从材质中提取颜色，如果是 MeshStandardMaterial 则有 color 属性 (THREE.Color)
     const color = white_color;
 
-    for (let i = 0; i < 4; i++) { // 稍微增加粒子数量
+    for (let i = 0; i < 4; i++) { // 减少粒子数量 (原为 8)
       const idx = this.particleNextIndex;
       const p = this.particlesData[idx];
 
