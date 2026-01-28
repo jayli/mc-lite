@@ -52,3 +52,50 @@ body { margin: 0; overflow: hidden; background-color: #87CEEB; user-select: none
   color: #FFD700; font-size: 14px; text-shadow: 1px 1px 2px #000;
   opacity: 0; transition: opacity 0.3s; pointer-events: none; font-weight: bold;
 }
+
+/* 设置按钮样式 */
+#settings-btn {
+  position: absolute; top: 10px; right: 10px;
+  width: 40px; height: 40px;
+  background: rgba(0,0,0,0.6); border: 2px solid #555;
+  color: white; font-size: 24px;
+  display: flex; justify-content: center; align-items: center;
+  cursor: pointer; z-index: 15; border-radius: 4px;
+  transition: background 0.2s;
+}
+#settings-btn:hover { background: rgba(255,255,255,0.2); }
+
+/* 设置弹窗样式 */
+#settings-modal {
+  display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.7); z-index: 30;
+  justify-content: center; align-items: center;
+}
+#settings-content {
+  background: #c6c6c6; border: 4px solid #555; padding: 20px;
+  width: 400px; min-height: 250px; border-radius: 4px;
+  box-shadow: 5px 5px 0 #000;
+  display: flex; flex-direction: column;
+  text-align: center;
+}
+.setting-item {
+  margin: 0px 0; display: flex; flex-direction: column; gap: 10px;
+  font-weight: bold; color: #333;
+}
+.btn-group { display: flex; gap: 8px; width: 100%; }
+.btn-group button { flex: 1; padding: 10px 5px; }
+button {
+  padding: 8px 16px; background: #8b8b8b; border: 2px solid #fff;
+  border-right-color: #373737; border-bottom-color: #373737;
+  color: white; cursor: pointer; font-family: inherit; font-weight: bold;
+  text-shadow: 1px 1px 0 #000;
+}
+button:hover { background: #999; }
+button:active {
+  border: 2px solid #373737; border-right-color: #fff; border-bottom-color: #fff;
+}
+button.active {
+  background: #559944; /* 绿色表示选中 */
+  border: 2px solid #373737; border-right-color: #fff; border-bottom-color: #fff;
+}
+#settings-close { margin-top: 20px; align-self: center; }

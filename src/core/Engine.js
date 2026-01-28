@@ -32,7 +32,8 @@ export class Engine {
     // 启用渲染器的阴影贴图
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.setPixelRatio(0.8);
+    this.resolutionScale = 0.7;
+    this.renderer.setPixelRatio(this.resolutionScale);
 
     // --- 氛围渲染优化 ---
     // 设置电影级色调映射，使高亮部分不过曝成纯白，而是有自然的色彩过渡
@@ -85,6 +86,14 @@ export class Engine {
 
     // 调用初始化方法
     this.init();
+  }
+
+  // 设置渲染分辨率倍率
+  setResolution(scale) {
+    this.resolutionScale = scale;
+    this.renderer.setPixelRatio(scale);
+    // 更新渲染器尺寸以应用新的像素比
+    this.onResize();
   }
 
   // 创建太阳 Sprite
