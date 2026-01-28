@@ -1,53 +1,53 @@
 // src/services/PersistenceService.js
 /**
  * PersistenceService - 负责地图增量修改的存储与检索
- * 使用 IndexedDB 作为持久化后端，并维护内存缓存以保证游戏性能
+ * 使用 Worker 线程处理 IndexedDB 操作，避免阻塞主线程
  */
 import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 
 export class PersistenceService {
   constructor() {
-    this.db = null;
+    this.worker = new Worker(new URL('../workers/PersistenceWorker.js', import.meta.url), { type: 'module' });
     this.cache = new Map(); // Key: "cx,cz" -> Map<blockKey, {type}>
+    this.messageId = 0;
+    this.callbacks = new Map();
     this.initPromise = this.init();
+
+    this.worker.onmessage = (event) => {
+      const { success, result, error, messageId } = event.data;
+      if (this.callbacks.has(messageId)) {
+        const { resolve, reject } = this.callbacks.get(messageId);
+        if (success) {
+          resolve(result);
+        } else {
+          reject(new Error(error));
+        }
+        this.callbacks.delete(messageId);
+      }
+    };
   }
 
   /**
-   * 初始化 IndexedDB 数据库
+   * 向 Worker 发送消息并返回一个 Promise
+   * @param {string} action - The action to perform in the worker
+   * @param {object} payload - The data to send to the worker
+   * @returns {Promise<any>}
+   */
+  postMessage(action, payload) {
+    return new Promise((resolve, reject) => {
+      const messageId = this.messageId++;
+      this.callbacks.set(messageId, { resolve, reject });
+      this.worker.postMessage({ action, payload, messageId });
+    });
+  }
+
+  /**
+   * 初始化与 Worker 的连接 (现在为空，因为 Worker 会自动初始化)
    */
   async init() {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(PERSISTENCE_CONFIG.DB_NAME, PERSISTENCE_CONFIG.DB_VERSION);
-
-      request.onupgradeneeded = (event) => {
-        const db = event.target.result;
-        if (!db.objectStoreNames.contains(PERSISTENCE_CONFIG.STORE_NAME)) {
-          db.createObjectStore(PERSISTENCE_CONFIG.STORE_NAME, { keyPath: 'id' });
-        }
-      };
-
-      request.onsuccess = (event) => {
-        this.db = event.target.result;
-        if (PERSISTENCE_CONFIG.SESSION_ONLY) {
-          // 直接执行清理逻辑，不使用 await initPromise 以避免死锁
-          const transaction = this.db.transaction([PERSISTENCE_CONFIG.STORE_NAME], 'readwrite');
-          const store = transaction.objectStore(PERSISTENCE_CONFIG.STORE_NAME);
-          const clearRequest = store.clear();
-          clearRequest.onsuccess = () => {
-            this.cache.clear();
-            resolve();
-          };
-          clearRequest.onerror = (e) => reject(e.target.error);
-        } else {
-          resolve();
-        }
-      };
-
-      request.onerror = (event) => {
-        console.error('IndexedDB error:', event.target.error);
-        reject(event.target.error);
-      };
-    });
+    // Worker 会在收到第一条消息时自动初始化 IndexedDB
+    // 我们可以发送一个空操作或特定 init 消息来预热
+    return Promise.resolve();
   }
 
   /**
@@ -60,30 +60,21 @@ export class PersistenceService {
     await this.initPromise;
     const key = `${cx},${cz}`;
 
-    // 1. 检查内存缓存
     if (this.cache.has(key)) {
       return this.cache.get(key);
     }
 
-    // 2. 从 IndexedDB 加载
-    return new Promise((resolve) => {
-      const transaction = this.db.transaction([PERSISTENCE_CONFIG.STORE_NAME], 'readonly');
-      const store = transaction.objectStore(PERSISTENCE_CONFIG.STORE_NAME);
-      const request = store.get(key);
-
-      request.onsuccess = (event) => {
-        const data = event.target.result ? event.target.result.changes : {};
-        const changesMap = new Map(Object.entries(data));
-        this.cache.set(key, changesMap);
-        resolve(changesMap);
-      };
-
-      request.onerror = () => {
-        const emptyMap = new Map();
-        this.cache.set(key, emptyMap);
-        resolve(emptyMap);
-      };
-    });
+    try {
+      const data = await this.postMessage('getDeltas', { key });
+      const changesMap = new Map(Object.entries(data));
+      this.cache.set(key, changesMap);
+      return changesMap;
+    } catch (error) {
+      console.error(`Failed to get deltas for chunk ${key}:`, error);
+      const emptyMap = new Map();
+      this.cache.set(key, emptyMap);
+      return emptyMap;
+    }
   }
 
   /**
@@ -120,22 +111,12 @@ export class PersistenceService {
     const changes = Object.fromEntries(this.cache.get(key));
     if (Object.keys(changes).length === 0) return;
 
-    return new Promise((resolve, reject) => {
-      const transaction = this.db.transaction([PERSISTENCE_CONFIG.STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(PERSISTENCE_CONFIG.STORE_NAME);
-      const request = store.put({
-        id: key,
-        changes: changes,
-        lastModified: Date.now()
-      });
-
-      request.onsuccess = () => {
-        // 从内存缓存中移除已刷新的数据以释放内存
-        this.cache.delete(key);
-        resolve();
-      };
-      request.onerror = (event) => reject(event.target.error);
-    });
+    try {
+      await this.postMessage('flush', { key, changes });
+      this.cache.delete(key);
+    } catch (error) {
+      console.error(`Failed to flush chunk ${key}:`, error);
+    }
   }
 
   /**
@@ -143,17 +124,12 @@ export class PersistenceService {
    */
   async clearSession() {
     await this.initPromise;
-    return new Promise((resolve, reject) => {
-      const transaction = this.db.transaction([PERSISTENCE_CONFIG.STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(PERSISTENCE_CONFIG.STORE_NAME);
-      const request = store.clear();
-
-      request.onsuccess = () => {
-        this.cache.clear();
-        resolve();
-      };
-      request.onerror = (event) => reject(event.target.error);
-    });
+    try {
+      await this.postMessage('clearSession');
+      this.cache.clear();
+    } catch (error) {
+      console.error('Failed to clear session:', error);
+    }
   }
 }
 
