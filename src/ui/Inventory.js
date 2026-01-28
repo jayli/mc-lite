@@ -25,6 +25,16 @@ const ITEMS = {
   'vine': { col: '#355E3B' }, 'lilypad': { col: '#228B22' }
 };
 
+function isDisplayNone(elementId) {
+  const element = document.getElementById(elementId);
+  if (!element) {
+    return null; // 或者抛出错误
+  }
+  // 获取计算后的样式
+  const computedStyle = window.getComputedStyle(element);
+  return computedStyle.display === 'none';
+}
+
 /**
  * 背包界面管理器
  * 负责背包的打开/关闭、渲染和交互
@@ -50,6 +60,26 @@ export class InventoryUI {
    */
   setupEvents() {
     window.addEventListener('keydown', (e) => {
+      // 按下 I 键关闭信息看板
+      if (e.code === 'KeyI') {
+        var hud = document.getElementById("hud");
+        var msg = document.getElementById("msg");
+        if (hud) {
+          if (isDisplayNone("hud")) {
+            hud.style.display = "block";
+          } else {
+            hud.style.display = "none";
+          }
+        }
+        if (msg) {
+          if (isDisplayNone("msg")) {
+            msg.style.display = "block";
+          } else {
+            msg.style.display = "none";
+          }
+        }
+        return;
+      }
       if (e.code === 'KeyZ' || (e.code === 'Escape' && this.isOpen)) this.toggle();
       // 快捷栏选择键（数字键1-5）
       if (['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].includes(e.code)) {
