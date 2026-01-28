@@ -6,12 +6,41 @@ import { Cloud } from './entities/Cloud.js';
 import { Island } from './entities/Island.js';
 
 const CHUNK_SIZE = 16;
+const ROOMS_PER_CHUNK = 2;
+const MAX_ROOM_SIZE = 5;
 
 onmessage = function(e) {
   const { cx, cz, seed, deltas } = e.data;
 
   // 同步种子
   setSeed(seed);
+
+  // 预先计算该区块的房间种子（基于区块坐标的确定性随机）
+  // 使用简单的线性同余或哈希来确保每个区块的房间位置固定
+  const rooms = [];
+  const roomSeed = Math.abs((cx * 73856093) ^ (cz * 19349663) ^ seed);
+  let rRand = roomSeed;
+  const nextRand = () => {
+    rRand = (rRand * 1103515245 + 12345) & 0x7fffffff;
+    return rRand / 0x7fffffff;
+  };
+
+  for (let i = 0; i < ROOMS_PER_CHUNK; i++) {
+    const rx = Math.floor(nextRand() * CHUNK_SIZE);
+    const rz = Math.floor(nextRand() * CHUNK_SIZE);
+    const ry = 2 + Math.floor(nextRand() * 8); // 在 k=2 到 k=10 之间
+    const rw = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1));
+    const rh = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1));
+    const rd = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1));
+    rooms.push({
+      minX: cx * CHUNK_SIZE + rx - Math.floor(rw/2),
+      maxX: cx * CHUNK_SIZE + rx + Math.floor(rw/2),
+      minY: ry, // 这里暂时记录相对高度偏移 k
+      maxY: ry + rh,
+      minZ: cz * CHUNK_SIZE + rz - Math.floor(rd/2),
+      maxZ: cz * CHUNK_SIZE + rz + Math.floor(rd/2)
+    });
+  }
 
   const d = {};
   const solidBlocks = []; // 传递数组更高效
@@ -79,8 +108,30 @@ onmessage = function(e) {
 
         fakeChunk.add(wx, h, wz, surf, d);
         fakeChunk.add(wx, h - 1, wz, sub, d);
+
         for (let k = 2; k <= 12; k++) {
-          if (Math.random() < 0.5) continue; // 矿洞生成概率
+          if (k === 12) {
+            // 基岩层
+            fakeChunk.add(wx, h - k, wz, 'end_stone', d);
+            continue;
+          }
+          if (k === 11) {
+            // 实体保护层（防止穿透基岩）
+            fakeChunk.add(wx, h - k, wz, 'stone', d);
+            continue;
+          }
+
+          // 检查是否处于预生成的房间（矿洞）内
+          let inRoom = false;
+          for (const r of rooms) {
+            if (wx >= r.minX && wx <= r.maxX && wz >= r.minZ && wz <= r.maxZ && k >= r.minY && k <= r.maxY) {
+              inRoom = true;
+              break;
+            }
+          }
+
+          if (inRoom) continue; // 如果在房间内，则生成空气（跳过添加方块）
+
           const blockType = Math.random() < 0.1 ? 'gold_ore' : 'stone';
           fakeChunk.add(wx, h - k, wz, blockType, d);
         }

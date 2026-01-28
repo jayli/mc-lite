@@ -56,9 +56,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Storage**: IndexedDB (Primary), LocalStorage (Fallback)
 
 ## Recent Changes
+- 003-land-caves: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
+- 001-land-caves: Added JavaScript (ES6+ Modules) + Three.js (WebGL 2.0)
 - 001-fps-optimization: Added JavaScript (ES6+ Modules) + Three.js (WebGL 2.0)
-- 001-fps-optimization: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
 
 ## Active Technologies
-- JavaScript (ES6+ Modules) + Three.js (WebGL 2.0) (001-fps-optimization)
-- IndexedDB (Persistence for modifications) (001-fps-optimization)
