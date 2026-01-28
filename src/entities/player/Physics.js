@@ -30,9 +30,36 @@ export class Physics {
     const x = nx;
     const z = nz;
     const y1 = Math.floor(this.player.position.y);
-    const y2 = Math.floor(this.player.position.y + this.playerHeight * 0.8);
+    const y2 = Math.floor(this.player.position.y + this.playerHeight * 0.9);
 
     return this.isSolid(x, y1, z) || this.isSolid(x, y2, z);
+  }
+
+  /**
+   * 检查指定坐标是否发生碰撞（排除脚部支撑碰撞）
+   * 用于水平移动检测，防止脚部支撑方块误判为阻挡
+   * @param {number} nx - 下一步的 X 坐标
+   * @param {number} nz - 下一步的 Z 坐标
+   * @returns {boolean} - 是否发生碰撞
+   */
+  checkCollisionForMovement(nx, nz) {
+    // 只检查头部和身体中部的碰撞，排除脚部支撑
+    const x = nx;
+    const z = nz;
+    const y2 = Math.floor(this.player.position.y + this.playerHeight * 0.9);
+
+    // 检查头部
+    if (this.isSolid(x, y2, z)) {
+      return true;
+    }
+
+    // 检查身体中部（大约玩家高度的一半）
+    const yMid = Math.floor(this.player.position.y + this.playerHeight * 0.4);
+    if (this.isSolid(x, yMid, z)) {
+      return true;
+    }
+
+    return false;
   }
 
   /**

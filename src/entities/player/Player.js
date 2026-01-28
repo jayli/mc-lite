@@ -24,6 +24,9 @@ export class Player {
     this.physics = new Physics(this, world);
     this.inventory = new Inventory();
 
+    // 碰撞检测偏移量，用于防止穿模（可微调）
+    this.collisionOffset = 0.6;
+
     // 初始出生点逻辑
     let spawnFound = false;
     for (let i = 0; i < 1000; i++) {
@@ -82,6 +85,202 @@ export class Player {
   }
 
   /**
+   * 检查带偏移的碰撞
+   * @param {number} x - 目标X坐标
+   * @param {number} z - 目标Z坐标
+   * @param {number} dx - X轴移动方向（可选）
+   * @param {number} dz - Z轴移动方向（可选）
+   * @returns {boolean} - 是否发生碰撞
+   */
+  _checkCollisionWithOffset(x, z, dx = 0, dz = 0) {
+    const offset = this.collisionOffset;
+
+    // 检查中心点 - 使用排除脚部支撑的碰撞检测
+    if (this.physics.checkCollisionForMovement(x, z)) {
+      return true;
+    }
+
+    var rat = 0.7;
+    // 基础偏移点：8个方向（4个正交 + 4个对角线）
+    const baseOffsetPoints = [
+      [x + offset, z],           // 东
+      [x - offset, z],           // 西
+      [x, z + offset],           // 南
+      [x, z - offset],           // 北
+      [x + offset * rat, z + offset * rat],  // 东南
+      [x + offset * rat, z - offset * rat],  // 东北
+      [x - offset * rat, z + offset * rat],  // 西南
+      [x - offset * rat, z - offset * rat],  // 西北
+    ];
+
+    // 检查所有基础偏移点
+    for (const [ox, oz] of baseOffsetPoints) {
+      if (this.physics.checkCollisionForMovement(ox, oz)) {
+        return true;
+      }
+    }
+
+    // 如果有移动方向，执行射线检测防止穿模
+    if (Math.abs(dx) > 0.001 || Math.abs(dz) > 0.001) {
+      const startX = this.position.x;
+      const startZ = this.position.z;
+      const endX = x;
+      const endZ = z;
+
+      // 计算距离
+      const distX = endX - startX;
+      const distZ = endZ - startZ;
+      const distance = Math.sqrt(distX * distX + distZ * distZ);
+
+      if (distance > 0) {
+        // 沿着移动方向进行射线采样
+        const steps = Math.ceil(distance / (offset * 0.5)); // 每半个偏移量采样一次
+        const stepSize = 1.0 / Math.max(1, steps);
+
+        for (let i = 1; i <= steps; i++) {
+          const t = i * stepSize;
+          const sampleX = startX + distX * t;
+          const sampleZ = startZ + distZ * t;
+
+          // 在采样点周围进行偏移检测
+          for (const [ox, oz] of baseOffsetPoints) {
+            // 将偏移点从目标位置调整到采样位置
+            const offsetFromSampleX = ox - x + sampleX;
+            const offsetFromSampleZ = oz - z + sampleZ;
+
+            if (this.physics.checkCollisionForMovement(offsetFromSampleX, offsetFromSampleZ)) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * 检查是否可以上一级台阶（X轴方向）
+   * @param {number} nextX - 目标X坐标
+   * @returns {boolean} - 是否可以上台阶
+   */
+  _canStepUpX(nextX) {
+    const floorY = Math.floor(this.position.y);
+    const deltaX = nextX - this.position.x;
+    const threshold = 0.1;  // 移动阈值
+
+    // 如果移动太小，不检查上台阶
+    if (Math.abs(deltaX) < threshold) {
+      return false;
+    }
+
+    // 根据移动方向确定目标整数位置
+    let targetX;
+    if (deltaX > 0) {
+      targetX = Math.floor(this.position.x) + 1;  // 向右移动
+    } else {
+      targetX = Math.floor(this.position.x) - 1;  // 向左移动
+    }
+
+    return (
+      this.physics.isSolid(targetX, floorY, this.position.z) &&
+      !this.physics.isSolid(targetX, floorY + 1, this.position.z) &&
+      !this.physics.isSolid(this.position.x, floorY + 2, this.position.z)
+    );
+  }
+
+  /**
+   * 检查是否可以上一级台阶（Z轴方向）
+   * @param {number} nextZ - 目标Z坐标
+   * @returns {boolean} - 是否可以上台阶
+   */
+  _canStepUpZ(nextZ) {
+    const floorY = Math.floor(this.position.y);
+    const deltaZ = nextZ - this.position.z;
+    const threshold = 0.01;  // 移动阈值
+
+    // 如果移动太小，不检查上台阶
+    if (Math.abs(deltaZ) < threshold) {
+      return false;
+    }
+
+    // 根据移动方向确定目标整数位置
+    let targetZ;
+    if (deltaZ > 0) {
+      targetZ = Math.floor(this.position.z) + 1;  // 向前移动
+    } else {
+      targetZ = Math.floor(this.position.z) - 1;  // 向后移动
+    }
+
+    return (
+      this.physics.isSolid(this.position.x, floorY, targetZ) &&
+      !this.physics.isSolid(this.position.x, floorY + 1, targetZ) &&
+      !this.physics.isSolid(this.position.x, floorY + 2, this.position.z)
+    );
+  }
+
+  /**
+   * 检查是否可以下一级台阶（X轴方向）
+   * @param {number} nextX - 目标X坐标
+   * @returns {boolean} - 是否可以下台阶
+   */
+  _canStepDownX(nextX) {
+    const floorY = Math.floor(this.position.y);
+    const deltaX = nextX - this.position.x;
+    const threshold = 0.01;
+
+    if (Math.abs(deltaX) < threshold) {
+      return false;
+    }
+
+    // 根据移动方向确定目标整数位置
+    let targetX;
+    if (deltaX > 0) {
+      targetX = Math.floor(this.position.x) + 1;  // 向右移动
+    } else {
+      targetX = Math.floor(this.position.x) - 1;  // 向左移动
+    }
+
+    // 下台阶条件：目标位置没有方块，但目标位置下方有方块支撑
+    // 且玩家当前位置到目标位置没有障碍
+    return (
+      !this.physics.isSolid(targetX, floorY, this.position.z) &&
+      !this.physics.isSolid(targetX, floorY + 1, this.position.z) &&
+      this.physics.isSolid(targetX, floorY - 1, this.position.z)
+    );
+  }
+
+  /**
+   * 检查是否可以下一级台阶（Z轴方向）
+   * @param {number} nextZ - 目标Z坐标
+   * @returns {boolean} - 是否可以下台阶
+   */
+  _canStepDownZ(nextZ) {
+    const floorY = Math.floor(this.position.y);
+    const deltaZ = nextZ - this.position.z;
+    const threshold = 0.01;
+
+    if (Math.abs(deltaZ) < threshold) {
+      return false;
+    }
+
+    // 根据移动方向确定目标整数位置
+    let targetZ;
+    if (deltaZ > 0) {
+      targetZ = Math.floor(this.position.z) + 1;  // 向前移动
+    } else {
+      targetZ = Math.floor(this.position.z) - 1;  // 向后移动
+    }
+
+    // 下台阶条件：目标位置没有方块，但目标位置下方有方块支撑
+    return (
+      !this.physics.isSolid(this.position.x, floorY, targetZ) &&
+      !this.physics.isSolid(this.position.x, floorY + 1, targetZ) &&
+      this.physics.isSolid(this.position.x, floorY - 1, targetZ)
+    );
+  }
+
+  /**
    * 每帧更新逻辑
    */
   update() {
@@ -109,30 +308,62 @@ export class Player {
       dz -= Math.sin(this.rotation.y) * speed;
     }
 
-    // X轴物理/碰撞
+    // 完整移动检测（防止对角线穿模）
     let nextX = this.position.x + dx;
-    if (this.physics.checkCollision(nextX, this.position.z)) {
-      // 基础自动上坡逻辑
-      if (this.physics.isSolid(nextX, Math.floor(this.position.y), this.position.z) &&
-        !this.physics.isSolid(nextX, Math.floor(this.position.y)+1, this.position.z) &&
-        !this.physics.isSolid(this.position.x, Math.floor(this.position.y)+2, this.position.z)) {
-        this.position.y += 1.0;
+    let nextZ = this.position.z + dz;
+
+    // 首先检查完整移动是否碰撞
+    const hasCollisionFull = this._checkCollisionWithOffset(nextX, nextZ, dx, dz);
+
+    if (hasCollisionFull) {
+      // 完整移动有碰撞，尝试分别处理X和Z轴
+      let canMoveX = false;
+      let canMoveZ = false;
+
+      // 检查X轴单独移动
+      if (dx !== 0) {
+        const collisionX = this._checkCollisionWithOffset(nextX, this.position.z, dx, 0);
+        if (!collisionX) {
+          canMoveX = true;
+        } else {
+          // X轴有碰撞，尝试上下台阶
+          if (this._canStepUpX(nextX)) {
+            this.position.y += 1.0;
+            canMoveX = true;
+          } else if (this._canStepDownX(nextX)) {
+            // 下台阶允许移动
+            canMoveX = true;
+          }
+        }
+      }
+
+      // 检查Z轴单独移动
+      if (dz !== 0) {
+        const collisionZ = this._checkCollisionWithOffset(this.position.x, nextZ, 0, dz);
+        if (!collisionZ) {
+          canMoveZ = true;
+        } else {
+          // Z轴有碰撞，尝试上下台阶
+          if (this._canStepUpZ(nextZ)) {
+            this.position.y += 1.0;
+            canMoveZ = true;
+          } else if (this._canStepDownZ(nextZ)) {
+            // 下台阶允许移动
+            canMoveZ = true;
+          }
+        }
+      }
+
+      // 根据检测结果更新位置
+      if (canMoveX) {
         this.position.x = nextX;
       }
-    } else {
-      this.position.x = nextX;
-    }
-
-    // Z轴物理/碰撞
-    let nextZ = this.position.z + dz;
-    if (this.physics.checkCollision(this.position.x, nextZ)) {
-      if (this.physics.isSolid(this.position.x, Math.floor(this.position.y), nextZ) &&
-        !this.physics.isSolid(this.position.x, Math.floor(this.position.y)+1, nextZ) &&
-        !this.physics.isSolid(this.position.x, Math.floor(this.position.y)+2, this.position.z)) {
-        this.position.y += 1.0;
+      if (canMoveZ) {
         this.position.z = nextZ;
       }
     } else {
+      // 完整移动没有碰撞，允许移动
+      this.position.x = nextX;
       this.position.z = nextZ;
     }
 
