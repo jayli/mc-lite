@@ -24,7 +24,7 @@ onmessage = function(e) {
     'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass', 'sky_wood', 'sky_leaves', 'moss',
     'azalea_log', 'azalea_leaves', 'azalea_flowers', 'swamp_water', 'swamp_grass', 'vine',
     'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'glass_blink',
-    'gold_ore', 'calcite', 'bricks', 'chimney', 'gold_block', 'emerald', 'amethyst', 'debris', 'iron', 'iron_ore'
+    'gold_ore', 'calcite', 'bricks', 'chimney', 'gold_block', 'emerald', 'amethyst', 'debris', 'iron', 'iron_ore', 'end_stone'
   ];
   for(const type of allTypes) {
     d[type] = [];
@@ -61,7 +61,7 @@ onmessage = function(e) {
 
       if (h < wLvl) {
         fakeChunk.add(wx, h, wz, 'sand', d);
-        for (let k = 1; k <= 3; k++) fakeChunk.add(wx, h - k, wz, 'sand', d);
+        fakeChunk.add(wx, h - 1, wz, 'end_stone', d);
 
         if (centerBiome === 'SWAMP' && Math.random() < 0.08) {
           fakeChunk.add(wx, wLvl + 0.1, wz, 'lilypad', d, false);
@@ -80,6 +80,7 @@ onmessage = function(e) {
         fakeChunk.add(wx, h, wz, surf, d);
         fakeChunk.add(wx, h - 1, wz, sub, d);
         for (let k = 2; k <= 12; k++) {
+          if (Math.random() < 0.5) continue; // 矿洞生成概率
           const blockType = Math.random() < 0.1 ? 'gold_ore' : 'stone';
           fakeChunk.add(wx, h - k, wz, blockType, d);
         }

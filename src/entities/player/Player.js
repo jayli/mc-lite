@@ -338,6 +338,11 @@ export class Player {
   removeBlock(hit) {
     const m = hit.object;
     const instanceId = hit.instanceId;
+    const type = m.userData.type || 'unknown';
+
+    // 不可破坏方块检查
+    if (type === 'end_stone') return;
+
     const dummy = new THREE.Matrix4();
 
     let pos = new THREE.Vector3();
