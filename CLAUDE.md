@@ -56,8 +56,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Storage**: IndexedDB (Primary), LocalStorage (Fallback)
 
 ## Recent Changes
+- 004-hidden-face-culling: Added JavaScript (ES6+ Modules) + Three.js (WebGL 2.0) + Three.js, IndexedDB (世界持久化）
 - 003-land-caves: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
 - 001-land-caves: Added JavaScript (ES6+ Modules) + Three.js (WebGL 2.0)
-- 001-fps-optimization: Added JavaScript (ES6+ Modules) + Three.js (WebGL 2.0)
 
 ## Active Technologies
+- JavaScript (ES6+ Modules) + Three.js (WebGL 2.0) + Three.js, IndexedDB (世界持久化） (004-hidden-face-culling)
+- IndexedDB (主要), LocalStorage (备用) (004-hidden-face-culling)

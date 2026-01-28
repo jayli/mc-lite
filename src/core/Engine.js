@@ -2,6 +2,7 @@
 // 引入 Three.js 库
 import * as THREE from 'three';
 import { SEED } from '../utils/MathUtils.js';
+import { faceCullingSystem } from './FaceCullingSystem.js';
 
 // 定义并导出 Engine 类，用于管理游戏的核心渲染引擎
 export class Engine {
@@ -292,6 +293,37 @@ export class Engine {
     this.waterPlane.rotation.x = -Math.PI / 2;
     this.waterPlane.position.y = -2.15;
     this.scene.add(this.waterPlane);
+
+    // --- 隐藏面剔除系统初始化 ---
+    this.faceCullingSystem = faceCullingSystem;
+
+    // 配置透明方块类型（与游戏中的透明方块匹配）
+    this.faceCullingSystem.setTransparentTypes([
+      'air', 'water', 'glass', 'ice', 'stained_glass'
+    ]);
+
+    // 启用系统
+    this.faceCullingSystem.enable();
+
+    // 设置调试场景
+    this.faceCullingSystem.initDebugScene(this.scene);
+
+    // 监听系统事件
+    this.faceCullingSystem.on('update', (stats) => {
+      if (stats.optimizationRate > 0.3) {
+        console.log(`隐藏面剔除优化率: ${(stats.optimizationRate * 100).toFixed(1)}%`);
+      }
+    });
+
+    this.faceCullingSystem.on('error', (error) => {
+      console.warn('隐藏面剔除系统错误:', error);
+    });
+
+    this.faceCullingSystem.on('performanceWarning', (warning) => {
+      console.warn('性能警告:', warning.warnings.join(', '));
+    });
+
+    console.log('隐藏面剔除系统已集成到渲染引擎');
   }
 
   // 初始化方法
@@ -317,6 +349,12 @@ export class Engine {
 
   // 渲染方法
   render() {
+    // --- 隐藏面剔除系统更新 ---
+    if (this.faceCullingSystem && this.faceCullingSystem.isEnabled()) {
+      // 这里可以添加基于相机位置的区块更新逻辑
+      // 实际实现将在后续任务中与World.js集成时完成
+    }
+
     // --- 主场景渲染阶段 ---
     // 更新水面动画时间
     if (this.waterMaterial) {
@@ -390,5 +428,112 @@ export class Engine {
     }
 
     this.renderer.render(this.scene, this.camera);
+  }
+
+  // --- 隐藏面剔除系统调试方法 ---
+
+  /**
+   * 切换隐藏面剔除系统
+   */
+  toggleFaceCulling() {
+    if (this.faceCullingSystem.isEnabled()) {
+      this.faceCullingSystem.disable('manual toggle');
+      console.log('隐藏面剔除已禁用');
+    } else {
+      this.faceCullingSystem.enable();
+      console.log('隐藏面剔除已启用');
+    }
+  }
+
+  /**
+   * 切换调试模式
+   */
+  toggleFaceCullingDebug() {
+    this.faceCullingSystem.toggleDebug();
+    console.log('隐藏面剔除调试模式:', this.faceCullingSystem.isDebugMode() ? '开启' : '关闭');
+  }
+
+  /**
+   * 获取隐藏面剔除系统状态
+   * @returns {Object} 系统状态
+   */
+  getFaceCullingStats() {
+    if (!this.faceCullingSystem) {
+      return { error: '系统未初始化' };
+    }
+    return this.faceCullingSystem.getStats();
+  }
+
+  /**
+   * 打印隐藏面剔除系统状态
+   */
+  printFaceCullingStats() {
+    const stats = this.getFaceCullingStats();
+    console.group('隐藏面剔除系统状态');
+    console.log('启用状态:', stats.enabled ? '是' : '否');
+    console.log('调试模式:', stats.debugMode ? '是' : '否');
+    console.log('处理方块数:', stats.totalBlocksProcessed);
+    console.log('剔除面数:', stats.facesCulled);
+    console.log('渲染面数:', stats.facesRendered);
+    console.log('优化率:', (stats.optimizationRate * 100).toFixed(1) + '%');
+    console.log('最后更新时间:', stats.updateTime.toFixed(2) + 'ms');
+    console.log('错误计数:', stats.errorCount);
+    if (stats.lastError) {
+      console.log('最后错误:', stats.lastError);
+    }
+    console.groupEnd();
+  }
+
+  /**
+   * 强制更新所有区块的可见面状态
+   */
+  forceFaceCullingUpdate() {
+    if (this.faceCullingSystem && this.faceCullingSystem.isEnabled()) {
+      this.faceCullingSystem.forceUpdate();
+      console.log('强制更新隐藏面剔除状态');
+    }
+  }
+
+  /**
+   * 测试调试可视化
+   */
+  testFaceCullingDebug() {
+    if (!this.faceCullingSystem) return;
+
+    // 启用调试模式
+    this.faceCullingSystem.setDebugMode(true);
+
+    // 添加测试方块
+    const testPositions = [
+      new THREE.Vector3(0, 2, -5),
+      new THREE.Vector3(2, 2, -5),
+      new THREE.Vector3(-2, 2, -5)
+    ];
+
+    const testMasks = [
+      0b00111111, // 所有面可见
+      0b00010101, // 上、北、东面可见
+      0b00101010  // 下、南、西面可见
+    ];
+
+    for (let i = 0; i < testPositions.length; i++) {
+      this.faceCullingSystem.addDebugBlock(
+        `test-block-${i}`,
+        testPositions[i],
+        testMasks[i]
+      );
+    }
+
+    console.log('调试可视化测试已启动，添加了', testPositions.length, '个测试方块');
+  }
+
+  /**
+   * 清理调试可视化
+   */
+  clearFaceCullingDebug() {
+    if (this.faceCullingSystem) {
+      this.faceCullingSystem.clearDebugObjects();
+      console.log('调试可视化已清理');
+    }
   }
 }
