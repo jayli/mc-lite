@@ -29,6 +29,8 @@ export class MaterialManager {
     return Promise.all(urls.map(url =>
       this.textureLoader.loadAsync(url).then(texture => {
         texture.magFilter = THREE.NearestFilter; // 设置纹理放大过滤器为最近邻（保持像素风格）
+        texture.minFilter = THREE.NearestFilter; // 设置纹理缩小过滤器为最近邻（禁用插值优化性能）
+        texture.generateMipmaps = false; // 禁用 Mipmaps 减少 GPU 内存占用和计算
         texture.colorSpace = THREE.SRGBColorSpace; // 设置颜色空间为SRGB
         this.textureCache.set(url, texture); // 将纹理存入缓存
       })
@@ -100,6 +102,8 @@ export class MaterialManager {
         texture.wrapT = THREE.RepeatWrapping;
         texture.repeat.set(def.repeat[0], def.repeat[1]);
         texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        texture.generateMipmaps = false;
         texture.colorSpace = THREE.SRGBColorSpace;
         texture.needsUpdate = true;
       }
@@ -131,6 +135,8 @@ export class MaterialManager {
 
       const texture = new THREE.CanvasTexture(canvas);
       texture.magFilter = THREE.NearestFilter;
+      texture.minFilter = THREE.NearestFilter;
+      texture.generateMipmaps = false;
       texture.colorSpace = THREE.SRGBColorSpace;
 
       return new THREE.MeshStandardMaterial({
