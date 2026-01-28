@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>隐藏面剔除算法测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-case {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .pass {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .fail {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        .result {
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 3px;
+            overflow-x: auto;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 3px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>隐藏面剔除算法测试</h1>
+
+    <div id="test-results">
+        <h2>测试结果</h2>
+        <div id="results-container"></div>
+    </div>
+
+    <div>
+        <h2>手动测试</h2>
+        <button onclick="runAllTests()">运行所有测试</button>
+        <button onclick="testSimpleCase()">测试简单情况</button>
+        <button onclick="testTransparentBlocks()">测试透明方块</button>
+        <button onclick="testPerformance()">测试性能</button>
+    </div>
+
+    <div>
+        <h2>算法说明</h2>
+        <p>简单相邻检查算法：</p>
+        <ol>
+            <li>透明方块的所有面都可见</li>
+            <li>如果相邻位置为空（空气），则对应面可见</li>
+            <li>如果相邻位置为透明方块，则对应面可见</li>
+            <li>如果相邻位置为固体方块，则对应面隐藏</li>
+        </ol>
+    </div>
+
+    <script type="module">
+        import { FaceCullingSystem } from './src/core/FaceCullingSystem.js';
+        import { faceMask, visualizeMask } from './src/core/face-culling-utils.js';
+
+        const system = new FaceCullingSystem();
+        const resultsContainer = document.getElementById('results-container');
+
+        function addTestResult(name, passed, details) {
+            const div = document.createElement('div');
+            div.className = `test-case ${passed ? 'pass' : 'fail'}`;
+            div.innerHTML = `
+                <h3>${name}</h3>
+                <div>${details}</div>
+                <div class="result">${passed ? '✓ 通过' : '✗ 失败'}</div>
+            `;
+            resultsContainer.appendChild(div);
+        }
+
+        function testSimpleCase() {
+            resultsContainer.innerHTML = '';
+
+            // 测试1: 孤立方块（所有相邻位置为空）
+            const isolatedBlock = { type: 'stone' };
+            const emptyNeighbors = {
+                top: null, bottom: null, north: null, south: null, west: null, east: null
+            };
+
+            const mask1 = system.calculateFaceVisibility(isolatedBlock, emptyNeighbors);
+            const expected1 = faceMask.ALL; // 所有面都应该可见
+            const passed1 = mask1 === expected1;
+
+            addTestResult(
+                '孤立方块测试',
+                passed1,
+                `方块类型: ${isolatedBlock.type}<br>
+                 计算掩码: ${mask1} (${visualizeMask(mask1)})<br>
+                 期望掩码: ${expected1} (${visualizeMask(expected1)})<br>
+                 所有相邻位置为空，所有面应该可见`
+            );
+
+            // 测试2: 完全被包围的方块
+            const surroundedBlock = { type: 'stone' };
+            const solidNeighbors = {
+                top: { type: 'stone' },
+                bottom: { type: 'stone' },
+                north: { type: 'stone' },
+                south: { type: 'stone' },
+                west: { type: 'stone' },
+                east: { type: 'stone' }
+            };
+
+            const mask2 = system.calculateFaceVisibility(surroundedBlock, solidNeighbors);
+            const expected2 = faceMask.NONE; // 所有面都应该隐藏
+            const passed2 = mask2 === expected2;
+
+            addTestResult(
+                '完全包围方块测试',
+                passed2,
+                `方块类型: ${surroundedBlock.type}<br>
+                 计算掩码: ${mask2} (${visualizeMask(mask2)})<br>
+                 期望掩码: ${expected2} (${visualizeMask(expected2)})<br>
+                 所有相邻位置为固体方块，所有面应该隐藏`
+            );
+
+            // 测试3: 部分相邻
+            const partialBlock = { type: 'stone' };
+            const partialNeighbors = {
+                top: null,
+                bottom: { type: 'stone' },
+                north: null,
+                south: { type: 'stone' },
+                west: null,
+                east: { type: 'stone' }
+            };
+
+            const mask3 = system.calculateFaceVisibility(partialBlock, partialNeighbors);
+            // 上面、北面、西面应该可见，其他面隐藏
+            const expected3 = faceMask.TOP | faceMask.NORTH | faceMask.WEST;
+            const passed3 = mask3 === expected3;
+
+            addTestResult(
+                '部分相邻测试',
+                passed3,
+                `方块类型: ${partialBlock.type}<br>
+                 计算掩码: ${mask3} (${visualizeMask(mask3)})<br>
+                 期望掩码: ${expected3} (${visualizeMask(expected3)})<br>
+                 空相邻: 上、北、西 | 固体相邻: 下、南、东`
+            );
+        }
+
+        function testTransparentBlocks() {
+            resultsContainer.innerHTML = '';
+
+            // 测试1: 透明方块（所有面应该可见）
+            const transparentBlock = { type: 'glass' };
+            const mixedNeighbors = {
+                top: { type: 'stone' },
+                bottom: null,
+                north: { type: 'stone' },
+                south: null,
+                west: { type: 'stone' },
+                east: null
+            };
+
+            const mask1 = system.calculateFaceVisibility(transparentBlock, mixedNeighbors);
+            const expected1 = faceMask.ALL; // 透明方块的所有面都可见
+            const passed1 = mask1 === expected1;
+
+            addTestResult(
+                '透明方块测试',
+                passed1,
+                `方块类型: ${transparentBlock.type} (透明)<br>
+                 计算掩码: ${mask1} (${visualizeMask(mask1)})<br>
+                 期望掩码: ${expected1} (${visualizeMask(expected1)})<br>
+                 透明方块的所有面都应该可见，无论相邻方块`
+            );
+
+            // 测试2: 固体方块相邻透明方块
+            const solidBlock = { type: 'stone' };
+            const transparentNeighbors = {
+                top: { type: 'glass' },
+                bottom: { type: 'stone' },
+                north: { type: 'glass' },
+                south: { type: 'stone' },
+                west: { type: 'glass' },
+                east: { type: 'stone' }
+            };
+
+            const mask2 = system.calculateFaceVisibility(solidBlock, transparentNeighbors);
+            // 与透明方块相邻的面应该可见
+            const expected2 = faceMask.TOP | faceMask.NORTH | faceMask.WEST;
+            const passed2 = mask2 === expected2;
+
+            addTestResult(
+                '固体相邻透明方块测试',
+                passed2,
+                `方块类型: ${solidBlock.type} (固体)<br>
+                 计算掩码: ${mask2} (${visualizeMask(mask2)})<br>
+                 期望掩码: ${expected2} (${visualizeMask(expected2)})<br>
+                 与透明方块(玻璃)相邻的面(上、北、西)应该可见`
+            );
+
+            // 测试3: 多种透明方块类型
+            system.addTransparentType('water');
+            system.addTransparentType('ice');
+
+            const blockWithWater = { type: 'stone' };
+            const waterNeighbors = {
+                top: { type: 'water' },
+                bottom: { type: 'stone' },
+                north: { type: 'ice' },
+                south: { type: 'stone' },
+                west: { type: 'glass' },
+                east: { type: 'stone' }
+            };
+
+            const mask3 = system.calculateFaceVisibility(blockWithWater, waterNeighbors);
+            // 与水、冰、玻璃相邻的面应该可见
+            const expected3 = faceMask.TOP | faceMask.NORTH | faceMask.WEST;
+            const passed3 = mask3 === expected3;
+
+            addTestResult(
+                '多种透明方块测试',
+                passed3,
+                `方块类型: ${blockWithWater.type}<br>
+                 透明类型: air, water, glass, ice, stained_glass<br>
+                 计算掩码: ${mask3} (${visualizeMask(mask3)})<br>
+                 期望掩码: ${expected3} (${visualizeMask(expected3)})<br>
+                 与水、冰、玻璃相邻的面应该可见`
+            );
+        }
+
+        function testPerformance() {
+            resultsContainer.innerHTML = '';
+
+            const testBlocks = 10000;
+            let totalTime = 0;
+            let correctCount = 0;
+
+            // 创建测试数据
+            const testData = [];
+            for (let i = 0; i < testBlocks; i++) {
+                const blockType = Math.random() > 0.3 ? 'stone' : 'glass';
+                const neighbors = {};
+
+                // 随机生成相邻方块
+                const directions = ['top', 'bottom', 'north', 'south', 'west', 'east'];
+                for (const dir of directions) {
+                    if (Math.random() > 0.5) {
+                        neighbors[dir] = Math.random() > 0.7 ?
+                            { type: 'glass' } : { type: 'stone' };
+                    } else {
+                        neighbors[dir] = null;
+                    }
+                }
+
+                testData.push({ block: { type: blockType }, neighbors });
+            }
+
+            // 性能测试
+            const startTime = performance.now();
+
+            for (const data of testData) {
+                try {
+                    system.calculateFaceVisibility(data.block, data.neighbors);
+                    correctCount++;
+                } catch (error) {
+                    console.error('计算错误:', error);
+                }
+            }
+
+            const endTime = performance.now();
+            totalTime = endTime - startTime;
+
+            const avgTime = totalTime / testBlocks;
+            const successRate = (correctCount / testBlocks) * 100;
+
+            addTestResult(
+                '性能测试',
+                avgTime < 0.01, // 平均时间小于0.01ms为通过
+                `测试方块数: ${testBlocks}<br>
+                 总时间: ${totalTime.toFixed(2)}ms<br>
+                 平均时间: ${avgTime.toFixed(4)}ms/方块<br>
+                 正确率: ${successRate.toFixed(1)}%<br>
+                 性能要求: 单次计算 < 0.01ms`
+            );
+
+            // 测试系统统计
+            const stats = system.getStats();
+            addTestResult(
+                '系统统计测试',
+                stats.enabled === true,
+                `系统启用: ${stats.enabled}<br>
+                 错误计数: ${stats.errorCount}<br>
+                 最后错误: ${stats.lastError || '无'}<br>
+                 透明类型数: ${system.getTransparentTypes().length}`
+            );
+        }
+
+        function runAllTests() {
+            resultsContainer.innerHTML = '<h3>运行所有测试...</h3>';
+
+            setTimeout(() => {
+                testSimpleCase();
+                setTimeout(() => {
+                    testTransparentBlocks();
+                    setTimeout(() => {
+                        testPerformance();
+                    }, 100);
+                }, 100);
+            }, 100);
+        }
+
+        // 初始化显示
+        resultsContainer.innerHTML = `
+            <div class="test-case">
+                <h3>准备测试</h3>
+                <p>点击上面的按钮运行测试</p>
+                <p>系统已初始化: ${system.isEnabled() ? '是' : '否'}</p>
+                <p>透明方块类型: ${system.getTransparentTypes().join(', ')}</p>
+            </div>
+        `;
+
+        // 导出到全局用于控制台测试
+        window.faceCullingSystem = system;
+        window.runAllTests = runAllTests;
+        window.testSimpleCase = testSimpleCase;
+        window.testTransparentBlocks = testTransparentBlocks;
+        window.testPerformance = testPerformance;
+    </script>
+</body>
+</html>

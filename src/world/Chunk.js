@@ -9,6 +9,7 @@ import { RealisticTree } from './entities/RealisticTree.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { persistenceService } from '../services/PersistenceService.js';
 import { SEED } from '../utils/MathUtils.js';
+import { faceCullingSystem } from '../core/FaceCullingSystem.js';
 
 /** 区块尺寸 - 每个区块在X和Z方向上的方块数量 */
 const CHUNK_SIZE = 16;
@@ -303,24 +304,46 @@ export class Chunk {
       this.solidBlocks.delete(key);
     }
 
-    if (type === 'air') return;
+    // 对于空气方块，只更新隐藏面剔除，不创建网格
+    if (type !== 'air') {
+      // 获取几何体和材质
+      const geometry = geomMap[type] || geomMap['default'];
+      const material = materials.getMaterial(type);
+      // 创建单个网格
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(x, y, z);                  // 设置位置
+      mesh.userData = { type: type };              // 存储方块类型
 
-    // 获取几何体和材质
-    const geometry = geomMap[type] || geomMap['default'];
-    const material = materials.getMaterial(type);
-    // 创建单个网格
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(x, y, z);                  // 设置位置
-    mesh.userData = { type: type };              // 存储方块类型
+      // 设置阴影
+      if(!nonSolidTypes.includes(type)) {
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+      }
 
-    // 设置阴影
-    if(!nonSolidTypes.includes(type)) {
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
+      // 添加到区块组中
+      this.group.add(mesh);
     }
 
-    // 添加到区块组中
-    this.group.add(mesh);
+    // 隐藏面剔除更新
+    if (faceCullingSystem && faceCullingSystem.isEnabled()) {
+      const position = new THREE.Vector3(x, y, z);
+      const block = { type };
+
+      // 创建简单的邻居数据（实际实现需要从世界数据获取）
+      // 这里使用占位符，实际集成将在World.js中完成
+      const neighbors = {
+        top: null, bottom: null, north: null, south: null, west: null, east: null
+      };
+
+      faceCullingSystem.updateBlock(position, block, neighbors);
+
+      // 更新相邻方块的可见面状态
+      faceCullingSystem.updateNeighbors(position, (neighborPos) => {
+        // 这里需要实现从世界数据获取邻居方块数据
+        // 返回null表示无法获取数据，跳过更新
+        return null;
+      });
+    }
   }
 
   /**
@@ -337,5 +360,17 @@ export class Chunk {
     persistenceService.recordChange(x, y, z, 'air');
     // 移除可能存在的动态方块
     this.addBlockDynamic(x, y, z, 'air');
+
+    // 隐藏面剔除更新：更新相邻方块的可见面状态
+    if (faceCullingSystem && faceCullingSystem.isEnabled()) {
+      const position = new THREE.Vector3(x, y, z);
+
+      // 更新相邻方块的可见面状态（因为移除了方块，邻居的面可能变得可见）
+      faceCullingSystem.updateNeighbors(position, (neighborPos) => {
+        // 这里需要实现从世界数据获取邻居方块数据
+        // 返回null表示无法获取数据，跳过更新
+        return null;
+      });
+    }
   }
 }
