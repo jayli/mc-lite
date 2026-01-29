@@ -25,7 +25,7 @@ export class Player {
     this.inventory = new Inventory();
 
     // 碰撞检测偏移量，用于防止穿模（可微调）
-    this.collisionOffset = 0.6;
+    this.collisionOffset = 0.3;
 
     // 初始出生点逻辑
     let spawnFound = false;
@@ -369,8 +369,8 @@ export class Player {
 
     // Y轴物理（重力与地面检测）
     let gy = -100;
-    const px = Math.round(this.position.x);
-    const pz = Math.round(this.position.z);
+    const px = Math.floor(this.position.x);
+    const pz = Math.floor(this.position.z);
     const py = Math.floor(this.position.y);
 
     // 向下寻找地面
@@ -410,7 +410,7 @@ export class Player {
     // 相机跟随与平滑处理
     this.camera.position.x = this.position.x;
     this.camera.position.z = this.position.z;
-    this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, this.position.y + 1.0, 0.25);
+    this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, this.position.y + 1.65, 0.25);
 
     this.updateArm();
   }
@@ -467,9 +467,9 @@ export class Player {
             targetPos.copy(m.position);
           }
 
-          const px = Math.round(targetPos.x + normal.x);
-          const py = Math.round(targetPos.y + normal.y);
-          const pz = Math.round(targetPos.z + normal.z);
+          const px = Math.floor(targetPos.x + normal.x);
+          const py = Math.floor(targetPos.y + normal.y);
+          const pz = Math.floor(targetPos.z + normal.z);
 
           if (this.tryPlaceBlock(px, py, pz, heldItem)) {
             this.swing();
@@ -553,7 +553,7 @@ export class Player {
     // 检查是否与玩家自身碰撞
     if (x >= this.position.x - 0.5 && x <= this.position.x + 0.5 &&
       z >= this.position.z - 0.5 && z <= this.position.z + 0.5 &&
-      y >= this.position.y - 0.5 && y <= this.position.y + 1.2) {
+      y >= this.position.y && y <= this.position.y + 1.9) {
       return false;
     }
 
@@ -590,9 +590,9 @@ export class Player {
       this.spawnParticles(pos, m.userData.type);
 
       // 逻辑移除
-      const x = Math.round(pos.x);
-      const y = Math.round(pos.y);
-      const z = Math.round(pos.z);
+      const x = Math.floor(pos.x);
+      const y = Math.floor(pos.y);
+      const z = Math.floor(pos.z);
       this.world.removeBlock(x, y, z);
 
       // 给予物品
@@ -602,7 +602,7 @@ export class Player {
       }
     } else {
       // 处理标准网格方块
-      this.world.removeBlock(Math.round(m.position.x), Math.round(m.position.y), Math.round(m.position.z));
+      this.world.removeBlock(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z));
       this.spawnParticles(m.position, m.userData.type);
       if (m.parent) m.parent.remove(m);
 
@@ -649,9 +649,9 @@ export class Player {
 
     for(let d=0; d<maxDist; d+=step) {
       rayPos.add(direction.clone().multiplyScalar(step));
-      const rx = Math.round(rayPos.x);
-      const ry = Math.round(rayPos.y);
-      const rz = Math.round(rayPos.z);
+      const rx = Math.floor(rayPos.x);
+      const ry = Math.floor(rayPos.y);
+      const rz = Math.floor(rayPos.z);
 
       if (!this.physics.isSolid(rx, ry, rz)) {
         let hasSolidNeighbor = false;

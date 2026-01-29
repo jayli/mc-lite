@@ -62,7 +62,7 @@ onmessage = function(e) {
   // 模拟 Chunk 类的 add 方法
   const fakeChunk = {
     add: (x, y, z, type, dObj, solid = true) => {
-      const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+      const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
       // 检查持久化增量覆盖
       if (deltas && deltas[key]) return;
 
@@ -93,7 +93,7 @@ onmessage = function(e) {
         fakeChunk.add(wx, h - 1, wz, 'end_stone', d);
 
         if (centerBiome === 'SWAMP' && Math.random() < 0.08) {
-          fakeChunk.add(wx, wLvl + 0.1, wz, 'lilypad', d, false);
+          fakeChunk.add(wx, wLvl + 1.1, wz, 'lilypad', d, false);
         }
         // 结构生成 (简化处理)
         if (h < -6 && Math.random() < 0.001) {

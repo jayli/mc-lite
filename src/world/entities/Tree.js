@@ -109,7 +109,7 @@ export class Tree {
   static _addOptimized(chunk, blocks, dObj) {
     const leafTypes = ['leaves', 'sky_leaves', 'azalea_leaves', 'azalea_flowers', 'yellow_leaves'];
     const blockMap = new Set();
-    blocks.forEach(b => blockMap.add(`${Math.round(b.x)},${Math.round(b.y)},${Math.round(b.z)}`));
+    blocks.forEach(b => blockMap.add(`${Math.floor(b.x)},${Math.floor(b.y)},${Math.floor(b.z)}`));
 
     blocks.forEach(b => {
       if (leafTypes.includes(b.type)) {
@@ -118,7 +118,7 @@ export class Tree {
           [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]
         ];
         const isSurrounded = neighbors.every(([dx, dy, dz]) =>
-          blockMap.has(`${Math.round(b.x + dx)},${Math.round(b.y + dy)},${Math.round(b.z + dz)}`)
+          blockMap.has(`${Math.floor(b.x + dx)},${Math.floor(b.y + dy)},${Math.floor(b.z + dz)}`)
         );
 
         // 如果被完全包围，则认为不接触空气，跳过生成

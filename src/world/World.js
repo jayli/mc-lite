@@ -180,7 +180,7 @@ export class World {
       return y <= h;
     }
 
-    const blockKey = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+    const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
     return chunk.solidBlocks.has(blockKey);
   }
 

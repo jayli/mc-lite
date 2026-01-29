@@ -37,18 +37,18 @@ export class RealisticTree {
             trunkMesh.material = mat;
         }
     }
-    trunkMesh.position.set(x, y + template.trunkHeight / 2 - 0.5, z);
+    trunkMesh.position.set(Math.floor(x) + 0.5, y + template.trunkHeight / 2 - 0.5, Math.floor(z) + 0.5);
     chunk.group.add(trunkMesh);
 
     // 添加碰撞方块
     for (let i = 0; i < Math.ceil(template.trunkHeight); i++) {
-      const key = `${Math.round(x)},${Math.round(y + i)},${Math.round(z)}`;
+      const key = `${Math.floor(x)},${Math.floor(y + i)},${Math.floor(z)}`;
       chunk.solidBlocks.add(key);
     }
 
     // --- 克隆树叶 ---
     const leavesMesh = template.leaves.clone();
-    leavesMesh.position.set(x, y, z); // 几何体已经相对于基部进行了偏移
+    leavesMesh.position.set(Math.floor(x) + 0.5, y, Math.floor(z) + 0.5); // 几何体已经相对于基部进行了偏移
     chunk.group.add(leavesMesh);
   }
 }

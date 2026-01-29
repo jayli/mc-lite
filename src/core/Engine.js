@@ -233,15 +233,15 @@ export class Engine {
           // --- 陆地/海洋显示逻辑 ---
           if (dist < 60.0) {
             bool nearOcean = false;
-            if (getHeight(pos.x, pos.y) < -1.8) {
+            if (getHeight(pos.x, pos.y) < -0.8) {
               nearOcean = true;
             } else {
-              if (getHeight(pos.x + 4.0, pos.y) < -1.8) nearOcean = true;
-              else if (getHeight(pos.x - 4.0, pos.y) < -1.8) nearOcean = true;
-              else if (getHeight(pos.x, pos.y + 4.0) < -1.8) nearOcean = true;
-              else if (getHeight(pos.x, pos.y - 4.0) < -1.8) nearOcean = true;
-              else if (getHeight(pos.x + 3.0, pos.y + 3.0) < -1.8) nearOcean = true;
-              else if (getHeight(pos.x - 3.0, pos.y - 3.0) < -1.8) nearOcean = true;
+              if (getHeight(pos.x + 4.0, pos.y) < -0.8) nearOcean = true;
+              else if (getHeight(pos.x - 4.0, pos.y) < -0.8) nearOcean = true;
+              else if (getHeight(pos.x, pos.y + 4.0) < -0.8) nearOcean = true;
+              else if (getHeight(pos.x, pos.y - 4.0) < -0.8) nearOcean = true;
+              else if (getHeight(pos.x + 3.0, pos.y + 3.0) < -0.8) nearOcean = true;
+              else if (getHeight(pos.x - 3.0, pos.y - 3.0) < -0.8) nearOcean = true;
             }
 
             if (!nearOcean) {
@@ -291,7 +291,7 @@ export class Engine {
 
     this.waterPlane = new THREE.Mesh(waterGeo, this.waterMaterial);
     this.waterPlane.rotation.x = -Math.PI / 2;
-    this.waterPlane.position.y = -2.15;
+    this.waterPlane.position.y = -1.15;
     this.scene.add(this.waterPlane);
 
     // --- 隐藏面剔除系统初始化 ---
@@ -371,7 +371,7 @@ export class Engine {
     const camX = this.camera.position.x;
     const camY = this.camera.position.y;
     const camZ = this.camera.position.z;
-    const waterLevel = -2.0;
+    const waterLevel = -1.0;
 
     // --- 模拟高度计算以判断是否在“近海”区域 ---
     const getNoise = (x, z, scale) => {
@@ -389,12 +389,12 @@ export class Engine {
     };
 
     let isNearOcean = false;
-    if (getHeight(camX, camZ) < -1.8) {
+    if (getHeight(camX, camZ) < -0.8) {
       isNearOcean = true;
     } else {
       // 检查周围 4 个单位
-      if (getHeight(camX + 4, camZ) < -1.8 || getHeight(camX - 4, camZ) < -1.8 ||
-          getHeight(camX, camZ + 4) < -1.8 || getHeight(camX, camZ - 4) < -1.8) {
+      if (getHeight(camX + 4, camZ) < -0.8 || getHeight(camX - 4, camZ) < -0.8 ||
+          getHeight(camX, camZ + 4) < -0.8 || getHeight(camX, camZ - 4) < -0.8) {
         isNearOcean = true;
       }
     }

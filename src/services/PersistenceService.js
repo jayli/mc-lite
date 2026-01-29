@@ -88,7 +88,7 @@ export class PersistenceService {
     const cx = Math.floor(x / PERSISTENCE_CONFIG.CHUNK_SIZE);
     const cz = Math.floor(z / PERSISTENCE_CONFIG.CHUNK_SIZE);
     const chunkKey = `${cx},${cz}`;
-    const blockKey = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+    const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
 
     if (!this.cache.has(chunkKey)) {
       this.cache.set(chunkKey, new Map());

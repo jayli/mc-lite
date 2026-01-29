@@ -171,7 +171,7 @@ export class Chunk {
     */
   add(x, y, z, type, dObj = null, solid = true) {
     // 生成方块的唯一键（用于碰撞检测和持久化覆盖检查）
-    const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
 
     // 如果该位置在当前区块生成期间有持久化增量覆盖，则跳过原始生成逻辑
     if (this._tempDeltas && this._tempDeltas.has(key)) return;
@@ -214,7 +214,7 @@ export class Chunk {
 
     // 为每个实例设置位置矩阵
     d[type].forEach((pos, i) => {
-      dummy.position.set(pos.x, pos.y, pos.z);  // 设置虚拟对象位置
+      dummy.position.set(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);  // 设置虚拟对象位置 (增加 0.5 偏移)
       dummy.updateMatrix();                     // 更新变换矩阵
       mesh.setMatrixAt(i, dummy.matrix);        // 设置实例矩阵
       // 如果是箱子，初始化该箱子的状态
@@ -282,9 +282,9 @@ export class Chunk {
     for (let i = this.group.children.length - 1; i >= 0; i--) {
       const child = this.group.children[i];
       if (!child.isInstancedMesh &&
-          Math.round(child.position.x) === Math.round(x) &&
-          Math.round(child.position.y) === Math.round(y) &&
-          Math.round(child.position.z) === Math.round(z)) {
+          Math.floor(child.position.x) === Math.floor(x) &&
+          Math.floor(child.position.y) === Math.floor(y) &&
+          Math.floor(child.position.z) === Math.floor(z)) {
         if (child.geometry) child.geometry.dispose();
         if (child.material && !child.isInstancedMesh) {
           if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
@@ -295,7 +295,7 @@ export class Chunk {
     }
 
     // 添加到实心方块集合（用于碰撞检测）
-    const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
     const nonSolidTypes = ['air', 'water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass', 'allium'];
 
     if (!nonSolidTypes.includes(type)) {
@@ -311,7 +311,7 @@ export class Chunk {
       const material = materials.getMaterial(type);
       // 创建单个网格
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(x, y, z);                  // 设置位置
+      mesh.position.set(Math.floor(x) + 0.5, Math.floor(y) + 0.5, Math.floor(z) + 0.5); // 增加 0.5 偏移
       mesh.userData = { type: type };              // 存储方块类型
 
       // 设置阴影
@@ -354,7 +354,7 @@ export class Chunk {
    */
   removeBlock(x, y, z) {
     // 从实心方块集合中移除（碰撞检测）
-    const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
     this.solidBlocks.delete(key);
     // 记录持久化变更
     persistenceService.recordChange(x, y, z, 'air');
