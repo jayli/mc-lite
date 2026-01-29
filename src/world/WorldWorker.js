@@ -43,42 +43,26 @@ onmessage = function(e) {
     });
   }
 
-  const d = {};
-  const solidBlocks = []; // 传递数组更高效
+  // 使用 Map 暂存方块，确保同一位置后生成的方块覆盖旧方块
+  const blockMap = new Map();
   const realisticTrees = []; // 记录真实树木的位置
+  const structureQueue = []; // 结构生成队列，确保结构覆盖地形
 
-  // 初始化所有可能的类型数组
-  const allTypes = [
-    'grass', 'dirt', 'stone', 'sand', 'wood', 'birch_log', 'planks', 'oak_planks', 'white_planks',
-    'obsidian', 'leaves', 'water', 'cactus', 'flower', 'short_grass', 'allium', 'chest', 'bookbox',
-    'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass', 'sky_wood', 'sky_leaves', 'moss',
-    'azalea_log', 'azalea_leaves', 'azalea_flowers', 'swamp_water', 'swamp_grass', 'vine',
-    'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'glass_blink',
-    'gold_ore', 'calcite', 'bricks', 'chimney', 'gold_block', 'emerald', 'amethyst', 'debris', 'iron', 'iron_ore', 'end_stone'
-  ];
-  for(const type of allTypes) {
-    d[type] = [];
-  }
-
-  // 模拟 Chunk 类的 add 方法
+  // 模拟 Chunk 类的 add 方法 - 改为写入 blockMap
   const fakeChunk = {
     add: (x, y, z, type, dObj, solid = true) => {
       const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
       // 检查持久化增量覆盖
       if (deltas && deltas[key]) return;
 
-      if (dObj) {
-        if (!dObj[type]) dObj[type] = [];
-        dObj[type].push({ x, y, z });
-      }
-      if (solid) {
-        solidBlocks.push(key);
-      }
+      blockMap.set(key, { x, y, z, type, solid });
     }
   };
 
   // 获取区块中心生物群系
   const centerBiome = terrainGen.getBiome(cx * CHUNK_SIZE, cz * CHUNK_SIZE);
+  // 数据收集对象占位符
+  const dPlaceholder = {};
 
   // 核心生成逻辑 (从 Chunk.js 迁移)
   for (let x = 0; x < CHUNK_SIZE; x++) {
@@ -89,18 +73,22 @@ onmessage = function(e) {
       const h = terrainGen.generateHeight(wx, wz, centerBiome);
       const wLvl = -2; // 海平面基准线高度，低于此高度可能生成水或沙滩
 
+      // 结构生成安全检查
+      const safeForStructure = x >= 3 && x <= 12 && z >= 3 && z <= 12;
+
       if (h < wLvl) {
         // 低于海平面：生成沙子和底部的末地石
-        fakeChunk.add(wx, h, wz, 'sand', d);
-        fakeChunk.add(wx, h - 1, wz, 'end_stone', d);
+        fakeChunk.add(wx, h, wz, 'sand', dPlaceholder);
+        fakeChunk.add(wx, h - 1, wz, 'end_stone', dPlaceholder);
 
         if (centerBiome === 'SWAMP' && Math.random() < 0.08) {
           // 沼泽生物群系：8% 概率在水面上生成睡莲 (1.1 偏移量使其浮在水面上方一点点)
-          fakeChunk.add(wx, wLvl + 1.1, wz, 'lilypad', d, false);
+          fakeChunk.add(wx, wLvl + 1.1, wz, 'lilypad', dPlaceholder, false);
         }
-        // 结构生成 (沉船)
-        if (h < -6 && Math.random() < 0.001) {
-          generateStructure('ship', wx, h + 1, wz, fakeChunk, d);
+
+        // 结构生成 (沉船) - 加入队列
+        if (h < -6 && Math.random() < 0.001 && safeForStructure) {
+          structureQueue.push(() => generateStructure('ship', wx, h + 1, wz, fakeChunk, dPlaceholder));
         }
       } else {
         // 高于海平面：根据生物群系确定地表和地下材质
@@ -109,19 +97,19 @@ onmessage = function(e) {
         if (centerBiome === 'AZALEA') { surf = 'moss'; sub = 'dirt'; }
         if (centerBiome === 'SWAMP') { surf = 'swamp_grass'; sub = 'dirt'; }
 
-        fakeChunk.add(wx, h, wz, surf, d);     // 地表层
-        fakeChunk.add(wx, h - 1, wz, sub, d); // 地表下一层
+        fakeChunk.add(wx, h, wz, surf, dPlaceholder);     // 地表层
+        fakeChunk.add(wx, h - 1, wz, sub, dPlaceholder); // 地表下一层
 
         // 垂直生成逻辑：处理地下岩层和矿洞
         for (let k = 2; k <= 12; k++) {
           if (k === 12) {
             // 基岩层 (y = h - 12)
-            fakeChunk.add(wx, h - k, wz, 'end_stone', d);
+            fakeChunk.add(wx, h - k, wz, 'end_stone', dPlaceholder);
             continue;
           }
           if (k === 11) {
             // 实体保护层 (y = h - 11)：防止玩家穿透基岩
-            fakeChunk.add(wx, h - k, wz, 'stone', d);
+            fakeChunk.add(wx, h - k, wz, 'stone', dPlaceholder);
             continue;
           }
 
@@ -138,7 +126,7 @@ onmessage = function(e) {
 
           // 10% 概率生成金矿，否则生成石头
           const blockType = Math.random() < 0.1 ? 'gold_ore' : 'stone';
-          fakeChunk.add(wx, h - k, wz, blockType, d);
+          fakeChunk.add(wx, h - k, wz, blockType, dPlaceholder);
         }
 
         if (centerBiome === 'FOREST') {
@@ -150,33 +138,43 @@ onmessage = function(e) {
               const leafType = isYellow ? 'yellow_leaves' : null;
               const isBirch = Math.random() < 0.1;
               const logType = isBirch ? 'birch_log' : null;
-              Tree.generate(wx, h + 1, wz, fakeChunk, 'big', d, logType, leafType);
+              Tree.generate(wx, h + 1, wz, fakeChunk, 'big', dPlaceholder, logType, leafType);
             }
           }
         } else if (centerBiome === 'AZALEA') {
-          if (Math.random() < 0.045) Tree.generate(wx, h + 1, wz, fakeChunk, 'azalea', d);
+          if (Math.random() < 0.045) Tree.generate(wx, h + 1, wz, fakeChunk, 'azalea', dPlaceholder);
         } else if (centerBiome === 'SWAMP') {
-          if (Math.random() < 0.03) Tree.generate(wx, h + 1, wz, fakeChunk, 'swamp', d);
+          if (Math.random() < 0.03) Tree.generate(wx, h + 1, wz, fakeChunk, 'swamp', dPlaceholder);
         } else if (centerBiome === 'DESERT') {
-          if (Math.random() < 0.01) fakeChunk.add(wx, h + 1, wz, 'cactus', d);
-          if (Math.random() < 0.001) generateStructure('rover', wx, h + 1, wz, fakeChunk, d);
+          if (Math.random() < 0.01) fakeChunk.add(wx, h + 1, wz, 'cactus', dPlaceholder);
+          if (Math.random() < 0.001 && safeForStructure) {
+            structureQueue.push(() => generateStructure('rover', wx, h + 1, wz, fakeChunk, dPlaceholder));
+          }
         } else {
+          let occupied = false;
           if (Math.random() < 0.005) {
-            Tree.generate(wx, h + 1, wz, fakeChunk, 'default', d);
+            Tree.generate(wx, h + 1, wz, fakeChunk, 'default', dPlaceholder);
+            occupied = true;
           }
-          const randPlant = Math.random();
-          if (randPlant < 0.05) {
-            fakeChunk.add(wx, h + 1, wz, 'short_grass', d, false);
-          } else if (randPlant < 0.10) {
-            const flowerType = Math.random() < 0.33 ? 'allium' : 'flower';
-            fakeChunk.add(wx, h + 1, wz, flowerType, d, false);
+
+          if (!occupied) {
+            const randPlant = Math.random();
+            if (randPlant < 0.05) {
+              fakeChunk.add(wx, h + 1, wz, 'short_grass', dPlaceholder, false);
+            } else if (randPlant < 0.10) {
+              const flowerType = Math.random() < 0.33 ? 'allium' : 'flower';
+              fakeChunk.add(wx, h + 1, wz, flowerType, dPlaceholder, false);
+            }
           }
-          if (Math.random() < 0.001) generateStructure('house', wx, h + 1, wz, fakeChunk, d);
+
+          if (Math.random() < 0.001 && safeForStructure) {
+            structureQueue.push(() => generateStructure('house', wx, h + 1, wz, fakeChunk, dPlaceholder));
+          }
         }
       }
 
       if (terrainGen.shouldGenerateCloud(wx, wz)) {
-        Cloud.generate(wx, 55, wz, fakeChunk, d);
+        Cloud.generate(wx, 55, wz, fakeChunk, dPlaceholder);
       }
     }
   }
@@ -186,7 +184,7 @@ onmessage = function(e) {
     const islandY = 40 + Math.floor(Math.random() * 30);
     const centerWx = cx * CHUNK_SIZE + 8;
     const centerWz = cz * CHUNK_SIZE + 8;
-    Island.generate(centerWx, islandY, centerWz, fakeChunk, d);
+    Island.generate(centerWx, islandY, centerWz, fakeChunk, dPlaceholder);
   }
 
   // 低空簇状云
@@ -194,22 +192,48 @@ onmessage = function(e) {
     const startX = cx * CHUNK_SIZE + Math.floor(Math.random() * CHUNK_SIZE);
     const startZ = cz * CHUNK_SIZE + Math.floor(Math.random() * CHUNK_SIZE);
     const size = 20 + Math.floor(Math.random() * 21);
-    Cloud.generateCluster(startX, 45, startZ, size, fakeChunk, d);
+    Cloud.generateCluster(startX, 45, startZ, size, fakeChunk, dPlaceholder);
   }
+
+  // 处理结构队列 (房屋、Rover、沉船)，确保它们覆盖地形
+  structureQueue.forEach(task => task());
 
   // 叠加持久化修改
   for (const blockKey in deltas) {
     const delta = deltas[blockKey];
     if (delta.type !== 'air') {
       const [bx, by, bz] = blockKey.split(',').map(Number);
-      if (!d[delta.type]) d[delta.type] = [];
-      d[delta.type].push({ x: bx, y: by, z: bz });
 
       // 简单逻辑：部分方块非实心
-      if (!['water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass'].includes(delta.type)) {
-        solidBlocks.push(blockKey);
-      }
+      const solid = !['water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass'].includes(delta.type);
+      blockMap.set(blockKey, { x: bx, y: by, z: bz, type: delta.type, solid });
+    } else {
+      // 如果是空气，确保 Map 里没有东西
+      blockMap.delete(blockKey);
     }
+  }
+
+  // 将 blockMap 转换为 d 和 solidBlocks
+  const d = {};
+  const solidBlocks = [];
+
+  // 初始化所有可能的类型数组
+  const allTypes = [
+    'grass', 'dirt', 'stone', 'sand', 'wood', 'birch_log', 'planks', 'oak_planks', 'white_planks',
+    'obsidian', 'leaves', 'water', 'cactus', 'flower', 'short_grass', 'allium', 'chest', 'bookbox',
+    'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass', 'sky_wood', 'sky_leaves', 'moss',
+    'azalea_log', 'azalea_leaves', 'azalea_flowers', 'swamp_water', 'swamp_grass', 'vine',
+    'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'glass_blink',
+    'gold_ore', 'calcite', 'bricks', 'chimney', 'gold_block', 'emerald', 'amethyst', 'debris', 'iron', 'iron_ore', 'end_stone'
+  ];
+  for(const type of allTypes) {
+    d[type] = [];
+  }
+
+  for (const [key, block] of blockMap) {
+      if (!d[block.type]) d[block.type] = [];
+      d[block.type].push({x: block.x, y: block.y, z: block.z});
+      if (block.solid) solidBlocks.push(key);
   }
 
   // 返回数据
