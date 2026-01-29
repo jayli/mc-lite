@@ -250,7 +250,7 @@ function generateStructure(type, x, y, z, chunk, dObj) {
           if (i === 0 && j === 2) continue;
           if ((i === -2 || i === 2) && j === 0) {
             chunk.add(x + i, y, z + j, wallMat, dObj);
-            chunk.add(x + i, y + 1, z + j, 'glass_block', dObj, false);
+            chunk.add(x + i, y + 1, z + j, 'glass_block', dObj);
             chunk.add(x + i, y + 2, z + j, wallMat, dObj);
           } else {
             for (let h = 0; h < 3; h++) chunk.add(x + i, y + h, z + j, wallMat, dObj);
