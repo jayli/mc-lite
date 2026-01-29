@@ -30,10 +30,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - `src/TerrainGen.js`: 包含噪声算法、生物群系判定和特殊结构生成。
 4. **持久化层**: `src/PersistenceService.js` 使用 IndexedDB 存储世界增量修改（Deltas）。
 
-### 关键系统设计
-- **高性能渲染**: 区块通过 `InstancedMesh` 渲染同类方块。动态物体（植物、火星车）使用 `BufferGeometryUtils` 合并几何体。
-- **环境系统**: 太阳位置与 `DirectionalLight` 同步，提供随时间变化的动态光照。
-- **生物群系**: 基于温度/湿度噪声生成森林、沙漠、沼泽、杜鹃林和平原。
+### 性能优化设计
+- **InstancedMesh**: 区块通过 `InstancedMesh` 渲染同类方块，大幅减少 Draw Calls；粒子系统同样使用 `InstancedMesh` 优化。
+- **Web Workers**: 地形生成、结构计算等重计算逻辑在 `WorldWorker.js` 中异步执行，避免主线程卡顿。
+- **隐藏面剔除 (Face Culling)**: `FaceCullingSystem.js` 通过位掩码管理方块可见面，仅渲染暴露在外的面（结合 `alphaTest` 处理透明材质）。
+- **材质优化**: `MaterialManager.js` 禁用纹理 Mipmaps，使用 `NearestFilter` 保持像素风格并减少内存占用。
+- **按需加载/卸载**: `World.js` 根据玩家位置动态加载渲染距离（默认3）内的区块，并及时卸载远端区块。
+- **碰撞检测占位**: 当区块尚未准备好时，`World.isSolid` 使用噪声函数进行快速物理估算，防止玩家坠入虚空。
+- **几何体合并**: 复杂结构（如仙人掌、火星车）使用 `BufferGeometryUtils.mergeGeometries` 合并，进一步优化性能。
 
 ## 常用操作指引
 

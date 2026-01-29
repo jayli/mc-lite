@@ -22,14 +22,15 @@ export class World {
     this.scene = scene;
     this.chunks = new Map(); // Key: "cx,cz" -> Chunk
 
-    // 粒子系统优化：使用 InstancedMesh 替换独立 Mesh
-    this.MAX_PARTICLES = 8;
-    this.particleGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.1);
+    // 粒子系统优化：使用 InstancedMesh 统一管理所有挖掘粒子，大幅减少 Draw Call
+    this.MAX_PARTICLES = 8; // 最大粒子数量，保持较小值以平衡视觉效果和性能
+    this.particleGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.1); // 每个粒子的基础几何体 (0.1单位的小方块)
     this.particleMaterial = new THREE.MeshBasicMaterial();
     this.particleMesh = new THREE.InstancedMesh(this.particleGeometry, this.particleMaterial, this.MAX_PARTICLES);
+    // DynamicDrawUsage: 提示 WebGL 粒子位置会频繁更新，优化 GPU 缓冲区上传速度
     this.particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.particleMesh.frustumCulled = false; // 防止因边界球未更新导致的裁剪
-    // 预先创建颜色属性
+    this.particleMesh.frustumCulled = false; // 禁用视锥体裁剪，防止因实例矩阵变换导致边界球失效而误删渲染
+    // 预先创建颜色属性，用于使粒子颜色与被挖掘方块匹配
     this.particleMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.MAX_PARTICLES * 3), 3);
     this.scene.add(this.particleMesh);
 
@@ -54,11 +55,11 @@ export class World {
    * @param {number} dt - 增量时间（秒）
    */
   update(playerPos = new THREE.Vector3(), dt = 0) { // Default for safety
-    const cx = Math.floor(playerPos.x / CHUNK_SIZE);
-    const cz = Math.floor(playerPos.z / CHUNK_SIZE);
+    const cx = Math.floor(playerPos.x / CHUNK_SIZE); // 玩家当前所在的区块 X 坐标
+    const cz = Math.floor(playerPos.z / CHUNK_SIZE); // 玩家当前所在的区块 Z 坐标
 
     // Load new chunks
-    // 加载新区块：根据玩家位置加载渲染距离内的区块
+    // 加载新区块：根据玩家位置加载渲染距离 (RENDER_DIST=3) 内的所有区块
     for (let i = -RENDER_DIST; i <= RENDER_DIST; i++) {
       for (let j = -RENDER_DIST; j <= RENDER_DIST; j++) {
         const key = `${cx + i},${cz + j}`;
@@ -71,11 +72,11 @@ export class World {
     }
 
     // Unload old chunks
-    // 卸载旧区块：卸载超出渲染距离的区块以节省内存
+    // 卸载旧区块：卸载超出渲染距离 (+1缓冲) 的区块，释放 GPU 显存和内存资源
     for (const [key, chunk] of this.chunks) {
       if (Math.abs(chunk.cx - cx) > RENDER_DIST + 1 || Math.abs(chunk.cz - cz) > RENDER_DIST + 1) {
         this.scene.remove(chunk.group);
-        // 持久化区块修改
+        // 持久化区块修改：将该区块的 Delta 数据存入 IndexedDB
         persistenceService.flush(chunk.cx, chunk.cz);
         chunk.dispose();
         this.chunks.delete(key);

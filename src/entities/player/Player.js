@@ -410,6 +410,8 @@ export class Player {
     // 相机跟随与平滑处理
     this.camera.position.x = this.position.x;
     this.camera.position.z = this.position.z;
+    // 1.65: 玩家眼睛的垂直偏移高度（相机高度）
+    // 0.25: lerp 的平滑系数，值越小相机跟随越平缓，值越大越实时
     this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, this.position.y + 1.65, 0.25);
 
     this.updateArm();
@@ -432,11 +434,11 @@ export class Player {
 
     const hits = this.raycaster.intersectObjects(targets, true);
 
-    if (button === 2) { // 右键点击 - 放置或打开
+    if (button === 2) { // 右键点击 - 放置方块或打开交互容器 (如箱子)
       const slot = this.inventory.getSelected();
       const heldItem = slot ? slot.item : null;
 
-      if (hits.length > 0 && hits[0].distance < 9) {
+      if (hits.length > 0 && hits[0].distance < 9) { // 9: 最大交互距离 (格)
         const hit = hits[0];
         const dummy = new THREE.Matrix4();
         const m = hit.object;

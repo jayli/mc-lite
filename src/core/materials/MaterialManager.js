@@ -22,17 +22,20 @@ export class MaterialManager {
 
   /**
    * 预加载纹理文件并缓存
-   * @param {string[]} urls - 纹理文件的URL数组
-   * @returns {Promise} 当所有纹理加载完成时解析的Promise
+   * @param {string[]} urls - 纹理文件的 URL 数组
+   * @returns {Promise} 当所有纹理加载完成时解析的 Promise
    */
   preloadTextures(urls) {
     return Promise.all(urls.map(url =>
       this.textureLoader.loadAsync(url).then(texture => {
-        texture.magFilter = THREE.NearestFilter; // 设置纹理放大过滤器为最近邻（保持像素风格）
-        texture.minFilter = THREE.NearestFilter; // 设置纹理缩小过滤器为最近邻（禁用插值优化性能）
-        texture.generateMipmaps = false; // 禁用 Mipmaps 减少 GPU 内存占用和计算
-        texture.colorSpace = THREE.SRGBColorSpace; // 设置颜色空间为SRGB
-        this.textureCache.set(url, texture); // 将纹理存入缓存
+        // NearestFilter: 最近邻过滤，禁用插值，实现干净的像素风效果 (Minecraft 风格)
+        texture.magFilter = THREE.NearestFilter;
+        texture.minFilter = THREE.NearestFilter;
+        // 性能优化：禁用 Mipmaps 减少 GPU 显存占用，并避免在像素风材质上产生模糊效果
+        texture.generateMipmaps = false;
+        // SRGBColorSpace: 确保颜色在 WebGL2 中渲染正确，符合现代颜色工作流
+        texture.colorSpace = THREE.SRGBColorSpace;
+        this.textureCache.set(url, texture); // 将加载完成的纹理存入缓存
       })
     ));
   }

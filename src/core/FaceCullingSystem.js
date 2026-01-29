@@ -56,13 +56,13 @@ export class FaceCullingSystem {
 
     // 配置参数
     this.config = {
-      updateThreshold: config.updateThreshold || 16, // ms
-      errorLimit: config.errorLimit || 10,
-      batchSize: config.batchSize || 64,
-      cacheNeighbors: config.cacheNeighbors !== false,
-      lazyUpdate: config.lazyUpdate !== false,
-      performanceMonitoring: config.performanceMonitoring !== false,
-      monitoringInterval: config.monitoringInterval || 5000, // 5秒
+      updateThreshold: config.updateThreshold || 16, // 更新阈值 (ms)：单次更新逻辑允许占用的最大时间，防止造成掉帧 (16ms 对应 60FPS)
+      errorLimit: config.errorLimit || 10,           // 错误限制：系统连续发生错误的上限，超过此值将自动禁用系统以保证游戏稳定性
+      batchSize: config.batchSize || 64,             // 批量大小：单词处理方块的数量，用于分片执行长任务
+      cacheNeighbors: config.cacheNeighbors !== false, // 是否缓存相邻方块信息，平衡内存与计算开销
+      lazyUpdate: config.lazyUpdate !== false,       // 懒更新：仅在方块数据发生变化时才重新计算
+      performanceMonitoring: config.performanceMonitoring !== false, // 性能监控开关
+      monitoringInterval: config.monitoringInterval || 5000, // 性能快照记录间隔 (ms)
       ...config
     };
 
@@ -172,12 +172,13 @@ export class FaceCullingSystem {
 
   /**
    * 计算单个方块的可见面位掩码
+   * 通过检查六个相邻位置是否存在不透明方块来确定每个面是否需要渲染
    * @param {Object} block - 方块对象
-   * @param {Object} neighbors - 相邻方块对象
-   * @returns {number} 位掩码 (0-63)
+   * @param {Object} neighbors - 相邻方块对象 (top, bottom, north, south, west, east)
+   * @returns {number} 位掩码 (0-63)，每一位对应一个面的可见性
    */
   calculateFaceVisibility(block, neighbors) {
-    if (!this.enabled) return faceMask.ALL;
+    if (!this.enabled) return faceMask.ALL; // 系统禁用时，默认所有面都可见
 
     // 透明方块的所有面都可见
     if (this.isTransparent(block.type)) {
@@ -186,7 +187,7 @@ export class FaceCullingSystem {
 
     let mask = 0;
 
-    // 检查六个方向
+    // 检查六个方向，如果相邻方向没有遮挡（或是透明方块），则设置对应位的掩码为可见
     if (this.shouldShowFace(block, neighbors.top)) mask |= faceMask.TOP;
     if (this.shouldShowFace(block, neighbors.bottom)) mask |= faceMask.BOTTOM;
     if (this.shouldShowFace(block, neighbors.north)) mask |= faceMask.NORTH;

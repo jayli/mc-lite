@@ -15,11 +15,12 @@ onmessage = function(e) {
   // 同步种子
   setSeed(seed);
 
-  // 预先计算该区块的房间种子（基于区块坐标的确定性随机）
-  // 使用简单的线性同余或哈希来确保每个区块的房间位置固定
+  // 预先计算该区块的房间种子（基于区块坐标的确定性随机，保证同一个区块每次生成的矿洞位置一致）
+  // 73856093 和 19349663 是常用的质数，用于简单的哈希计算
   const rooms = [];
   const roomSeed = Math.abs((cx * 73856093) ^ (cz * 19349663) ^ seed);
   let rRand = roomSeed;
+  // 线性同余生成器 (LCG) 参数，用于生成确定性的伪随机数
   const nextRand = () => {
     rRand = (rRand * 1103515245 + 12345) & 0x7fffffff;
     return rRand / 0x7fffffff;
@@ -28,14 +29,14 @@ onmessage = function(e) {
   for (let i = 0; i < ROOMS_PER_CHUNK; i++) {
     const rx = Math.floor(nextRand() * CHUNK_SIZE);
     const rz = Math.floor(nextRand() * CHUNK_SIZE);
-    const ry = 2 + Math.floor(nextRand() * 8); // 在 k=2 到 k=10 之间
-    const rw = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1));
-    const rh = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1));
-    const rd = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1));
+    const ry = 2 + Math.floor(nextRand() * 8); // 矿洞垂直位置在 y=2 到 y=10 之间
+    const rw = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1)); // 宽度
+    const rh = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1)); // 高度
+    const rd = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1)); // 深度
     rooms.push({
       minX: cx * CHUNK_SIZE + rx - Math.floor(rw/2),
       maxX: cx * CHUNK_SIZE + rx + Math.floor(rw/2),
-      minY: ry, // 这里暂时记录相对高度偏移 k
+      minY: ry,
       maxY: ry + rh,
       minZ: cz * CHUNK_SIZE + rz - Math.floor(rd/2),
       maxZ: cz * CHUNK_SIZE + rz + Math.floor(rd/2)
@@ -86,37 +87,40 @@ onmessage = function(e) {
       const wz = cz * CHUNK_SIZE + z;
 
       const h = terrainGen.generateHeight(wx, wz, centerBiome);
-      const wLvl = -2;
+      const wLvl = -2; // 海平面基准线高度，低于此高度可能生成水或沙滩
 
       if (h < wLvl) {
+        // 低于海平面：生成沙子和底部的末地石
         fakeChunk.add(wx, h, wz, 'sand', d);
         fakeChunk.add(wx, h - 1, wz, 'end_stone', d);
 
         if (centerBiome === 'SWAMP' && Math.random() < 0.08) {
+          // 沼泽生物群系：8% 概率在水面上生成睡莲 (1.1 偏移量使其浮在水面上方一点点)
           fakeChunk.add(wx, wLvl + 1.1, wz, 'lilypad', d, false);
         }
-        // 结构生成 (简化处理)
+        // 结构生成 (沉船)
         if (h < -6 && Math.random() < 0.001) {
-          // ship 结构可以在这里生成，或者标记位置
           generateStructure('ship', wx, h + 1, wz, fakeChunk, d);
         }
       } else {
+        // 高于海平面：根据生物群系确定地表和地下材质
         let surf = 'grass', sub = 'dirt';
         if (centerBiome === 'DESERT') { surf = 'sand'; sub = 'sand'; }
         if (centerBiome === 'AZALEA') { surf = 'moss'; sub = 'dirt'; }
         if (centerBiome === 'SWAMP') { surf = 'swamp_grass'; sub = 'dirt'; }
 
-        fakeChunk.add(wx, h, wz, surf, d);
-        fakeChunk.add(wx, h - 1, wz, sub, d);
+        fakeChunk.add(wx, h, wz, surf, d);     // 地表层
+        fakeChunk.add(wx, h - 1, wz, sub, d); // 地表下一层
 
+        // 垂直生成逻辑：处理地下岩层和矿洞
         for (let k = 2; k <= 12; k++) {
           if (k === 12) {
-            // 基岩层
+            // 基岩层 (y = h - 12)
             fakeChunk.add(wx, h - k, wz, 'end_stone', d);
             continue;
           }
           if (k === 11) {
-            // 实体保护层（防止穿透基岩）
+            // 实体保护层 (y = h - 11)：防止玩家穿透基岩
             fakeChunk.add(wx, h - k, wz, 'stone', d);
             continue;
           }
@@ -130,8 +134,9 @@ onmessage = function(e) {
             }
           }
 
-          if (inRoom) continue; // 如果在房间内，则生成空气（跳过添加方块）
+          if (inRoom) continue; // 如果在矿洞范围内，则跳过方块生成（即为空气）
 
+          // 10% 概率生成金矿，否则生成石头
           const blockType = Math.random() < 0.1 ? 'gold_ore' : 'stone';
           fakeChunk.add(wx, h - k, wz, blockType, d);
         }

@@ -12,11 +12,17 @@ export class Engine {
     this.scene = new THREE.Scene();
     // 场景背景设为 null，因为我们将使用天空球
     this.scene.background = null;
-    // 在场景中添加雾效，颜色与地平线相同，从距离20开始，到距离70完全遮挡
+    // 在场景中添加雾效
+    // 0x62b4d5: 雾的颜色（浅蓝色），与背景/地平线颜色匹配
+    // 20: 雾开始出现的近距，此距离内物体完全清晰
+    // 70: 雾完全覆盖的远距，此距离外物体被完全遮盖，用于平滑过渡区块卸载的边界
     this.scene.fog = new THREE.Fog(0x62b4d5, 20, 70);
 
     // 创建一个透视相机
-    // 参数分别为：视野角度(FOV)，宽高比，近裁剪面，远裁剪面
+    // 75: 视野角度 (FOV)，典型第一人称游戏设定
+    // innerWidth / innerHeight: 宽高比，自动适配窗口
+    // 0.1: 近裁剪面，物体离相机多近时开始不可见
+    // 200: 远裁剪面，物体离相机多远时开始不可见，应大于雾的最大距离 (70)
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
     // 设置相机的旋转顺序为 YXZ，这对于第一人称控制器很重要
     this.camera.rotation.order = 'YXZ';
@@ -37,33 +43,35 @@ export class Engine {
     this.renderer.setPixelRatio(this.resolutionScale);
 
     // --- 氛围渲染优化 ---
-    // 设置电影级色调映射，使高亮部分不过曝成纯白，而是有自然的色彩过渡
+    // ACESFilmicToneMapping: 电影级色调映射，使高亮部分不过曝成纯白，而是有自然的色彩过渡，提升视觉质感
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.25; // 提升全局曝光，让阳光感更强
+    this.renderer.toneMappingExposure = 1.25; // 全局曝光度，提升到 1.25 使阳光感更强，画面更明亮
 
     // --- 灯光与天空设置 ---
-    this.sunDirection = new THREE.Vector3(1, 0.8, 0.5).normalize();
-    this.sunColor = 0xfff7c2; // 温暖的金黄色
-    this.lightColor = 0xfffaf0; // 极亮的暖白色
-    this.zenithColor = 0x87CEEB;  // 顶点颜色 (深蓝)
-    this.horizonColor = 0xb2e0f2; // 地平线颜色 (浅蓝)
+    this.sunDirection = new THREE.Vector3(1, 0.8, 0.5).normalize(); // 初始太阳方向向量
+    this.sunColor = 0xfff7c2; // 太阳本体颜色 (金黄色)
+    this.lightColor = 0xfffaf0; // 阳光颜色 (接近白色的暖黄色)
+    this.zenithColor = 0x87CEEB;  // 天空顶点颜色 (深蓝色)
+    this.horizonColor = 0xb2e0f2; // 天空地平线颜色 (浅蓝色)
 
-    // 创建一个平行光
-    const light = new THREE.DirectionalLight(this.lightColor, 3.2); // 强度大幅提升 2.2 -> 3.2
-    // 关键优化：将 light.target 直接添加到场景中，方便后续同步
+    // 创建一个平行光 (模拟太阳光)
+    const light = new THREE.DirectionalLight(this.lightColor, 3.2); // 强度 3.2，提供强烈的直射光照
+    // 关键优化：将 light.target 直接添加到场景中，方便后续同步灯光指向的方向
     this.scene.add(light.target);
 
     // 允许此光源投射阴影
     light.castShadow = true;
-    // 设置阴影贴图的分辨率（根据需要调整：512, 1024, 2048）
+    // 设置阴影贴图的分辨率，更高的值意味着更清晰的阴影，但会增加 GPU 开销
     light.shadow.mapSize.set(612, 612);
-    // 设置平行光阴影相机的视锥体范围
+    // 设置平行光阴影相机的视锥体范围，决定了阴影覆盖的区域大小
     light.shadow.camera.left = -40;
     light.shadow.camera.right = 40;
     light.shadow.camera.top = 40;
     light.shadow.camera.bottom = -40;
     light.shadow.camera.near = 0.1;
     light.shadow.camera.far = 400;
+    // shadow.bias: 阴影偏移，用于减少阴影失真 (shadow acne)
+    // normalBias: 法线偏移，通过沿表面法线偏移深度来进一步优化阴影边缘
     light.shadow.bias = -0.000;
     light.shadow.normalBias = 0.02;
 
@@ -135,13 +143,14 @@ export class Engine {
 
   // 创建渐变天空球
   createSky() {
+    // 180: 球体半径，必须大于相机远裁剪面以防被裁剪
     const skyGeo = new THREE.SphereGeometry(180, 32, 15);
     const skyMat = new THREE.ShaderMaterial({
       uniforms: {
         topColor: { value: new THREE.Color(this.zenithColor) },
         bottomColor: { value: new THREE.Color(this.horizonColor) },
-        offset: { value: 33 },
-        exponent: { value: 0.6 }
+        offset: { value: 33 }, // 颜色过渡的垂直偏移量
+        exponent: { value: 0.6 } // 渐变指数，值越小渐变越陡峭
       },
       vertexShader: `
         varying vec3 vWorldPosition;
@@ -290,8 +299,8 @@ export class Engine {
     });
 
     this.waterPlane = new THREE.Mesh(waterGeo, this.waterMaterial);
-    this.waterPlane.rotation.x = -Math.PI / 2;
-    this.waterPlane.position.y = -1.15;
+    this.waterPlane.rotation.x = -Math.PI / 2; // 将平面旋转到水平位置
+    this.waterPlane.position.y = -1.15; // 设置水平面高度，略低于地面基准面 (-1.0)
     this.scene.add(this.waterPlane);
 
     // --- 隐藏面剔除系统初始化 ---

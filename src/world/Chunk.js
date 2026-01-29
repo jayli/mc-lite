@@ -11,12 +11,13 @@ import { persistenceService } from '../services/PersistenceService.js';
 import { SEED } from '../utils/MathUtils.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
 
-/** 区块尺寸 - 每个区块在X和Z方向上的方块数量 */
+/** 区块尺寸 - 每个区块在 X 和 Z 方向上的方块数量 (16x16 是 Voxel 游戏的标准区块大小) */
 const CHUNK_SIZE = 16;
 
 // --- Worker 设置 ---
+// 使用 Web Worker 处理计算密集型的地形生成，避免阻塞主线程（UI/渲染线程）
 const worldWorker = new Worker(new URL('./WorldWorker.js', import.meta.url), { type: 'module' });
-const workerCallbacks = new Map();
+const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函数
 
 worldWorker.onmessage = (e) => {
   const { cx, cz, d, solidBlocks, realisticTrees } = e.data;
@@ -31,20 +32,20 @@ worldWorker.onerror = (e) => {
   console.error('WorldWorker Error:', e);
 };
 
-// 共享几何体定义 - 用于优化渲染性能，避免重复创建相同几何体
+// 共享几何体定义 - 用于优化渲染性能，避免在每个区块中重复创建相同的几何体，减少 GPU 内存占用
 
 /**
  * 构建交叉平面几何体（用于花、藤蔓等植物）
- * 由两个垂直交叉的平面组成，形成十字形状
- * @param {number} offsetY - Y轴偏移，用于调整植物在地面上的高度
+ * 由两个垂直交叉的平面组成，形成十字形状，使其在各个角度看都有体积感
+ * @param {number} offsetY - Y 轴偏移，用于调整植物模型相对于方块底部的垂直高度
  * @returns {THREE.BufferGeometry} 合并后的交叉平面几何体
  */
 function buildCrossGeo(offsetY = -0.25) {
-  const p1 = new THREE.PlaneGeometry(0.7, 0.7);
+  const p1 = new THREE.PlaneGeometry(0.7, 0.7); // 基础平面尺寸 0.7x0.7
   const p2 = new THREE.PlaneGeometry(0.7, 0.7);
-  p2.rotateY(Math.PI / 2);
-  const merged = BufferGeometryUtils.mergeGeometries([p1, p2]);
-  merged.translate(0, offsetY, 0);
+  p2.rotateY(Math.PI / 2); // 绕 Y 轴旋转 90 度
+  const merged = BufferGeometryUtils.mergeGeometries([p1, p2]); // 合并几何体减少渲染开销
+  merged.translate(0, offsetY, 0); // 应用垂直偏移
   return merged;
 }
 // 花的几何体（交叉平面，向下偏移0.25单位，使花朵看起来生长在地面上）
@@ -189,50 +190,52 @@ export class Chunk {
 
   /**
    * 构建所有网格 - 将收集的方块位置转换为 Three.js 网格
-   * 使用 InstancedMesh 优化相同类型方块的渲染性能
+   * 使用 InstancedMesh 优化相同类型方块的渲染性能：
+   * 1. 对于每个方块类型，只创建一个 InstancedMesh 实例。
+   * 2. 通过一次 Draw Call 渲染该区块内所有的该类方块。
    * @param {Object} d - 数据收集对象，包含按类型分类的方块位置数组
    */
   buildMeshes(d) {
-    // 创建一个虚拟对象用于计算实例矩阵
+    // 创建一个虚拟对象用于计算每个实例的变换矩阵 (Matrix4)
     const dummy = new THREE.Object3D();
 
     // 遍历每种方块类型，为每种类型创建一个 InstancedMesh
     for (const type in d) {
-      if (d[type].length === 0) continue;  // 跳过没有方块的类型
+      if (d[type].length === 0) continue;  // 跳过没有任何实例的方块类型
 
-      // 获取几何体和材质
-      const geometry = geomMap[type] || geomMap['default'];  // 使用默认几何体如果未找到
-      const material = materials.getMaterial(type);          // 从材质管理器获取材质
-      const mesh = new THREE.InstancedMesh(geometry, material, d[type].length);  // 创建实例网格
+      // 从材质管理器和几何体映射表获取资源
+      const geometry = geomMap[type] || geomMap['default'];
+      const material = materials.getMaterial(type);
+      // 创建实例化网格：指定几何体、材质和实例总数
+      const mesh = new THREE.InstancedMesh(geometry, material, d[type].length);
 
-      // 存储用户数据，包含方块类型信息
+      // 存储元数据，便于后续通过 Raycaster 进行交互识别
       mesh.userData = { type: type };
-      // 如果是箱子，初始化箱子状态对象
       if (type === 'chest') {
-        mesh.userData.chests = {};
+        mesh.userData.chests = {}; // 如果是箱子，初始化一个子对象存储每个箱子的开启状态
       }
 
     // 为每个实例设置位置矩阵
     d[type].forEach((pos, i) => {
-      dummy.position.set(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);  // 设置虚拟对象位置 (增加 0.5 偏移)
-      dummy.updateMatrix();                     // 更新变换矩阵
-      mesh.setMatrixAt(i, dummy.matrix);        // 设置实例矩阵
-      // 如果是箱子，初始化该箱子的状态
+      // 核心偏移：将模型中心对齐到方块中心 (增加 0.5 偏移)
+      dummy.position.set(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
+      dummy.updateMatrix();                     // 根据位置生成变换矩阵
+      mesh.setMatrixAt(i, dummy.matrix);        // 将矩阵写入实例化缓冲区
       if (type === 'chest') {
-        mesh.userData.chests[i] = { open: false };
+        mesh.userData.chests[i] = { open: false }; // 初始化对应索引箱子的状态
       }
     });
 
-    // 重要：设置完所有实例矩阵后标记需要更新
+    // 重要：标记 instanceMatrix 需要更新，否则 GPU 不会重新加载数据
     mesh.instanceMatrix.needsUpdate = true;
 
-      // 设置阴影：半透明和特殊模型不投射/接收阴影
+      // 阴影配置优化：半透明物体、植物和云朵默认不投射/接收阴影，以节省渲染开销并避免视觉错误
       if(!['water','swamp_water','cloud','vine','lilypad','flower','short_grass'].includes(type)) {
-        mesh.castShadow = true;    // 投射阴影
-        mesh.receiveShadow = true; // 接收阴影
+        mesh.castShadow = true;    // 开启实时阴影投射
+        mesh.receiveShadow = true; // 开启实时阴影接收
       }
 
-      // 将网格添加到区块组中
+      // 将实例化网格添加到区块的分组中
       this.group.add(mesh);
     }
   }

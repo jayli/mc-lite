@@ -11,11 +11,11 @@ export class Physics {
   constructor(player, world) {
     this.player = player;
     this.world = world;
-    this.gravity = -0.015;      // 重力加速度
-    this.terminalVelocity = -1.0; // 终端速度（最大下落速度）
-    this.playerHeight = 1.9;     // 玩家碰撞高度 (从 1.8 增加到 1.9)
-    this.jumpForce = 0.20;       // 跳跃力
-    this.speed = 0.13;           // 移动速度
+    this.gravity = -0.015;      // 重力加速度：每帧 Y 轴速度的改变量，负值表示向下坠落
+    this.terminalVelocity = -1.0; // 终端速度：最大下落速度，防止重力加速度导致速度无限增大，避免穿透地面
+    this.playerHeight = 1.9;     // 玩家碰撞高度：用于碰撞检测的高度，从 1.8 增加到 1.9 以匹配新的坐标系统
+    this.jumpForce = 0.20;       // 跳跃初速度：跳跃瞬间向上的速度冲量
+    this.speed = 0.13;           // 移动速度：每帧在 XZ 平面上移动的基础距离
   }
 
   /**

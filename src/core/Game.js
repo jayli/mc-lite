@@ -113,29 +113,29 @@ export class Game {
 
     // 更新光源与太阳位置使其跟随玩家
     if (this.player) {
-      // 性能优化：只有当玩家移动超过一定阈值时才更新灯光位置
-      // 这可以减少每帧的矩阵计算，并减少阴影抖动
+      // 性能优化：只有当玩家移动超过一定阈值时才更新灯光和天空的位置
+      // 这可以显著减少每帧重复的矩阵计算和光源更新，同时减少阴影在微小移动时的抖动
       const distSq = this.player.position.distanceToSquared(this.engine._lastUpdatePos);
-      if (distSq > 25) { // 移动5个单位再重新计算阴影，提高运行时性能 (5 * 5 = 25)
+      if (distSq > 25) { // 阈值设定为 5个单位距离的平方 (5 * 5 = 25)，即移动超过5格时才同步位置
 
-        // 太阳位置：直接使用预分配向量
+        // 太阳位置：使太阳始终在距离玩家 150 单位远的位置同步移动，模拟无限远的效果
         if (this.engine.sunSprite) {
           this.engine.sunSprite.position.copy(this.player.position)
             .addScaledVector(this.engine.sunDirection, 150);
         }
 
-        // 天空位置：始终跟随玩家中心
+        // 天空球位置：始终以玩家为中心，确保玩家无论移动多远都无法到达天空边界
         if (this.engine.skyMesh) {
           this.engine.skyMesh.position.copy(this.player.position);
         }
 
-        // 光源位置：同步移动
+        // 光源位置：同步移动阴影投射光源，60 是光源相对于玩家的偏移距离，确保阴影覆盖玩家周围区域
         if (this.engine.light) {
           this.engine.light.position.copy(this.player.position)
             .addScaledVector(this.engine.sunDirection, 60);
-          this.engine.light.target.position.copy(this.player.position);
+          this.engine.light.target.position.copy(this.player.position); // 光源始终指向玩家
 
-          // 更新上次同步的位置
+          // 更新记录位置，用于下一次距离检测
           this.engine._lastUpdatePos.copy(this.player.position);
         }
       }
