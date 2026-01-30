@@ -51,7 +51,8 @@ export class Engine {
     this.renderer.toneMappingExposure = 1.25; // 全局曝光度，提升到 1.25 使阳光感更强，画面更明亮
 
     // --- 灯光与天空设置 ---
-    this.sunDirection = new THREE.Vector3(1, 0.8, 0.5).normalize(); // 初始太阳方向向量
+    // 太阳位置, x 水平1（越大，越靠右），高度，z 水平2（越大，越低）
+    this.sunDirection = new THREE.Vector3(0, 0.8, 0.6).normalize(); // 初始太阳方向向量
     this.sunColor = 0xfff7c2; // 太阳本体颜色 (金黄色)
     this.lightColor = 0xfffaf0; // 阳光颜色 (接近白色的暖黄色)
     this.zenithColor = 0x87CEEB;  // 天空顶点颜色 (深蓝色)
@@ -94,7 +95,8 @@ export class Engine {
     // 创建太阳
     this.createSun();
     // 创建渐变天空
-    this.createSky();
+    // this.createSky();
+    this.createSkybox();
 
     // 调用初始化方法
     this.init();
@@ -140,8 +142,19 @@ export class Engine {
     });
 
     this.sunSprite = new THREE.Sprite(sunMaterial);
+    // 太阳形状
     this.sunSprite.scale.set(20, 20, 1);
     this.scene.add(this.sunSprite);
+  }
+
+  createSkybox() {
+    const loader = new THREE.CubeTextureLoader();
+    const texture = loader.setPath('src/world/assets/skyBox4/').load([
+      'posx.jpg', 'negx.jpg',
+      'posy.jpg', 'negy.jpg',
+      'posz.jpg', 'negz.jpg'
+    ]);
+    this.scene.background = texture;
   }
 
   // 创建渐变天空球
@@ -178,8 +191,8 @@ export class Engine {
       depthWrite: false
     });
 
-    this.skyMesh = new THREE.Mesh(skyGeo, skyMat);
-    this.scene.add(this.skyMesh);
+    // this.skyMesh = new THREE.Mesh(skyGeo, skyMat);
+    // this.scene.add(this.skyMesh);
   }
 
   // 创建全局水面平面

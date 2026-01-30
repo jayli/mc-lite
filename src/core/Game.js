@@ -125,9 +125,9 @@ export class Game {
         }
 
         // 天空球位置：始终以玩家为中心，确保玩家无论移动多远都无法到达天空边界
-        if (this.engine.skyMesh) {
+        /* if (this.engine.skyMesh) {
           this.engine.skyMesh.position.copy(this.player.position);
-        }
+        } */
 
         // 光源位置：同步移动阴影投射光源，60 是光源相对于玩家的偏移距离，确保阴影覆盖玩家周围区域
         if (this.engine.light) {
