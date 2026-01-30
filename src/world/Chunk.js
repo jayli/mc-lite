@@ -10,6 +10,7 @@ import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 import { persistenceService } from '../services/PersistenceService.js';
 import { SEED } from '../utils/MathUtils.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
+import { rookModel } from '../core/Engine.js';
 
 /** 区块尺寸 - 每个区块在 X 和 Z 方向上的方块数量 (16x16 是 Voxel 游戏的标准区块大小) */
 const CHUNK_SIZE = 16;
@@ -237,6 +238,12 @@ export class Chunk {
 
       // 将实例化网格添加到区块的分组中
       this.group.add(mesh);
+      if (type === 'grass' && rookModel && Math.random() < 0.5) {
+        const rook = rookModel.clone();
+        const pos = d[type][d[type].length-1];
+        rook.position.set(pos.x + 0.5, pos.y + 1, pos.z + 0.5);
+        this.group.add(rook);
+      }
     }
   }
 

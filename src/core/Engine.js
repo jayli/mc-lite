@@ -1,6 +1,6 @@
-// src/core/Engine.js
 // 引入 Three.js 库
 import * as THREE from 'three';
+import { AMFLoader } from 'three/addons/loaders/AMFLoader.js';
 import { SEED } from '../utils/MathUtils.js';
 import { faceCullingSystem } from './FaceCullingSystem.js';
 
@@ -8,6 +8,7 @@ import { faceCullingSystem } from './FaceCullingSystem.js';
 const warterLeverHightOffset = -1.5;
 // 雾颜色
 const forgColor = 0x94bcf5; // 原单色天空球的雾色：0x62b4d5
+export let rookModel = null;
 
 // 定义并导出 Engine 类，用于管理游戏的核心渲染引擎
 export class Engine {
@@ -102,7 +103,42 @@ export class Engine {
 
     // 调用初始化方法
     this.init();
+    this.loadModel();
   }
+  loadModel() {
+    const loader = new AMFLoader();
+    loader.load('src/world/assets/mod/rook.amf', (amfobject) => {
+      // 步骤 1: 将模型立起来 (绕X轴旋转-90度)
+      amfobject.rotation.x = -Math.PI / 2;
+      // 必须更新矩阵，以便后续的边界框计算是准确的
+      amfobject.updateMatrixWorld(true);
+
+      // 步骤 2: 计算边界框并确定平移向量，以将模型基座移动到原点
+      const box = new THREE.Box3().setFromObject(amfobject);
+      const center = box.getCenter(new THREE.Vector3());
+      const translationVector = new THREE.Vector3(-center.x, -box.min.y, -center.z);
+
+      // 步骤 3: 使用 traverse 安全地遍历并平移所有网格的几何体
+      amfobject.traverse((child) => {
+        if (child.isMesh) {
+          child.geometry.translate(translationVector.x, translationVector.y, translationVector.z);
+        }
+      });
+
+      // 步骤 4: 几何体修改后，重置对象位置并重新计算边界框以进行缩放
+      amfobject.position.set(0, 0, 0);
+      box.setFromObject(amfobject);
+
+      const newSize = box.getSize(new THREE.Vector3());
+      const targetHeight = 2.0;
+      const scale = (targetHeight / newSize.y) || 1; // Fallback to 1 if size is 0
+      amfobject.scale.set(scale, scale, scale);
+
+      // 将最终调整好的模型赋值给全局变量
+      rookModel = amfobject;
+    });
+  }
+
 
   // 设置渲染分辨率倍率
   setResolution(scale) {
