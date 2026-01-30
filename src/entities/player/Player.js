@@ -316,49 +316,27 @@ export class Player {
     const hasCollisionFull = this._checkCollisionWithOffset(nextX, nextZ, dx, dz);
 
     if (hasCollisionFull) {
-      // 完整移动有碰撞，尝试分别处理X和Z轴
-      let canMoveX = false;
-      let canMoveZ = false;
+      // 完整移动有碰撞，改为逐轴检查和应用位移，以实现更可靠的墙壁滑动
 
-      // 检查X轴单独移动
-      if (dx !== 0) {
-        const collisionX = this._checkCollisionWithOffset(nextX, this.position.z, dx, 0);
-        if (!collisionX) {
-          canMoveX = true;
-        } else {
-          // X轴有碰撞，尝试上下台阶
-          if (this._canStepUpX(nextX)) {
-            this.position.y += 1.0;
-            canMoveX = true;
-          } else if (this._canStepDownX(nextX)) {
-            // 下台阶允许移动
-            canMoveX = true;
-          }
-        }
-      }
-
-      // 检查Z轴单独移动
-      if (dz !== 0) {
-        const collisionZ = this._checkCollisionWithOffset(this.position.x, nextZ, 0, dz);
-        if (!collisionZ) {
-          canMoveZ = true;
-        } else {
-          // Z轴有碰撞，尝试上下台阶
-          if (this._canStepUpZ(nextZ)) {
-            this.position.y += 1.0;
-            canMoveZ = true;
-          } else if (this._canStepDownZ(nextZ)) {
-            // 下台阶允许移动
-            canMoveZ = true;
-          }
-        }
-      }
-
-      // 根据检测结果更新位置
-      if (canMoveX) {
+      // 1. 尝试在 X 轴上移动
+      const collisionX = this._checkCollisionWithOffset(nextX, this.position.z, dx, 0);
+      if (!collisionX) {
+        this.position.x = nextX;
+      } else if (this._canStepUpX(nextX)) { // 如果X轴被阻挡，检查是否可以上台阶
+        this.position.y += 1.0;
+        this.position.x = nextX;
+      } else if (this._canStepDownX(nextX)) { // 或下台阶
         this.position.x = nextX;
       }
-      if (canMoveZ) {
+
+      // 2. 尝试在 Z 轴上移动 (注意：这次检查是基于可能已经更新过的 X 坐标)
+      const collisionZ = this._checkCollisionWithOffset(this.position.x, nextZ, 0, dz);
+      if (!collisionZ) {
+        this.position.z = nextZ;
+      } else if (this._canStepUpZ(nextZ)) { // 如果Z轴被阻挡，检查是否可以上台阶
+        this.position.y += 1.0;
+        this.position.z = nextZ;
+      } else if (this._canStepDownZ(nextZ)) { // 或下台阶
         this.position.z = nextZ;
       }
     } else {
