@@ -14,6 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - 使用 ES6 Modules (`import`/`export`)，通过 CDN 加载 Three.js。
   - 遵循面向对象编程模式（类名大写，属性驼峰命名）。
   - 使用 `src/MaterialManager.js` 统一管理资源。
+  - 使用 `specs/` 目录进行功能规格驱动开发。
 
 ## 项目架构
 
@@ -29,6 +30,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - `src/Chunk.js`: 核心渲染单元，使用 `THREE.InstancedMesh` 优化性能。
    - `src/TerrainGen.js`: 包含噪声算法、生物群系判定和特殊结构生成。
 4. **持久化层**: `src/PersistenceService.js` 使用 IndexedDB 存储世界增量修改（Deltas）。
+
+### 目录结构
+```
+src/
+├── constants/         # 常量定义（方块类型、生物群系等）
+├── core/             # 核心引擎和游戏逻辑
+│   ├── materials/    # 材质管理器
+│   └── face-culling/ # 隐藏面剔除系统
+├── entities/         # 游戏实体
+│   └── player/       # 玩家相关
+├── services/         # 服务层（持久化等）
+├── ui/              # 用户界面
+├── utils/           # 工具函数
+├── workers/         # Web Workers
+└── world/           # 世界生成和管理
+    └── entities/    # 世界实体（树、箱子等）
+```
 
 ### 性能优化设计
 - **InstancedMesh**: 区块通过 `InstancedMesh` 渲染同类方块，大幅减少 Draw Calls；粒子系统同样使用 `InstancedMesh` 优化。
@@ -53,17 +71,69 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **调试信息**:
   - 使用 `UIManager.js` 及其子组件 `HUD.js` 显示实时状态。
   - 碰撞逻辑可在 `Physics.js` 中通过辅助线进行调试。
+- **使用规格驱动开发**:
+  - 新功能应在 `specs/` 目录下创建规格文档
+  - 使用 `.specify/scripts/bash/create-new-feature.sh` 创建新功能
 
 ## 技术栈
 - **JavaScript**: ES6+ Modules
 - **Rendering**: Three.js (WebGL 2.0)
 - **Storage**: IndexedDB (Primary), LocalStorage (Fallback)
+- **开发工具**: Node.js 静态服务器
 
-## Recent Changes
-- 004-hidden-face-culling: Added JavaScript (ES6+ Modules) + Three.js (WebGL 2.0) + Three.js, IndexedDB (世界持久化）
-- 003-land-caves: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
-- 001-land-caves: Added JavaScript (ES6+ Modules) + Three.js (WebGL 2.0)
+## 开发工作流
 
-## Active Technologies
-- JavaScript (ES6+ Modules) + Three.js (WebGL 2.0) + Three.js, IndexedDB (世界持久化） (004-hidden-face-culling)
-- IndexedDB (主要), LocalStorage (备用) (004-hidden-face-culling)
+### 1. 启动开发
+```bash
+npm start
+# 或
+npx serve .
+```
+
+### 2. 创建新功能
+```bash
+.specify/scripts/bash/create-new-feature.sh --json --number <编号> --short-name "<功能名称>" "<功能描述>"
+```
+
+### 3. 代码提交
+- 使用 `git add` 添加特定文件，避免使用 `git add -A`
+- 提交信息应遵循约定式提交格式
+- 使用 `Skill("commit")` 进行提交操作
+
+### 4. 规格文档
+- 所有功能规格位于 `specs/` 目录
+- 每个功能包含：spec.md, plan.md, tasks.md, data-model.md
+- 使用 `speckit.*` 技能进行规格驱动开发
+
+## 重要文件位置
+
+- **入口文件**: `index.html` - 使用 ES6 Modules 和 importmap
+- **主游戏循环**: `src/Game.js`
+- **世界管理**: `src/World.js`
+- **地形生成**: `src/TerrainGen.js`
+- **材质管理**: `src/MaterialManager.js`
+- **持久化**: `src/PersistenceService.js`
+- **性能优化**: `src/core/face-culling/FaceCullingSystem.js`
+
+## 资源管理
+- **纹理资源**: `minecraft-bundles/textures/`
+- **材质定义**: `src/MaterialManager.js`
+- **方块类型**: `src/constants/blockTypes.js`
+
+## 调试技巧
+1. **性能监控**: 查看 HUD 显示的 FPS 和区块信息
+2. **碰撞调试**: 在 `Physics.js` 中启用辅助线可视化
+3. **内存使用**: 监控 IndexedDB 存储使用情况
+4. **网络请求**: 检查 Three.js 纹理加载状态
+
+## 最近功能
+- **004-hidden-face-culling**: 隐藏面剔除优化，提升渲染性能
+- **003-land-caves**: 地形洞穴生成系统
+- **002-warm-sun-light**: 温暖太阳光照系统
+- **001-world-persistence**: 世界持久化存储
+- **001-fps-optimization**: FPS 性能优化
+- **001-realistic-textured-trees**: 真实纹理树木
+
+## 在线演示
+- 访问: https://js-perf.cn
+- 项目描述: "妈妈不让我玩我的世界，所以我用 AI 做了一个，自己玩。"
