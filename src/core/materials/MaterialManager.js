@@ -573,6 +573,8 @@ materials.registerMaterial('allium', {
 });
 
 materials.registerMaterial('chimney', mkMat('#7f5b37')); // 深棕色烟囱
+materials.registerMaterial('collider', { transparent: true, opacity: 0 }); // 碰撞体材质
+
 
 // 新增金属与宝石方块
 materials.registerMaterial('gold_block', { textureUrl: './src/world/assets/textures/gold_block.png' });

@@ -562,8 +562,19 @@ export class Player {
     * 移除方块并生成掉落物和粒子
     */
   removeBlock(hit) {
-    const m = hit.object;
+    let m = hit.object;
     const instanceId = hit.instanceId;
+
+    // 向上查找实体父节点，确保能正确识别 Rook 等复合实体
+    let entity = m;
+    while (entity && !entity.userData.isEntity && entity.parent) {
+      if (entity.isInstancedMesh || entity.type === 'Scene') break;
+      entity = entity.parent;
+    }
+    if (entity && entity.userData.isEntity) {
+      m = entity;
+    }
+
     const type = m.userData.type || 'unknown';
 
     // 不可破坏方块检查
@@ -596,18 +607,41 @@ export class Player {
         this.inventory.add(type === 'grass' ? 'dirt' : type, 1);
       }
     } else {
-      // 处理标准网格方块
-      this.world.removeBlock(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z));
-      this.spawnParticles(m.position, m.userData.type);
-      if (m.parent) m.parent.remove(m);
+      // --- 处理标准网格 (非 InstancedMesh) ---
 
-      const type = m.userData.type;
-      if (type === 'realistic_trunk') {
-        this.inventory.add('wood', 1);
-      } else if (type === 'realistic_leaves') {
-        if (Math.random() < 0.8) this.inventory.add('leaves', 1);
+      // 检查是否为我们定义的实体 (如 Rook)
+      if (m.userData.isEntity) {
+        // 1. 如果实体有关联的碰撞块，则使用专用的无副作用函数移除它们
+        if (m.userData.collisionBlocks && Array.isArray(m.userData.collisionBlocks)) {
+          m.userData.collisionBlocks.forEach(blockPos => {
+            this.world.removeBlockCollider(blockPos.x, blockPos.y, blockPos.z);
+          });
+        }
+
+        // 2. 移除实体本身的可视化模型
+        if (m.parent) {
+          m.parent.remove(m);
+        }
+
+        // 3. 生成粒子效果
+        this.spawnParticles(m.position, m.userData.type || 'stone'); // 使用石头作为后备粒子类型
+
+        // 4. (可选) 给予物品 - 这里暂时不给，因为没有定义 rook 的掉落物
+
       } else {
-        this.inventory.add(type, 1);
+        // --- 如果是普通的动态方块 (非实体) ---
+        this.world.removeBlock(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z));
+        this.spawnParticles(m.position, m.userData.type);
+        if (m.parent) m.parent.remove(m);
+
+        const type = m.userData.type;
+        if (type === 'realistic_trunk') {
+          this.inventory.add('wood', 1);
+        } else if (type === 'realistic_leaves') {
+          if (Math.random() < 0.8) this.inventory.add('leaves', 1);
+        } else {
+          this.inventory.add(type, 1);
+        }
       }
     }
   }

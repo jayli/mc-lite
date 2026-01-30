@@ -64,7 +64,7 @@ export class World {
       for (let j = -RENDER_DIST; j <= RENDER_DIST; j++) {
         const key = `${cx + i},${cz + j}`;
         if (!this.chunks.has(key)) {
-          const chunk = new Chunk(cx + i, cz + j);
+          const chunk = new Chunk(cx + i, cz + j, this);
           this.chunks.set(key, chunk);
           this.scene.add(chunk.group);
         }
@@ -236,6 +236,23 @@ export class World {
       chunk.removeBlock(x, y, z);
       // 立即持久化删除操作
       // 性能考虑可以先关闭，后面再打开
+      persistenceService.flush(cx, cz);
+    }
+  }
+
+  /**
+   * 移除指定位置的方块碰撞体（无副作用）
+   * @param {number} x - X坐标
+   * @param {number} y - Y坐标
+   * @param {number} z - Z坐标
+   */
+  removeBlockCollider(x, y, z) {
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cz = Math.floor(z / CHUNK_SIZE);
+    const key = `${cx},${cz}`;
+    const chunk = this.chunks.get(key);
+    if (chunk) {
+      chunk.removeCollisionKey(x, y, z);
       persistenceService.flush(cx, cz);
     }
   }

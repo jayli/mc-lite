@@ -109,14 +109,17 @@ export class Chunk {
    * 创建区块实例
    * @param {number} cx - 区块的X坐标（区块坐标）
    * @param {number} cz - 区块的Z坐标（区块坐标）
+   * @param {World} world - 世界引用
    */
-  constructor(cx, cz) {
+  constructor(cx, cz, world) {
     this.cx = cx;                    // 区块的X坐标（区块坐标）
     this.cz = cz;                    // 区块的Z坐标（区块坐标）
+    this.world = world;              // 世界引用
     this.group = new THREE.Group();  // Three.js 组，包含区块内所有网格
     this.keys = [];                  // 区块标识符（当前未使用）
     this.solidBlocks = new Set();    // 实心方块的集合，用于碰撞检测
     this.isReady = false;            // 区块是否已完成生成
+    this.deltas = {};                // 持久化增量数据
     this.gen();                      // 生成区块内容
   }
 
@@ -129,6 +132,7 @@ export class Chunk {
     const deltasMap = await persistenceService.getDeltas(this.cx, this.cz);
     // 将 Map 转换为对象以便通过 postMessage 发送
     const deltas = Object.fromEntries(deltasMap);
+    this.deltas = deltas;
 
     return new Promise((resolve) => {
       const callbackKey = `${this.cx},${this.cz}`;
@@ -236,13 +240,38 @@ export class Chunk {
         mesh.receiveShadow = true; // 开启实时阴影接收
       }
 
-      // 将实例化网格添加到区块的分组中
+      // 将实例化网格添加到区块的分S组中
       this.group.add(mesh);
-      if (type === 'grass' && rookModel && Math.random() < 0.5) {
-        const rook = rookModel.clone();
-        const pos = d[type][d[type].length-1];
-        rook.position.set(pos.x + 0.5, pos.y + 1, pos.z + 0.5);
-        this.group.add(rook);
+
+      // --- Rook 模型生成逻辑 ---
+      if (type === 'grass' && rookModel && d[type].length > 0 && Math.random() < 0.5) {
+        // 随机选择一个草地方块的位置来放置 rook
+        const pos = d[type][Math.floor(Math.random() * d[type].length)];
+
+        // 检查持久化数据，看 Rook 占据的位置是否被标记为 'air'
+        const k1 = `${pos.x},${pos.y + 1},${pos.z}`;
+        const k2 = `${pos.x},${pos.y + 2},${pos.z}`;
+        if (this.deltas[k1] === 'air' || this.deltas[k2] === 'air') {
+          // 跳过生成
+        } else {
+          const rook = rookModel.clone();
+          rook.userData.isEntity = true; // 添加实体标记
+          rook.userData.type = 'rook';   // 添加类型标记
+          rook.position.set(pos.x + 0.5, pos.y + 1, pos.z + 0.5);
+
+          // --- 建立实体与其碰撞体的链接 ---
+          rook.userData.collisionBlocks = [
+            { x: pos.x, y: pos.y + 1, z: pos.z },
+            { x: pos.x, y: pos.y + 2, z: pos.z }
+          ];
+
+          this.group.add(rook);
+
+          // --- 添加碰撞体 ---
+          // 在 rook 模型占据的两个方块空间内添加隐形的实心碰撞块
+          this.addBlockDynamic(pos.x, pos.y + 1, pos.z, 'collider');
+          this.addBlockDynamic(pos.x, pos.y + 2, pos.z, 'collider');
+        }
       }
     }
   }
@@ -288,11 +317,20 @@ export class Chunk {
    * @param {string} type - 方块类型
    */
   addBlockDynamic(x, y, z, type) {
+    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+
+    // 同步更新内存中的 deltas 缓存，确保与持久化层一致，防止区块重新加载前逻辑判定失效
+    if (this.deltas) {
+      this.deltas[key] = type;
+    }
+
     // 检查并移除该位置已有的动态方块（实现位移/替换逻辑）
     for (let i = this.group.children.length - 1; i >= 0; i--) {
       const child = this.group.children[i];
-      if (!child.isInstancedMesh &&
-          Math.floor(child.position.x) === Math.floor(x) &&
+      // 跳过 InstancedMesh 和被标记为实体的对象
+      if (child.isInstancedMesh || child.userData.isEntity) continue;
+
+      if (Math.floor(child.position.x) === Math.floor(x) &&
           Math.floor(child.position.y) === Math.floor(y) &&
           Math.floor(child.position.z) === Math.floor(z)) {
         if (child.geometry) child.geometry.dispose();
@@ -305,7 +343,6 @@ export class Chunk {
     }
 
     // 添加到实心方块集合（用于碰撞检测）
-    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
     const nonSolidTypes = ['air', 'water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass', 'allium'];
 
     if (!nonSolidTypes.includes(type)) {
@@ -314,8 +351,10 @@ export class Chunk {
       this.solidBlocks.delete(key);
     }
 
-    // 对于空气方块，只更新隐藏面剔除，不创建网格
-    if (type !== 'air') {
+    // 对于空气方块和碰撞体方块，只更新逻辑状态，不创建网格
+    if (type === 'air' || type === 'collider') {
+       // 更新隐藏面剔除逻辑...
+    } else {
       // 获取几何体和材质
       const geometry = geomMap[type] || geomMap['default'];
       const material = materials.getMaterial(type);
@@ -349,9 +388,8 @@ export class Chunk {
 
       // 更新相邻方块的可见面状态
       faceCullingSystem.updateNeighbors(position, (neighborPos) => {
-        // 这里需要实现从世界数据获取邻居方块数据
-        // 返回null表示无法获取数据，跳过更新
-        return null;
+        // 从世界数据获取邻居方块数据
+        return this.world.isSolid(neighborPos.x, neighborPos.y, neighborPos.z) ? { type: 'stone' } : null;
       });
     }
   }
@@ -363,24 +401,20 @@ export class Chunk {
    * @param {number} z - 世界坐标Z
    */
   removeBlock(x, y, z) {
-    // 从实心方块集合中移除（碰撞检测）
-    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-    this.solidBlocks.delete(key);
     // 记录持久化变更
     persistenceService.recordChange(x, y, z, 'air');
-    // 移除可能存在的动态方块
+    // 使用 addBlockDynamic 统一处理逻辑状态更新、内存缓存同步和隐藏面剔除
     this.addBlockDynamic(x, y, z, 'air');
+  }
 
-    // 隐藏面剔除更新：更新相邻方块的可见面状态
-    if (faceCullingSystem && faceCullingSystem.isEnabled()) {
-      const position = new THREE.Vector3(x, y, z);
-
-      // 更新相邻方块的可见面状态（因为移除了方块，邻居的面可能变得可见）
-      faceCullingSystem.updateNeighbors(position, (neighborPos) => {
-        // 这里需要实现从世界数据获取邻居方块数据
-        // 返回null表示无法获取数据，跳过更新
-        return null;
-      });
-    }
+  /**
+   * 移除一个坐标的碰撞键（用于实体碰撞体）
+   * @param {number} x - 世界坐标X
+   * @param {number} y - 世界坐标Y
+   * @param {number} z - 世界坐标Z
+   */
+  removeCollisionKey(x, y, z) {
+    // 移除碰撞键的操作现在与移除方块逻辑完全一致，确保状态同步
+    this.removeBlock(x, y, z);
   }
 }
