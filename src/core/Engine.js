@@ -6,6 +6,8 @@ import { faceCullingSystem } from './FaceCullingSystem.js';
 
 // 海平面相比陆地低多少
 const warterLeverHightOffset = -1.5;
+// 雾颜色
+const forgColor = 0x94bcf5; // 原单色天空球的雾色：0x62b4d5
 
 // 定义并导出 Engine 类，用于管理游戏的核心渲染引擎
 export class Engine {
@@ -16,10 +18,10 @@ export class Engine {
     // 场景背景设为 null，因为我们将使用天空球
     this.scene.background = null;
     // 在场景中添加雾效
-    // 0x62b4d5: 雾的颜色（浅蓝色），与背景/地平线颜色匹配
+    // forgColor: 雾的颜色（浅蓝色），与背景/地平线颜色匹配
     // 20: 雾开始出现的近距，此距离内物体完全清晰
     // 70: 雾完全覆盖的远距，此距离外物体被完全遮盖，用于平滑过渡区块卸载的边界
-    this.scene.fog = new THREE.Fog(0x62b4d5, 20, 70);
+    this.scene.fog = new THREE.Fog(forgColor, 30, 70);
 
     // 创建一个透视相机
     // 75: 视野角度 (FOV)，典型第一人称游戏设定
@@ -142,6 +144,7 @@ export class Engine {
     });
 
     this.sunSprite = new THREE.Sprite(sunMaterial);
+    this.sunSprite.visible = false; // 天空盒已包含太阳，隐藏程序化太阳
     // 太阳形状
     this.sunSprite.scale.set(20, 20, 1);
     this.scene.add(this.sunSprite);
@@ -439,13 +442,13 @@ export class Engine {
       }
     } else {
       if (this.isUnderwater) {
-        this.scene.fog.color.set(0x62b4d5);
+        this.scene.fog.color.set(forgColor);
         this.scene.fog.near = 20;
         this.scene.fog.far = 60;
         this.isUnderwater = false;
 
         if (this.waterMaterial) {
-          this.waterMaterial.uniforms.uFogColor.value.set(0x62b4d5);
+          this.waterMaterial.uniforms.uFogColor.value.set(forgColor);
           this.waterMaterial.uniforms.uFogNear.value = 20;
           this.waterMaterial.uniforms.uFogFar.value = 60;
         }
