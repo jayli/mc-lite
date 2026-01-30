@@ -187,12 +187,13 @@ onmessage = function(e) {
     Island.generate(centerWx, islandY, centerWz, fakeChunk, dPlaceholder);
   }
 
-  // 低空簇状云
-  if (Math.random() < 0.10) {
+  // 低空簇状云，控制低空云生成的密度
+  if (Math.random() < 0.20) {
     const startX = cx * CHUNK_SIZE + Math.floor(Math.random() * CHUNK_SIZE);
     const startZ = cz * CHUNK_SIZE + Math.floor(Math.random() * CHUNK_SIZE);
-    const size = 20 + Math.floor(Math.random() * 21);
-    Cloud.generateCluster(startX, 45, startZ, size, fakeChunk, dPlaceholder);
+    const size = 30 + Math.floor(Math.random() * 21);
+    // 第二个参数，控制地空云生成的高度
+    Cloud.generateCluster(startX, 35, startZ, size, fakeChunk, dPlaceholder);
   }
 
   // 处理结构队列 (房屋、Rover、沉船)，确保它们覆盖地形

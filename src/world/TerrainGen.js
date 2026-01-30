@@ -94,7 +94,7 @@ export class TerrainGen {
    */
   shouldGenerateCloud(x, z) {
     // 使用噪声函数生成云朵分布，噪声值大于1.2时生成云朵
-    return noise(x, z, 0.03) > 1.7;
+    return noise(x, z, 0.03) > 1.2;
   }
 }
 
