@@ -60,6 +60,12 @@ export class Player {
     // 交互系统相关
     this.raycaster = new THREE.Raycaster();
     this.center = new THREE.Vector2(0, 0);
+
+    // 镜头晃动（bobbing）相关参数
+    this.bobbing_timer = 0;
+    this.bobbing_intensity = 0.1; // 晃动幅度
+    this.bobbing_speed = 0.2;   // 晃动速度
+    this.bob_offset = new THREE.Vector2(); // 用于平滑处理晃动偏移
   }
 
   /**
@@ -393,6 +399,7 @@ export class Player {
     this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, this.position.y + 1.65, 0.25);
 
     this.updateArm();
+    this.updateCameraBob(dx, dz);
   }
 
   /**
@@ -682,5 +689,37 @@ export class Player {
     } else {
       this.arm.visible = false;
     }
+  }
+
+  /**
+   * 更新镜头晃动效果
+   * @param {number} dx - X轴上的移动量
+   * @param {number} dz - Z轴上的移动量
+   */
+  updateCameraBob(dx, dz) {
+    const isMoving = (Math.abs(dx) > 0 || Math.abs(dz) > 0) && !this.jumping;
+
+    let targetBobX = 0;
+    let targetBobY = 0;
+
+    if (isMoving) {
+      // 如果在移动，则更新晃动计时器并计算目标偏移
+      this.bobbing_timer += this.bobbing_speed;
+      targetBobX = Math.sin(this.bobbing_timer) * this.bobbing_intensity;
+      targetBobY = Math.cos(this.bobbing_timer * 2) * this.bobbing_intensity * 0.5;
+    } else {
+      // 如果停止移动，重置计时器，确保下次移动从头开始晃动
+      this.bobbing_timer = 0;
+    }
+
+    // 使用线性插值 (Lerp) 平滑地将当前的晃动偏移过渡到目标偏移
+    // 当停止移动时，目标偏移为0，这将使镜头平滑地恢复到中心位置
+    const lerpFactor = 0.3; // 插值系数，控制恢复速度
+    this.bob_offset.x = THREE.MathUtils.lerp(this.bob_offset.x, targetBobX, lerpFactor);
+    this.bob_offset.y = THREE.MathUtils.lerp(this.bob_offset.y, targetBobY, lerpFactor);
+
+    // 将最终平滑处理过的偏移量应用到相机
+    this.camera.position.x += this.bob_offset.x;
+    this.camera.position.y += this.bob_offset.y;
   }
 }
