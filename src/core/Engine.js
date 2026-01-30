@@ -4,6 +4,9 @@ import * as THREE from 'three';
 import { SEED } from '../utils/MathUtils.js';
 import { faceCullingSystem } from './FaceCullingSystem.js';
 
+// 海平面相比陆地低多少
+const warterLeverHightOffset = -1.5;
+
 // 定义并导出 Engine 类，用于管理游戏的核心渲染引擎
 export class Engine {
   // Engine 类的构造函数
@@ -300,7 +303,7 @@ export class Engine {
 
     this.waterPlane = new THREE.Mesh(waterGeo, this.waterMaterial);
     this.waterPlane.rotation.x = -Math.PI / 2; // 将平面旋转到水平位置
-    this.waterPlane.position.y = -1.15; // 设置水平面高度，略低于地面基准面 (-1.0)
+    this.waterPlane.position.y = warterLeverHightOffset; // 设置水平面高度，略低于地面基准面
     this.scene.add(this.waterPlane);
 
     // --- 隐藏面剔除系统初始化 ---
@@ -380,7 +383,7 @@ export class Engine {
     const camX = this.camera.position.x;
     const camY = this.camera.position.y;
     const camZ = this.camera.position.z;
-    const waterLevel = -1.0;
+    const waterLevel = warterLeverHightOffset; // 动态水雾效果高度，和waterPlane.position.y要一起配合配置
 
     // --- 模拟高度计算以判断是否在“近海”区域 ---
     const getNoise = (x, z, scale) => {
