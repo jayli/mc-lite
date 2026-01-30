@@ -63,8 +63,8 @@ export class Player {
 
     // 镜头晃动（bobbing）相关参数
     this.bobbing_timer = 0;
-    this.bobbing_intensity = 0.1; // 晃动幅度
-    this.bobbing_speed = 0.2;   // 晃动速度
+    this.bobbing_intensity = 0.08; // 晃动幅度
+    this.bobbing_speed = 0.2;     // 晃动速度
     this.bob_offset = new THREE.Vector2(); // 用于平滑处理晃动偏移
   }
 
@@ -293,6 +293,10 @@ export class Player {
     // 更新相机仰角
     this.camera.rotation.x = this.cameraPitch;
 
+    // 记录移动前的位置，用于判断实际位移
+    const oldX = this.position.x;
+    const oldZ = this.position.z;
+
     // 输入驱动移动
     const speed = this.physics.speed;
     let dx = 0, dz = 0;
@@ -398,8 +402,12 @@ export class Player {
     // 0.25: lerp 的平滑系数，值越小相机跟随越平缓，值越大越实时
     this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, this.position.y + 1.65, 0.25);
 
+    // 计算实际位移
+    const actualDx = this.position.x - oldX;
+    const actualDz = this.position.z - oldZ;
+
     this.updateArm();
-    this.updateCameraBob(dx, dz);
+    this.updateCameraBob(actualDx, actualDz, hasCollisionFull);
   }
 
   /**
@@ -693,22 +701,24 @@ export class Player {
 
   /**
    * 更新镜头晃动效果
-   * @param {number} dx - X轴上的移动量
-   * @param {number} dz - Z轴上的移动量
+   * @param {number} dx - X轴上的实际移动量
+   * @param {number} dz - Z轴上的实际移动量
+   * @param {boolean} isObstructed - 玩家的预期移动是否被阻挡
    */
-  updateCameraBob(dx, dz) {
-    const isMoving = (Math.abs(dx) > 0 || Math.abs(dz) > 0) && !this.jumping;
+  updateCameraBob(dx, dz, isObstructed) {
+    // 只有在实际移动、不在跳跃中、且未被障碍物阻挡时，才应用晃动效果
+    const isMovingFreely = (Math.abs(dx) > 0 || Math.abs(dz) > 0) && !this.jumping && !isObstructed;
 
     let targetBobX = 0;
     let targetBobY = 0;
 
-    if (isMoving) {
-      // 如果在移动，则更新晃动计时器并计算目标偏移
+    if (isMovingFreely) {
+      // 如果在自由移动，则更新晃动计时器并计算目标偏移
       this.bobbing_timer += this.bobbing_speed;
       targetBobX = Math.sin(this.bobbing_timer) * this.bobbing_intensity;
       targetBobY = Math.cos(this.bobbing_timer * 2) * this.bobbing_intensity * 0.5;
     } else {
-      // 如果停止移动，重置计时器，确保下次移动从头开始晃动
+      // 如果停止移动或被阻挡，重置计时器
       this.bobbing_timer = 0;
     }
 
