@@ -1,6 +1,7 @@
 // 引入 Three.js 库
 import * as THREE from 'three';
 import { AMFLoader } from 'three/addons/loaders/AMFLoader.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { SEED } from '../utils/MathUtils.js';
 import { FaceCullingSystem, faceCullingSystem } from './FaceCullingSystem.js';
 
@@ -12,6 +13,7 @@ const waterColor = 0x588be4; // 原来的颜色 0x4488ff; // 水颜色
 const waterOpacity = 0.7; // 水透明度
 const waterForgColor = 0xa7d1e2; // 水雾颜色
 export let rookModel = null;
+export let carModel = null;
 
 // 定义并导出 Engine 类，用于管理游戏的核心渲染引擎
 export class Engine {
@@ -140,6 +142,31 @@ export class Engine {
 
       // 将最终调整好的模型赋值给全局变量
       rookModel = amfobject;
+    });
+
+    const gltfLoader = new GLTFLoader();
+    gltfLoader.load('src/world/assets/mod/free_car_001.gltf', (gltf) => {
+      const car = gltf.scene;
+      // 计算边界框
+      const box = new THREE.Box3().setFromObject(car);
+      const center = box.getCenter(new THREE.Vector3());
+      const size = box.getSize(new THREE.Vector3());
+
+      // 平移使基座底部中心位于 (0,0,0)
+      car.position.set(-center.x, -box.min.y, -center.z);
+
+      const carParent = new THREE.Group();
+      carParent.add(car);
+
+      // 目标尺寸：长(Z)=5, 宽(X)=3, 高(Y)=3
+      const targetSize = new THREE.Vector3(3, 3, 5);
+      carParent.scale.set(
+        targetSize.x / size.x,
+        targetSize.y / size.y,
+        targetSize.z / size.z
+      );
+
+      carModel = carParent;
     });
   }
 

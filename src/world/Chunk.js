@@ -10,7 +10,7 @@ import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 import { persistenceService } from '../services/PersistenceService.js';
 import { SEED } from '../utils/MathUtils.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
-import { rookModel } from '../core/Engine.js';
+import { rookModel, carModel } from '../core/Engine.js';
 
 /** 区块尺寸 - 每个区块在 X 和 Z 方向上的方块数量 (16x16 是 Voxel 游戏的标准区块大小) */
 const CHUNK_SIZE = 16;
@@ -21,10 +21,10 @@ const worldWorker = new Worker(new URL('./WorldWorker.js', import.meta.url), { t
 const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函数
 
 worldWorker.onmessage = (e) => {
-  const { cx, cz, d, solidBlocks, realisticTrees, allBlockTypes, visibleKeys } = e.data;
+  const { cx, cz, d, solidBlocks, realisticTrees, rovers, allBlockTypes, visibleKeys } = e.data;
   const key = `${cx},${cz}`;
   if (workerCallbacks.has(key)) {
-    workerCallbacks.get(key)({ d, solidBlocks, realisticTrees, allBlockTypes, visibleKeys });
+    workerCallbacks.get(key)({ d, solidBlocks, realisticTrees, rovers, allBlockTypes, visibleKeys });
     workerCallbacks.delete(key);
   }
 };
@@ -154,7 +154,7 @@ export class Chunk {
 
       // 注册 Worker 回调
       workerCallbacks.set(callbackKey, (data) => {
-        const { d, solidBlocks, realisticTrees, allBlockTypes, visibleKeys } = data;
+        const { d, solidBlocks, realisticTrees, rovers, allBlockTypes, visibleKeys } = data;
 
         // 1. 同步实心方块数据 (用于碰撞检测)
         solidBlocks.forEach(k => this.solidBlocks.add(k));
@@ -170,6 +170,31 @@ export class Chunk {
         realisticTrees.forEach(pos => {
           RealisticTree.generate(pos.x, pos.y, pos.z, this, null);
         });
+
+        // 3.1 处理火星车模型
+        if (rovers && rovers.length > 0 && carModel) {
+          rovers.forEach(pos => {
+            const car = carModel.clone();
+            car.userData.isEntity = true;
+            car.userData.type = 'rover';
+            // 放置在方块顶部中心，注意模型已经处理过，基座在 (0,0,0)
+            car.position.set(pos.x + 0.5, pos.y, pos.z + 0.5);
+
+            // 添加碰撞体：火星车尺寸为 5x3x3 (长Z, 高Y, 宽X)
+            // 我们以 pos 为基准，模型居中放置
+            const collisionBlocks = [];
+            for (let dx = -1; dx <= 1; dx++) {
+              for (let dy = 0; dy < 3; dy++) {
+                for (let dz = -2; dz <= 2; dz++) {
+                  collisionBlocks.push({ x: pos.x + dx, y: pos.y + dy, z: pos.z + dz });
+                  this.addBlockDynamic(pos.x + dx, pos.y + dy, pos.z + dz, 'collider');
+                }
+              }
+            }
+            car.userData.collisionBlocks = collisionBlocks;
+            this.group.add(car);
+          });
+        }
 
         this.isReady = true;
         resolve();

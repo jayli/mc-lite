@@ -46,6 +46,7 @@ onmessage = function(e) {
   // 使用 Map 暂存方块，确保同一位置后生成的方块覆盖旧方块
   const blockMap = new Map();
   const realisticTrees = []; // 记录真实树木的位置
+  const rovers = []; // 记录火星车的位置
   const structureQueue = []; // 结构生成队列，确保结构覆盖地形
 
   // 模拟 Chunk 类的 add 方法 - 改为写入 blockMap
@@ -88,7 +89,7 @@ onmessage = function(e) {
 
         // 结构生成 (沉船) - 加入队列
         if (h < -6 && Math.random() < 0.001 && safeForStructure) {
-          structureQueue.push(() => generateStructure('ship', wx, h + 1, wz, fakeChunk, dPlaceholder));
+          structureQueue.push(() => generateStructure('ship', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
         }
       } else {
         // 高于海平面：根据生物群系确定地表和地下材质
@@ -124,12 +125,12 @@ onmessage = function(e) {
 
           if (inRoom) continue; // 如果在矿洞范围内，则跳过方块生成（即为空气）
 
-          // 10% 概率生成金矿，否则生成石头
-          const blockType = Math.random() < 0.1 ? 'gold_ore' : 'stone';
+          // 5% 概率生成金矿，否则生成石头
+          const blockType = Math.random() < 0.05 ? 'gold_ore' : 'stone';
           fakeChunk.add(wx, h - k, wz, blockType, dPlaceholder);
         }
 
-        if (centerBiome === 'FOREST') {
+        if (centerBiome === 'FOREST') { // 森林
           if (Math.random() < 0.04) {
             if (Math.random() < 0.15) {
               realisticTrees.push({ x: wx, y: h + 1, z: wz });
@@ -141,14 +142,15 @@ onmessage = function(e) {
               Tree.generate(wx, h + 1, wz, fakeChunk, 'big', dPlaceholder, logType, leafType);
             }
           }
-        } else if (centerBiome === 'AZALEA') {
+        } else if (centerBiome === 'AZALEA') { // 杜鹃花树林
           if (Math.random() < 0.045) Tree.generate(wx, h + 1, wz, fakeChunk, 'azalea', dPlaceholder);
-        } else if (centerBiome === 'SWAMP') {
+        } else if (centerBiome === 'SWAMP') { // 湿地沼泽地
           if (Math.random() < 0.03) Tree.generate(wx, h + 1, wz, fakeChunk, 'swamp', dPlaceholder);
-        } else if (centerBiome === 'DESERT') {
+        } else if (centerBiome === 'DESERT') { // 沙漠
           if (Math.random() < 0.01) fakeChunk.add(wx, h + 1, wz, 'cactus', dPlaceholder);
-          if (Math.random() < 0.001 && safeForStructure) {
-            structureQueue.push(() => generateStructure('rover', wx, h + 1, wz, fakeChunk, dPlaceholder));
+          if (Math.random() < 0.0005 && safeForStructure) { // 0.05%
+            // 生成越野车/火星车
+            structureQueue.push(() => generateStructure('rover', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
           }
         } else {
           let occupied = false;
@@ -168,7 +170,7 @@ onmessage = function(e) {
           }
 
           if (Math.random() < 0.001 && safeForStructure) {
-            structureQueue.push(() => generateStructure('house', wx, h + 1, wz, fakeChunk, dPlaceholder));
+            structureQueue.push(() => generateStructure('house', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
           }
         }
       }
@@ -358,11 +360,11 @@ onmessage = function(e) {
   }
 
   // 返回数据
-  postMessage({ cx, cz, d, solidBlocks, realisticTrees, allBlockTypes, visibleKeys });
+  postMessage({ cx, cz, d, solidBlocks, realisticTrees, rovers, allBlockTypes, visibleKeys });
 };
 
 // 复制结构生成逻辑 (避免依赖 Chunk.js 的循环引用)
-function generateStructure(type, x, y, z, chunk, dObj) {
+function generateStructure(type, x, y, z, chunk, dObj, rovers = []) {
     if (type === 'house') {
       const wallMat = Math.random() < 0.33 ? 'bricks' : 'planks';
       for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) chunk.add(x + i, y - 1, z + j, 'stone', dObj);
@@ -405,12 +407,7 @@ function generateStructure(type, x, y, z, chunk, dObj) {
       chunk.add(x - 1, y, z - 1, 'bookbox', dObj, false);
       chunk.add(x + 1, y, z - 1, 'chest', dObj);
     } else if (type === 'rover') {
-      chunk.add(x - 1, y, z - 1, 'wheel', dObj);
-      chunk.add(x + 1, y, z - 1, 'wheel', dObj);
-      chunk.add(x - 1, y, z + 1, 'wheel', dObj);
-      chunk.add(x + 1, y, z + 1, 'wheel', dObj);
-      for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 2; dz++) chunk.add(x + dx, y + 1, z + dz, 'carBody', dObj);
-      chunk.add(x, y + 2, z, 'chest', dObj);
+      rovers.push({ x, y, z });
     } else if (type === 'ship') {
       for (let dz = -3; dz <= 3; dz++) for (let dx = -2; dx <= 2; dx++) {
         if (Math.abs(dx) === 2 || Math.abs(dz) === 3) {
