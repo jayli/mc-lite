@@ -36,6 +36,19 @@ worldWorker.onerror = (e) => {
 // 共享几何体定义 - 用于优化渲染性能，避免在每个区块中重复创建相同的几何体，减少 GPU 内存占用
 
 /**
+ * 为几何体添加顶点 ID 属性，用于着色器中索引 AO 数据
+ */
+function addVertexIdAttribute(geometry) {
+  const count = geometry.attributes.position.count;
+  const vertexIds = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    vertexIds[i] = i;
+  }
+  geometry.setAttribute('aVertexId', new THREE.BufferAttribute(vertexIds, 1));
+  return geometry;
+}
+
+/**
  * 构建交叉平面几何体（用于花、藤蔓等植物）
  * 由两个垂直交叉的平面组成，形成十字形状，使其在各个角度看都有体积感
  * @param {number} offsetY - Y 轴偏移，用于调整植物模型相对于方块底部的垂直高度
@@ -47,7 +60,7 @@ function buildCrossGeo(offsetY = -0.25) {
   p2.rotateY(Math.PI / 2); // 绕 Y 轴旋转 90 度
   const merged = BufferGeometryUtils.mergeGeometries([p1, p2]); // 合并几何体减少渲染开销
   merged.translate(0, offsetY, 0); // 应用垂直偏移
-  return merged;
+  return addVertexIdAttribute(merged);
 }
 // 花的几何体（交叉平面，向下偏移0.25单位，使花朵看起来生长在地面上）
 const geoFlower = buildCrossGeo(-0.25);
@@ -66,7 +79,7 @@ const geoLily = (() => {
   const geo = new THREE.PlaneGeometry(0.8, 0.8);
   geo.rotateX(-Math.PI / 2);
   geo.translate(0, -0.48, 0);
-  return geo;
+  return addVertexIdAttribute(geo);
 })();
 
 /**
@@ -80,11 +93,11 @@ const geoCactus = (() => {
   const lau = new THREE.BoxGeometry(0.25, 0.4, 0.25); lau.translate(-0.4, 0.35, 0); geoms.push(lau);
   const ra = new THREE.BoxGeometry(0.25, 0.25, 0.25); ra.translate(0.4, -0.1, 0); geoms.push(ra);
   const rau = new THREE.BoxGeometry(0.25, 0.3, 0.25); rau.translate(0.4, 0.1, 0); geoms.push(rau);
-  return BufferGeometryUtils.mergeGeometries(geoms);
+  return addVertexIdAttribute(BufferGeometryUtils.mergeGeometries(geoms));
 })();
 
 /** 烟囱几何体 - 一个略窄的圆柱体 */
-const geoChimney = new THREE.CylinderGeometry(0.15, 0.15, 2, 8);
+const geoChimney = addVertexIdAttribute(new THREE.CylinderGeometry(0.15, 0.15, 2, 8));
 
 /**
  * 几何体映射表 - 将方块类型映射到对应的几何体
@@ -97,7 +110,7 @@ const geomMap = {
   'lilypad': geoLily,
   'cactus': geoCactus,
   'chimney': geoChimney,
-  'default': new THREE.BoxGeometry(1, 1, 1)
+  'default': addVertexIdAttribute(new THREE.BoxGeometry(1, 1, 1))
 };
 
 /**
@@ -219,6 +232,23 @@ export class Chunk {
       const material = materials.getMaterial(type);
       // 创建实例化网格：指定几何体、材质和实例总数
       const mesh = new THREE.InstancedMesh(geometry, material, d[type].length);
+
+      // --- 添加 AO 属性 ---
+      const aoAllowedTypes = ['sand', 'stone', 'mossy_stone', 'cobblestone', 'bricks'];
+      if (aoAllowedTypes.includes(type)) {
+        const aoLowArray = new Float32Array(d[type].length);
+        const aoHighArray = new Float32Array(d[type].length);
+        d[type].forEach((pos, i) => {
+          aoLowArray[i] = pos.aoLow || 0;
+          aoHighArray[i] = pos.aoHigh || 0;
+        });
+        // 必须在 geometry 上克隆或者直接设置，InstancedMesh 共享 geometry 会有问题
+        // 但这里我们使用的是共享几何体，所以我们需要为每个 InstancedMesh 唯一的属性
+        // 实际上 InstancedBufferAttribute 就是为此设计的
+        mesh.geometry = geometry.clone(); // 克隆几何体以拥有独立的属性
+        mesh.geometry.setAttribute('aAoLow', new THREE.InstancedBufferAttribute(aoLowArray, 1));
+        mesh.geometry.setAttribute('aAoHigh', new THREE.InstancedBufferAttribute(aoHighArray, 1));
+      }
 
       // 存储元数据，便于后续通过 Raycaster 进行交互识别
       mesh.userData = { type: type };
@@ -419,6 +449,17 @@ export class Chunk {
       mesh.position.set(Math.floor(x) + 0.5, Math.floor(y) + 0.5, Math.floor(z) + 0.5); // 增加 0.5 偏移
       mesh.userData = { type: type };
       mesh.frustumCulled = false; // 防止视锥剔除误判
+
+      // --- 为动态方块设置空的 AO 属性，防止报错 ---
+      const aoAllowedTypes = ['sand', 'stone', 'mossy_stone', 'cobblestone', 'bricks'];
+      if (aoAllowedTypes.includes(type)) {
+        mesh.geometry = geometry.clone();
+        const count = mesh.geometry.attributes.position.count;
+        const aoLowArray = new Float32Array(count).fill(16777215); // AO = 3 for all vertices
+        const aoHighArray = new Float32Array(count).fill(16777215);
+        mesh.geometry.setAttribute('aAoLow', new THREE.BufferAttribute(aoLowArray, 1));
+        mesh.geometry.setAttribute('aAoHigh', new THREE.BufferAttribute(aoHighArray, 1));
+      }
 
       // 设置阴影
       if(!nonSolidTypes.includes(type)) {

@@ -240,6 +240,46 @@ onmessage = function(e) {
     return true;
   };
 
+  /**
+   * 计算指定角落的 AO 值 (0-3)
+   * AO = 3 - (side1 + side2 + corner)
+   * side1, side2, corner 为 1 如果该位置被遮挡，否则为 0
+   */
+  const getAOValue = (side1, side2, corner) => {
+    if (side1 && side2) return 0; // 两个侧面都遮挡，AO 为 0 (最暗)
+    return 3 - (side1 + side2 + corner);
+  };
+
+  const getAO = (x, y, z, faceIdx) => {
+    // faceIdx: 0:px, 1:nx, 2:py, 3:ny, 4:pz, 5:nz
+    // 返回 4 个顶点的 AO 值
+    const aos = new Uint8Array(4).fill(3);
+
+    // 根据面定义相邻方块偏移
+    // 优化：仅在台阶下方（地面交界处和悬空物下方）保留阴影，移除垂直墙角阴影
+    if (faceIdx === 0) { // px (侧面) - 仅保留上方邻居，实现悬空物下方阴影
+      aos[0] = getAOValue(isOccluding(x+1, y+1, z), 0, 0);
+      aos[2] = getAOValue(isOccluding(x+1, y+1, z), 0, 0);
+    } else if (faceIdx === 1) { // nx (侧面)
+      aos[0] = getAOValue(isOccluding(x-1, y+1, z), 0, 0);
+      aos[2] = getAOValue(isOccluding(x-1, y+1, z), 0, 0);
+    } else if (faceIdx === 2) { // py (顶面) - 保留完整 AO，实现台阶/墙根地面阴影
+      aos[0] = getAOValue(isOccluding(x-1, y+1, z), isOccluding(x, y+1, z-1), isOccluding(x-1, y+1, z-1));
+      aos[1] = getAOValue(isOccluding(x+1, y+1, z), isOccluding(x, y+1, z-1), isOccluding(x+1, y+1, z-1));
+      aos[2] = getAOValue(isOccluding(x-1, y+1, z), isOccluding(x, y+1, z+1), isOccluding(x-1, y+1, z+1));
+      aos[3] = getAOValue(isOccluding(x+1, y+1, z), isOccluding(x, y+1, z+1), isOccluding(x+1, y+1, z+1));
+    } else if (faceIdx === 3) { // ny (底面) - 移除阴影
+      // Keep all at 3
+    } else if (faceIdx === 4) { // pz (侧面)
+      aos[0] = getAOValue(isOccluding(x, y+1, z+1), 0, 0);
+      aos[2] = getAOValue(isOccluding(x, y+1, z+1), 0, 0);
+    } else if (faceIdx === 5) { // nz (侧面)
+      aos[0] = getAOValue(isOccluding(x, y+1, z-1), 0, 0);
+      aos[2] = getAOValue(isOccluding(x, y+1, z-1), 0, 0);
+    }
+    return aos;
+  };
+
   // 初始化所有可能的类型数组
   const allTypes = [
     'grass', 'dirt', 'stone', 'sand', 'wood', 'birch_log', 'planks', 'oak_planks', 'white_planks',
@@ -286,7 +326,30 @@ onmessage = function(e) {
 
       if (visible) {
           if (!d[block.type]) d[block.type] = [];
-          d[block.type].push({x: block.x, y: block.y, z: block.z});
+
+          // 计算 AO 数据
+          let aoLow = 0;
+          let aoHigh = 0;
+
+          // 如果是 Box 类型的方块，计算 6 个面的 AO
+          const boxTypes = ['sand', 'stone', 'mossy_stone', 'cobblestone', 'bricks'];
+
+          if (boxTypes.includes(block.type)) {
+            for (let f = 0; f < 6; f++) {
+              const aos = getAO(block.x, block.y, block.z, f);
+              for (let v = 0; v < 4; v++) {
+                const vertexIdx = f * 4 + v;
+                const aoVal = aos[v];
+                if (vertexIdx < 12) {
+                  aoLow |= (aoVal << (vertexIdx * 2));
+                } else {
+                  aoHigh |= (aoVal << ((vertexIdx - 12) * 2));
+                }
+              }
+            }
+          }
+
+          d[block.type].push({x: block.x, y: block.y, z: block.z, aoLow, aoHigh});
           visibleKeys.push(key);
       }
 

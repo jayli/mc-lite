@@ -68,7 +68,7 @@ export class MaterialManager {
     }
 
     // 创建材质并缓存
-    const mat = this._createMaterial(def);
+    const mat = this._createMaterial(def, type);
     this.materials.set(type, mat);
     return mat;
   }
@@ -76,16 +76,21 @@ export class MaterialManager {
   /**
    * 根据材质定义创建 Three.js 材质（私有方法）
    * @param {Object} def - 材质定义对象
+   * @param {string} type - 材质类型
    * @returns {THREE.Material} 创建的 Three.js 材质
    */
-  _createMaterial(def) {
+  _createMaterial(def, type) {
+    // 定义允许使用 AO 阴影的材质列表
+    const aoAllowedTypes = ['sand', 'stone', 'mossy_stone', 'cobblestone', 'bricks'];
+    const useAO = aoAllowedTypes.includes(type);
+
     // 情况0：多面材质（用于立方体不同面使用不同材质）
     if (def.faces) {
       // Three.js BoxGeometry 面的顺序：px, nx, py, ny, pz, nz (0-5)
       const mats = [];
       for (let i = 0; i < 6; i++) {
         const faceDef = def.faces[i] || def.faces.all || def;
-        mats.push(this._createMaterial(faceDef));
+        mats.push(this._createMaterial(faceDef, type));
       }
       return mats;
     }
@@ -111,13 +116,15 @@ export class MaterialManager {
         texture.needsUpdate = true;
       }
 
-      return new THREE.MeshStandardMaterial({
+      const mat = new THREE.MeshStandardMaterial({
         map: texture,
         transparent: def.transparent || false,
         opacity: def.opacity || 1,
         side: def.side || THREE.FrontSide,
         alphaTest: def.alphaTest || 0
       });
+      if (useAO) this._applyShaderModifications(mat);
+      return mat;
     }
 
     // 情况2：使用纹理生成器（程序化纹理）
@@ -142,21 +149,79 @@ export class MaterialManager {
       texture.generateMipmaps = false;
       texture.colorSpace = THREE.SRGBColorSpace;
 
-      return new THREE.MeshStandardMaterial({
+      const mat = new THREE.MeshStandardMaterial({
         map: texture,
         transparent: def.transparent || false,
         opacity: def.opacity || 1,
         side: def.side || THREE.FrontSide,
         alphaTest: def.alphaTest || 0
       });
+      if (useAO) this._applyShaderModifications(mat);
+      return mat;
     }
 
     // 情况3：纯颜色材质（无纹理）
-    return new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshStandardMaterial({
       color: def.color || 0xffffff,
       transparent: def.transparent || false,
       opacity: def.opacity || 1
     });
+    if (useAO) this._applyShaderModifications(mat);
+    return mat;
+  }
+
+  /**
+   * 为材质注入 AO 着色器逻辑
+   * @param {THREE.Material} material
+   */
+  _applyShaderModifications(material) {
+    material.onBeforeCompile = (shader) => {
+      // 顶点着色器修改
+      shader.vertexShader = `
+        attribute float aVertexId;
+        attribute float aAoLow;
+        attribute float aAoHigh;
+        varying float vAo;
+      ` + shader.vertexShader;
+
+      // 台阶底部阴影
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <common>',
+        `
+        #include <common>
+        float getAo(float id, float low, float high) {
+          float aoRaw;
+          if (id < 12.0) {
+            aoRaw = mod(floor(low / pow(4.0, id)), 4.0);
+          } else {
+            aoRaw = mod(floor(high / pow(4.0, id - 12.0)), 4.0);
+          }
+          return 1.0 - (3.0 - aoRaw) / 3.0 * 0.9; // 0.9 为阴影强度
+        }
+        `
+      );
+
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <begin_vertex>',
+        `
+        #include <begin_vertex>
+        vAo = getAo(aVertexId, aAoLow, aAoHigh);
+        `
+      );
+
+      // 片元着色器修改
+      shader.fragmentShader = `
+        varying float vAo;
+      ` + shader.fragmentShader;
+
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <color_fragment>',
+        `
+        #include <color_fragment>
+        diffuseColor.rgb *= vAo;
+        `
+      );
+    };
   }
 }
 
@@ -367,17 +432,8 @@ materials.registerMaterial('hay_bale', {
   }
 }); // 干草堆
 
-const sandSide = { textureUrl: './src/world/assets/textures/sand_side.png' };
-const sandTopBottom = { textureUrl: './src/world/assets/textures/sand.png' };
 materials.registerMaterial('sand', {
-  faces: {
-    0: sandSide,
-    1: sandSide,
-    2: sandTopBottom,
-    3: sandTopBottom,
-    4: sandSide,
-    5: sandSide
-  }
+  textureUrl:'./src/world/assets/textures/sand.png'
 }); // 沙地
 
 const woodSide = { textureUrl: './src/world/assets/textures/log_big_oak.png' };
