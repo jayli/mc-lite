@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { AMFLoader } from 'three/addons/loaders/AMFLoader.js';
 import { SEED } from '../utils/MathUtils.js';
-import { faceCullingSystem } from './FaceCullingSystem.js';
+import { FaceCullingSystem, faceCullingSystem } from './FaceCullingSystem.js';
 
 // 海平面相比陆地低多少
 const warterLeverHightOffset = -1.5;
@@ -360,12 +360,9 @@ export class Engine {
     this.scene.add(this.waterPlane);
 
     // --- 隐藏面剔除系统初始化 ---
-    this.faceCullingSystem = faceCullingSystem;
-
-    // 配置透明方块类型（与游戏中的透明方块匹配）
-    this.faceCullingSystem.setTransparentTypes([
-      'air', 'water', 'glass', 'ice', 'stained_glass'
-    ]);
+    this.faceCullingSystem = new FaceCullingSystem({
+      transparentTypes: ['air', 'water']
+    });
 
     // 启用系统
     this.faceCullingSystem.enable();

@@ -24,7 +24,7 @@ export class FaceCullingSystem {
 
     // 透明方块类型集合
     this.transparentTypes = new Set(config.transparentTypes || [
-      'air', 'water', 'glass', 'ice', 'stained_glass'
+      'air', 'water', 'glass_block', 'glass_blink'
     ]);
 
     // 性能统计
@@ -315,7 +315,7 @@ export class FaceCullingSystem {
       this.stats.facesCulled += hiddenFaces;
       this.stats.totalBlocksProcessed += 1;
 
-      console.log(`方块更新完成，可见面: ${visibleFaces}, 隐藏面: ${hiddenFaces}`);
+      console.log(`方块更新完成，可见面: ${visibleFaces}, 隐藏面: ${hiddenFaces}。系统累计隐藏面数: ${this.stats.facesCulled}`);
 
       // 触发事件
       this.emit('blockUpdated', { position, block, faceMask, visibleFaces, hiddenFaces });
