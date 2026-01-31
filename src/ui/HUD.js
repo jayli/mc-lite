@@ -13,6 +13,7 @@ const ITEMS = {
   'moss': { col: '#4B6E31' }, 'azalea_log': { col: '#635338' }, 'yellow_leaves': { col: '#FFD700' },
   'cobblestone': { col: '#8B8B8B' },
   'obsidian': { col: '#2E2E2E' },
+  'marble': { col: '#F2F0E6' },
   'glass_blink': { col: '#E0F7FA' },
   'mossy_stone': { col: '#6B8E23' },
   'blue_planks': { col: '#4A90E2' },

@@ -85,6 +85,10 @@ export class Game {
     this.player.inventory.add('debris', 1000);
     this.player.inventory.add('iron', 1000);
     this.player.inventory.add('iron_ore', 1000);
+    this.player.inventory.add('marble', 1000);
+    this.player.inventory.add('cactus', 1000);
+    this.player.inventory.add('tnt', 1000);
+    // this.player.inventory.add('cloud', 1000);
 
     // 延迟执行 Face Culling 审计
     setTimeout(() => {

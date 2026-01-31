@@ -50,7 +50,7 @@ export class Inventory {
   /**
    * @param {number} size - 背包容量
    */
-  constructor(size = 36) {
+  constructor(size = 100) {
     this.slots = [];
     for (let i = 0; i < size; i++) {
       this.slots.push(new Slot(i));

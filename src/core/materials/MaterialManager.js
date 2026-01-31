@@ -289,7 +289,9 @@ export async function initializeMaterials() {
     './src/world/assets/textures/Ancient_Debris_side.png',
     './src/world/assets/textures/iron.png',
     './src/world/assets/textures/Iron_Ore.png',
-    './src/world/assets/textures/leaves_yellow.png'
+    './src/world/assets/textures/leaves_yellow.png',
+    './src/world/assets/textures/tnt_side.png',
+    './src/world/assets/textures/tnt_top.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -398,6 +400,8 @@ materials.registerMaterial('cobblestone', {
 materials.registerMaterial('obsidian', {
   textureUrl: './src/world/assets/textures/Obsidian.png'
 }); // 黑曜石
+
+materials.registerMaterial('marble', mkMat('#F2F0E6')); // 大理石
 
 materials.registerMaterial('dark_planks', {
   textureUrl: './src/world/assets/textures/dark_planks.png'
@@ -656,5 +660,18 @@ materials.registerMaterial('yellow_leaves', {
   textureUrl: './src/world/assets/textures/leaves_yellow.png',
   transparent: true,
   alphaTest: 0.3
+});
+
+const tntSide = { textureUrl: './src/world/assets/textures/tnt_side.png' };
+const tntTopBottom = { textureUrl: './src/world/assets/textures/tnt_top.png' };
+materials.registerMaterial('tnt', {
+  faces: {
+    0: tntSide,
+    1: tntSide,
+    2: tntTopBottom,
+    3: tntTopBottom,
+    4: tntSide,
+    5: tntSide
+  }
 });
 
