@@ -1069,7 +1069,8 @@ export class FaceCullingSystem {
    * @returns {Promise<Object>} 审计结果
    */
   async auditWorld(world) {
-    console.log('开始异步审计世界 Face Culling 情况...');
+    // console.log('开始异步审计世界 Face Culling 情况...');
+    document.getElementById("perf").innerHTML = `开始审计地图 Face Culling 情况...`;
     const startTime = performance.now();
 
     let totalBlocks = 0;
@@ -1126,12 +1127,20 @@ export class FaceCullingSystem {
             duration
           };
 
-          console.log(`异步审计完成 (耗时: ${duration.toFixed(2)}ms):`);
-          console.log(`- 总方块数: ${stats.totalBlocks}`);
-          console.log(`- 总面数: ${stats.totalFaces}`);
-          console.log(`- 隐藏面 (被剔除): ${stats.hiddenFaces}`);
-          console.log(`- 可见面 (需渲染): ${stats.visibleFaces}`);
-          console.log(`- 剔除率: ${(stats.cullingRate * 100).toFixed(2)}%`);
+          var retMsg = `地图绘制审计完成（耗时: ${duration.toFixed(2)}ms）<br />`;
+          retMsg += `- 总方块数: ${stats.totalBlocks}<br />`;
+          retMsg += `- 总面数: ${stats.totalFaces}<br />`;
+          retMsg += `- 隐藏面 (被剔除): ${stats.hiddenFaces}<br />`;
+          retMsg += `- 可见面 (需渲染): ${stats.visibleFaces}<br />`;
+          retMsg += `- 剔除率: ${(stats.cullingRate * 100).toFixed(2)}%`;
+          document.getElementById("perf").innerHTML = retMsg;
+
+          // console.log(`异步审计完成 (耗时: ${duration.toFixed(2)}ms):`);
+          // console.log(`- 总方块数: ${stats.totalBlocks}`);
+          // console.log(`- 总面数: ${stats.totalFaces}`);
+          // console.log(`- 隐藏面 (被剔除): ${stats.hiddenFaces}`);
+          // console.log(`- 可见面 (需渲染): ${stats.visibleFaces}`);
+          // console.log(`- 剔除率: ${(stats.cullingRate * 100).toFixed(2)}%`);
 
           resolve(stats);
         }

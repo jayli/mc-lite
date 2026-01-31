@@ -1,50 +1,51 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-<head>
+  <head>
     <meta charset="UTF-8">
     <title>Web Minecraft: Refactored</title>
     <link data-n-head="ssr" rel="icon" type="image/x-icon" href="./src/style/icon.png" />
     <link rel="stylesheet" href="./src/style/global.css" />
-</head>
-<body>
+  </head>
+  <body>
     <div id="crosshair"></div>
-    <div id="hud">
-        <b>Minecraft</b><br>
-        <b>繁花与沼泽，空岛与森林</b> | Author by jayli<br>
-        WASD（↑↓←→）: 移动 | Z: 背包 | Esc/Z: 关闭背包 | I: 关闭/打开信息看板<br>
-        左键: 挖掘 | 右键: <b>虚空搭路/互动</b><br>
-        群系: 杜鹃林(苔藓/花树), 沼泽(藤蔓/睡莲)，森林，沙漠，草地...
-    </div>
     <div id="msg"></div>
+    <div id="hud">
+      <b>Minecraft - blooming</b><br>
+      <b>繁花与沼泽，空岛与森林</b> | Author by jayli<br>
+      WASD（↑↓←→）: 移动 | Z: 背包 | Esc/Z: 关闭背包 | I: 关闭/打开信息看板<br>
+      左键: 挖掘 | 右键: <b>虚空搭路/互动</b><br>
+      群系: 杜鹃林(苔藓/花树), 沼泽(藤蔓/睡莲)，森林，沙漠，草地...
+      <div id="perf"></div>
+    </div>
     <div id="hotbar"></div>
     <div id="settings-btn">⚙</div>
 
     <div id="settings-modal">
-        <div id="settings-content">
-            <h2 style="margin-top:0; text-align:left;">游戏设置</h2>
-            <div class="setting-item">
-                <span style="text-align:left;">渲染画质:</span>
-                <div class="btn-group">
-                    <button id="btn-perf">性能 (0.4x)</button>
-                    <button id="btn-mid">平衡 (0.7x)</button>
-                    <button id="btn-quality">画质 (1.0x)</button>
-                </div>
-            </div>
-            <div style="margin-top: auto; display: flex; justify-content: center;">
-                <button id="settings-close">确定</button>
-            </div>
+      <div id="settings-content">
+        <h2 style="margin-top:0; text-align:left;">游戏设置</h2>
+        <div class="setting-item">
+          <span style="text-align:left;">渲染画质:</span>
+          <div class="btn-group">
+            <button id="btn-perf">性能 (0.4x)</button>
+            <button id="btn-mid">平衡 (0.7x)</button>
+            <button id="btn-quality">画质 (1.0x)</button>
+          </div>
         </div>
+        <div style="margin-top: auto; display: flex; justify-content: center;">
+          <button id="settings-close">确定</button>
+        </div>
+      </div>
     </div>
 
     <div id="inventory-modal">
-        <div id="inventory-content">
-            <h2 style="margin:0">物品清单 (点击装备)</h2>
-            <div id="inventory-grid"></div>
-        </div>
+      <div id="inventory-content">
+        <h2 style="margin:0">物品清单 (点击装备)</h2>
+        <div id="inventory-grid"></div>
+      </div>
     </div>
 
     <script type="importmap">
-        {
+{
             "imports": {
                 "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
                 "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
@@ -53,7 +54,7 @@
     </script>
 
     <script type="module">
-        import { Game } from './src/core/Game.js';
+import { Game } from './src/core/Game.js';
         import { initializeMaterials } from './src/core/materials/MaterialManager.js';
 
         async function main() {
@@ -65,5 +66,5 @@
 
         main();
     </script>
-</body>
+  </body>
 </html>

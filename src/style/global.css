@@ -7,7 +7,7 @@ body { margin: 0; overflow: hidden; background-color: #87CEEB; user-select: none
 }
 
 #hud {
-  position: absolute; top: 10px; left: 10px; color: white;
+  position: absolute; top: 30px; left: 10px; color: white;
   text-shadow: 1px 1px 2px black; pointer-events: none; font-size: 14px; line-height: 1.5;
 }
 
@@ -48,9 +48,13 @@ body { margin: 0; overflow: hidden; background-color: #87CEEB; user-select: none
 }
 
 #msg {
-  position: absolute; top: 116px; left: 10px;
+  position: absolute; top: 10px; left: 10px;
   color: #FFD700; font-size: 14px; text-shadow: 1px 1px 2px #000;
   opacity: 0; transition: opacity 0.3s; pointer-events: none; font-weight: bold;
+}
+#perf {
+  font-size: 14px; text-shadow: 1px 1px 2px #000;
+  opacity: 1; transition: opacity 0.3s; pointer-events: none;
 }
 
 /* 设置按钮样式 */

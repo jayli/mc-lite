@@ -97,13 +97,13 @@ export class HUD {
       // 尝试获取内存信息 (仅限 Chromium 浏览器)
       if (performance.memory) {
         const memoryUsed = Math.round(performance.memory.usedJSHeapSize / 1048576); // 转换为 MB
-        statsText += ` | Mem: ${memoryUsed}MB`;
+        statsText += ` | 内存: ${memoryUsed}MB`;
       }
 
       // 紧跟在 Mem 后面显示性能指标
       if (this.msgEl) {
         const info = this.game.engine.renderer.info.render;
-        const perfText = ` | Smoothness: Jank: ${this.jankCount} | LongTasks: ${this.longTaskCount} | Calls: ${info.calls} | Tris: ${info.triangles}`;
+        const perfText = ` | 卡顿: ${this.jankCount} | 长任务: ${this.longTaskCount} | 调用数: ${info.calls} | 三角形数量: ${info.triangles}`;
         this.msgEl.textContent = statsText + perfText;
         this.msgEl.style.opacity = 1; // 确保可见
       }
