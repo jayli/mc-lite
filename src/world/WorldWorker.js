@@ -218,6 +218,28 @@ onmessage = function(e) {
   const d = {};
   const solidBlocks = [];
 
+  // 定义非遮挡方块列表（视线可穿透）
+  const nonOccludingTypes = new Set([
+    'air',
+    'water', 'swamp_water',
+    'glass_block', 'glass_blink',
+    'cloud',
+    'vine', 'lilypad',
+    'flower', 'short_grass', 'allium',
+    'leaves', 'yellow_leaves', 'azalea_leaves', 'swamp_leaves',
+    'cactus'
+  ]);
+
+  // 辅助函数：判断指定位置的方块是否遮挡视线
+  const isOccluding = (x, y, z) => {
+    const k = `${x},${y},${z}`;
+    const b = blockMap.get(k);
+    if (!b) return false;
+    if (!b.solid) return false;
+    if (nonOccludingTypes.has(b.type)) return false;
+    return true;
+  };
+
   // 初始化所有可能的类型数组
   const allTypes = [
     'grass', 'dirt', 'stone', 'sand', 'wood', 'birch_log', 'planks', 'oak_planks', 'white_planks',
@@ -225,20 +247,55 @@ onmessage = function(e) {
     'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass', 'sky_wood', 'sky_leaves', 'moss',
     'azalea_log', 'azalea_leaves', 'azalea_flowers', 'swamp_water', 'swamp_grass', 'vine',
     'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'glass_blink',
-    'gold_ore', 'calcite', 'bricks', 'chimney', 'gold_block', 'emerald', 'amethyst', 'debris', 'iron', 'iron_ore', 'end_stone'
+    'gold_ore', 'calcite', 'bricks', 'chimney', 'gold_block', 'emerald', 'amethyst', 'debris', 'iron', 'iron_ore', 'end_stone',
+    'yellow_leaves'
   ];
   for(const type of allTypes) {
     d[type] = [];
   }
 
+  // 记录所有方块的类型（包括被剔除的），用于主线程在挖掘时恢复
+  const allBlockTypes = {};
+  // 记录当前可见（已添加进d）的方块Key
+  const visibleKeys = [];
+
   for (const [key, block] of blockMap) {
-      if (!d[block.type]) d[block.type] = [];
-      d[block.type].push({x: block.x, y: block.y, z: block.z});
+      // 物理碰撞数据必须包含所有实心方块
       if (block.solid) solidBlocks.push(key);
+
+      // 渲染剔除逻辑
+      let visible = true;
+
+      // 只有实心且非透明方块才尝试剔除
+      if (block.solid) {
+          const { x, y, z } = block;
+
+          // 检查 6 个方向是否都有遮挡
+          const covered =
+              isOccluding(x + 1, y, z) &&
+              isOccluding(x - 1, y, z) &&
+              isOccluding(x, y + 1, z) &&
+              isOccluding(x, y - 1, z) &&
+              isOccluding(x, y, z + 1) &&
+              isOccluding(x, y, z - 1);
+
+          if (covered) {
+              visible = false;
+          }
+      }
+
+      if (visible) {
+          if (!d[block.type]) d[block.type] = [];
+          d[block.type].push({x: block.x, y: block.y, z: block.z});
+          visibleKeys.push(key);
+      }
+
+      // 无论是否可见，都记录类型
+      allBlockTypes[key] = block.type;
   }
 
   // 返回数据
-  postMessage({ cx, cz, d, solidBlocks, realisticTrees });
+  postMessage({ cx, cz, d, solidBlocks, realisticTrees, allBlockTypes, visibleKeys });
 };
 
 // 复制结构生成逻辑 (避免依赖 Chunk.js 的循环引用)

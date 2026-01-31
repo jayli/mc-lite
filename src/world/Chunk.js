@@ -21,10 +21,10 @@ const worldWorker = new Worker(new URL('./WorldWorker.js', import.meta.url), { t
 const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函数
 
 worldWorker.onmessage = (e) => {
-  const { cx, cz, d, solidBlocks, realisticTrees } = e.data;
+  const { cx, cz, d, solidBlocks, realisticTrees, allBlockTypes, visibleKeys } = e.data;
   const key = `${cx},${cz}`;
   if (workerCallbacks.has(key)) {
-    workerCallbacks.get(key)({ d, solidBlocks, realisticTrees });
+    workerCallbacks.get(key)({ d, solidBlocks, realisticTrees, allBlockTypes, visibleKeys });
     workerCallbacks.delete(key);
   }
 };
@@ -118,6 +118,8 @@ export class Chunk {
     this.group = new THREE.Group();  // Three.js 组，包含区块内所有网格
     this.keys = [];                  // 区块标识符（当前未使用）
     this.solidBlocks = new Set();    // 实心方块的集合，用于碰撞检测
+    this.blockData = {};             // 全量方块类型数据
+    this.visibleKeys = new Set();    // 当前已渲染方块的 Key 集合
     this.isReady = false;            // 区块是否已完成生成
     this.deltas = {};                // 持久化增量数据
     this.gen();                      // 生成区块内容
@@ -139,10 +141,14 @@ export class Chunk {
 
       // 注册 Worker 回调
       workerCallbacks.set(callbackKey, (data) => {
-        const { d, solidBlocks, realisticTrees } = data;
+        const { d, solidBlocks, realisticTrees, allBlockTypes, visibleKeys } = data;
 
         // 1. 同步实心方块数据 (用于碰撞检测)
         solidBlocks.forEach(k => this.solidBlocks.add(k));
+
+        // 1.1 同步全量方块数据和可见性状态
+        if (allBlockTypes) this.blockData = allBlockTypes;
+        if (visibleKeys) visibleKeys.forEach(k => this.visibleKeys.add(k));
 
         // 2. 构建渲染网格 (InstancedMesh)
         this.buildMeshes(d);
@@ -319,15 +325,23 @@ export class Chunk {
   addBlockDynamic(x, y, z, type) {
     const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
 
-    // 同步更新内存中的 deltas 缓存，确保与持久化层一致，防止区块重新加载前逻辑判定失效
+    // 同步更新内存中的 deltas 缓存
     if (this.deltas) {
       this.deltas[key] = type;
     }
 
-    // 检查并移除该位置已有的动态方块（实现位移/替换逻辑）
+    // 更新数据和可见性状态
+    if (type === 'air') {
+        delete this.blockData[key];
+        this.visibleKeys.delete(key);
+    } else {
+        this.blockData[key] = type;
+        this.visibleKeys.add(key);
+    }
+
+    // 检查并移除该位置已有的动态方块
     for (let i = this.group.children.length - 1; i >= 0; i--) {
       const child = this.group.children[i];
-      // 跳过 InstancedMesh 和被标记为实体的对象
       if (child.isInstancedMesh || child.userData.isEntity) continue;
 
       if (Math.floor(child.position.x) === Math.floor(x) &&
@@ -342,26 +356,69 @@ export class Chunk {
       }
     }
 
-    // 添加到实心方块集合（用于碰撞检测）
+    // 更新碰撞体集合
     const nonSolidTypes = ['air', 'water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass', 'allium'];
-
     if (!nonSolidTypes.includes(type)) {
       this.solidBlocks.add(key);
     } else {
       this.solidBlocks.delete(key);
     }
 
+    // 如果方块被移除（变成空气），检查并恢复周围隐藏的方块
+    if (type === 'air') {
+        const neighbors = [
+            { dx: 1, dy: 0, dz: 0 }, { dx: -1, dy: 0, dz: 0 },
+            { dx: 0, dy: 1, dz: 0 }, { dx: 0, dy: -1, dz: 0 },
+            { dx: 0, dy: 0, dz: 1 }, { dx: 0, dy: 0, dz: -1 }
+        ];
+
+        for (const offset of neighbors) {
+            const nx = x + offset.dx;
+            const ny = y + offset.dy;
+            const nz = z + offset.dz;
+
+            const nCx = Math.floor(nx / CHUNK_SIZE);
+            const nCz = Math.floor(nz / CHUNK_SIZE);
+
+            if (nCx === this.cx && nCz === this.cz) {
+                // 邻居在当前 Chunk
+                const nKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
+                // 如果邻居存在且当前不可见，则显示它
+                if (this.blockData[nKey] && !this.visibleKeys.has(nKey)) {
+                    this.addBlockDynamic(nx, ny, nz, this.blockData[nKey]);
+                }
+            } else {
+                // 邻居在隔壁 Chunk
+                const neighborChunkKey = `${nCx},${nCz}`;
+                const neighborChunk = this.world.chunks.get(neighborChunkKey);
+                if (neighborChunk && neighborChunk.isReady) {
+                    neighborChunk.checkReveal(nx, ny, nz);
+                }
+            }
+        }
+    }
+
     // 对于空气方块和碰撞体方块，只更新逻辑状态，不创建网格
     if (type === 'air' || type === 'collider') {
-       // 更新隐藏面剔除逻辑...
+       // ...
     } else {
       // 获取几何体和材质
       const geometry = geomMap[type] || geomMap['default'];
-      const material = materials.getMaterial(type);
+      let material = materials.getMaterial(type);
+      // 克隆材质以避免潜在问题
+      if (material) {
+        if (Array.isArray(material)) {
+            material = material.map(m => m.clone());
+        } else {
+            material = material.clone();
+        }
+      }
+
       // 创建单个网格
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(Math.floor(x) + 0.5, Math.floor(y) + 0.5, Math.floor(z) + 0.5); // 增加 0.5 偏移
-      mesh.userData = { type: type };              // 存储方块类型
+      mesh.userData = { type: type };
+      mesh.frustumCulled = false; // 防止视锥剔除误判
 
       // 设置阴影
       if(!nonSolidTypes.includes(type)) {
@@ -371,38 +428,28 @@ export class Chunk {
 
       // 添加到区块组中
       this.group.add(mesh);
+
+      mesh.updateMatrix();
+      mesh.updateMatrixWorld();
     }
 
-    // 隐藏面剔除更新
+    // 隐藏面剔除更新 (FaceCullingSystem integration)
     if (faceCullingSystem && faceCullingSystem.isEnabled()) {
+      // ... existing logic ...
       const position = new THREE.Vector3(x, y, z);
       const block = { type };
-
       // Helper to get neighbor block info
       const getNeighborBlock = (nx, ny, nz) => {
         const cx = Math.floor(nx / 16);
         const cz = Math.floor(nz / 16);
         const chunkKey = `${cx},${cz}`;
-        // Optimization: check if it's current chunk
         let chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(chunkKey);
-
         if (!chunk || !chunk.isReady) return null;
-
         const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-
-        // Check deltas
-        if (chunk.deltas && chunk.deltas[key]) {
-          return { type: chunk.deltas[key] };
-        }
-
-        // Check solid blocks
-        if (chunk.solidBlocks.has(key)) {
-           return { type: 'stone' }; // Assume opaque solid
-        }
-
+        if (chunk.deltas && chunk.deltas[key]) return { type: chunk.deltas[key] };
+        if (chunk.solidBlocks.has(key)) return { type: 'stone' };
         return null;
       };
-
       const getNeighborsOf = (nx, ny, nz) => {
           return {
             top: getNeighborBlock(nx, ny + 1, nz),
@@ -413,16 +460,23 @@ export class Chunk {
             east: getNeighborBlock(nx + 1, ny, nz)
           };
       };
-
       const neighbors = getNeighborsOf(x, y, z);
       faceCullingSystem.updateBlock(position, block, neighbors);
-
-      // 更新相邻方块的可见面状态
       faceCullingSystem.updateNeighbors(position, (neighborPos) => {
         const nb = getNeighborBlock(neighborPos.x, neighborPos.y, neighborPos.z);
         if (!nb) return null;
         return { block: nb, neighbors: getNeighborsOf(neighborPos.x, neighborPos.y, neighborPos.z) };
       });
+    }
+  }
+
+  /**
+   * 检查指定位置是否是隐藏方块，如果是则显示它
+   */
+  checkReveal(x, y, z) {
+    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    if (this.blockData[key] && !this.visibleKeys.has(key)) {
+        this.addBlockDynamic(x, y, z, this.blockData[key]);
     }
   }
 
