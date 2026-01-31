@@ -8,6 +8,9 @@ import { FaceCullingSystem, faceCullingSystem } from './FaceCullingSystem.js';
 const warterLeverHightOffset = -1.5;
 // 雾颜色
 const forgColor = 0x94bcf5; // 原单色天空球的雾色：0x62b4d5
+const waterColor = 0x588be4; // 原来的颜色 0x4488ff; // 水颜色
+const waterOpacity = 0.7; // 水透明度
+const waterForgColor = 0xa7d1e2; // 水雾颜色
 export let rookModel = null;
 
 // 定义并导出 Engine 类，用于管理游戏的核心渲染引擎
@@ -242,11 +245,11 @@ export class Engine {
     this.waterMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
-        uColor: { value: new THREE.Color(0x4488ff) },
+        uColor: { value: new THREE.Color(waterColor) },
         uSunDirection: { value: this.sunDirection },
-        uOpacity: { value: 0.6 },
+        uOpacity: { value: waterOpacity },
         uSeed: { value: SEED },
-        uFogColor: { value: new THREE.Color(0xa7d1e2) },
+        uFogColor: { value: new THREE.Color(waterForgColor) },
         uFogNear: { value: 20 },
         uFogFar: { value: 70 }
       },

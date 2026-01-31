@@ -83,7 +83,7 @@ onmessage = function(e) {
 
         if (centerBiome === 'SWAMP' && Math.random() < 0.08) {
           // 沼泽生物群系：8% 概率在水面上生成睡莲 (1.1 偏移量使其浮在水面上方一点点)
-          fakeChunk.add(wx, wLvl + 1.1, wz, 'lilypad', dPlaceholder, false);
+          fakeChunk.add(wx, wLvl + 0.5, wz, 'lilypad', dPlaceholder, false);
         }
 
         // 结构生成 (沉船) - 加入队列
