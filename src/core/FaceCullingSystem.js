@@ -225,12 +225,14 @@ export class FaceCullingSystem {
     const startTime = performance.now();
 
     try {
-      console.log('Updating chunk:', { cx: chunk.cx, cz: chunk.cz });
+      if (this.debugMode) {
+        console.log('Updating chunk:', { cx: chunk.cx, cz: chunk.cz });
+      }
 
       // 检查区块是否已缓存
       const chunkKey = `${chunk.cx},${chunk.cz}`;
       if (this.chunkCache.has(chunkKey) && this.config.lazyUpdate) {
-        console.log('Chunk already cached, skipping update');
+        if (this.debugMode) console.log('Chunk already cached, skipping update');
         return;
       }
 
@@ -270,12 +272,14 @@ export class FaceCullingSystem {
       this.stats.updateTime = endTime - startTime;
       this.stats.lastUpdateTime = Date.now();
 
-      console.log(`Chunk update completed in ${this.stats.updateTime.toFixed(2)}ms`, {
-        blocks: Math.min(blockCount, 1000),
-        facesCulled,
-        facesRendered,
-        optimizationRate: this.stats.optimizationRate.toFixed(3)
-      });
+      if (this.debugMode) {
+        console.log(`Chunk update completed in ${this.stats.updateTime.toFixed(2)}ms`, {
+          blocks: Math.min(blockCount, 1000),
+          facesCulled,
+          facesRendered,
+          optimizationRate: this.stats.optimizationRate.toFixed(3)
+        });
+      }
 
       this.emit('update', { ...this.stats });
 
@@ -294,7 +298,9 @@ export class FaceCullingSystem {
     if (!this.enabled) return;
 
     try {
-      console.log('Updating block at:', position, 'type:', block?.type);
+      if (this.debugMode) {
+        console.log('Updating block at:', position, 'type:', block?.type);
+      }
 
       // 计算可见面状态
       const faceMask = this.calculateFaceVisibility(block, neighbors);
@@ -315,7 +321,9 @@ export class FaceCullingSystem {
       this.stats.facesCulled += hiddenFaces;
       this.stats.totalBlocksProcessed += 1;
 
-      console.log(`方块更新完成，可见面: ${visibleFaces}, 隐藏面: ${hiddenFaces}。系统累计隐藏面数: ${this.stats.facesCulled}`);
+      if (this.debugMode) {
+        console.log(`方块更新完成，可见面: ${visibleFaces}, 隐藏面: ${hiddenFaces}。系统累计隐藏面数: ${this.stats.facesCulled}`);
+      }
 
       // 触发事件
       this.emit('blockUpdated', { position, block, faceMask, visibleFaces, hiddenFaces });
@@ -334,11 +342,13 @@ export class FaceCullingSystem {
     if (!this.enabled) return;
 
     try {
-      console.log('Updating neighbors around:', position);
+      if (this.debugMode) {
+        console.log('Updating neighbors around:', position);
+      }
 
       // 如果没有提供获取方块数据的函数，无法继续
       if (!getBlockData) {
-        console.warn('updateNeighbors: 需要提供getBlockData函数来获取方块数据');
+        if (this.debugMode) console.warn('updateNeighbors: 需要提供getBlockData函数来获取方块数据');
         return;
       }
 
@@ -364,7 +374,9 @@ export class FaceCullingSystem {
         }
       }
 
-      console.log(`更新了 ${updatedCount} 个相邻方块`);
+      if (this.debugMode) {
+        console.log(`更新了 ${updatedCount} 个相邻方块`);
+      }
 
       // 触发事件
       this.emit('neighborsUpdated', { position, updatedCount });
@@ -1049,6 +1061,85 @@ export class FaceCullingSystem {
       console.warn('性能警告:', warningMessage);
       this.emit('performanceWarning', { warnings, snapshot });
     }
+  }
+
+  /**
+   * 异步审计整个世界的 Face Culling 情况 (分片执行，避免卡顿)
+   * @param {Object} world - 世界对象
+   * @returns {Promise<Object>} 审计结果
+   */
+  async auditWorld(world) {
+    console.log('开始异步审计世界 Face Culling 情况...');
+    const startTime = performance.now();
+
+    let totalBlocks = 0;
+    let totalFaces = 0;
+    let hiddenFaces = 0;
+    let visibleFaces = 0;
+
+    const chunks = Array.from(world.chunks.values());
+    const totalChunks = chunks.length;
+    let processedChunks = 0;
+
+    return new Promise((resolve) => {
+      const processNextBatch = () => {
+        const batchStartTime = performance.now();
+
+        // 每次处理最多 5ms，避免掉帧
+        while (processedChunks < totalChunks && performance.now() - batchStartTime < 5) {
+          const chunk = chunks[processedChunks++];
+
+          for (const key of chunk.solidBlocks) {
+            totalBlocks++;
+            totalFaces += 6;
+
+            const [x, y, z] = key.split(',').map(Number);
+
+            // 检查 6 个方向的邻居
+            if (world.isSolid(x, y + 1, z)) hiddenFaces++; else visibleFaces++; // Top
+            if (world.isSolid(x, y - 1, z)) hiddenFaces++; else visibleFaces++; // Bottom
+            if (world.isSolid(x, y, z - 1)) hiddenFaces++; else visibleFaces++; // North
+            if (world.isSolid(x, y, z + 1)) hiddenFaces++; else visibleFaces++; // South
+            if (world.isSolid(x - 1, y, z)) hiddenFaces++; else visibleFaces++; // West
+            if (world.isSolid(x + 1, y, z)) hiddenFaces++; else visibleFaces++; // East
+          }
+        }
+
+        if (processedChunks < totalChunks) {
+          // 继续下一批
+          if (window.requestIdleCallback) {
+              window.requestIdleCallback(processNextBatch);
+          } else {
+              setTimeout(processNextBatch, 0);
+          }
+        } else {
+          // 完成
+          const endTime = performance.now();
+          const duration = endTime - startTime;
+
+          const stats = {
+            totalBlocks,
+            totalFaces,
+            hiddenFaces,
+            visibleFaces,
+            cullingRate: totalFaces > 0 ? (hiddenFaces / totalFaces) : 0,
+            duration
+          };
+
+          console.log(`异步审计完成 (耗时: ${duration.toFixed(2)}ms):`);
+          console.log(`- 总方块数: ${stats.totalBlocks}`);
+          console.log(`- 总面数: ${stats.totalFaces}`);
+          console.log(`- 隐藏面 (被剔除): ${stats.hiddenFaces}`);
+          console.log(`- 可见面 (需渲染): ${stats.visibleFaces}`);
+          console.log(`- 剔除率: ${(stats.cullingRate * 100).toFixed(2)}%`);
+
+          resolve(stats);
+        }
+      };
+
+      // 启动处理
+      processNextBatch();
+    });
   }
 
   /**

@@ -6,6 +6,7 @@ import { World } from '../world/World.js';
 import { UIManager } from '../ui/UIManager.js';
 import { Player } from '../entities/player/Player.js';
 import { realisticTreeManager } from '../world/entities/RealisticTreeManager.js';
+import { faceCullingSystem } from './FaceCullingSystem.js';
 
 /**
  * 游戏主类，负责初始化游戏核心组件并管理游戏循环
@@ -67,6 +68,13 @@ export class Game {
     this.player.inventory.add('debris', 1000);
     this.player.inventory.add('iron', 1000);
     this.player.inventory.add('iron_ore', 1000);
+
+    // 延迟执行 Face Culling 审计
+    setTimeout(() => {
+      if (faceCullingSystem) {
+        faceCullingSystem.auditWorld(this.world);
+      }
+    }, 5000);
   }
 
   /**
