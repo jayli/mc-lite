@@ -378,18 +378,50 @@ export class Chunk {
       const position = new THREE.Vector3(x, y, z);
       const block = { type };
 
-      // 创建简单的邻居数据（实际实现需要从世界数据获取）
-      // 这里使用占位符，实际集成将在World.js中完成
-      const neighbors = {
-        top: null, bottom: null, north: null, south: null, west: null, east: null
+      // Helper to get neighbor block info
+      const getNeighborBlock = (nx, ny, nz) => {
+        const cx = Math.floor(nx / 16);
+        const cz = Math.floor(nz / 16);
+        const chunkKey = `${cx},${cz}`;
+        // Optimization: check if it's current chunk
+        let chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(chunkKey);
+
+        if (!chunk || !chunk.isReady) return null;
+
+        const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
+
+        // Check deltas
+        if (chunk.deltas && chunk.deltas[key]) {
+          return { type: chunk.deltas[key] };
+        }
+
+        // Check solid blocks
+        if (chunk.solidBlocks.has(key)) {
+           return { type: 'stone' }; // Assume opaque solid
+        }
+
+        return null;
       };
 
+      const getNeighborsOf = (nx, ny, nz) => {
+          return {
+            top: getNeighborBlock(nx, ny + 1, nz),
+            bottom: getNeighborBlock(nx, ny - 1, nz),
+            north: getNeighborBlock(nx, ny, nz - 1),
+            south: getNeighborBlock(nx, ny, nz + 1),
+            west: getNeighborBlock(nx - 1, ny, nz),
+            east: getNeighborBlock(nx + 1, ny, nz)
+          };
+      };
+
+      const neighbors = getNeighborsOf(x, y, z);
       faceCullingSystem.updateBlock(position, block, neighbors);
 
       // 更新相邻方块的可见面状态
       faceCullingSystem.updateNeighbors(position, (neighborPos) => {
-        // 从世界数据获取邻居方块数据
-        return this.world.isSolid(neighborPos.x, neighborPos.y, neighborPos.z) ? { type: 'stone' } : null;
+        const nb = getNeighborBlock(neighborPos.x, neighborPos.y, neighborPos.z);
+        if (!nb) return null;
+        return { block: nb, neighbors: getNeighborsOf(neighborPos.x, neighborPos.y, neighborPos.z) };
       });
     }
   }
