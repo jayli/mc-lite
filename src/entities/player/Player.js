@@ -63,7 +63,7 @@ export class Player {
 
     // 镜头晃动（bobbing）相关参数
     this.bobbing_timer = 0;
-    this.bobbing_intensity = 0.08; // 晃动幅度
+    this.bobbing_intensity = 0.06; // 晃动幅度
     this.bobbing_speed = 0.2;     // 晃动速度
     this.bob_offset = new THREE.Vector2(); // 用于平滑处理晃动偏移
   }
