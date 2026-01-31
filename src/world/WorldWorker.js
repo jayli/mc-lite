@@ -46,6 +46,7 @@ onmessage = function(e) {
   // 使用 Map 暂存方块，确保同一位置后生成的方块覆盖旧方块
   const blockMap = new Map();
   const realisticTrees = []; // 记录真实树木的位置
+  const modTrees = []; // 记录模型树 (Tree1.glb) 的位置
   const rovers = []; // 记录火星车的位置
   const structureQueue = []; // 结构生成队列，确保结构覆盖地形
 
@@ -154,7 +155,14 @@ onmessage = function(e) {
           }
         } else {
           let occupied = false;
-          if (Math.random() < 0.005) {
+
+          // 0.05% 概率在草地上生成模型树 (Tree1.glb)
+          if (surf === 'grass' && Math.random() < 0.0005) {
+            modTrees.push({ x: wx, y: h + 1, z: wz });
+            occupied = true;
+          }
+
+          if (!occupied && Math.random() < 0.005) {
             Tree.generate(wx, h + 1, wz, fakeChunk, 'default', dPlaceholder);
             occupied = true;
           }
@@ -360,7 +368,7 @@ onmessage = function(e) {
   }
 
   // 返回数据
-  postMessage({ cx, cz, d, solidBlocks, realisticTrees, rovers, allBlockTypes, visibleKeys });
+  postMessage({ cx, cz, d, solidBlocks, realisticTrees, modTrees, rovers, allBlockTypes, visibleKeys });
 };
 
 // 复制结构生成逻辑 (避免依赖 Chunk.js 的循环引用)

@@ -10,7 +10,7 @@ import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 import { persistenceService } from '../services/PersistenceService.js';
 import { SEED } from '../utils/MathUtils.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
-import { rookModel, carModel } from '../core/Engine.js';
+import { rookModel, carModel, treeModel } from '../core/Engine.js';
 
 /** 区块尺寸 - 每个区块在 X 和 Z 方向上的方块数量 (16x16 是 Voxel 游戏的标准区块大小) */
 const CHUNK_SIZE = 16;
@@ -21,10 +21,10 @@ const worldWorker = new Worker(new URL('./WorldWorker.js', import.meta.url), { t
 const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函数
 
 worldWorker.onmessage = (e) => {
-  const { cx, cz, d, solidBlocks, realisticTrees, rovers, allBlockTypes, visibleKeys } = e.data;
+  const { cx, cz, d, solidBlocks, realisticTrees, modTrees, rovers, allBlockTypes, visibleKeys } = e.data;
   const key = `${cx},${cz}`;
   if (workerCallbacks.has(key)) {
-    workerCallbacks.get(key)({ d, solidBlocks, realisticTrees, rovers, allBlockTypes, visibleKeys });
+    workerCallbacks.get(key)({ d, solidBlocks, realisticTrees, modTrees, rovers, allBlockTypes, visibleKeys });
     workerCallbacks.delete(key);
   }
 };
@@ -154,7 +154,7 @@ export class Chunk {
 
       // 注册 Worker 回调
       workerCallbacks.set(callbackKey, (data) => {
-        const { d, solidBlocks, realisticTrees, rovers, allBlockTypes, visibleKeys } = data;
+        const { d, solidBlocks, realisticTrees, modTrees, rovers, allBlockTypes, visibleKeys } = data;
 
         // 1. 同步实心方块数据 (用于碰撞检测)
         solidBlocks.forEach(k => this.solidBlocks.add(k));
@@ -170,6 +170,30 @@ export class Chunk {
         realisticTrees.forEach(pos => {
           RealisticTree.generate(pos.x, pos.y, pos.z, this, null);
         });
+
+        // 3.1 处理模型树 (Tree1.glb)
+        if (modTrees && modTrees.length > 0 && treeModel) {
+          modTrees.forEach(pos => {
+            // 检查持久化数据，看树木占据的位置是否被标记为 'air'
+            // 假设树木至少占据 1x1x4 的空间
+            const k = `${pos.x},${pos.y},${pos.z}`;
+            if (this.deltas[k] === 'air') return;
+
+            const tree = treeModel.clone();
+            tree.userData.isEntity = true;
+            tree.userData.type = 'modTree';
+            tree.position.set(pos.x + 0.5, pos.y - 0.4, pos.z + 0.5);
+
+            // 添加碰撞体：假设树干占据 1x1x5 的空间
+            const collisionBlocks = [];
+            for (let dy = 0; dy < 5; dy++) {
+              collisionBlocks.push({ x: pos.x, y: pos.y + dy, z: pos.z });
+              this.addBlockDynamic(pos.x, pos.y + dy, pos.z, 'collider');
+            }
+            tree.userData.collisionBlocks = collisionBlocks;
+            this.group.add(tree);
+          });
+        }
 
         // 3.1 处理火星车模型
         if (rovers && rovers.length > 0 && carModel) {
@@ -305,7 +329,7 @@ export class Chunk {
       this.group.add(mesh);
 
       // --- Rook 模型生成逻辑 ---
-      if (type === 'grass' && rookModel && d[type].length > 0 && Math.random() < 0.5) {
+      if (type === 'grass' && rookModel && d[type].length > 0 && Math.random() < 0.3) {
         // 随机选择一个草地方块的位置来放置 rook
         const pos = d[type][Math.floor(Math.random() * d[type].length)];
 
