@@ -69,18 +69,19 @@ export class Engine {
     // 允许此光源投射阴影
     light.castShadow = true;
     // 设置阴影贴图的分辨率，更高的值意味着更清晰的阴影，但会增加 GPU 开销
-    light.shadow.mapSize.set(612, 612);
+    light.shadow.mapSize.set(712, 712);
     // 设置平行光阴影相机的视锥体范围，决定了阴影覆盖的区域大小
-    light.shadow.camera.left = -40;
-    light.shadow.camera.right = 40;
-    light.shadow.camera.top = 40;
-    light.shadow.camera.bottom = -40;
+    var shadowSize = 30;
+    light.shadow.camera.left = -1 * shadowSize;
+    light.shadow.camera.right = shadowSize;
+    light.shadow.camera.top = shadowSize;
+    light.shadow.camera.bottom = -1 * shadowSize;
     light.shadow.camera.near = 0.1;
     light.shadow.camera.far = 400;
     // shadow.bias: 阴影偏移，用于减少阴影失真 (shadow acne)
     // normalBias: 法线偏移，通过沿表面法线偏移深度来进一步优化阴影边缘
-    light.shadow.bias = -0.000;
-    light.shadow.normalBias = 0.02;
+    light.shadow.bias = 0.0001;
+    light.shadow.normalBias = 0.078;
 
     this.scene.add(light);
     // 环境光：使用微弱的冷蓝色（天空散射光），与暖色阳光形成对比，增加画面的层次感
