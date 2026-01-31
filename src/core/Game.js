@@ -25,8 +25,25 @@ export class Game {
     this.player.game = this; // 将游戏实例传递给玩家对象
     this.ui = new UIManager(this); // 初始化UI管理器，传递游戏实例
     this.isRunning = false; // 游戏运行状态标志
+    this.perfStats = { player: 0, world: 0, ui: 0, render: 0 }; // 性能统计数据
+    this.showDebugInfo = false; // 是否显示调试信息
 
     this.lastTime = 0; // 用于计算时间差的时间戳
+
+    // 监听键盘事件
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyP') {
+        this.showDebugInfo = !this.showDebugInfo;
+        if (!this.showDebugInfo) {
+          console.log('[Debug] 性能监控已关闭');
+          if (this.ui && this.ui.hud && this.ui.hud.msgEl) {
+            this.ui.hud.msgEl.style.opacity = 0;
+          }
+        } else {
+          console.log('[Debug] 性能监控已开启');
+        }
+      }
+    });
 
     // 初始化树木管理器（用于生成逼真树木）
     realisticTreeManager.init();
@@ -102,12 +119,27 @@ export class Game {
     if (!this.isRunning) return;
     requestAnimationFrame(() => this.loop());
 
-    const time = performance.now();
-    const dt = (time - this.lastTime) / 1000; // 计算时间差（秒）
-    this.lastTime = time;
+    const frameStart = performance.now();
+    const dt = (frameStart - this.lastTime) / 1000; // 计算时间差（秒）
+    this.lastTime = frameStart;
 
     this.update(dt); // 更新游戏状态
     this.render();   // 渲染场景
+
+    const totalFrameTime = performance.now() - frameStart;
+    if (this.showDebugInfo && totalFrameTime > 25) {
+      console.warn(`[Jank] 帧耗时过长: ${totalFrameTime.toFixed(2)}ms`);
+      const uiStats = this.ui.hud.perfStats || { updateFPS: 0, renderHotbar: 0 };
+      console.table({
+        'Player Update': `${this.perfStats.player.toFixed(2)}ms`,
+        'World Update': `${this.perfStats.world.toFixed(2)}ms`,
+        'UI Update (Total)': `${this.perfStats.ui.toFixed(2)}ms`,
+        '  └─ HUD.updateFPS': `${uiStats.updateFPS.toFixed(2)}ms`,
+        '  └─ HUD.renderHotbar': `${uiStats.renderHotbar.toFixed(2)}ms`,
+        'Render (WebGL)': `${this.perfStats.render.toFixed(2)}ms`,
+        'Other (Overhead)': `${(totalFrameTime - (this.perfStats.player + this.perfStats.world + this.perfStats.ui + this.perfStats.render)).toFixed(2)}ms`
+      });
+    }
   }
 
   /**
@@ -115,9 +147,19 @@ export class Game {
     * @param {number} dt - 时间差（秒），自上一帧以来的时间
     */
   update(dt) {
+    const t1 = performance.now();
     if (this.player) this.player.update(dt); // 更新玩家状态（移动、物理等）
+    const t2 = performance.now();
+
     if (this.world && this.player) this.world.update(this.player.position, dt); // 更新世界状态（区块加载等）
+    const t3 = performance.now();
+
     if (this.ui) this.ui.update(dt); // 更新UI
+    const t4 = performance.now();
+
+    this.perfStats.player = t2 - t1;
+    this.perfStats.world = t3 - t2;
+    this.perfStats.ui = t4 - t3;
 
     // 更新光源与太阳位置使其跟随玩家
     if (this.player) {
@@ -154,6 +196,9 @@ export class Game {
     * 渲染游戏场景
     */
   render() {
+    const t1 = performance.now();
     this.engine.render(); // 调用引擎渲染方法
+    const t2 = performance.now();
+    this.perfStats.render = t2 - t1;
   }
 }

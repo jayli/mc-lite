@@ -68,18 +68,33 @@ export class HUD {
   update() {
     if (!this.game.player) return; // 确保玩家对象存在
 
-    // 检测 Jank (掉帧)
-    const now = performance.now();
-    const frameDuration = now - this.lastFrameTime;
-    if (frameDuration > 33.3) { // 低于 30FPS 的帧视为 Jank
-      this.jankCount++;
+    // 只有在开启调试模式时才进行性能监控
+    if (this.game.showDebugInfo) {
+      // 检测 Jank (掉帧)
+      const now = performance.now();
+      const frameDuration = now - this.lastFrameTime;
+      if (frameDuration > 33.3) { // 低于 30FPS 的帧视为 Jank
+        this.jankCount++;
+      }
+      this.lastFrameTime = now;
+
+      // 计算并更新 FPS
+      const t1 = performance.now();
+      this.updateFPS();
+      const t2 = performance.now();
+
+      this.renderHotbar();           // 渲染快捷栏
+      const t3 = performance.now();
+
+      // 记录子任务耗时，供 UIManager 读取
+      this.perfStats = {
+        updateFPS: t2 - t1,
+        renderHotbar: t3 - t2
+      };
+    } else {
+      // 非调试模式下，只执行优化的快捷栏渲染
+      this.renderHotbar();
     }
-    this.lastFrameTime = now;
-
-    // 计算并更新 FPS
-    this.updateFPS();
-
-    this.renderHotbar();           // 渲染快捷栏
   }
 
   /**
@@ -124,6 +139,20 @@ export class HUD {
     if (!this.hotbarEl) return;
     const inventory = this.game.player.inventory;
     const selectedSlot = inventory.selectedSlot;
+
+    // --- 状态检测优化 ---
+    // 生成当前状态的快照（选中槽位 + 前5个槽位的物品和数量）
+    const currentState = JSON.stringify({
+      selected: selectedSlot,
+      slots: inventory.slots.slice(0, 5).map(s => ({ item: s.item, count: s.count }))
+    });
+
+    // 如果状态没有变化，直接跳过渲染，避免昂贵的 DOM 和 Canvas 操作
+    if (this._lastInventoryState === currentState) {
+      return;
+    }
+    this._lastInventoryState = currentState;
+    // --- 优化结束 ---
 
     this.hotbarEl.innerHTML = '';
     // 显示前5个物品槽作为快捷栏
