@@ -43,6 +43,14 @@ export class Game {
           console.log('[Debug] 性能监控已开启');
         }
       }
+
+      // 按 M 键执行地图审计（隐藏面剔除审计）
+      if (e.code === 'KeyM') {
+        console.log('[Debug] 正在执行手动地图审计...');
+        if (faceCullingSystem) {
+          faceCullingSystem.auditWorld(this.world);
+        }
+      }
     });
 
     // 初始化树木管理器（用于生成逼真树木）

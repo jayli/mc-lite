@@ -33,8 +33,7 @@ export class Player {
       const tx = (Math.random() - 0.5) * 20000;
       const tz = (Math.random() - 0.5) * 20000;
       // 尝试在森林或平原生物群系出生
-      // if (getBiome(tx, tz) === 'FOREST' || getBiome(tx, tz) === 'PLAINS') {
-      if (getBiome(tx, tz) === 'DESERT') {
+      if (getBiome(tx, tz) === 'FOREST' || getBiome(tx, tz) === 'PLAINS') {
         this.position.set(tx, 70, tz);
         spawnFound = true;
         break;
