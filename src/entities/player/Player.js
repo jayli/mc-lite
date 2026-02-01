@@ -3,6 +3,7 @@
  * 玩家类，负责处理玩家状态、输入、物理交互和渲染辅助（如相机位置、手臂）
  */
 import * as THREE from 'three';
+import { audioManager } from '../../core/AudioManager.js';
 import { Physics } from './Physics.js';
 import { Inventory } from './Slots.js';
 import { getBiome, noise } from '../../utils/MathUtils.js';
@@ -78,14 +79,7 @@ export class Player {
     this.explosionWorker.onmessage = (e) => this.handleExplosionResult(e.data);
 
     // --- 音频系统初始化 ---
-    this.listener = new THREE.AudioListener();
-    this.camera.add(this.listener);
-    this.explosionSound = new THREE.Audio(this.listener);
-    const audioLoader = new THREE.AudioLoader();
-    audioLoader.load('./src/world/assets/sound/explosion.mp3', (buffer) => {
-      this.explosionSound.setBuffer(buffer);
-      this.explosionSound.setVolume(0.4);
-    });
+    audioManager.init(this.camera);
   }
 
   /**
@@ -723,11 +717,8 @@ export class Player {
         this.world.spawnExplosionParticles(centerPos);
       }
 
-      // 播放爆炸音效
-      if (this.explosionSound && this.explosionSound.buffer) {
-        if (this.explosionSound.isPlaying) this.explosionSound.stop();
-        this.explosionSound.play();
-      }
+      // 播放爆炸音效 (使用 AudioManager)
+      audioManager.playSound('explosion', 0.4);
     }
   }
 

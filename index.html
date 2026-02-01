@@ -56,9 +56,13 @@
     <script type="module">
 import { Game } from './src/core/Game.js';
         import { initializeMaterials } from './src/core/materials/MaterialManager.js';
+        import { initializeAudio } from './src/core/AudioManager.js';
 
         async function main() {
-            await initializeMaterials();
+            await Promise.all([
+                initializeMaterials(),
+                initializeAudio()
+            ]);
             const game = new Game();
             game.start();
             window.game = game; // Expose for debugging
