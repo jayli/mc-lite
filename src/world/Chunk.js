@@ -621,6 +621,152 @@ export class Chunk {
   }
 
   /**
+   * 批量移除方块优化
+   * @param {Array<{x,y,z}>} positions - 待移除的坐标列表
+   */
+  removeBlocksBatch(positions) {
+    if (positions.length === 0) return;
+
+    const dummy = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+    const affectedTypes = new Set();
+    const neighborsToUpdate = new Set();
+
+    // 1. 更新逻辑数据和物理数据，并收集需要更新的邻居
+    positions.forEach(p => {
+      const px = Math.floor(p.x);
+      const py = Math.floor(p.y);
+      const pz = Math.floor(p.z);
+      const key = `${px},${py},${pz}`;
+      const oldType = this.blockData[key];
+
+      if (oldType) {
+        affectedTypes.add(oldType);
+        delete this.blockData[key];
+        this.visibleKeys.delete(key);
+        this.solidBlocks.delete(key);
+        if (this.deltas) this.deltas[key] = 'air';
+        persistenceService.recordChange(px, py, pz, 'air');
+
+        // 收集周围 6 个方向的邻居坐标
+        const offsets = [
+          [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]
+        ];
+        offsets.forEach(([dx, dy, dz]) => {
+          const nx = px + dx;
+          const ny = py + dy;
+          const nz = pz + dz;
+          neighborsToUpdate.add(`${nx},${ny},${nz}`);
+        });
+      }
+    });
+
+    // 2. 移除当前待删除方块的渲染网格
+    for (let i = this.group.children.length - 1; i >= 0; i--) {
+      const child = this.group.children[i];
+
+      if (child.isInstancedMesh) {
+        if (affectedTypes.has(child.userData.type)) {
+          let updated = false;
+          for (let j = 0; j < child.count; j++) {
+            child.getMatrixAt(j, dummy);
+            pos.setFromMatrixPosition(dummy);
+            const mx = Math.floor(pos.x);
+            const my = Math.floor(pos.y);
+            const mz = Math.floor(pos.z);
+
+            const isMatch = positions.some(p =>
+              Math.floor(p.x) === mx && Math.floor(p.y) === my && Math.floor(p.z) === mz
+            );
+
+            if (isMatch) {
+              dummy.makeScale(0, 0, 0);
+              child.setMatrixAt(j, dummy);
+              updated = true;
+            }
+          }
+          if (updated) child.instanceMatrix.needsUpdate = true;
+        }
+      } else {
+        const cx = Math.floor(child.position.x);
+        const cy = Math.floor(child.position.y);
+        const cz = Math.floor(child.position.z);
+        const isMatch = positions.some(p =>
+          Math.floor(p.x) === cx && Math.floor(p.y) === cy && Math.floor(p.z) === cz
+        );
+
+        if (isMatch) {
+          if (child.geometry) child.geometry.dispose();
+          this.group.remove(child);
+        }
+      }
+    }
+
+    // 3. 核心修复：更新周围邻居的 Face Culling 状态，让原本隐藏的面显示出来
+    neighborsToUpdate.forEach(nKey => {
+      // 如果邻居本身也在本次删除列表中，跳过
+      if (positions.some(p => `${Math.floor(p.x)},${Math.floor(p.y)},${Math.floor(p.z)}` === nKey)) return;
+
+      const [nx, ny, nz] = nKey.split(',').map(Number);
+      const nCx = Math.floor(nx / CHUNK_SIZE);
+      const nCz = Math.floor(nz / CHUNK_SIZE);
+
+      if (nCx === this.cx && nCz === this.cz) {
+        // 邻居在当前区块
+        if (this.blockData[nKey]) {
+          // 如果邻居存在但不可见（被剔除了），则“唤醒”它
+          if (!this.visibleKeys.has(nKey)) {
+            this.addBlockDynamic(nx, ny, nz, this.blockData[nKey]);
+          } else {
+            // 如果本来就可见，也要重新触发 Face Culling 更新以显示新的暴露面
+            this._triggerFaceCullingUpdate(nx, ny, nz, this.blockData[nKey]);
+          }
+        }
+      } else {
+        // 跨区块邻居处理
+        const neighborChunk = this.world.chunks.get(`${nCx},${nCz}`);
+        if (neighborChunk && neighborChunk.isReady) {
+          neighborChunk.checkReveal(nx, ny, nz);
+        }
+      }
+    });
+
+    // 4. 触发持久化刷新
+    persistenceService.flush(this.cx, this.cz);
+  }
+
+  /**
+   * 私有辅助方法：为单个方块触发 Face Culling 更新
+   */
+  _triggerFaceCullingUpdate(x, y, z, type) {
+    if (faceCullingSystem && faceCullingSystem.isEnabled()) {
+      const position = new THREE.Vector3(x, y, z);
+      const block = { type };
+
+      const getNeighborBlock = (nx, ny, nz) => {
+        const cx = Math.floor(nx / 16);
+        const cz = Math.floor(nz / 16);
+        let chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(`${cx},${cz}`);
+        if (!chunk || !chunk.isReady) return null;
+        const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
+        const t = chunk.blockData[key];
+        return t ? { type: t } : null;
+      };
+
+      const getNeighborsOf = (nx, ny, nz) => ({
+        top: getNeighborBlock(nx, ny + 1, nz),
+        bottom: getNeighborBlock(nx, ny - 1, nz),
+        north: getNeighborBlock(nx, ny, nz - 1),
+        south: getNeighborBlock(nx, ny, nz + 1),
+        west: getNeighborBlock(nx - 1, ny, nz),
+        east: getNeighborBlock(nx + 1, ny, nz)
+      });
+
+      faceCullingSystem.updateBlock(position, block, getNeighborsOf(x, y, z));
+    }
+  }
+
+  /**
    * 移除方块
    * @param {number} x - 世界坐标X
    * @param {number} y - 世界坐标Y

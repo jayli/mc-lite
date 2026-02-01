@@ -72,6 +72,10 @@ export class Player {
     this.bobbing_intensity = 0.05; // 晃动幅度
     this.bobbing_speed = 0.2;     // 晃动速度
     this.bob_offset = new THREE.Vector2(); // 用于平滑处理晃动偏移
+
+    // 初始化爆炸 Worker
+    this.explosionWorker = new Worker(new URL('../../workers/ExplosionWorker.js', import.meta.url), { type: 'module' });
+    this.explosionWorker.onmessage = (e) => this.handleExplosionResult(e.data);
   }
 
   /**
@@ -672,73 +676,72 @@ export class Player {
   }
 
   /**
+   * 处理从 Worker 返回的爆炸计算结果
+   */
+  handleExplosionResult(data) {
+    const { action, payload } = data;
+    if (action === 'explosionResult') {
+      const { blocksToDestroy, tntToIgnite, center } = payload;
+
+      // 1. 执行批量销毁
+      // 过滤掉不可破坏方块
+      const validDestruction = blocksToDestroy.filter(p => {
+        const type = this.world.getBlock(p.x, p.y, p.z);
+        if (!type) return false;
+        if (type === 'end_stone') {
+          const below = this.world.getBlock(p.x, p.y - 1, p.z);
+          if (!below) return false;
+        }
+        return true;
+      });
+
+      this.world.removeBlocksBatch(validDestruction);
+
+      // 2. 调度连锁反应
+      tntToIgnite.forEach(tnt => {
+        // 在调度前立即将该 TNT 标记为已移除，防止重复触发
+        this.world.removeBlock(tnt.x, tnt.y, tnt.z);
+
+        setTimeout(() => {
+          this.explode(tnt.x, tnt.y, tnt.z);
+        }, tnt.delay);
+      });
+
+      // 3. 视觉效果
+      const centerPos = new THREE.Vector3(center.x + 0.5, center.y + 0.5, center.z + 0.5);
+      if (this.world.spawnExplosionParticles) {
+        this.world.spawnExplosionParticles(centerPos);
+      }
+    }
+  }
+
+  /**
    * 执行 TNT 爆炸逻辑
-   * 移除以 (x, y, z) 为中心 3x3x3 范围内的方块
    */
   explode(x, y, z) {
+    // 收集周围区块的 Deltas 发送给 Worker
+    const nearbyDeltas = {};
     const bx = Math.floor(x);
     const by = Math.floor(y);
     const bz = Math.floor(z);
 
-    // 1. 连炸逻辑：搜索 5x5x5 区域内的其他 TNT
-    for (let dx = -2; dx <= 2; dx++) {
-      for (let dy = -2; dy <= 2; dy++) {
-        for (let dz = -2; dz <= 2; dz++) {
-          // 跳过中心点（当前正在爆炸的 TNT）
-          if (dx === 0 && dy === 0 && dz === 0) continue;
-
+    // 只需要 5x5x5 范围涉及的方块状态
+    for (let dx = -3; dx <= 3; dx++) {
+      for (let dy = -3; dy <= 3; dy++) {
+        for (let dz = -3; dz <= 3; dz++) {
           const tx = bx + dx;
           const ty = by + dy;
           const tz = bz + dz;
-
-          if (this.world.getBlock(tx, ty, tz) === 'tnt') {
-            // 立即移除该 TNT 以防止在连炸中被重复搜索到
-            this.world.removeBlock(tx, ty, tz);
-
-            // 随机延迟 100-700ms 后触发连炸
-            const delay = 100 + Math.random() * 600;
-            setTimeout(() => {
-              this.explode(tx, ty, tz);
-            }, delay);
-          }
-        }
-      }
-    }
-
-    // 2. 原始爆炸逻辑：遍历 3x3x3 区域（TNT 所在的 1x1x1 立方体向外扩展一格）
-    for (let dx = -1; dx <= 1; dx++) {
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dz = -1; dz <= 1; dz++) {
-          const tx = bx + dx;
-          const ty = by + dy;
-          const tz = bz + dz;
-
-          // 地图保护：如果是 end_stone 且下方是虚空，则不允许炸开
           const type = this.world.getBlock(tx, ty, tz);
-          if (!type) continue;
-
-          if (type === 'end_stone') {
-            const belowType = this.world.getBlock(tx, ty - 1, tz);
-            // 如果下方没有方块，说明这是最底层的保护层，跳过
-            if (!belowType) continue;
-          }
-
-          // 调用世界移除方块方法
-          this.world.removeBlock(tx, ty, tz);
+          if (type) nearbyDeltas[`${tx},${ty},${tz}`] = type;
         }
       }
     }
 
-    // 在中心产生爆炸粒子效果
-    const centerPos = new THREE.Vector3(bx + 0.5, by + 0.5, bz + 0.5);
-    if (this.world.spawnExplosionParticles) {
-      this.world.spawnExplosionParticles(centerPos);
-    }
-
-    // 如果 HUD 可用，显示提示
-    // if (this.game && this.game.ui && this.game.ui.hud) {
-    //   this.game.ui.hud.showMessage("TNT 爆炸了！");
-    // }
+    this.explosionWorker.postMessage({
+      action: 'calculateExplosion',
+      payload: { x, y, z, nearbyDeltas }
+    });
   }
 
   /**

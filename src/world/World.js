@@ -226,6 +226,28 @@ export class World {
   }
 
   /**
+   * 批量移除指定位置的方块
+   * @param {Array<{x,y,z}>} positions
+   */
+  removeBlocksBatch(positions) {
+    const chunkGroups = new Map();
+    positions.forEach(p => {
+      const cx = Math.floor(p.x / CHUNK_SIZE);
+      const cz = Math.floor(p.z / CHUNK_SIZE);
+      const key = `${cx},${cz}`;
+      if (!chunkGroups.has(key)) chunkGroups.set(key, []);
+      chunkGroups.get(key).push(p);
+    });
+
+    for (const [key, chunkPosList] of chunkGroups) {
+      const chunk = this.chunks.get(key);
+      if (chunk) {
+        chunk.removeBlocksBatch(chunkPosList);
+      }
+    }
+  }
+
+  /**
    * 判断指定位置是否为固体方块
    * @param {number} x - X坐标
    * @param {number} y - Y坐标
