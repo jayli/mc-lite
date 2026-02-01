@@ -280,40 +280,40 @@ onmessage = function(e) {
   const visibleKeys = [];
 
   for (const [key, block] of blockMap) {
-      if (block.solid) solidBlocks.push(key);
-      let visible = true;
-      if (block.solid) {
-          const { x, y, z } = block;
-          const covered =
-              isOccluding(x + 1, y, z) &&
-              isOccluding(x - 1, y, z) &&
-              isOccluding(x, y + 1, z) &&
-              isOccluding(x, y - 1, z) &&
-              isOccluding(x, y, z + 1) &&
-              isOccluding(x, y, z - 1);
-          if (covered) visible = false;
-      }
+    if (block.solid) solidBlocks.push(key);
+    let visible = true;
+    if (block.solid) {
+      const { x, y, z } = block;
+      const covered =
+        isOccluding(x + 1, y, z) &&
+        isOccluding(x - 1, y, z) &&
+        isOccluding(x, y + 1, z) &&
+        isOccluding(x, y - 1, z) &&
+        isOccluding(x, y, z + 1) &&
+        isOccluding(x, y, z - 1);
+      if (covered) visible = false;
+    }
 
-      if (visible) {
-          if (!d[block.type]) d[block.type] = [];
-          let aoLow = 0;
-          let aoHigh = 0;
-          const boxTypes = ['sand', 'stone', 'mossy_stone', 'cobblestone', 'bricks'];
-          if (boxTypes.includes(block.type)) {
-            for (let f = 0; f < 6; f++) {
-              const aos = getAO(block.x, block.y, block.z, f);
-              for (let v = 0; v < 4; v++) {
-                const vertexIdx = f * 4 + v;
-                const aoVal = aos[v];
-                if (vertexIdx < 12) aoLow |= (aoVal << (vertexIdx * 2));
-                else aoHigh |= (aoVal << ((vertexIdx - 12) * 2));
-              }
-            }
+    if (visible) {
+      if (!d[block.type]) d[block.type] = [];
+      let aoLow = 0;
+      let aoHigh = 0;
+      const boxTypes = ['sand', 'stone', 'mossy_stone', 'cobblestone', 'bricks'];
+      if (boxTypes.includes(block.type)) {
+        for (let f = 0; f < 6; f++) {
+          const aos = getAO(block.x, block.y, block.z, f);
+          for (let v = 0; v < 4; v++) {
+            const vertexIdx = f * 4 + v;
+            const aoVal = aos[v];
+            if (vertexIdx < 12) aoLow |= (aoVal << (vertexIdx * 2));
+            else aoHigh |= (aoVal << ((vertexIdx - 12) * 2));
           }
-          d[block.type].push({x: block.x, y: block.y, z: block.z, aoLow, aoHigh});
-          visibleKeys.push(key);
+        }
       }
-      allBlockTypes[key] = block.type;
+      d[block.type].push({x: block.x, y: block.y, z: block.z, aoLow, aoHigh});
+      visibleKeys.push(key);
+    }
+    allBlockTypes[key] = block.type;
   }
 
   // 返回数据
@@ -328,59 +328,59 @@ onmessage = function(e) {
 
 // 复制结构生成逻辑
 function generateStructure(type, x, y, z, chunk, dObj, rovers = []) {
-    if (type === 'house') {
-      const wallMat = Math.random() < 0.33 ? 'bricks' : 'planks';
-      for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) chunk.add(x + i, y - 1, z + j, 'stone', dObj);
-      for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
-        if (Math.abs(i) === 2 || Math.abs(j) === 2) {
-          if (i === 0 && j === 2) continue;
-          if ((i === -2 || i === 2) && j === 0) {
-            chunk.add(x + i, y, z + j, wallMat, dObj);
-            chunk.add(x + i, y + 1, z + j, 'glass_block', dObj);
-            chunk.add(x + i, y + 2, z + j, wallMat, dObj);
-          } else {
-            for (let h = 0; h < 3; h++) chunk.add(x + i, y + h, z + j, wallMat, dObj);
-          }
-        }
-      }
-      const roofMat = Math.random() < 0.5 ? 'dark_planks' : 'oak_planks';
-      const roofBlocks = [];
-      for (let h = 0; h < 3; h++) {
-        for (let i = -2 + h; i <= 2 - h; i++) {
-          for (let j = -2 + h; j <= 2 - h; j++) {
-            chunk.add(x + i, y + 3 + h, z + j, roofMat, dObj);
-            if (h === 2 || Math.abs(i) === 2 - h || Math.abs(j) === 2 - h) {
-              roofBlocks.push({ x: x + i, y: y + 3 + h, z: z + j });
-            }
-          }
-        }
-      }
-      for (let j = -1; j <= 1; j++) {
-        chunk.add(x, y + 5, z + j, roofMat, dObj);
-        roofBlocks.push({ x: x, y: y + 5, z: z + j });
-      }
-      if (Math.random() < 0.33) {
-        const lowerRoofBlocks = roofBlocks.filter(b => b.y < y + 5);
-        const targetPool = lowerRoofBlocks.length > 0 ? lowerRoofBlocks : roofBlocks;
-        if (targetPool.length > 0) {
-          const pos = targetPool[Math.floor(Math.random() * targetPool.length)];
-          chunk.add(pos.x, pos.y + 1, pos.z, 'chimney', dObj, false);
-        }
-      }
-      chunk.add(x - 1, y, z - 1, 'bookbox', dObj, false);
-      chunk.add(x + 1, y, z - 1, 'chest', dObj);
-    } else if (type === 'rover') {
-      rovers.push({ x, y, z });
-    } else if (type === 'ship') {
-      for (let dz = -3; dz <= 3; dz++) for (let dx = -2; dx <= 2; dx++) {
-        if (Math.abs(dx) === 2 || Math.abs(dz) === 3) {
-          chunk.add(x + dx, y + 1, z + dz, 'wood', dObj);
-          chunk.add(x + dx, y + 2, z + dz, 'planks', dObj);
+  if (type === 'house') {
+    const wallMat = Math.random() < 0.33 ? 'bricks' : 'planks';
+    for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) chunk.add(x + i, y - 1, z + j, 'stone', dObj);
+    for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) {
+      if (Math.abs(i) === 2 || Math.abs(j) === 2) {
+        if (i === 0 && j === 2) continue;
+        if ((i === -2 || i === 2) && j === 0) {
+          chunk.add(x + i, y, z + j, wallMat, dObj);
+          chunk.add(x + i, y + 1, z + j, 'glass_block', dObj);
+          chunk.add(x + i, y + 2, z + j, wallMat, dObj);
         } else {
-          chunk.add(x + dx, y, z + dz, 'planks', dObj);
+          for (let h = 0; h < 3; h++) chunk.add(x + i, y + h, z + j, wallMat, dObj);
         }
       }
-      for (let i = 0; i < 5; i++) chunk.add(x, y + i, z, 'wood', dObj);
-      chunk.add(x, y + 1, z + 2, 'chest', dObj);
     }
+    const roofMat = Math.random() < 0.5 ? 'dark_planks' : 'oak_planks';
+    const roofBlocks = [];
+    for (let h = 0; h < 3; h++) {
+      for (let i = -2 + h; i <= 2 - h; i++) {
+        for (let j = -2 + h; j <= 2 - h; j++) {
+          chunk.add(x + i, y + 3 + h, z + j, roofMat, dObj);
+          if (h === 2 || Math.abs(i) === 2 - h || Math.abs(j) === 2 - h) {
+            roofBlocks.push({ x: x + i, y: y + 3 + h, z: z + j });
+          }
+        }
+      }
+    }
+    for (let j = -1; j <= 1; j++) {
+      chunk.add(x, y + 5, z + j, roofMat, dObj);
+      roofBlocks.push({ x: x, y: y + 5, z: z + j });
+    }
+    if (Math.random() < 0.33) {
+      const lowerRoofBlocks = roofBlocks.filter(b => b.y < y + 5);
+      const targetPool = lowerRoofBlocks.length > 0 ? lowerRoofBlocks : roofBlocks;
+      if (targetPool.length > 0) {
+        const pos = targetPool[Math.floor(Math.random() * targetPool.length)];
+        chunk.add(pos.x, pos.y + 1, pos.z, 'chimney', dObj, false);
+      }
+    }
+    chunk.add(x - 1, y, z - 1, 'bookbox', dObj, false);
+    chunk.add(x + 1, y, z - 1, 'chest', dObj);
+  } else if (type === 'rover') {
+    rovers.push({ x, y, z });
+  } else if (type === 'ship') {
+    for (let dz = -3; dz <= 3; dz++) for (let dx = -2; dx <= 2; dx++) {
+      if (Math.abs(dx) === 2 || Math.abs(dz) === 3) {
+        chunk.add(x + dx, y + 1, z + dz, 'wood', dObj);
+        chunk.add(x + dx, y + 2, z + dz, 'planks', dObj);
+      } else {
+        chunk.add(x + dx, y, z + dz, 'planks', dObj);
+      }
+    }
+    for (let i = 0; i < 5; i++) chunk.add(x, y + i, z, 'wood', dObj);
+    chunk.add(x, y + 1, z + 2, 'chest', dObj);
+  }
 }

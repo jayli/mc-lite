@@ -433,36 +433,36 @@ export class Chunk {
     // 计算隐藏面剔除掩码
     let mask = 63; // 默认全显示 (111111)
     if (faceCullingSystem && faceCullingSystem.isEnabled() && type !== 'air' && type !== 'collider') {
-        const position = new THREE.Vector3(x, y, z);
-        const block = { type };
+      const position = new THREE.Vector3(x, y, z);
+      const block = { type };
 
-        const getNeighborBlock = (nx, ny, nz) => {
-            const cx = Math.floor(nx / 16);
-            const cz = Math.floor(nz / 16);
-            let chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(`${cx},${cz}`);
-            if (!chunk || !chunk.isReady) return null;
-            const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-            const t = chunk.blockData[key];
-            return t ? { type: t } : null;
-        };
+      const getNeighborBlock = (nx, ny, nz) => {
+        const cx = Math.floor(nx / 16);
+        const cz = Math.floor(nz / 16);
+        let chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(`${cx},${cz}`);
+        if (!chunk || !chunk.isReady) return null;
+        const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
+        const t = chunk.blockData[key];
+        return t ? { type: t } : null;
+      };
 
-        const neighbors = {
-            top: getNeighborBlock(x, y + 1, z),
-            bottom: getNeighborBlock(x, y - 1, z),
-            north: getNeighborBlock(x, y, z - 1),
-            south: getNeighborBlock(x, y, z + 1),
-            west: getNeighborBlock(x - 1, y, z),
-            east: getNeighborBlock(x + 1, y, z)
-        };
+      const neighbors = {
+        top: getNeighborBlock(x, y + 1, z),
+        bottom: getNeighborBlock(x, y - 1, z),
+        north: getNeighborBlock(x, y, z - 1),
+        south: getNeighborBlock(x, y, z + 1),
+        west: getNeighborBlock(x - 1, y, z),
+        east: getNeighborBlock(x + 1, y, z)
+      };
 
-        mask = faceCullingSystem.calculateFaceVisibility(block, neighbors);
+      mask = faceCullingSystem.calculateFaceVisibility(block, neighbors);
 
-        // 如果方块完全被遮挡且不是透明方块，则标记为不可见
-        if (mask === 0 && !faceCullingSystem.isTransparent(type)) {
-            this.visibleKeys.delete(key);
-        } else {
-            this.visibleKeys.add(key);
-        }
+      // 如果方块完全被遮挡且不是透明方块，则标记为不可见
+      if (mask === 0 && !faceCullingSystem.isTransparent(type)) {
+        this.visibleKeys.delete(key);
+      } else {
+        this.visibleKeys.add(key);
+      }
     }
 
     // 检查并移除/隐藏该位置已有的方块（处理实例化网格和动态网格）
@@ -551,36 +551,36 @@ export class Chunk {
 
     // 如果方块被移除（变成空气），检查并恢复周围隐藏的方块
     if (type === 'air') {
-        const neighbors = [
-            { dx: 1, dy: 0, dz: 0 }, { dx: -1, dy: 0, dz: 0 },
-            { dx: 0, dy: 1, dz: 0 }, { dx: 0, dy: -1, dz: 0 },
-            { dx: 0, dy: 0, dz: 1 }, { dx: 0, dy: 0, dz: -1 }
-        ];
+      const neighbors = [
+        { dx: 1, dy: 0, dz: 0 }, { dx: -1, dy: 0, dz: 0 },
+        { dx: 0, dy: 1, dz: 0 }, { dx: 0, dy: -1, dz: 0 },
+        { dx: 0, dy: 0, dz: 1 }, { dx: 0, dy: 0, dz: -1 }
+      ];
 
-        for (const offset of neighbors) {
-            const nx = x + offset.dx;
-            const ny = y + offset.dy;
-            const nz = z + offset.dz;
+      for (const offset of neighbors) {
+        const nx = x + offset.dx;
+        const ny = y + offset.dy;
+        const nz = z + offset.dz;
 
-            const nCx = Math.floor(nx / CHUNK_SIZE);
-            const nCz = Math.floor(nz / CHUNK_SIZE);
+        const nCx = Math.floor(nx / CHUNK_SIZE);
+        const nCz = Math.floor(nz / CHUNK_SIZE);
 
-            if (nCx === this.cx && nCz === this.cz) {
-                // 邻居在当前 Chunk
-                const nKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-                // 如果邻居存在且当前不可见，则显示它
-                if (this.blockData[nKey] && !this.visibleKeys.has(nKey)) {
-                    this.addBlockDynamic(nx, ny, nz, this.blockData[nKey]);
-                }
-            } else {
-                // 邻居在隔壁 Chunk
-                const neighborChunkKey = `${nCx},${nCz}`;
-                const neighborChunk = this.world.chunks.get(neighborChunkKey);
-                if (neighborChunk && neighborChunk.isReady) {
-                    neighborChunk.checkReveal(nx, ny, nz);
-                }
-            }
+        if (nCx === this.cx && nCz === this.cz) {
+          // 邻居在当前 Chunk
+          const nKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
+          // 如果邻居存在且当前不可见，则显示它
+          if (this.blockData[nKey] && !this.visibleKeys.has(nKey)) {
+            this.addBlockDynamic(nx, ny, nz, this.blockData[nKey]);
+          }
+        } else {
+          // 邻居在隔壁 Chunk
+          const neighborChunkKey = `${nCx},${nCz}`;
+          const neighborChunk = this.world.chunks.get(neighborChunkKey);
+          if (neighborChunk && neighborChunk.isReady) {
+            neighborChunk.checkReveal(nx, ny, nz);
+          }
         }
+      }
     }
 
     // 对于空气方块和碰撞体方块，或者因完全遮挡而不可见的方块，不创建网格
@@ -647,14 +647,14 @@ export class Chunk {
         return null;
       };
       const getNeighborsOf = (nx, ny, nz) => {
-          return {
-            top: getNeighborBlock(nx, ny + 1, nz),
-            bottom: getNeighborBlock(nx, ny - 1, nz),
-            north: getNeighborBlock(nx, ny, nz - 1),
-            south: getNeighborBlock(nx, ny, nz + 1),
-            west: getNeighborBlock(nx - 1, ny, nz),
-            east: getNeighborBlock(nx + 1, ny, nz)
-          };
+        return {
+          top: getNeighborBlock(nx, ny + 1, nz),
+          bottom: getNeighborBlock(nx, ny - 1, nz),
+          north: getNeighborBlock(nx, ny, nz - 1),
+          south: getNeighborBlock(nx, ny, nz + 1),
+          west: getNeighborBlock(nx - 1, ny, nz),
+          east: getNeighborBlock(nx + 1, ny, nz)
+        };
       };
       const neighbors = getNeighborsOf(x, y, z);
       faceCullingSystem.updateBlock(position, block, neighbors);
@@ -672,7 +672,7 @@ export class Chunk {
   checkReveal(x, y, z) {
     const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
     if (this.blockData[key] && !this.visibleKeys.has(key)) {
-        this.addBlockDynamic(x, y, z, this.blockData[key]);
+      this.addBlockDynamic(x, y, z, this.blockData[key]);
     }
   }
 
