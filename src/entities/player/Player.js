@@ -98,9 +98,16 @@ export class Player {
         this.cameraPitch = Math.max(-1.5, Math.min(1.5, this.cameraPitch));
       }
     });
+    this.bgmStarted = false;
     document.body.addEventListener('click', () => {
       // 请求鼠标锁定
       if (document.pointerLockElement !== document.body) document.body.requestPointerLock();
+
+      // 首次点击启动背景音乐
+      if (!this.bgmStarted) {
+        audioManager.playBGM('bgm', 0.15);
+        this.bgmStarted = true;
+      }
     });
   }
 
@@ -422,6 +429,26 @@ export class Player {
 
     this.updateArm();
     this.updateCameraBob(actualDx, actualDz, hasCollisionFull);
+  }
+
+  /**
+   * 播放脚步声，根据环境选择水声或陆地声
+   */
+  playFootstepSound() {
+    const px = Math.floor(this.position.x);
+    const py = Math.floor(this.position.y);
+    const pz = Math.floor(this.position.z);
+    const blockType = this.world.getBlock(px, py, pz);
+
+    if (blockType === 'water') {
+      // 切换到循环的水面音效
+      audioManager.stopSound('running_land');
+      audioManager.playSound('running_water', 0.25, true);
+    } else {
+      // 切换到循环的陆地音效
+      audioManager.stopSound('running_water');
+      audioManager.playSound('running_land', 0.2, true);
+    }
   }
 
   /**
@@ -855,13 +882,35 @@ export class Player {
     let targetBobY = 0;
 
     if (isMovingFreely) {
+      // 检查环境变化（陆地 vs 水面）
+      const px = Math.floor(this.position.x);
+      const py = Math.floor(this.position.y);
+      const pz = Math.floor(this.position.z);
+      const currentInWater = this.world.getBlock(px, py, pz) === 'water';
+
+      if (this.lastInWater !== undefined && this.lastInWater !== currentInWater) {
+        // 环境发生即时改变，切断之前的音效
+        if (currentInWater) {
+          audioManager.stopSound('running_land');
+        } else {
+          audioManager.stopSound('running_water');
+        }
+      }
+      this.lastInWater = currentInWater;
+
+      // 如果在自由移动，则启动对应的循环音效
+      this.playFootstepSound();
+
       // 如果在自由移动，则更新晃动计时器并计算目标偏移
-      this.bobbing_timer += this.bobbing_speed;
+      const oldTimer = this.bobbing_timer;
+
       targetBobX = Math.sin(this.bobbing_timer) * this.bobbing_intensity;
       targetBobY = Math.cos(this.bobbing_timer * 2) * this.bobbing_intensity * 0.5;
     } else {
-      // 如果停止移动或被阻挡，重置计时器
+      // 如果停止移动或被阻挡，重置计时器并停止移动音效
       this.bobbing_timer = 0;
+      audioManager.stopSound('running_land');
+      audioManager.stopSound('running_water');
     }
 
     // 使用线性插值 (Lerp) 平滑地将当前的晃动偏移过渡到目标偏移
