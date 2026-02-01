@@ -425,7 +425,7 @@ export class Chunk {
 
       // 处理实例化网格 (静态生成的方块)
       if (child.isInstancedMesh) {
-        // 如果已知该位置之前的方块类型，且与当前网格类型匹配，则尝试隐藏它
+        // ... (保持原有实例化网格处理逻辑)
         if (oldType && child.userData.type === oldType) {
           const dummy = new THREE.Matrix4();
           const pos = new THREE.Vector3();
@@ -435,14 +435,39 @@ export class Chunk {
             if (Math.floor(pos.x) === Math.floor(x) &&
                 Math.floor(pos.y) === Math.floor(y) &&
                 Math.floor(pos.z) === Math.floor(z)) {
-              dummy.makeScale(0, 0, 0); // 缩放为0实现视觉隐藏
+              dummy.makeScale(0, 0, 0);
               child.setMatrixAt(j, dummy);
               child.instanceMatrix.needsUpdate = true;
-              break; // 找到并处理后退出当前网格的循环
+              break;
             }
           }
         }
         continue;
+      }
+
+      // --- 处理实体移除逻辑 ---
+      // 如果移除的是碰撞体(collider)，则需要把关联的整个实体（如 Rook, Rover, modTree）炸掉
+      if (child.userData.isEntity && child.userData.collisionBlocks && type === 'air' && oldType === 'collider') {
+        const isHit = child.userData.collisionBlocks.some(b =>
+          Math.floor(b.x) === Math.floor(x) &&
+          Math.floor(b.y) === Math.floor(y) &&
+          Math.floor(b.z) === Math.floor(z)
+        );
+
+        if (isHit) {
+          // 1. 从场景中移除实体模型
+          this.group.remove(child);
+
+          // 2. 递归移除该实体的所有其他碰撞块，确保逻辑彻底清理
+          child.userData.collisionBlocks.forEach(b => {
+            const bKey = `${Math.floor(b.x)},${Math.floor(b.y)},${Math.floor(b.z)}`;
+            // 只有当该位置确实还是碰撞体时才移除，避免无限递归
+            if (this.blockData[bKey] === 'collider') {
+              this.removeBlock(b.x, b.y, b.z);
+            }
+          });
+          continue;
+        }
       }
 
       if (child.userData.isEntity) continue;
