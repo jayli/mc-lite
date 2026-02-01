@@ -696,14 +696,14 @@ export class Player {
 
     // 在中心产生爆炸粒子效果
     const centerPos = new THREE.Vector3(bx + 0.5, by + 0.5, bz + 0.5);
-    for (let i = 0; i < 8; i++) {
-      this.spawnParticles(centerPos, 'tnt');
+    if (this.world.spawnExplosionParticles) {
+      this.world.spawnExplosionParticles(centerPos);
     }
 
     // 如果 HUD 可用，显示提示
-    if (this.game && this.game.ui && this.game.ui.hud) {
-      this.game.ui.hud.showMessage("TNT 爆炸了！");
-    }
+    // if (this.game && this.game.ui && this.game.ui.hud) {
+    //   this.game.ui.hud.showMessage("TNT 爆炸了！");
+    // }
   }
 
   /**
