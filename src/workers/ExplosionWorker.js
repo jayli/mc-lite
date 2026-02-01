@@ -39,7 +39,7 @@ self.onmessage = function(e) {
           if (nearbyDeltas[key] === 'tnt') {
             tntToIgnite.push({
               x: tx, y: ty, z: tz,
-              delay: 100 + Math.random() * 600
+              delay: 500 + Math.random() * 600 // 连续爆炸的延迟，至少 500ms
             });
           }
         }
