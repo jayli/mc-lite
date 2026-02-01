@@ -84,8 +84,8 @@ export class World {
     for (const [key, chunk] of this.chunks) {
       if (Math.abs(chunk.cx - cx) > RENDER_DIST + 1 || Math.abs(chunk.cz - cz) > RENDER_DIST + 1) {
         this.scene.remove(chunk.group);
-        // 持久化区块修改：将该区块的 Delta 数据存入 IndexedDB
-        persistenceService.flush(chunk.cx, chunk.cz);
+        // 持久化区块修改：将该区块的快照数据存入 IndexedDB
+        persistenceService.saveChunkData(chunk.cx, chunk.cz);
         chunk.dispose();
         this.chunks.delete(key);
       }
@@ -323,7 +323,7 @@ export class World {
     // 记录持久化变更
     persistenceService.recordChange(x, y, z, type);
     // 性能考虑可以先关闭，后面再打开
-    persistenceService.flush(cx, cz);
+    persistenceService.saveChunkData(cx, cz);
   }
 
   /**
@@ -341,7 +341,7 @@ export class World {
       chunk.removeBlock(x, y, z);
       // 立即持久化删除操作
       // 性能考虑可以先关闭，后面再打开
-      persistenceService.flush(cx, cz);
+      persistenceService.saveChunkData(cx, cz);
     }
   }
 
@@ -358,7 +358,7 @@ export class World {
     const chunk = this.chunks.get(key);
     if (chunk) {
       chunk.removeCollisionKey(x, y, z);
-      persistenceService.flush(cx, cz);
+      persistenceService.saveChunkData(cx, cz);
     }
   }
 }

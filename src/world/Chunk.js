@@ -21,10 +21,10 @@ const worldWorker = new Worker(new URL('./WorldWorker.js', import.meta.url), { t
 const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函数
 
 worldWorker.onmessage = (e) => {
-  const { cx, cz, d, solidBlocks, realisticTrees, modTrees, rovers, allBlockTypes, visibleKeys } = e.data;
+  const { cx, cz, d, solidBlocks, realisticTrees, modTrees, rovers, allBlockTypes, visibleKeys, snapshot } = e.data;
   const key = `${cx},${cz}`;
   if (workerCallbacks.has(key)) {
-    workerCallbacks.get(key)({ d, solidBlocks, realisticTrees, modTrees, rovers, allBlockTypes, visibleKeys });
+    workerCallbacks.get(key)({ d, solidBlocks, realisticTrees, modTrees, rovers, allBlockTypes, visibleKeys, snapshot });
     workerCallbacks.delete(key);
   }
 };
@@ -134,7 +134,6 @@ export class Chunk {
     this.blockData = {};             // 全量方块类型数据
     this.visibleKeys = new Set();    // 当前已渲染方块的 Key 集合
     this.isReady = false;            // 区块是否已完成生成
-    this.deltas = {};                // 持久化增量数据
     this.gen();                      // 生成区块内容
   }
 
@@ -143,18 +142,15 @@ export class Chunk {
    * 将计算压力较大的地形和结构生成逻辑分解到 Worker 线程中执行
    */
   async gen() {
-    // 0. 加载持久化增量数据
-    const deltasMap = await persistenceService.getDeltas(this.cx, this.cz);
-    // 将 Map 转换为对象以便通过 postMessage 发送
-    const deltas = Object.fromEntries(deltasMap);
-    this.deltas = deltas;
+    // 0. 加载持久化全量数据 (快照)
+    const snapshot = await persistenceService.getChunkData(this.cx, this.cz);
 
     return new Promise((resolve) => {
       const callbackKey = `${this.cx},${this.cz}`;
 
       // 注册 Worker 回调
       workerCallbacks.set(callbackKey, (data) => {
-        const { d, solidBlocks, realisticTrees, modTrees, rovers, allBlockTypes, visibleKeys } = data;
+        const { d, solidBlocks, realisticTrees, modTrees, rovers, allBlockTypes, visibleKeys, snapshot: newSnapshot } = data;
 
         // 1. 同步实心方块数据 (用于碰撞检测)
         solidBlocks.forEach(k => this.solidBlocks.add(k));
@@ -174,11 +170,6 @@ export class Chunk {
         // 3.1 处理模型树 (Tree1.glb)
         if (modTrees && modTrees.length > 0 && treeModel) {
           modTrees.forEach(pos => {
-            // 检查持久化数据，看树木占据的位置是否被标记为 'air'
-            // 假设树木至少占据 1x1x4 的空间
-            const k = `${pos.x},${pos.y},${pos.z}`;
-            if (this.deltas[k] === 'air') return;
-
             const tree = treeModel.clone();
             tree.userData.isEntity = true;
             tree.userData.type = 'modTree';
@@ -220,6 +211,11 @@ export class Chunk {
           });
         }
 
+        // 4. 重要：在生成完成后，立即保存快照数据
+        if (newSnapshot) {
+          persistenceService.saveChunkData(this.cx, this.cz, newSnapshot);
+        }
+
         this.isReady = true;
         resolve();
       });
@@ -229,7 +225,7 @@ export class Chunk {
         cx: this.cx,
         cz: this.cz,
         seed: SEED,
-        deltas
+        snapshot
       });
     });
   }
@@ -246,9 +242,6 @@ export class Chunk {
   add(x, y, z, type, dObj = null, solid = true) {
     // 生成方块的唯一键（用于碰撞检测和持久化覆盖检查）
     const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-
-    // 如果该位置在当前区块生成期间有持久化增量覆盖，则跳过原始生成逻辑
-    if (this._tempDeltas && this._tempDeltas.has(key)) return;
 
     // 如果提供了数据收集对象，将方块位置按类型分类存储
     if (dObj) {
@@ -333,30 +326,23 @@ export class Chunk {
         // 随机选择一个草地方块的位置来放置 rook
         const pos = d[type][Math.floor(Math.random() * d[type].length)];
 
-        // 检查持久化数据，看 Rook 占据的位置是否被标记为 'air'
-        const k1 = `${pos.x},${pos.y + 1},${pos.z}`;
-        const k2 = `${pos.x},${pos.y + 2},${pos.z}`;
-        if (this.deltas[k1] === 'air' || this.deltas[k2] === 'air') {
-          // 跳过生成
-        } else {
-          const rook = rookModel.clone();
-          rook.userData.isEntity = true; // 添加实体标记
-          rook.userData.type = 'rook';   // 添加类型标记
-          rook.position.set(pos.x + 0.5, pos.y + 1, pos.z + 0.5);
+        const rook = rookModel.clone();
+        rook.userData.isEntity = true; // 添加实体标记
+        rook.userData.type = 'rook';   // 添加类型标记
+        rook.position.set(pos.x + 0.5, pos.y + 1, pos.z + 0.5);
 
-          // --- 建立实体与其碰撞体的链接 ---
-          rook.userData.collisionBlocks = [
-            { x: pos.x, y: pos.y + 1, z: pos.z },
-            { x: pos.x, y: pos.y + 2, z: pos.z }
-          ];
+        // --- 建立实体与其碰撞体的链接 ---
+        rook.userData.collisionBlocks = [
+          { x: pos.x, y: pos.y + 1, z: pos.z },
+          { x: pos.x, y: pos.y + 2, z: pos.z }
+        ];
 
-          this.group.add(rook);
+        this.group.add(rook);
 
-          // --- 添加碰撞体 ---
-          // 在 rook 模型占据的两个方块空间内添加隐形的实心碰撞块
-          this.addBlockDynamic(pos.x, pos.y + 1, pos.z, 'collider');
-          this.addBlockDynamic(pos.x, pos.y + 2, pos.z, 'collider');
-        }
+        // --- 添加碰撞体 ---
+        // 在 rook 模型占据的两个方块空间内添加隐形的实心碰撞块
+        this.addBlockDynamic(pos.x, pos.y + 1, pos.z, 'collider');
+        this.addBlockDynamic(pos.x, pos.y + 2, pos.z, 'collider');
       }
     }
   }
@@ -403,12 +389,10 @@ export class Chunk {
    */
   addBlockDynamic(x, y, z, type) {
     const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-    const oldType = this.blockData[key]; // 记录旧的方块类型，用于查找实例化网格
+    const oldType = this.blockData[key];
 
-    // 同步更新内存中的 deltas 缓存
-    if (this.deltas) {
-      this.deltas[key] = type;
-    }
+    // 更新内存中的快照数据
+    persistenceService.recordChange(x, y, z, type);
 
     // 更新数据和可见性状态
     if (type === 'air') {
@@ -418,6 +402,9 @@ export class Chunk {
         this.blockData[key] = type;
         this.visibleKeys.add(key);
     }
+
+    // 触发持久化刷新
+    persistenceService.saveChunkData(this.cx, this.cz);
 
     // 检查并移除/隐藏该位置已有的方块（处理实例化网格和动态网格）
     for (let i = this.group.children.length - 1; i >= 0; i--) {
@@ -645,7 +632,6 @@ export class Chunk {
         delete this.blockData[key];
         this.visibleKeys.delete(key);
         this.solidBlocks.delete(key);
-        if (this.deltas) this.deltas[key] = 'air';
         persistenceService.recordChange(px, py, pz, 'air');
 
         // 收集周围 6 个方向的邻居坐标
@@ -732,7 +718,7 @@ export class Chunk {
     });
 
     // 4. 触发持久化刷新
-    persistenceService.flush(this.cx, this.cz);
+    persistenceService.saveChunkData(this.cx, this.cz);
   }
 
   /**

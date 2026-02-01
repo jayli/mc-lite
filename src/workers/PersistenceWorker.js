@@ -38,17 +38,17 @@ function init() {
 }
 
 /**
- * 获取指定区块的增量修改数据
+ * 获取指定区块的全量数据 (快照)
  * @param {string} key - "cx,cz"
  */
-function getDeltas(key) {
+function getChunkData(key) {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([PERSISTENCE_CONFIG.STORE_NAME], 'readonly');
     const store = transaction.objectStore(PERSISTENCE_CONFIG.STORE_NAME);
     const request = store.get(key);
 
     request.onsuccess = (event) => {
-      const data = event.target.result ? event.target.result.changes : {};
+      const data = event.target.result ? event.target.result.data : null;
       resolve(data);
     };
 
@@ -57,17 +57,17 @@ function getDeltas(key) {
 }
 
 /**
- * 将区块数据持久化到 IndexedDB
+ * 将区块全量数据持久化到 IndexedDB
  * @param {string} key - "cx,cz"
- * @param {object} changes - blockKey -> {type} 的对象
+ * @param {object} data - { blocks: {}, entities: {} }
  */
-function flush(key, changes) {
+function saveChunkData(key, data) {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([PERSISTENCE_CONFIG.STORE_NAME], 'readwrite');
     const store = transaction.objectStore(PERSISTENCE_CONFIG.STORE_NAME);
     const request = store.put({
       id: key,
-      changes: changes,
+      data: data,
       lastModified: Date.now()
     });
 
@@ -103,11 +103,11 @@ self.onmessage = async (event) => {
     let result;
 
     switch (action) {
-      case 'getDeltas':
-        result = await getDeltas(payload.key);
+      case 'getChunkData':
+        result = await getChunkData(payload.key);
         break;
-      case 'flush':
-        await flush(payload.key, payload.changes);
+      case 'saveChunkData':
+        await saveChunkData(payload.key, payload.data);
         result = true;
         break;
       case 'clearSession':

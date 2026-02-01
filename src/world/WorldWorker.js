@@ -10,218 +10,189 @@ const ROOMS_PER_CHUNK = 2;
 const MAX_ROOM_SIZE = 5;
 
 onmessage = function(e) {
-  const { cx, cz, seed, deltas } = e.data;
+  const { cx, cz, seed, snapshot } = e.data;
 
   // 同步种子
   setSeed(seed);
 
-  // 预先计算该区块的房间种子（基于区块坐标的确定性随机，保证同一个区块每次生成的矿洞位置一致）
-  // 73856093 和 19349663 是常用的质数，用于简单的哈希计算
-  const rooms = [];
-  const roomSeed = Math.abs((cx * 73856093) ^ (cz * 19349663) ^ seed);
-  let rRand = roomSeed;
-  // 线性同余生成器 (LCG) 参数，用于生成确定性的伪随机数
-  const nextRand = () => {
-    rRand = (rRand * 1103515245 + 12345) & 0x7fffffff;
-    return rRand / 0x7fffffff;
-  };
-
-  for (let i = 0; i < ROOMS_PER_CHUNK; i++) {
-    const rx = Math.floor(nextRand() * CHUNK_SIZE);
-    const rz = Math.floor(nextRand() * CHUNK_SIZE);
-    const ry = 2 + Math.floor(nextRand() * 8); // 矿洞垂直位置在 y=2 到 y=10 之间
-    const rw = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1)); // 宽度
-    const rh = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1)); // 高度
-    const rd = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1)); // 深度
-    rooms.push({
-      minX: cx * CHUNK_SIZE + rx - Math.floor(rw/2),
-      maxX: cx * CHUNK_SIZE + rx + Math.floor(rw/2),
-      minY: ry,
-      maxY: ry + rh,
-      minZ: cz * CHUNK_SIZE + rz - Math.floor(rd/2),
-      maxZ: cz * CHUNK_SIZE + rz + Math.floor(rd/2)
-    });
-  }
-
   // 使用 Map 暂存方块，确保同一位置后生成的方块覆盖旧方块
   const blockMap = new Map();
-  const realisticTrees = []; // 记录真实树木的位置
-  const modTrees = []; // 记录模型树 (Tree1.glb) 的位置
-  const rovers = []; // 记录火星车的位置
+  let realisticTrees = []; // 记录真实树木的位置
+  let modTrees = []; // 记录模型树 (Tree1.glb) 的位置
+  let rovers = []; // 记录火星车的位置
   const structureQueue = []; // 结构生成队列，确保结构覆盖地形
 
   // 模拟 Chunk 类的 add 方法 - 改为写入 blockMap
   const fakeChunk = {
     add: (x, y, z, type, dObj, solid = true) => {
       const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-      // 检查持久化增量覆盖
-      if (deltas && deltas[key]) return;
-
       blockMap.set(key, { x, y, z, type, solid });
     }
   };
 
-  // 获取区块中心生物群系
-  const centerBiome = terrainGen.getBiome(cx * CHUNK_SIZE, cz * CHUNK_SIZE);
-  // 数据收集对象占位符
-  const dPlaceholder = {};
+  if (snapshot) {
+    // 如果存在快照，直接恢复数据
+    if (snapshot.blocks) {
+      for (const key in snapshot.blocks) {
+        const type = snapshot.blocks[key];
+        const [bx, by, bz] = key.split(',').map(Number);
+        // 简单逻辑：部分方块非实心
+        const solid = !['water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass', 'allium'].includes(type);
+        blockMap.set(key, { x: bx, y: by, z: bz, type, solid });
+      }
+    }
+    if (snapshot.entities) {
+      realisticTrees = snapshot.entities.realisticTrees || [];
+      modTrees = snapshot.entities.modTrees || [];
+      rovers = snapshot.entities.rovers || [];
+    }
+  } else {
+    // 如果快照不存在，执行原有的地形、生物群系和结构生成逻辑
+    const rooms = [];
+    const roomSeed = Math.abs((cx * 73856093) ^ (cz * 19349663) ^ seed);
+    let rRand = roomSeed;
+    const nextRand = () => {
+      rRand = (rRand * 1103515245 + 12345) & 0x7fffffff;
+      return rRand / 0x7fffffff;
+    };
 
-  // 核心生成逻辑 (从 Chunk.js 迁移)
-  for (let x = 0; x < CHUNK_SIZE; x++) {
-    for (let z = 0; z < CHUNK_SIZE; z++) {
-      const wx = cx * CHUNK_SIZE + x;
-      const wz = cz * CHUNK_SIZE + z;
+    for (let i = 0; i < ROOMS_PER_CHUNK; i++) {
+      const rx = Math.floor(nextRand() * CHUNK_SIZE);
+      const rz = Math.floor(nextRand() * CHUNK_SIZE);
+      const ry = 2 + Math.floor(nextRand() * 8);
+      const rw = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1));
+      const rh = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1));
+      const rd = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1));
+      rooms.push({
+        minX: cx * CHUNK_SIZE + rx - Math.floor(rw/2),
+        maxX: cx * CHUNK_SIZE + rx + Math.floor(rw/2),
+        minY: ry,
+        maxY: ry + rh,
+        minZ: cz * CHUNK_SIZE + rz - Math.floor(rd/2),
+        maxZ: cz * CHUNK_SIZE + rz + Math.floor(rd/2)
+      });
+    }
 
-      const h = terrainGen.generateHeight(wx, wz, centerBiome);
-      const wLvl = -2; // 海平面基准线高度，低于此高度可能生成水或沙滩
+    const centerBiome = terrainGen.getBiome(cx * CHUNK_SIZE, cz * CHUNK_SIZE);
+    const dPlaceholder = {};
 
-      // 结构生成安全检查
-      const safeForStructure = x >= 3 && x <= 12 && z >= 3 && z <= 12;
+    for (let x = 0; x < CHUNK_SIZE; x++) {
+      for (let z = 0; z < CHUNK_SIZE; z++) {
+        const wx = cx * CHUNK_SIZE + x;
+        const wz = cz * CHUNK_SIZE + z;
+        const h = terrainGen.generateHeight(wx, wz, centerBiome);
+        const wLvl = -2;
+        const safeForStructure = x >= 3 && x <= 12 && z >= 3 && z <= 12;
 
-      if (h < wLvl) {
-        // 低于海平面：生成沙子和底部的末地石
-        fakeChunk.add(wx, h, wz, 'sand', dPlaceholder);
-        fakeChunk.add(wx, h - 1, wz, 'end_stone', dPlaceholder);
-
-        if (centerBiome === 'SWAMP' && Math.random() < 0.08) {
-          // 沼泽生物群系：8% 概率在水面上生成睡莲 (1.1 偏移量使其浮在水面上方一点点)
-          fakeChunk.add(wx, wLvl + 0.5, wz, 'lilypad', dPlaceholder, false);
-        }
-
-        // 结构生成 (沉船) - 加入队列
-        if (h < -6 && Math.random() < 0.001 && safeForStructure) {
-          structureQueue.push(() => generateStructure('ship', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
-        }
-      } else {
-        // 高于海平面：根据生物群系确定地表和地下材质
-        let surf = 'grass', sub = 'dirt';
-        if (centerBiome === 'DESERT') { surf = 'sand'; sub = 'sand'; }
-        if (centerBiome === 'AZALEA') { surf = 'moss'; sub = 'dirt'; }
-        if (centerBiome === 'SWAMP') { surf = 'swamp_grass'; sub = 'dirt'; }
-
-        fakeChunk.add(wx, h, wz, surf, dPlaceholder);     // 地表层
-        fakeChunk.add(wx, h - 1, wz, sub, dPlaceholder); // 地表下一层
-
-        // 垂直生成逻辑：处理地下岩层和矿洞
-        for (let k = 2; k <= 12; k++) {
-          if (k === 12) {
-            // 基岩层 (y = h - 12)
-            fakeChunk.add(wx, h - k, wz, 'end_stone', dPlaceholder);
-            continue;
+        if (h < wLvl) {
+          fakeChunk.add(wx, h, wz, 'sand', dPlaceholder);
+          fakeChunk.add(wx, h - 1, wz, 'end_stone', dPlaceholder);
+          if (centerBiome === 'SWAMP' && Math.random() < 0.08) {
+            fakeChunk.add(wx, wLvl + 0.5, wz, 'lilypad', dPlaceholder, false);
           }
-          if (k === 11) {
-            // 实体保护层 (y = h - 11)：防止玩家穿透基岩
-            fakeChunk.add(wx, h - k, wz, 'stone', dPlaceholder);
-            continue;
-          }
-
-          // 检查是否处于预生成的房间（矿洞）内
-          let inRoom = false;
-          for (const r of rooms) {
-            if (wx >= r.minX && wx <= r.maxX && wz >= r.minZ && wz <= r.maxZ && k >= r.minY && k <= r.maxY) {
-              inRoom = true;
-              break;
-            }
-          }
-
-          if (inRoom) continue; // 如果在矿洞范围内，则跳过方块生成（即为空气）
-
-          // 5% 概率生成金矿，否则生成石头
-          const blockType = Math.random() < 0.05 ? 'gold_ore' : 'stone';
-          fakeChunk.add(wx, h - k, wz, blockType, dPlaceholder);
-        }
-
-        if (centerBiome === 'FOREST') { // 森林
-          if (Math.random() < 0.04) {
-            if (Math.random() < 0.15) {
-              realisticTrees.push({ x: wx, y: h + 1, z: wz });
-            } else {
-              const isYellow = Math.random() < 0.1;
-              const leafType = isYellow ? 'yellow_leaves' : null;
-              const isBirch = Math.random() < 0.1;
-              const logType = isBirch ? 'birch_log' : null;
-              Tree.generate(wx, h + 1, wz, fakeChunk, 'big', dPlaceholder, logType, leafType);
-            }
-          }
-        } else if (centerBiome === 'AZALEA') { // 杜鹃花树林
-          if (Math.random() < 0.045) Tree.generate(wx, h + 1, wz, fakeChunk, 'azalea', dPlaceholder);
-        } else if (centerBiome === 'SWAMP') { // 湿地沼泽地
-          if (Math.random() < 0.03) Tree.generate(wx, h + 1, wz, fakeChunk, 'swamp', dPlaceholder);
-        } else if (centerBiome === 'DESERT') { // 沙漠
-          if (Math.random() < 0.01) fakeChunk.add(wx, h + 1, wz, 'cactus', dPlaceholder);
-          if (Math.random() < 0.0005 && safeForStructure) { // 0.05%
-            // 生成越野车/火星车
-            structureQueue.push(() => generateStructure('rover', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
+          if (h < -6 && Math.random() < 0.001 && safeForStructure) {
+            structureQueue.push(() => generateStructure('ship', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
           }
         } else {
-          let occupied = false;
+          let surf = 'grass', sub = 'dirt';
+          if (centerBiome === 'DESERT') { surf = 'sand'; sub = 'sand'; }
+          if (centerBiome === 'AZALEA') { surf = 'moss'; sub = 'dirt'; }
+          if (centerBiome === 'SWAMP') { surf = 'swamp_grass'; sub = 'dirt'; }
 
-          // 0.05% 概率在草地上生成模型树 (Tree1.glb)
-          if (surf === 'grass' && Math.random() < 0.0005) {
-            modTrees.push({ x: wx, y: h + 1, z: wz });
-            occupied = true;
+          fakeChunk.add(wx, h, wz, surf, dPlaceholder);
+          fakeChunk.add(wx, h - 1, wz, sub, dPlaceholder);
+
+          for (let k = 2; k <= 12; k++) {
+            if (k === 12) {
+              fakeChunk.add(wx, h - k, wz, 'end_stone', dPlaceholder);
+              continue;
+            }
+            if (k === 11) {
+              fakeChunk.add(wx, h - k, wz, 'stone', dPlaceholder);
+              continue;
+            }
+            let inRoom = false;
+            for (const r of rooms) {
+              if (wx >= r.minX && wx <= r.maxX && wz >= r.minZ && wz <= r.maxZ && k >= r.minY && k <= r.maxY) {
+                inRoom = true;
+                break;
+              }
+            }
+            if (inRoom) continue;
+            const blockType = Math.random() < 0.05 ? 'gold_ore' : 'stone';
+            fakeChunk.add(wx, h - k, wz, blockType, dPlaceholder);
           }
 
-          if (!occupied && Math.random() < 0.005) {
-            Tree.generate(wx, h + 1, wz, fakeChunk, 'default', dPlaceholder);
-            occupied = true;
-          }
-
-          if (!occupied) {
-            const randPlant = Math.random();
-            if (randPlant < 0.05) {
-              fakeChunk.add(wx, h + 1, wz, 'short_grass', dPlaceholder, false);
-            } else if (randPlant < 0.10) {
-              const flowerType = Math.random() < 0.33 ? 'allium' : 'flower';
-              fakeChunk.add(wx, h + 1, wz, flowerType, dPlaceholder, false);
+          if (centerBiome === 'FOREST') {
+            if (Math.random() < 0.04) {
+              if (Math.random() < 0.15) {
+                realisticTrees.push({ x: wx, y: h + 1, z: wz });
+              } else {
+                const isYellow = Math.random() < 0.1;
+                const leafType = isYellow ? 'yellow_leaves' : null;
+                const isBirch = Math.random() < 0.1;
+                const logType = isBirch ? 'birch_log' : null;
+                Tree.generate(wx, h + 1, wz, fakeChunk, 'big', dPlaceholder, logType, leafType);
+              }
+            }
+          } else if (centerBiome === 'AZALEA') {
+            if (Math.random() < 0.045) Tree.generate(wx, h + 1, wz, fakeChunk, 'azalea', dPlaceholder);
+          } else if (centerBiome === 'SWAMP') {
+            if (Math.random() < 0.03) Tree.generate(wx, h + 1, wz, fakeChunk, 'swamp', dPlaceholder);
+          } else if (centerBiome === 'DESERT') {
+            if (Math.random() < 0.01) fakeChunk.add(wx, h + 1, wz, 'cactus', dPlaceholder);
+            if (Math.random() < 0.0005 && safeForStructure) {
+              structureQueue.push(() => generateStructure('rover', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
+            }
+          } else {
+            let occupied = false;
+            if (surf === 'grass' && Math.random() < 0.0005) {
+              modTrees.push({ x: wx, y: h + 1, z: wz });
+              occupied = true;
+            }
+            if (!occupied && Math.random() < 0.005) {
+              Tree.generate(wx, h + 1, wz, fakeChunk, 'default', dPlaceholder);
+              occupied = true;
+            }
+            if (!occupied) {
+              const randPlant = Math.random();
+              if (randPlant < 0.05) {
+                fakeChunk.add(wx, h + 1, wz, 'short_grass', dPlaceholder, false);
+              } else if (randPlant < 0.10) {
+                const flowerType = Math.random() < 0.33 ? 'allium' : 'flower';
+                fakeChunk.add(wx, h + 1, wz, flowerType, dPlaceholder, false);
+              }
+            }
+            if (Math.random() < 0.001 && safeForStructure) {
+              structureQueue.push(() => generateStructure('house', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
             }
           }
-
-          if (Math.random() < 0.001 && safeForStructure) {
-            structureQueue.push(() => generateStructure('house', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
-          }
+        }
+        if (terrainGen.shouldGenerateCloud(wx, wz)) {
+          Cloud.generate(wx, 55, wz, fakeChunk, dPlaceholder);
         }
       }
-
-      if (terrainGen.shouldGenerateCloud(wx, wz)) {
-        Cloud.generate(wx, 55, wz, fakeChunk, dPlaceholder);
-      }
     }
-  }
 
-  // 天空岛生成
-  if (Math.random() < 0.08) {
-    const islandY = 40 + Math.floor(Math.random() * 30);
-    const centerWx = cx * CHUNK_SIZE + 8;
-    const centerWz = cz * CHUNK_SIZE + 8;
-    Island.generate(centerWx, islandY, centerWz, fakeChunk, dPlaceholder);
-  }
-
-  // 低空簇状云，控制低空云生成的密度
-  if (Math.random() < 0.20) {
-    const startX = cx * CHUNK_SIZE + Math.floor(Math.random() * CHUNK_SIZE);
-    const startZ = cz * CHUNK_SIZE + Math.floor(Math.random() * CHUNK_SIZE);
-    const size = 30 + Math.floor(Math.random() * 21);
-    // 第二个参数，控制地空云生成的高度
-    Cloud.generateCluster(startX, 35, startZ, size, fakeChunk, dPlaceholder);
-  }
-
-  // 处理结构队列 (房屋、Rover、沉船)，确保它们覆盖地形
-  structureQueue.forEach(task => task());
-
-  // 叠加持久化修改
-  for (const blockKey in deltas) {
-    const delta = deltas[blockKey];
-    if (delta.type !== 'air') {
-      const [bx, by, bz] = blockKey.split(',').map(Number);
-
-      // 简单逻辑：部分方块非实心
-      const solid = !['water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass'].includes(delta.type);
-      blockMap.set(blockKey, { x: bx, y: by, z: bz, type: delta.type, solid });
-    } else {
-      // 如果是空气，确保 Map 里没有东西
-      blockMap.delete(blockKey);
+    if (Math.random() < 0.08) {
+      const islandY = 40 + Math.floor(Math.random() * 30);
+      const centerWx = cx * CHUNK_SIZE + 8;
+      const centerWz = cz * CHUNK_SIZE + 8;
+      Island.generate(centerWx, islandY, centerWz, fakeChunk, dPlaceholder);
     }
+    if (Math.random() < 0.20) {
+      const startX = cx * CHUNK_SIZE + Math.floor(Math.random() * CHUNK_SIZE);
+      const startZ = cz * CHUNK_SIZE + Math.floor(Math.random() * CHUNK_SIZE);
+      const size = 30 + Math.floor(Math.random() * 21);
+      Cloud.generateCluster(startX, 35, startZ, size, fakeChunk, dPlaceholder);
+    }
+    structureQueue.forEach(task => task());
+  }
+
+  // 统一后处理：AO 计算、隐藏面剔除，并返回渲染数据
+  const blocksForSnapshot = {};
+  for (const [key, b] of blockMap) {
+    blocksForSnapshot[key] = b.type;
   }
 
   // 将 blockMap 转换为 d 和 solidBlocks
@@ -266,19 +237,18 @@ onmessage = function(e) {
     const aos = new Uint8Array(4).fill(3);
 
     // 根据面定义相邻方块偏移
-    // 优化：仅在台阶下方（地面交界处和悬空物下方）保留阴影，移除垂直墙角阴影
-    if (faceIdx === 0) { // px (侧面) - 仅保留上方邻居，实现悬空物下方阴影
+    if (faceIdx === 0) { // px (侧面)
       aos[0] = getAOValue(isOccluding(x+1, y+1, z), 0, 0);
       aos[2] = getAOValue(isOccluding(x+1, y+1, z), 0, 0);
     } else if (faceIdx === 1) { // nx (侧面)
       aos[0] = getAOValue(isOccluding(x-1, y+1, z), 0, 0);
       aos[2] = getAOValue(isOccluding(x-1, y+1, z), 0, 0);
-    } else if (faceIdx === 2) { // py (顶面) - 保留完整 AO，实现台阶/墙根地面阴影
+    } else if (faceIdx === 2) { // py (顶面)
       aos[0] = getAOValue(isOccluding(x-1, y+1, z), isOccluding(x, y+1, z-1), isOccluding(x-1, y+1, z-1));
       aos[1] = getAOValue(isOccluding(x+1, y+1, z), isOccluding(x, y+1, z-1), isOccluding(x+1, y+1, z-1));
       aos[2] = getAOValue(isOccluding(x-1, y+1, z), isOccluding(x, y+1, z+1), isOccluding(x-1, y+1, z+1));
       aos[3] = getAOValue(isOccluding(x+1, y+1, z), isOccluding(x, y+1, z+1), isOccluding(x+1, y+1, z+1));
-    } else if (faceIdx === 3) { // ny (底面) - 移除阴影
+    } else if (faceIdx === 3) { // ny (底面)
       // Keep all at 3
     } else if (faceIdx === 4) { // pz (侧面)
       aos[0] = getAOValue(isOccluding(x, y+1, z+1), 0, 0);
@@ -310,17 +280,10 @@ onmessage = function(e) {
   const visibleKeys = [];
 
   for (const [key, block] of blockMap) {
-      // 物理碰撞数据必须包含所有实心方块
       if (block.solid) solidBlocks.push(key);
-
-      // 渲染剔除逻辑
       let visible = true;
-
-      // 只有实心且非透明方块才尝试剔除
       if (block.solid) {
           const { x, y, z } = block;
-
-          // 检查 6 个方向是否都有遮挡
           const covered =
               isOccluding(x + 1, y, z) &&
               isOccluding(x - 1, y, z) &&
@@ -328,50 +291,42 @@ onmessage = function(e) {
               isOccluding(x, y - 1, z) &&
               isOccluding(x, y, z + 1) &&
               isOccluding(x, y, z - 1);
-
-          if (covered) {
-              visible = false;
-          }
+          if (covered) visible = false;
       }
 
       if (visible) {
           if (!d[block.type]) d[block.type] = [];
-
-          // 计算 AO 数据
           let aoLow = 0;
           let aoHigh = 0;
-
-          // 如果是 Box 类型的方块，计算 6 个面的 AO
           const boxTypes = ['sand', 'stone', 'mossy_stone', 'cobblestone', 'bricks'];
-
           if (boxTypes.includes(block.type)) {
             for (let f = 0; f < 6; f++) {
               const aos = getAO(block.x, block.y, block.z, f);
               for (let v = 0; v < 4; v++) {
                 const vertexIdx = f * 4 + v;
                 const aoVal = aos[v];
-                if (vertexIdx < 12) {
-                  aoLow |= (aoVal << (vertexIdx * 2));
-                } else {
-                  aoHigh |= (aoVal << ((vertexIdx - 12) * 2));
-                }
+                if (vertexIdx < 12) aoLow |= (aoVal << (vertexIdx * 2));
+                else aoHigh |= (aoVal << ((vertexIdx - 12) * 2));
               }
             }
           }
-
           d[block.type].push({x: block.x, y: block.y, z: block.z, aoLow, aoHigh});
           visibleKeys.push(key);
       }
-
-      // 无论是否可见，都记录类型
       allBlockTypes[key] = block.type;
   }
 
   // 返回数据
-  postMessage({ cx, cz, d, solidBlocks, realisticTrees, modTrees, rovers, allBlockTypes, visibleKeys });
+  postMessage({
+    cx, cz, d, solidBlocks, realisticTrees, modTrees, rovers, allBlockTypes, visibleKeys,
+    snapshot: {
+      blocks: blocksForSnapshot,
+      entities: { realisticTrees, modTrees, rovers }
+    }
+  });
 };
 
-// 复制结构生成逻辑 (避免依赖 Chunk.js 的循环引用)
+// 复制结构生成逻辑
 function generateStructure(type, x, y, z, chunk, dObj, rovers = []) {
     if (type === 'house') {
       const wallMat = Math.random() < 0.33 ? 'bricks' : 'planks';

@@ -8,7 +8,7 @@ import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 export class PersistenceService {
   constructor() {
     this.worker = new Worker(new URL('../workers/PersistenceWorker.js', import.meta.url), { type: 'module' });
-    this.cache = new Map(); // Key: "cx,cz" -> Map<blockKey, {type}>
+    this.cache = new Map(); // Key: "cx,cz" -> { blocks: {}, entities: {} }
     this.messageId = 0;
     this.callbacks = new Map();
     this.initPromise = this.init();
@@ -51,12 +51,12 @@ export class PersistenceService {
   }
 
   /**
-   * 获取指定区块的增量修改数据
+   * 获取指定区块的全量快照数据
    * @param {number} cx - 区块X坐标
    * @param {number} cz - 区块Z坐标
-   * @returns {Promise<Map<string, object>>} 返回 blockKey -> {type} 的映射
+   * @returns {Promise<object|null>} 返回 { blocks, entities } 或 null
    */
-  async getDeltas(cx, cz) {
+  async getChunkData(cx, cz) {
     await this.initPromise;
     const key = `${cx},${cz}`;
 
@@ -65,20 +65,17 @@ export class PersistenceService {
     }
 
     try {
-      const data = await this.postMessage('getDeltas', { key });
-      const changesMap = new Map(Object.entries(data));
-      this.cache.set(key, changesMap);
-      return changesMap;
+      const data = await this.postMessage('getChunkData', { key });
+      this.cache.set(key, data);
+      return data;
     } catch (error) {
-      console.error(`Failed to get deltas for chunk ${key}:`, error);
-      const emptyMap = new Map();
-      this.cache.set(key, emptyMap);
-      return emptyMap;
+      console.error(`Failed to get data for chunk ${key}:`, error);
+      return null;
     }
   }
 
   /**
-   * 记录一个方块的变更 (内存缓存)
+   * 记录一个方块的变更 (直接更新内存快照)
    * @param {number} x - 世界坐标X
    * @param {number} y - 世界坐标Y
    * @param {number} z - 世界坐标Z
@@ -90,32 +87,35 @@ export class PersistenceService {
     const chunkKey = `${cx},${cz}`;
     const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
 
-    if (!this.cache.has(chunkKey)) {
-      this.cache.set(chunkKey, new Map());
+    const chunkData = this.cache.get(chunkKey);
+    if (chunkData && chunkData.blocks) {
+      if (type === 'air') {
+        delete chunkData.blocks[blockKey];
+      } else {
+        chunkData.blocks[blockKey] = type;
+      }
     }
-
-    const chunkDeltas = this.cache.get(chunkKey);
-    chunkDeltas.set(blockKey, { type });
   }
 
   /**
-   * 将缓存中的区块数据持久化到 IndexedDB
+   * 将缓存中的区块快照数据持久化到 IndexedDB
    * @param {number} cx - 区块X坐标
    * @param {number} cz - 区块Z坐标
+   * @param {object} data - (可选) 要保存的完整数据
    */
-  async flush(cx, cz) {
+  async saveChunkData(cx, cz, data = null) {
     await this.initPromise;
     const key = `${cx},${cz}`;
-    if (!this.cache.has(key)) return;
 
-    const changes = Object.fromEntries(this.cache.get(key));
-    if (Object.keys(changes).length === 0) return;
+    const chunkData = data || this.cache.get(key);
+    if (!chunkData) return;
 
     try {
-      await this.postMessage('flush', { key, changes });
-      this.cache.delete(key);
+      await this.postMessage('saveChunkData', { key, data: chunkData });
+      // 如果是传入的新数据，更新缓存
+      if (data) this.cache.set(key, data);
     } catch (error) {
-      console.error(`Failed to flush chunk ${key}:`, error);
+      console.error(`Failed to save chunk ${key}:`, error);
     }
   }
 
