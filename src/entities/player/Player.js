@@ -688,6 +688,14 @@ export class Player {
           const ty = by + dy;
           const tz = bz + dz;
 
+          // 地图保护：如果是 end_stone 且下方是虚空，则不允许炸开
+          const type = this.world.getBlock(tx, ty, tz);
+          if (type === 'end_stone') {
+            const belowType = this.world.getBlock(tx, ty - 1, tz);
+            // 如果下方没有方块，说明这是最底层的保护层，跳过
+            if (!belowType) continue;
+          }
+
           // 调用世界移除方块方法
           this.world.removeBlock(tx, ty, tz);
         }

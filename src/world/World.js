@@ -251,6 +251,24 @@ export class World {
   }
 
   /**
+   * 获取指定位置的方块类型
+   * @param {number} x
+   * @param {number} y
+   * @param {number} z
+   * @returns {string|null}
+   */
+  getBlock(x, y, z) {
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cz = Math.floor(z / CHUNK_SIZE);
+    const key = `${cx},${cz}`;
+    const chunk = this.chunks.get(key);
+    if (!chunk) return null;
+
+    const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    return chunk.blockData[blockKey] || null;
+  }
+
+  /**
    * 在指定位置放置方块
    * @param {number} x - X坐标
    * @param {number} y - Y坐标
