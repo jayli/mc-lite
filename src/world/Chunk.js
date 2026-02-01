@@ -134,6 +134,8 @@ export class Chunk {
     this.blockData = {};             // 全量方块类型数据
     this.visibleKeys = new Set();    // 当前已渲染方块的 Key 集合
     this.isReady = false;            // 区块是否已完成生成
+    this.instanceIndexMap = new Map(); // Key: "type" -> Map("x,y,z" -> index)
+    this.saveTimeout = null;         // 用于防抖保存
     this.gen();                      // 生成区块内容
   }
 
@@ -299,11 +301,16 @@ export class Chunk {
       }
 
     // 为每个实例设置位置矩阵
+    this.instanceIndexMap[type] = new Map();
     d[type].forEach((pos, i) => {
       // 核心偏移：将模型中心对齐到方块中心 (增加 0.5 偏移)
       dummy.position.set(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
       dummy.updateMatrix();                     // 根据位置生成变换矩阵
       mesh.setMatrixAt(i, dummy.matrix);        // 将矩阵写入实例化缓冲区
+
+      const posKey = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
+      this.instanceIndexMap[type].set(posKey, i);
+
       if (type === 'chest') {
         mesh.userData.chests[i] = { open: false }; // 初始化对应索引箱子的状态
       }
@@ -372,13 +379,16 @@ export class Chunk {
   }
 
   /**
-   * 动态添加单个方块（与批量生成相对）
-   * 用于游戏运行时玩家放置方块
-   * @param {number} x - 世界坐标X
-   * @param {number} y - 世界坐标Y
-   * @param {number} z - 世界坐标Z
-   * @param {string} type - 方块类型
+   * 防抖保存区块数据
    */
+  saveDebounced() {
+    if (this.saveTimeout) clearTimeout(this.saveTimeout);
+    this.saveTimeout = setTimeout(() => {
+      persistenceService.saveChunkData(this.cx, this.cz);
+      this.saveTimeout = null;
+    }, 500);
+  }
+
   /**
    * 动态添加单个方块（与批量生成相对）
    * 用于游戏运行时玩家放置方块
@@ -403,8 +413,43 @@ export class Chunk {
         this.visibleKeys.add(key);
     }
 
-    // 触发持久化刷新
-    persistenceService.saveChunkData(this.cx, this.cz);
+    // 触发持久化刷新 (防抖)
+    this.saveDebounced();
+
+    // 计算隐藏面剔除掩码
+    let mask = 63; // 默认全显示 (111111)
+    if (faceCullingSystem && faceCullingSystem.isEnabled() && type !== 'air' && type !== 'collider') {
+        const position = new THREE.Vector3(x, y, z);
+        const block = { type };
+
+        const getNeighborBlock = (nx, ny, nz) => {
+            const cx = Math.floor(nx / 16);
+            const cz = Math.floor(nz / 16);
+            let chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(`${cx},${cz}`);
+            if (!chunk || !chunk.isReady) return null;
+            const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
+            const t = chunk.blockData[key];
+            return t ? { type: t } : null;
+        };
+
+        const neighbors = {
+            top: getNeighborBlock(x, y + 1, z),
+            bottom: getNeighborBlock(x, y - 1, z),
+            north: getNeighborBlock(x, y, z - 1),
+            south: getNeighborBlock(x, y, z + 1),
+            west: getNeighborBlock(x - 1, y, z),
+            east: getNeighborBlock(x + 1, y, z)
+        };
+
+        mask = faceCullingSystem.calculateFaceVisibility(block, neighbors);
+
+        // 如果方块完全被遮挡且不是透明方块，则标记为不可见
+        if (mask === 0 && !faceCullingSystem.isTransparent(type)) {
+            this.visibleKeys.delete(key);
+        } else {
+            this.visibleKeys.add(key);
+        }
+    }
 
     // 检查并移除/隐藏该位置已有的方块（处理实例化网格和动态网格）
     for (let i = this.group.children.length - 1; i >= 0; i--) {
@@ -412,20 +457,30 @@ export class Chunk {
 
       // 处理实例化网格 (静态生成的方块)
       if (child.isInstancedMesh) {
-        // ... (保持原有实例化网格处理逻辑)
         if (oldType && child.userData.type === oldType) {
-          const dummy = new THREE.Matrix4();
-          const pos = new THREE.Vector3();
-          for (let j = 0; j < child.count; j++) {
-            child.getMatrixAt(j, dummy);
-            pos.setFromMatrixPosition(dummy);
-            if (Math.floor(pos.x) === Math.floor(x) &&
-                Math.floor(pos.y) === Math.floor(y) &&
-                Math.floor(pos.z) === Math.floor(z)) {
-              dummy.makeScale(0, 0, 0);
-              child.setMatrixAt(j, dummy);
-              child.instanceMatrix.needsUpdate = true;
-              break;
+          const typeMap = this.instanceIndexMap[oldType];
+          if (typeMap && typeMap.has(key)) {
+            const idx = typeMap.get(key);
+            const dummy = new THREE.Matrix4();
+            dummy.makeScale(0, 0, 0);
+            child.setMatrixAt(idx, dummy);
+            child.instanceMatrix.needsUpdate = true;
+            typeMap.delete(key);
+          } else {
+            // Fallback to slow search if map fails
+            const dummy = new THREE.Matrix4();
+            const pos = new THREE.Vector3();
+            for (let j = 0; j < child.count; j++) {
+              child.getMatrixAt(j, dummy);
+              pos.setFromMatrixPosition(dummy);
+              if (Math.floor(pos.x) === Math.floor(x) &&
+                  Math.floor(pos.y) === Math.floor(y) &&
+                  Math.floor(pos.z) === Math.floor(z)) {
+                dummy.makeScale(0, 0, 0);
+                child.setMatrixAt(j, dummy);
+                child.instanceMatrix.needsUpdate = true;
+                break;
+              }
             }
           }
         }
@@ -514,8 +569,8 @@ export class Chunk {
         }
     }
 
-    // 对于空气方块和碰撞体方块，只更新逻辑状态，不创建网格
-    if (type === 'air' || type === 'collider') {
+    // 对于空气方块和碰撞体方块，或者因完全遮挡而不可见的方块，不创建网格
+    if (type === 'air' || type === 'collider' || !this.visibleKeys.has(key)) {
        // ...
     } else {
       // 获取几何体和材质
@@ -717,8 +772,8 @@ export class Chunk {
       }
     });
 
-    // 4. 触发持久化刷新
-    persistenceService.saveChunkData(this.cx, this.cz);
+    // 4. 触发持久化刷新 (防抖)
+    this.saveDebounced();
   }
 
   /**

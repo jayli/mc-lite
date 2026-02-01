@@ -322,8 +322,6 @@ export class World {
     chunk.addBlockDynamic(x, y, z, type);
     // 记录持久化变更
     persistenceService.recordChange(x, y, z, type);
-    // 性能考虑可以先关闭，后面再打开
-    persistenceService.saveChunkData(cx, cz);
   }
 
   /**
@@ -339,9 +337,6 @@ export class World {
     const chunk = this.chunks.get(key);
     if (chunk) {
       chunk.removeBlock(x, y, z);
-      // 立即持久化删除操作
-      // 性能考虑可以先关闭，后面再打开
-      persistenceService.saveChunkData(cx, cz);
     }
   }
 
@@ -358,7 +353,6 @@ export class World {
     const chunk = this.chunks.get(key);
     if (chunk) {
       chunk.removeCollisionKey(x, y, z);
-      persistenceService.saveChunkData(cx, cz);
     }
   }
 }

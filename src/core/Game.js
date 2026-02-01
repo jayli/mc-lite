@@ -56,9 +56,9 @@ export class Game {
 
       // 按 M 键执行地图审计（隐藏面剔除审计）
       if (e.code === 'KeyM') {
-        console.log('[Debug] 正在执行手动地图审计...');
+        console.log('[Debug] 正在执行手动地图审计与场景同步...');
         if (faceCullingSystem) {
-          faceCullingSystem.auditWorld(this.world);
+          faceCullingSystem.auditWorld(this.world, true);
         }
       }
     });
@@ -108,10 +108,10 @@ export class Game {
     this.player.inventory.add('tnt', 1000);
     // this.player.inventory.add('cloud', 1000);
 
-    // 延迟执行 Face Culling 审计
+    // 延迟执行 Face Culling 审计并同步场景
     setTimeout(() => {
       if (faceCullingSystem) {
-        faceCullingSystem.auditWorld(this.world);
+        faceCullingSystem.auditWorld(this.world, true);
       }
     }, 5000);
   }
