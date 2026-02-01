@@ -403,6 +403,7 @@ export class Chunk {
    */
   addBlockDynamic(x, y, z, type) {
     const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const oldType = this.blockData[key]; // 记录旧的方块类型，用于查找实例化网格
 
     // 同步更新内存中的 deltas 缓存
     if (this.deltas) {
@@ -418,11 +419,35 @@ export class Chunk {
         this.visibleKeys.add(key);
     }
 
-    // 检查并移除该位置已有的动态方块
+    // 检查并移除/隐藏该位置已有的方块（处理实例化网格和动态网格）
     for (let i = this.group.children.length - 1; i >= 0; i--) {
       const child = this.group.children[i];
-      if (child.isInstancedMesh || child.userData.isEntity) continue;
 
+      // 处理实例化网格 (静态生成的方块)
+      if (child.isInstancedMesh) {
+        // 如果已知该位置之前的方块类型，且与当前网格类型匹配，则尝试隐藏它
+        if (oldType && child.userData.type === oldType) {
+          const dummy = new THREE.Matrix4();
+          const pos = new THREE.Vector3();
+          for (let j = 0; j < child.count; j++) {
+            child.getMatrixAt(j, dummy);
+            pos.setFromMatrixPosition(dummy);
+            if (Math.floor(pos.x) === Math.floor(x) &&
+                Math.floor(pos.y) === Math.floor(y) &&
+                Math.floor(pos.z) === Math.floor(z)) {
+              dummy.makeScale(0, 0, 0); // 缩放为0实现视觉隐藏
+              child.setMatrixAt(j, dummy);
+              child.instanceMatrix.needsUpdate = true;
+              break; // 找到并处理后退出当前网格的循环
+            }
+          }
+        }
+        continue;
+      }
+
+      if (child.userData.isEntity) continue;
+
+      // 处理动态网格 (玩家放置的单体 Mesh)
       if (Math.floor(child.position.x) === Math.floor(x) &&
           Math.floor(child.position.y) === Math.floor(y) &&
           Math.floor(child.position.z) === Math.floor(z)) {

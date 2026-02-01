@@ -80,7 +80,7 @@ export class Player {
   setupInput() {
     window.addEventListener('keydown', e => this.keys[e.code] = true);
     window.addEventListener('keyup', e => this.keys[e.code] = false);
-    window.addEventListener('mousedown', e => this.interact(e.button)); // Add interact listener
+    window.addEventListener('mousedown', e => this.interact(e)); // 传递完整事件对象
 
     document.addEventListener('mousemove', e => {
       if (document.pointerLockElement === document.body) {
@@ -418,11 +418,12 @@ export class Player {
 
   /**
    * 处理交互逻辑（左键挖掘，右键放置/打开）
-   * @param {number} button - 鼠标按键
+   * @param {MouseEvent} e - 鼠标事件对象
    */
-  interact(button) {
+  interact(e) {
     if (document.pointerLockElement !== document.body) return;
 
+    const button = e.button;
     this.raycaster.setFromCamera(this.center, this.camera);
 
     // 获取所有可交互的区块物体
@@ -486,6 +487,24 @@ export class Player {
         const m = hit.object;
         const instanceId = hit.instanceId;
         const type = m.userData.type || 'unknown';
+
+        // 处理功能组合键 (Ctrl + 左键)
+        if (e.ctrlKey) {
+          if (type === 'tnt') {
+            let pos = new THREE.Vector3();
+            if (m.isInstancedMesh) {
+              const dummy = new THREE.Matrix4();
+              m.getMatrixAt(instanceId, dummy);
+              dummy.decompose(pos, new THREE.Quaternion(), new THREE.Vector3());
+            } else {
+              pos.copy(m.position);
+            }
+            this.explode(pos.x, pos.y, pos.z);
+            this.swing();
+          }
+          // 只要按住了 Ctrl，无论是否是 TNT，都阻止常规挖掘动作
+          return;
+        }
 
         // 处理箱子挖掘（如果未打开则直接打开）
         if (type === 'chest' && m.isInstancedMesh) {
@@ -649,6 +668,41 @@ export class Player {
           this.inventory.add(type, 1);
         }
       }
+    }
+  }
+
+  /**
+   * 执行 TNT 爆炸逻辑
+   * 移除以 (x, y, z) 为中心 3x3x3 范围内的方块
+   */
+  explode(x, y, z) {
+    const bx = Math.floor(x);
+    const by = Math.floor(y);
+    const bz = Math.floor(z);
+
+    // 遍历 3x3x3 区域（TNT 所在的 1x1x1 立方体向外扩展一格）
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          const tx = bx + dx;
+          const ty = by + dy;
+          const tz = bz + dz;
+
+          // 调用世界移除方块方法
+          this.world.removeBlock(tx, ty, tz);
+        }
+      }
+    }
+
+    // 在中心产生爆炸粒子效果
+    const centerPos = new THREE.Vector3(bx + 0.5, by + 0.5, bz + 0.5);
+    for (let i = 0; i < 8; i++) {
+      this.spawnParticles(centerPos, 'tnt');
+    }
+
+    // 如果 HUD 可用，显示提示
+    if (this.game && this.game.ui && this.game.ui.hud) {
+      this.game.ui.hud.showMessage("TNT 爆炸了！");
     }
   }
 
