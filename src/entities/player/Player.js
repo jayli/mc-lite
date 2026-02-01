@@ -76,6 +76,16 @@ export class Player {
     // 初始化爆炸 Worker
     this.explosionWorker = new Worker(new URL('../../workers/ExplosionWorker.js', import.meta.url), { type: 'module' });
     this.explosionWorker.onmessage = (e) => this.handleExplosionResult(e.data);
+
+    // --- 音频系统初始化 ---
+    this.listener = new THREE.AudioListener();
+    this.camera.add(this.listener);
+    this.explosionSound = new THREE.Audio(this.listener);
+    const audioLoader = new THREE.AudioLoader();
+    audioLoader.load('./src/world/assets/sound/explosion.mp3', (buffer) => {
+      this.explosionSound.setBuffer(buffer);
+      this.explosionSound.setVolume(0.4);
+    });
   }
 
   /**
@@ -707,10 +717,16 @@ export class Player {
         }, tnt.delay);
       });
 
-      // 3. 视觉效果
+      // 3. 视觉与听觉效果
       const centerPos = new THREE.Vector3(center.x + 0.5, center.y + 0.5, center.z + 0.5);
       if (this.world.spawnExplosionParticles) {
         this.world.spawnExplosionParticles(centerPos);
+      }
+
+      // 播放爆炸音效
+      if (this.explosionSound && this.explosionSound.buffer) {
+        if (this.explosionSound.isPlaying) this.explosionSound.stop();
+        this.explosionSound.play();
       }
     }
   }
