@@ -32,11 +32,17 @@ export class Player {
     for (let i = 0; i < 1000; i++) {
       const tx = (Math.random() - 0.5) * 20000;
       const tz = (Math.random() - 0.5) * 20000;
+
+      const biome = getBiome(tx, tz);
       // 尝试在森林或平原生物群系出生
-      if (getBiome(tx, tz) === 'FOREST' || getBiome(tx, tz) === 'PLAINS') {
-        this.position.set(tx, 70, tz);
-        spawnFound = true;
-        break;
+      if (biome === 'FOREST' || biome === 'PLAINS') {
+        // 计算预估地形高度，确保不在水面上（海平面约 -1.5）
+        const h = Math.floor(noise(tx, tz, 0.08) + noise(tx, tz, 0.02) * 3);
+        if (h > -0.5) {
+          this.position.set(tx, 70, tz);
+          spawnFound = true;
+          break;
+        }
       }
     }
     if (!spawnFound) this.position.set(0, 70, 0);
