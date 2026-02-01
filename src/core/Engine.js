@@ -2,6 +2,8 @@
 import * as THREE from 'three';
 import { AMFLoader } from 'three/addons/loaders/AMFLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { SEED } from '../utils/MathUtils.js';
 import { FaceCullingSystem, faceCullingSystem } from './FaceCullingSystem.js';
 
@@ -14,7 +16,7 @@ const waterOpacity = 0.7; // 水透明度
 const waterForgColor = 0xa7d1e2; // 水雾颜色
 export let rookModel = null;
 export let carModel = null;
-export let treeModel = null;
+export let gunManModel = null;
 
 // 定义并导出 Engine 类，用于管理游戏的核心渲染引擎
 export class Engine {
@@ -170,24 +172,55 @@ export class Engine {
       carModel = carParent;
     });
 
-    gltfLoader.load('src/world/assets/mod/Tree1.glb', (gltf) => {
-      const tree = gltf.scene;
-      const box = new THREE.Box3().setFromObject(tree);
-      const center = box.getCenter(new THREE.Vector3());
-      const size = box.getSize(new THREE.Vector3());
+    const mtlLoader = new MTLLoader();
+    mtlLoader.load('src/world/assets/mod/gun_man.mtl', (materials) => {
+      materials.preload();
+      const objLoader = new OBJLoader();
+      objLoader.setMaterials(materials);
+      objLoader.load('src/world/assets/mod/gun_man.obj', (model) => {
+        // 遍历设置阴影和材质属性
+        model.traverse(child => {
+          if (child.isMesh) {
+            child.castShadow = true;
+            child.receiveShadow = true;
+            // 确保材质可见
+            if (child.material) {
+              if (Array.isArray(child.material)) {
+                child.material.forEach(m => {
+                  m.side = THREE.DoubleSide;
+                  m.transparent = true;
+                  m.alphaTest = 0.5;
+                });
+              } else {
+                child.material.side = THREE.DoubleSide;
+                child.material.transparent = true;
+                child.material.alphaTest = 0.5;
+              }
+            }
+          }
+        });
 
-      // 平移使基座底部中心位于 (0,0,0)
-      tree.position.set(-center.x, -box.min.y, -center.z);
+        const box = new THREE.Box3().setFromObject(model);
+        const center = box.getCenter(new THREE.Vector3());
+        const size = box.getSize(new THREE.Vector3());
 
-      const treeParent = new THREE.Group();
-      treeParent.add(tree);
+        // 平移使基座底部中心位于 (0,0,0)
+        model.position.set(-center.x, -box.min.y, -center.z);
 
-      // 目标尺寸：高约为 6 个方块，宽约为 3x3
-      const targetHeight = 6;
-      const scale = targetHeight / size.y;
-      treeParent.scale.set(scale, scale, scale);
+        const parent = new THREE.Group();
+        parent.add(model);
 
-      treeModel = treeParent;
+        // 目标尺寸：高度设为 2 个方块高度
+        const targetHeight = 2.0;
+        const scale = targetHeight / (size.y || 1);
+        parent.scale.set(scale, scale, scale);
+
+        gunManModel = parent;
+      }, undefined, (error) => {
+        console.error('Failed to load gun_man.obj:', error);
+      });
+    }, undefined, (error) => {
+      console.error('Failed to load gun_man.mtl:', error);
     });
   }
 

@@ -18,7 +18,7 @@ onmessage = function(e) {
   // 使用 Map 暂存方块，确保同一位置后生成的方块覆盖旧方块
   const blockMap = new Map();
   let realisticTrees = []; // 记录真实树木的位置
-  let modTrees = []; // 记录模型树 (Tree1.glb) 的位置
+  let modGunMan = []; // 记录模型人 (gun_man.glb) 的位置
   let rovers = []; // 记录火星车的位置
   const structureQueue = []; // 结构生成队列，确保结构覆盖地形
 
@@ -43,7 +43,7 @@ onmessage = function(e) {
     }
     if (snapshot.entities) {
       realisticTrees = snapshot.entities.realisticTrees || [];
-      modTrees = snapshot.entities.modTrees || [];
+      modGunMan = snapshot.entities.modGunMan || [];
       rovers = snapshot.entities.rovers || [];
     }
   } else {
@@ -146,8 +146,8 @@ onmessage = function(e) {
             }
           } else {
             let occupied = false;
-            if (surf === 'grass' && Math.random() < 0.0005) {
-              modTrees.push({ x: wx, y: h + 1, z: wz });
+            if (surf === 'grass' && Math.random() < 0.0005) { // gunman士兵的生成比例
+              modGunMan.push({ x: wx, y: h + 1, z: wz });
               occupied = true;
             }
             if (!occupied && Math.random() < 0.005) {
@@ -318,10 +318,10 @@ onmessage = function(e) {
 
   // 返回数据
   postMessage({
-    cx, cz, d, solidBlocks, realisticTrees, modTrees, rovers, allBlockTypes, visibleKeys,
+    cx, cz, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys,
     snapshot: {
       blocks: blocksForSnapshot,
-      entities: { realisticTrees, modTrees, rovers }
+      entities: { realisticTrees, modGunMan, rovers }
     }
   });
 };
