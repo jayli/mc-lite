@@ -742,6 +742,31 @@ export class Chunk {
           }
           if (updated) child.instanceMatrix.needsUpdate = true;
         }
+      } else if (child.userData.isEntity) {
+        // --- 处理实体批量移除逻辑 (如 TNT 爆炸) ---
+        if (child.userData.collisionBlocks) {
+          const isHit = child.userData.collisionBlocks.some(b =>
+            positions.some(p =>
+              Math.floor(p.x) === Math.floor(b.x) &&
+              Math.floor(p.y) === Math.floor(b.y) &&
+              Math.floor(p.z) === Math.floor(b.z)
+            )
+          );
+
+          if (isHit) {
+            // 1. 从场景中移除实体模型
+            this.group.remove(child);
+
+            // 2. 递归移除该实体的所有其他碰撞块，确保逻辑彻底清理
+            child.userData.collisionBlocks.forEach(b => {
+              const bKey = `${Math.floor(b.x)},${Math.floor(b.y)},${Math.floor(b.z)}`;
+              // 只有当该位置确实还是碰撞体时才移除
+              if (this.blockData[bKey] === 'collider') {
+                this.removeBlock(b.x, b.y, b.z);
+              }
+            });
+          }
+        }
       } else {
         const cx = Math.floor(child.position.x);
         const cy = Math.floor(child.position.y);
