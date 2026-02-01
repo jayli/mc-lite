@@ -7,6 +7,7 @@ import { UIManager } from '../ui/UIManager.js';
 import { Player } from '../entities/player/Player.js';
 import { realisticTreeManager } from '../world/entities/RealisticTreeManager.js';
 import { faceCullingSystem } from './FaceCullingSystem.js';
+import Stats from 'stats';
 
 /**
  * 游戏主类，负责初始化游戏核心组件并管理游戏循环
@@ -24,6 +25,15 @@ export class Game {
     this.player = new Player(this.world, this.engine.camera);
     this.player.game = this; // 将游戏实例传递给玩家对象
     this.ui = new UIManager(this); // 初始化UI管理器，传递游戏实例
+
+    // 初始化 Stats 监控
+    this.stats = new Stats();
+    this.stats.dom.style.position = 'absolute';
+    this.stats.dom.style.top = '54px';
+    this.stats.dom.style.right = '10px';
+    this.stats.dom.style.left = 'auto'; // 确保不靠左
+    document.body.appendChild(this.stats.dom);
+
     this.isRunning = false; // 游戏运行状态标志
     this.perfStats = { player: 0, world: 0, ui: 0, render: 0 }; // 性能统计数据
     this.showDebugInfo = false; // 是否显示调试信息
@@ -129,6 +139,7 @@ export class Game {
   */
   loop() {
     if (!this.isRunning) return;
+    if (this.stats) this.stats.begin();
     requestAnimationFrame(() => this.loop());
 
     const frameStart = performance.now();
@@ -137,6 +148,8 @@ export class Game {
 
     this.update(dt); // 更新游戏状态
     this.render();   // 渲染场景
+
+    if (this.stats) this.stats.end();
 
     const totalFrameTime = performance.now() - frameStart;
     if (this.showDebugInfo && totalFrameTime > 25) {
