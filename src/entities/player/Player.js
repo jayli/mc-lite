@@ -680,7 +680,32 @@ export class Player {
     const by = Math.floor(y);
     const bz = Math.floor(z);
 
-    // 遍历 3x3x3 区域（TNT 所在的 1x1x1 立方体向外扩展一格）
+    // 1. 连炸逻辑：搜索 5x5x5 区域内的其他 TNT
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dz = -2; dz <= 2; dz++) {
+          // 跳过中心点（当前正在爆炸的 TNT）
+          if (dx === 0 && dy === 0 && dz === 0) continue;
+
+          const tx = bx + dx;
+          const ty = by + dy;
+          const tz = bz + dz;
+
+          if (this.world.getBlock(tx, ty, tz) === 'tnt') {
+            // 立即移除该 TNT 以防止在连炸中被重复搜索到
+            this.world.removeBlock(tx, ty, tz);
+
+            // 随机延迟 100-700ms 后触发连炸
+            const delay = 100 + Math.random() * 600;
+            setTimeout(() => {
+              this.explode(tx, ty, tz);
+            }, delay);
+          }
+        }
+      }
+    }
+
+    // 2. 原始爆炸逻辑：遍历 3x3x3 区域（TNT 所在的 1x1x1 立方体向外扩展一格）
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         for (let dz = -1; dz <= 1; dz++) {
@@ -690,6 +715,8 @@ export class Player {
 
           // 地图保护：如果是 end_stone 且下方是虚空，则不允许炸开
           const type = this.world.getBlock(tx, ty, tz);
+          if (!type) continue;
+
           if (type === 'end_stone') {
             const belowType = this.world.getBlock(tx, ty - 1, tz);
             // 如果下方没有方块，说明这是最底层的保护层，跳过
