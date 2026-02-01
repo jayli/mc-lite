@@ -929,7 +929,7 @@ export class Player {
       this.playFootstepSound();
 
       // 如果在自由移动，则更新晃动计时器并计算目标偏移
-      const oldTimer = this.bobbing_timer;
+      this.bobbing_timer += this.bobbing_speed;
 
       targetBobX = Math.sin(this.bobbing_timer) * this.bobbing_intensity;
       targetBobY = Math.cos(this.bobbing_timer * 2) * this.bobbing_intensity * 0.5;
