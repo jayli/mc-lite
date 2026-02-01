@@ -57,7 +57,9 @@ export const audioManager = new AudioManager();
  */
 export async function initializeAudio() {
   const soundUrls = [
-    './src/world/assets/sound/explosion.mp3'
+    './src/world/assets/sound/explosion.mp3',
+    './src/world/assets/sound/put.mp3',
+    './src/world/assets/sound/delete_get.mp3'
   ];
   await audioManager.preloadSounds(soundUrls);
 }

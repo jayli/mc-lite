@@ -588,6 +588,7 @@ export class Player {
     // 添加到世界
     this.world.setBlock(x, y, z, type);
     this.inventory.remove(type, 1);
+    audioManager.playSound('put', 0.3);
     return true;
   }
 
@@ -633,6 +634,7 @@ export class Player {
       const y = Math.floor(pos.y);
       const z = Math.floor(pos.z);
       this.world.removeBlock(x, y, z);
+      audioManager.playSound('delete_get', 0.3);
 
       // 给予物品
       const type = m.userData.type;
@@ -664,6 +666,7 @@ export class Player {
       } else {
         // --- 如果是普通的动态方块 (非实体) ---
         this.world.removeBlock(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z));
+        audioManager.playSound('delete_get', 0.3);
         this.spawnParticles(m.position, m.userData.type);
         if (m.parent) m.parent.remove(m);
 
