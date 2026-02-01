@@ -80,6 +80,9 @@ export class Player {
 
     // --- 音频系统初始化 ---
     audioManager.init(this.camera);
+
+    // 追踪引燃中的 TNT
+    this.ignitingTNTs = new Set();
   }
 
   /**
@@ -534,8 +537,12 @@ export class Player {
             } else {
               pos.copy(m.position);
             }
-            this.explode(pos.x, pos.y, pos.z);
-            this.swing();
+            const key = `${pos.x},${pos.y},${pos.z}`;
+            if (!this.ignitingTNTs.has(key)) {
+              this.ignitingTNTs.add(key);
+              this.explode(pos.x, pos.y, pos.z);
+              this.swing();
+            }
           }
           // 只要按住了 Ctrl，无论是否是 TNT，都阻止常规挖掘动作
           return;
@@ -717,9 +724,16 @@ export class Player {
     if (action === 'explosionResult') {
       const { blocksToDestroy, tntToIgnite, center } = payload;
 
-      // 1. 执行批量销毁
-      // 过滤掉不可破坏方块
+      // 1. 追踪引燃中的 TNT
+      const ignitingKeys = new Set(this.ignitingTNTs);
+      tntToIgnite.forEach(tnt => ignitingKeys.add(`${tnt.x},${tnt.y},${tnt.z}`));
+
+      // 2. 执行批量销毁
+      // 过滤掉不可破坏方块和正在引燃中的 TNT
       const validDestruction = blocksToDestroy.filter(p => {
+        const key = `${p.x},${p.y},${p.z}`;
+        if (ignitingKeys.has(key)) return false;
+
         const type = this.world.getBlock(p.x, p.y, p.z);
         if (!type) return false;
         if (type === 'end_stone') {
@@ -731,17 +745,22 @@ export class Player {
 
       this.world.removeBlocksBatch(validDestruction);
 
-      // 2. 调度连锁反应
+      // 3. 调度连锁反应
       tntToIgnite.forEach(tnt => {
-        // 在调度前立即将该 TNT 标记为已移除，防止重复触发
-        this.world.removeBlock(tnt.x, tnt.y, tnt.z);
+        const key = `${tnt.x},${tnt.y},${tnt.z}`;
+        if (this.ignitingTNTs.has(key)) return;
+
+        this.ignitingTNTs.add(key);
 
         setTimeout(() => {
+          // 在爆炸时刻移除方块
+          this.world.removeBlock(tnt.x, tnt.y, tnt.z);
+          this.ignitingTNTs.delete(key);
           this.explode(tnt.x, tnt.y, tnt.z);
         }, tnt.delay);
       });
 
-      // 3. 视觉与听觉效果
+      // 4. 视觉与听觉效果
       const centerPos = new THREE.Vector3(center.x + 0.5, center.y + 0.5, center.z + 0.5);
       if (this.world.spawnExplosionParticles) {
         this.world.spawnExplosionParticles(centerPos);
@@ -756,11 +775,19 @@ export class Player {
    * 执行 TNT 爆炸逻辑
    */
   explode(x, y, z) {
-    // 收集周围区块的 Deltas 发送给 Worker
-    const nearbyDeltas = {};
     const bx = Math.floor(x);
     const by = Math.floor(y);
     const bz = Math.floor(z);
+
+    // 在正式计算爆炸前，确保移除方块（如果是手动触发）
+    const key = `${bx},${by},${bz}`;
+    if (this.world.getBlock(bx, by, bz) === 'tnt') {
+      this.world.removeBlock(bx, by, bz);
+      this.ignitingTNTs.delete(key);
+    }
+
+    // 收集周围区块的 Deltas 发送给 Worker
+    const nearbyDeltas = {};
 
     // 只需要 5x5x5 范围涉及的方块状态
     for (let dx = -3; dx <= 3; dx++) {
