@@ -26,7 +26,7 @@ export class Player {
     this.inventory = new Inventory();
 
     // 碰撞检测偏移量，用于防止穿模（可微调）
-    this.collisionOffset = 0.32;
+    this.collisionOffset = 0.34;
 
     // 初始出生点逻辑
     let spawnFound = false;
@@ -392,12 +392,44 @@ export class Player {
       const probeX = this.position.x - Math.sin(this.rotation.y) * bumperDist;
       const probeZ = this.position.z - Math.cos(this.rotation.y) * bumperDist;
 
-      // 如果面前有障碍物，说明发生了穿模，强制回退到移动前的位置
       // 只检测头部高度（防止穿模），忽略脚部高度（允许上台阶）
       const headY = Math.floor(this.position.y + 1.65);
+
+      // 解决墙壁凸角防止穿模的问题加的逻辑
       if (this.physics.isSolid(probeX, headY, probeZ)) {
-        this.position.x = oldX;
-        this.position.z = oldZ;
+        // 发生穿模！尝试进行“滑动”处理，而不是直接回弹停止
+        // 这模拟了碰撞检测生效时的滑墙效果，同时修复了凸角穿模导致的卡顿
+
+        // 1. 尝试只保留 X 轴移动 (回退 Z)
+        // 使用回退后的 Z 轴坐标重新计算探测点
+        const slideX_Pos = this.position.x; // current (nextX)
+        const slideX_Z = oldZ;
+
+        const probeX_SlideX = slideX_Pos - Math.sin(this.rotation.y) * bumperDist;
+        const probeZ_SlideX = slideX_Z - Math.cos(this.rotation.y) * bumperDist;
+
+        // 2. 尝试只保留 Z 轴移动 (回退 X)
+        const slideZ_X = oldX;
+        const slideZ_Pos = this.position.z; // current (nextZ)
+
+        const probeX_SlideZ = slideZ_X - Math.sin(this.rotation.y) * bumperDist;
+        const probeZ_SlideZ = slideZ_Pos - Math.cos(this.rotation.y) * bumperDist;
+
+        // 检查滑动路径是否安全
+        const blockedX = this.physics.isSolid(probeX_SlideX, headY, probeZ_SlideX);
+        const blockedZ = this.physics.isSolid(probeX_SlideZ, headY, probeZ_SlideZ);
+
+        if (!blockedX) {
+          // X轴滑动安全，应用 X 轴移动，回退 Z 轴
+          this.position.z = oldZ;
+        } else if (!blockedZ) {
+          // Z轴滑动安全，应用 Z 轴移动，回退 X 轴
+          this.position.x = oldX;
+        } else {
+          // 两个方向都受阻，完全回弹
+          this.position.x = oldX;
+          this.position.z = oldZ;
+        }
       }
     }
 
