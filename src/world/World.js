@@ -36,7 +36,7 @@ export class World {
     this.scene.add(this.particleMesh);
 
     // 爆炸粒子系统：使用更大的几何体 (particleGeometryBlow)
-    this.explosionMesh = new THREE.InstancedMesh(this.particleGeometryBlow, this.particleMaterial, this.MAX_PARTICLES/3);
+    this.explosionMesh = new THREE.InstancedMesh(this.particleGeometryBlow, this.particleMaterial, this.MAX_PARTICLES);
     this.explosionMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.explosionMesh.frustumCulled = false;
     this.explosionMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.MAX_PARTICLES * 3), 3);
@@ -228,7 +228,7 @@ export class World {
       new THREE.Color(0xf7ff13),  // 纯黄 (火焰)
     ];
 
-    const particleCount = 30; // 爆炸产生的粒子数量
+    const particleCount = 15; // 爆炸产生的粒子数量
 
     for (let i = 0; i < particleCount; i++) {
       const idx = this.explosionNextIndex;
