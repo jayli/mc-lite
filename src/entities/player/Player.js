@@ -26,7 +26,7 @@ export class Player {
     this.inventory = new Inventory();
 
     // 碰撞检测偏移量，用于防止穿模（可微调）
-    this.collisionOffset = 0.3;
+    this.collisionOffset = 0.32;
 
     // 初始出生点逻辑
     let spawnFound = false;
@@ -130,7 +130,7 @@ export class Player {
       return true;
     }
 
-    var rat = 0.7;
+    var rat = 1.0;
     // 基础偏移点：8个方向（4个正交 + 4个对角线）
     const baseOffsetPoints = [
       [x + offset, z],           // 东
@@ -381,6 +381,24 @@ export class Player {
       // 完整移动没有碰撞，或者当前处于卡死状态，允许移动以脱困
       this.position.x = nextX;
       this.position.z = nextZ;
+    }
+
+    // --- 防穿模回弹保护 (Camera Bumper) ---
+    // 即使预判检测失效，如果移动导致摄像机前方极近处(0.25m)有方块，则强制回弹
+    // 这能有效防止视觉上的穿模
+    if (!isCurrentlyStuck) {
+      // 计算玩家面前 0.25 米处的探测点 (摄像机 NearPlane 约为 0.1)
+      const bumperDist = 0.25;
+      const probeX = this.position.x - Math.sin(this.rotation.y) * bumperDist;
+      const probeZ = this.position.z - Math.cos(this.rotation.y) * bumperDist;
+
+      // 如果面前有障碍物，说明发生了穿模，强制回退到移动前的位置
+      // 只检测头部高度（防止穿模），忽略脚部高度（允许上台阶）
+      const headY = Math.floor(this.position.y + 1.65);
+      if (this.physics.isSolid(probeX, headY, probeZ)) {
+        this.position.x = oldX;
+        this.position.z = oldZ;
+      }
     }
 
     // Y轴物理（重力与地面检测）

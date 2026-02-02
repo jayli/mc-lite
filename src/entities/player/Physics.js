@@ -43,20 +43,20 @@ export class Physics {
    * @returns {boolean} - 是否发生碰撞
    */
   checkCollisionForMovement(nx, nz) {
-    // 只检查头部和身体中部的碰撞，排除脚部支撑
+    // 检查玩家高度范围内的所有方块（排除脚部，防止被台阶卡住）
+    // 使用循环检查覆盖整个身体高度，避免两点检测（头部+中部）在特殊对齐下失效
     const x = nx;
     const z = nz;
-    const y2 = Math.floor(this.player.position.y + this.playerHeight * 0.9);
 
-    // 检查头部
-    if (this.isSolid(x, y2, z)) {
-      return true;
-    }
+    // 从脚部上方一定高度开始检查，直到头顶
+    // 0.5 的偏移量排除脚部，允许上台阶
+    const minY = Math.floor(this.player.position.y + 0.5);
+    const maxY = Math.floor(this.player.position.y + this.playerHeight - 0.2);
 
-    // 检查身体中部（大约玩家高度的一半）
-    const yMid = Math.floor(this.player.position.y + this.playerHeight * 0.4);
-    if (this.isSolid(x, yMid, z)) {
-      return true;
+    for (let y = minY; y <= maxY; y++) {
+      if (this.isSolid(x, y, z)) {
+        return true;
+      }
     }
 
     return false;
