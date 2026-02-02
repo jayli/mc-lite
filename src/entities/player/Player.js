@@ -215,6 +215,7 @@ export class Player {
     return (
       this.physics.isSolid(targetX, floorY, this.position.z) &&
       !this.physics.isSolid(targetX, floorY + 1, this.position.z) &&
+      !this.physics.isSolid(targetX, floorY + 2, this.position.z) &&
       !this.physics.isSolid(this.position.x, floorY + 2, this.position.z)
     );
   }
@@ -245,6 +246,7 @@ export class Player {
     return (
       this.physics.isSolid(this.position.x, floorY, targetZ) &&
       !this.physics.isSolid(this.position.x, floorY + 1, targetZ) &&
+      !this.physics.isSolid(this.position.x, floorY + 2, targetZ) &&
       !this.physics.isSolid(this.position.x, floorY + 2, this.position.z)
     );
   }
@@ -347,10 +349,12 @@ export class Player {
     let nextZ = this.position.z + dz;
 
     // 首先检查完整移动是否碰撞
+    const isCurrentlyStuck = this.physics.checkCollisionForMovement(this.position.x, this.position.z);
     const hasCollisionFull = this._checkCollisionWithOffset(nextX, nextZ, dx, dz);
 
-    if (hasCollisionFull) {
-      // 完整移动有碰撞，改为逐轴检查和应用位移，以实现更可靠的墙壁滑动
+    if (hasCollisionFull && !isCurrentlyStuck) {
+      // 完整移动有碰撞且当前未卡死，改为逐轴检查和应用位移，以实现更可靠的墙壁滑动
+      // ... 保持原有的顺序解析逻辑 ...
 
       // 1. 尝试在 X 轴上移动
       const collisionX = this._checkCollisionWithOffset(nextX, this.position.z, dx, 0);
@@ -374,7 +378,7 @@ export class Player {
         this.position.z = nextZ;
       }
     } else {
-      // 完整移动没有碰撞，允许移动
+      // 完整移动没有碰撞，或者当前处于卡死状态，允许移动以脱困
       this.position.x = nextX;
       this.position.z = nextZ;
     }
