@@ -36,7 +36,7 @@ export class World {
     this.scene.add(this.particleMesh);
 
     // 爆炸粒子系统：使用更大的几何体 (particleGeometryBlow)
-    this.explosionMesh = new THREE.InstancedMesh(this.particleGeometryBlow, this.particleMaterial, this.MAX_PARTICLES);
+    this.explosionMesh = new THREE.InstancedMesh(this.particleGeometryBlow, this.particleMaterial, this.MAX_PARTICLES/3);
     this.explosionMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.explosionMesh.frustumCulled = false;
     this.explosionMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.MAX_PARTICLES * 3), 3);
@@ -55,6 +55,32 @@ export class World {
     this.particleNextIndex = 0;
     this.explosionNextIndex = 0;
     this.dummy = new THREE.Object3D(); // 用于辅助计算矩阵
+
+    // 爆炸球体特效池
+    this.MAX_EXPLOSION_SPHERES = 15;
+    this.explosionSphereGeometry = new THREE.SphereGeometry(1, 24, 24);
+    this.explosionSpheres = [];
+    for (let i = 0; i < this.MAX_EXPLOSION_SPHERES; i++) {
+      const mesh = new THREE.Mesh(
+        this.explosionSphereGeometry,
+        new THREE.MeshBasicMaterial({
+          color: 0xffff00,
+          transparent: true,
+          opacity: 0,
+          depthWrite: false, // 避免深度冲突
+          side: THREE.DoubleSide
+        })
+      );
+      mesh.visible = false;
+      this.scene.add(mesh);
+      this.explosionSpheres.push({
+        mesh: mesh,
+        active: false,
+        timer: 0,
+        maxLife: 0.6,
+        targetScale: 8.0
+      });
+    }
   }
 
   /**
@@ -123,6 +149,23 @@ export class World {
     }
     if (expUpdate) this.explosionMesh.instanceMatrix.needsUpdate = true;
 
+    // 更新爆炸球体特效
+    for (const s of this.explosionSpheres) {
+      if (!s.active) continue;
+      s.timer += dt;
+      const progress = s.timer / s.maxLife;
+      if (progress >= 1) {
+        s.active = false;
+        s.mesh.visible = false;
+      } else {
+        // 使用自定义的目标缩放
+        const scale = 0.1 + progress * s.targetScale;
+        s.mesh.scale.setScalar(scale);
+        // 从 1.0 变透明到 0.0，使用平方根使消失更平滑
+        s.mesh.material.opacity = Math.pow(1.0 - progress, 1.5);
+      }
+    }
+
     // Update chest animations
     chestManager.update(dt);
   }
@@ -185,7 +228,7 @@ export class World {
       new THREE.Color(0xf7ff13),  // 纯黄 (火焰)
     ];
 
-    const particleCount = 40; // 爆炸产生的粒子数量
+    const particleCount = 30; // 爆炸产生的粒子数量
 
     for (let i = 0; i < particleCount; i++) {
       const idx = this.explosionNextIndex;
@@ -219,6 +262,19 @@ export class World {
       this.explosionMesh.setColorAt(idx, color);
 
       this.explosionNextIndex = (this.explosionNextIndex + 1) % this.MAX_PARTICLES;
+    }
+
+    // 触发球体扩张特效
+    const sphere = this.explosionSpheres.find(s => !s.active);
+    if (sphere) {
+      sphere.active = true;
+      sphere.timer = 0;
+      sphere.maxLife = 0.3; //+ Math.random() * 0.4;
+      sphere.targetScale = 4.0; //+ Math.random() * 6.0;
+      sphere.mesh.position.copy(pos);
+      sphere.mesh.visible = true;
+      sphere.mesh.scale.setScalar(0.1);
+      sphere.mesh.material.opacity = 1.0;
     }
 
     this.explosionMesh.instanceMatrix.needsUpdate = true;

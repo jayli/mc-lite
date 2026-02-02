@@ -372,16 +372,17 @@ materials.registerMaterial('dirt', {
   }
 }); // 土
 
+const stoneSide1 = { textureUrl: './src/world/assets/textures/stone.png' };
 const stoneSide = { textureUrl: './src/world/assets/textures/stone_diorite.png' };
 const stoneTopBottom = { textureUrl: './src/world/assets/textures/stone_andesite.png' };
 materials.registerMaterial('stone', {
   faces: {
     0: stoneSide,
-    1: stoneSide,
+    1: stoneSide1,
     2: stoneTopBottom,
     3: stoneTopBottom,
     4: stoneSide,
-    5: stoneSide
+    5: stoneSide1
   }
 }); // 石头
 
@@ -436,8 +437,17 @@ materials.registerMaterial('hay_bale', {
   }
 }); // 干草堆
 
+const sandSide = { textureUrl: './src/world/assets/textures/sand_side.png' };
+const sandTopBottom = { textureUrl: './src/world/assets/textures/sand.png' };
 materials.registerMaterial('sand', {
-  textureUrl:'./src/world/assets/textures/sand.png'
+  faces: {
+    0: sandSide,
+    1: sandSide,
+    2: sandTopBottom,
+    3: sandTopBottom,
+    4: sandSide,
+    5: sandSide
+  }
 }); // 沙地
 
 const woodSide = { textureUrl: './src/world/assets/textures/log_big_oak.png' };
