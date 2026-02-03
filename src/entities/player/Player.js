@@ -666,10 +666,26 @@ export class Player {
     // 如果位置已有实心方块，无法放置
     if (this.physics.isSolid(x, y, z)) return false;
 
-    // 检查是否与玩家自身碰撞
-    if (x >= this.position.x - 0.5 && x <= this.position.x + 0.5 &&
-      z >= this.position.z - 0.5 && z <= this.position.z + 0.5 &&
-      y >= this.position.y && y <= this.position.y + 1.9) {
+    // 检查是否与玩家自身碰撞 (AABB 碰撞检测)
+    // 玩家占据的空间：[x - 0.3, x + 0.3], [y, y + 1.8], [z - 0.3, z + 0.3] (略微缩小判定区以提升放置体验)
+    // 方块占据的空间：[x, x + 1], [y, y + 1], [z, z + 1]
+    const playerMinX = this.position.x - 0.3;
+    const playerMaxX = this.position.x + 0.3;
+    const playerMinZ = this.position.z - 0.3;
+    const playerMaxZ = this.position.z + 0.3;
+    const playerMinY = this.position.y;
+    const playerMaxY = this.position.y + 1.8;
+
+    const blockMinX = x;
+    const blockMaxX = x + 1;
+    const blockMinY = y;
+    const blockMaxY = y + 1;
+    const blockMinZ = z;
+    const blockMaxZ = z + 1;
+
+    if (playerMinX < blockMaxX && playerMaxX > blockMinX &&
+        playerMinY < blockMaxY && playerMaxY > blockMinY &&
+        playerMinZ < blockMaxZ && playerMaxZ > blockMinZ) {
       return false;
     }
 

@@ -3,15 +3,13 @@
 // 负责区块的加载/卸载、粒子效果、方块放置/移除逻辑
 import * as THREE from 'three';
 import { Chunk } from './Chunk.js';
-import { materials } from '../core/materials/MaterialManager.js';
 import { chestManager } from './entities/Chest.js';
 import { persistenceService } from '../services/PersistenceService.js';
 import { noise } from '../utils/MathUtils.js';
+import { ParticleSystem } from './effects/ParticleSystem.js';
 
 const CHUNK_SIZE = 16;
 const RENDER_DIST = 3;
-// 默认为白色
-const white_color = new THREE.Color(0xffffff);
 
 /**
  * 世界管理器类
@@ -22,38 +20,9 @@ export class World {
     this.scene = scene;
     this.chunks = new Map(); // Key: "cx,cz" -> Chunk
 
-    // 粒子系统优化：使用 InstancedMesh 统一管理所有挖掘粒子，大幅减少 Draw Call
-    this.MAX_PARTICLES = 128; // 增加粒子上限以支持爆炸效果
-    this.particleGeometry = new THREE.BoxGeometry(0.1, 0.1, 0.1); // 每个粒子的基础几何体 (0.1单位的小方块)
-    this.particleGeometryBlow = new THREE.BoxGeometry(0.5, 0.5, 0.5); // 爆炸粒子
-    this.particleMaterial = new THREE.MeshBasicMaterial();
-    this.particleMesh = new THREE.InstancedMesh(this.particleGeometry, this.particleMaterial, this.MAX_PARTICLES);
-    // DynamicDrawUsage: 提示 WebGL 粒子位置会频繁更新，优化 GPU 缓冲区上传速度
-    this.particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.particleMesh.frustumCulled = false; // 禁用视锥体裁剪，防止因实例矩阵变换导致边界球失效而误删渲染
-    // 预先创建颜色属性，用于使粒子颜色与被挖掘方块匹配
-    this.particleMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.MAX_PARTICLES * 3), 3);
-    this.scene.add(this.particleMesh);
+    // 初始化粒子系统
+    this.particles = new ParticleSystem(this.scene);
 
-    // 爆炸粒子系统：使用更大的几何体 (particleGeometryBlow)
-    this.explosionMesh = new THREE.InstancedMesh(this.particleGeometryBlow, this.particleMaterial, this.MAX_PARTICLES);
-    this.explosionMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-    this.explosionMesh.frustumCulled = false;
-    this.explosionMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(this.MAX_PARTICLES * 3), 3);
-    this.scene.add(this.explosionMesh);
-
-    this.particlesData = []; // 普通粒子数据
-    this.explosionData = []; // 爆炸粒子数据
-    for (let i = 0; i < this.MAX_PARTICLES; i++) {
-      this.particlesData.push({ active: false, vel: new THREE.Vector3(), life: 0, pos: new THREE.Vector3() });
-      this.explosionData.push({ active: false, vel: new THREE.Vector3(), life: 0, pos: new THREE.Vector3() });
-
-      // 初始隐藏
-      this.particleMesh.setMatrixAt(i, new THREE.Matrix4().makeScale(0, 0, 0));
-      this.explosionMesh.setMatrixAt(i, new THREE.Matrix4().makeScale(0, 0, 0));
-    }
-    this.particleNextIndex = 0;
-    this.explosionNextIndex = 0;
     this.dummy = new THREE.Object3D(); // 用于辅助计算矩阵
 
     // 爆炸球体特效池
@@ -117,37 +86,8 @@ export class World {
       }
     }
 
-    // Update particles (普通粒子)
-    let digUpdate = false;
-    for (let i = 0; i < this.MAX_PARTICLES; i++) {
-      const p = this.particlesData[i];
-      if (!p.active) continue;
-      p.life -= 0.04;
-      p.pos.add(p.vel);
-      p.vel.y -= 0.01;
-      if (p.life <= 0) { p.active = false; this.dummy.scale.setScalar(0); }
-      else { this.dummy.position.copy(p.pos); this.dummy.scale.setScalar(p.life); }
-      this.dummy.updateMatrix();
-      this.particleMesh.setMatrixAt(i, this.dummy.matrix);
-      digUpdate = true;
-    }
-    if (digUpdate) this.particleMesh.instanceMatrix.needsUpdate = true;
-
-    // Update explosion particles (爆炸粒子)
-    let expUpdate = false;
-    for (let i = 0; i < this.MAX_PARTICLES; i++) {
-      const p = this.explosionData[i];
-      if (!p.active) continue;
-      p.life -= 0.02; // 爆炸粒子消失慢一点，更有视觉冲击力
-      p.pos.add(p.vel);
-      p.vel.y -= 0.005; // 受到重力影响也小一点
-      if (p.life <= 0) { p.active = false; this.dummy.scale.setScalar(0); }
-      else { this.dummy.position.copy(p.pos); this.dummy.scale.setScalar(p.life); }
-      this.dummy.updateMatrix();
-      this.explosionMesh.setMatrixAt(i, this.dummy.matrix);
-      expUpdate = true;
-    }
-    if (expUpdate) this.explosionMesh.instanceMatrix.needsUpdate = true;
+    // 更新粒子系统
+    this.particles.update(dt);
 
     // 更新爆炸球体特效
     for (const s of this.explosionSpheres) {
@@ -171,114 +111,33 @@ export class World {
   }
 
   /**
-   * 生成粒子效果
+   * 生成挖掘粒子效果 (转发至 ParticleSystem)
    * @param {THREE.Vector3} pos - 粒子生成位置
-   * @param {string} type - 方块类型，用于确定粒子颜色
    */
-  spawnParticles(pos, type) {
-    let material = materials.getMaterial(type);
-    if (Array.isArray(material)) material = material[0];
-
-    // 从材质中提取颜色，如果是 MeshStandardMaterial 则有 color 属性 (THREE.Color)
-    const color = white_color;
-
-    for (let i = 0; i < 4; i++) { // 稍微增加粒子数量
-      const idx = this.particleNextIndex;
-      const p = this.particlesData[idx];
-
-      p.active = true;
-      p.pos.copy(pos).add(new THREE.Vector3(
-        (Math.random() - 0.5) * 0.5,
-        (Math.random() - 0.1) * 0.5,
-        (Math.random() - 0.5) * 0.5
-      ));
-      p.vel.set(
-        (Math.random() - 0.5) * 0.1,
-        Math.random() * 0.15 + 0.05,
-        (Math.random() - 0.5) * 0.1
-      );
-      p.life = 1.0;
-
-      this.dummy.position.copy(p.pos);
-      this.dummy.scale.setScalar(p.life);
-      this.dummy.rotation.set(0, 0, 0); // 重置旋转
-      this.dummy.updateMatrix();
-
-      this.particleMesh.setMatrixAt(idx, this.dummy.matrix);
-      this.particleMesh.setColorAt(idx, color);
-
-      this.particleNextIndex = (this.particleNextIndex + 1) % this.MAX_PARTICLES;
-    }
-
-    this.particleMesh.instanceMatrix.needsUpdate = true;
-    if (this.particleMesh.instanceColor) this.particleMesh.instanceColor.needsUpdate = true;
+  spawnParticles(pos) {
+    this.particles.spawnDigEffect(pos);
   }
 
   /**
-   * 生成 TNT 爆炸粒子效果
+   * 生成 TNT 爆炸效果 (转发至 ParticleSystem)
    * @param {THREE.Vector3} pos - 爆炸中心位置
    */
   spawnExplosionParticles(pos) {
-    const explosionColors = [
-      new THREE.Color(0xffffff), // 白色 (闪光)
-      new THREE.Color(0xffcc00), // 黄色 (火花)
-      new THREE.Color(0xff6600), // 橙色 (火焰)
-      new THREE.Color(0x666666),  // 灰色 (烟雾)
-      new THREE.Color(0xfd52d3),  // 分红 (火焰)
-      new THREE.Color(0xf7ff13),  // 纯黄 (火焰)
-    ];
+    // 1. 触发 2D Billboard 爆炸
+    this.particles.spawnExplosionEffect(pos);
 
-    const particleCount = 15; // 爆炸产生的粒子数量
-
-    for (let i = 0; i < particleCount; i++) {
-      const idx = this.explosionNextIndex;
-      const p = this.explosionData[idx];
-
-      p.active = true;
-      p.pos.copy(pos);
-
-      // 随机方向的强力爆发速度
-      const theta = Math.random() * Math.PI * 2;
-      const phi = Math.random() * Math.PI;
-      const speed = 0.2 + Math.random() * 0.4;
-
-      p.vel.set(
-        Math.sin(phi) * Math.cos(theta) * speed,
-        Math.sin(phi) * Math.sin(theta) * speed,
-        Math.cos(phi) * speed
-      );
-
-      // 爆炸粒子生命周期
-      p.life = 1.0 + Math.random() * 0.5;
-
-      this.dummy.position.copy(p.pos);
-      this.dummy.scale.setScalar(p.life);
-      this.dummy.updateMatrix();
-
-      this.explosionMesh.setMatrixAt(idx, this.dummy.matrix);
-
-      // 随机分配爆炸颜色
-      const color = explosionColors[Math.floor(Math.random() * explosionColors.length)];
-      this.explosionMesh.setColorAt(idx, color);
-
-      this.explosionNextIndex = (this.explosionNextIndex + 1) % this.MAX_PARTICLES;
-    }
-
-    // 触发球体扩张特效
+    // 2. 触发球体扩张特效 (保留在 World 中，作为底层增强)
     const sphere = this.explosionSpheres.find(s => !s.active);
     if (sphere) {
       sphere.active = true;
       sphere.timer = 0;
-      sphere.maxLife = 0.3; //+ Math.random() * 0.4;
-      sphere.targetScale = 4.0; //+ Math.random() * 6.0;
+      sphere.maxLife = 0.3;
+      sphere.targetScale = 5.0;
       sphere.mesh.position.copy(pos);
       sphere.mesh.visible = true;
       sphere.mesh.scale.setScalar(0.1);
       sphere.mesh.material.opacity = 1.0;
     }
-
-    this.explosionMesh.instanceMatrix.needsUpdate = true;
-    if (this.explosionMesh.instanceColor) this.explosionMesh.instanceColor.needsUpdate = true;
   }
 
   /**

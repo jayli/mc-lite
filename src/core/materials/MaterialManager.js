@@ -81,12 +81,13 @@ export class MaterialManager {
    */
   _createMaterial(def, type) {
     // 定义允许使用 AO 阴影的材质列表
-    const aoAllowedTypes = ['sand', 'stone', 'mossy_stone', 'cobblestone', 'bricks'];
+    const aoAllowedTypes = ['sand', 'stone', 'mossy_stone', 'cobblestone', 'bricks']; // 支持环境遮蔽（AO）的材质类型，这些材质会在着色器中应用AO效果
     const useAO = aoAllowedTypes.includes(type);
 
     // 情况0：多面材质（用于立方体不同面使用不同材质）
     if (def.faces) {
       // Three.js BoxGeometry 面的顺序：px, nx, py, ny, pz, nz (0-5)
+      // 对应关系：0: 正X面（东），1: 负X面（西），2: 正Y面（上），3: 负Y面（下），4: 正Z面（南），5: 负Z面（北）
       const mats = [];
       for (let i = 0; i < 6; i++) {
         const faceDef = def.faces[i] || def.faces.all || def;
@@ -108,7 +109,7 @@ export class MaterialManager {
         texture = texture.clone(); // 克隆纹理以避免修改缓存中的原始纹理
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(def.repeat[0], def.repeat[1]);
+        texture.repeat.set(def.repeat[0], def.repeat[1]); // 设置纹理重复次数，[0]为U方向，[1]为V方向
         texture.magFilter = THREE.NearestFilter;
         texture.minFilter = THREE.NearestFilter;
         texture.generateMipmaps = false;
@@ -130,8 +131,8 @@ export class MaterialManager {
     // 情况2：使用纹理生成器（程序化纹理）
     if (def.textureGenerator) {
       const canvas = document.createElement('canvas');
-      canvas.width = 64;
-      canvas.height = 64;
+      canvas.width = 64;  // 程序化纹理宽度：64像素
+      canvas.height = 64; // 程序化纹理高度：64像素
       const ctx = canvas.getContext('2d');
 
       // 如果定义了颜色且fillBackground不为false，填充背景色
@@ -191,12 +192,12 @@ export class MaterialManager {
         #include <common>
         float getAo(float id, float low, float high) {
           float aoRaw;
-          if (id < 12.0) {
-            aoRaw = mod(floor(low / pow(4.0, id)), 4.0);
+          if (id < 12.0) { // 前12个顶点（0-11）的AO数据存储在low中，后12个顶点（12-23）存储在high中
+            aoRaw = mod(floor(low / pow(4.0, id)), 4.0); // 每个顶点AO值用2位存储（0-3），4.0表示4种可能值
           } else {
             aoRaw = mod(floor(high / pow(4.0, id - 12.0)), 4.0);
           }
-          return 1.0 - (3.0 - aoRaw) / 3.0 * 0.9; // 0.9 为阴影强度
+          return 1.0 - (3.0 - aoRaw) / 3.0 * 0.9; // 0.9 为阴影强度，3.0为最大AO值，将0-3映射到亮度系数
         }
         `
       );
@@ -349,26 +350,26 @@ const grassTop = { textureUrl: './src/world/assets/textures/grass_carried.png' }
 const grassBottom = mkMat('#559944');
 
 materials.registerMaterial('grass', {
-  faces: {
-    0: grassSide,
-    1: grassSide,
-    2: grassTop,
-    3: grassBottom,
-    4: grassSide,
-    5: grassSide
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: grassSide,   // 东面：草地侧面
+    1: grassSide,   // 西面：草地侧面
+    2: grassTop,    // 上面：草地顶部
+    3: grassBottom, // 下面：草地底部（泥土色）
+    4: grassSide,   // 南面：草地侧面
+    5: grassSide    // 北面：草地侧面
   }
 });
 
 const dirtSide = { textureUrl: './src/world/assets/textures/dirt.png' };
 const dirtTopBottom = { textureUrl: './src/world/assets/textures/dirt_podzol_top.png' };
 materials.registerMaterial('dirt', {
-  faces: {
-    0: dirtSide,
-    1: dirtSide,
-    2: dirtTopBottom,
-    3: dirtTopBottom,
-    4: dirtSide,
-    5: dirtSide
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: dirtSide,       // 东面：泥土侧面
+    1: dirtSide,       // 西面：泥土侧面
+    2: dirtTopBottom,  // 上面：泥土顶部
+    3: dirtTopBottom,  // 下面：泥土底部
+    4: dirtSide,       // 南面：泥土侧面
+    5: dirtSide        // 北面：泥土侧面
   }
 }); // 土
 
@@ -376,13 +377,13 @@ const stoneSide1 = { textureUrl: './src/world/assets/textures/stone.png' };
 const stoneSide = { textureUrl: './src/world/assets/textures/stone_diorite.png' };
 const stoneTopBottom = { textureUrl: './src/world/assets/textures/stone_andesite.png' };
 materials.registerMaterial('stone', {
-  faces: {
-    0: stoneSide,
-    1: stoneSide1,
-    2: stoneTopBottom,
-    3: stoneTopBottom,
-    4: stoneSide,
-    5: stoneSide1
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: stoneSide,       // 东面：石头侧面（闪长岩）
+    1: stoneSide,       // 西面：石头侧面（闪长岩）
+    2: stoneTopBottom,  // 上面：石头顶部（安山岩）
+    3: stoneTopBottom,  // 下面：石头底部（安山岩）
+    4: stoneSide1,      // 南面：石头侧面（普通石头）
+    5: stoneSide1       // 北面：石头侧面（普通石头）
   }
 }); // 石头
 
@@ -427,52 +428,52 @@ materials.registerMaterial('green_planks', {
 const hayBaleSide = { textureUrl: './src/world/assets/textures/Hay_Bale.png' };
 const hayBaleTopBottom = { textureUrl: './src/world/assets/textures/Hay_Bale_top.png' };
 materials.registerMaterial('hay_bale', {
-  faces: {
-    0: hayBaleSide,
-    1: hayBaleSide,
-    2: hayBaleTopBottom,
-    3: hayBaleTopBottom,
-    4: hayBaleSide,
-    5: hayBaleSide
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: hayBaleSide,      // 东面：干草堆侧面
+    1: hayBaleSide,      // 西面：干草堆侧面
+    2: hayBaleTopBottom, // 上面：干草堆顶部
+    3: hayBaleTopBottom, // 下面：干草堆底部
+    4: hayBaleSide,      // 南面：干草堆侧面
+    5: hayBaleSide       // 北面：干草堆侧面
   }
 }); // 干草堆
 
 const sandSide = { textureUrl: './src/world/assets/textures/sand_side.png' };
 const sandTopBottom = { textureUrl: './src/world/assets/textures/sand.png' };
 materials.registerMaterial('sand', {
-  faces: {
-    0: sandSide,
-    1: sandSide,
-    2: sandTopBottom,
-    3: sandTopBottom,
-    4: sandSide,
-    5: sandSide
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: sandSide,       // 东面：沙地侧面
+    1: sandSide,       // 西面：沙地侧面
+    2: sandTopBottom,  // 上面：沙地顶部
+    3: sandTopBottom,  // 下面：沙地底部
+    4: sandSide,       // 南面：沙地侧面
+    5: sandSide        // 北面：沙地侧面
   }
 }); // 沙地
 
 const woodSide = { textureUrl: './src/world/assets/textures/log_big_oak.png' };
 const woodTopBottom = { textureUrl: './src/world/assets/textures/log_big_oak_top.png' };
 materials.registerMaterial('wood', {
-  faces: {
-    0: woodSide,
-    1: woodSide,
-    2: woodTopBottom,
-    3: woodTopBottom,
-    4: woodSide,
-    5: woodSide
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: woodSide,       // 东面：木头侧面（树干纹理）
+    1: woodSide,       // 西面：木头侧面（树干纹理）
+    2: woodTopBottom,  // 上面：木头顶部（年轮纹理）
+    3: woodTopBottom,  // 下面：木头底部（年轮纹理）
+    4: woodSide,       // 南面：木头侧面（树干纹理）
+    5: woodSide        // 北面：木头侧面（树干纹理）
   }
 }); // 木头
 
 const birchLogSide = { textureUrl: './src/world/assets/textures/Birch_Log_side.png' };
 const birchLogTopBottom = { textureUrl: './src/world/assets/textures/Birch_Log_top.png' };
 materials.registerMaterial('birch_log', {
-  faces: {
-    0: birchLogSide,
-    1: birchLogSide,
-    2: birchLogTopBottom,
-    3: birchLogTopBottom,
-    4: birchLogSide,
-    5: birchLogSide
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: birchLogSide,       // 东面：桦木树干侧面
+    1: birchLogSide,       // 西面：桦木树干侧面
+    2: birchLogTopBottom,  // 上面：桦木树干顶部
+    3: birchLogTopBottom,  // 下面：桦木树干底部
+    4: birchLogSide,       // 南面：桦木树干侧面
+    5: birchLogSide        // 北面：桦木树干侧面
   }
 }); // 桦木树干
 
@@ -502,13 +503,13 @@ materials.registerMaterial('swamp_water', mkMat('#2F4F4F', 0.7)); // 沼泽水
 const swampGrassSide = { textureUrl: './src/world/assets/textures/Mossy_Cobblestone_side.png' };
 const swampGrassTopBottom = mkMat('#4C5E34');
 materials.registerMaterial('swamp_grass', {
-  faces: {
-    0: swampGrassSide,
-    1: swampGrassSide,
-    2: swampGrassTopBottom,
-    3: swampGrassTopBottom,
-    4: swampGrassSide,
-    5: swampGrassSide
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: swampGrassSide,       // 东面：沼泽草侧面（苔藓石侧面纹理）
+    1: swampGrassSide,       // 西面：沼泽草侧面（苔藓石侧面纹理）
+    2: swampGrassTopBottom,  // 上面：沼泽草顶部（深绿色）
+    3: swampGrassTopBottom,  // 下面：沼泽草底部（深绿色）
+    4: swampGrassSide,       // 南面：沼泽草侧面（苔藓石侧面纹理）
+    5: swampGrassSide        // 北面：沼泽草侧面（苔藓石侧面纹理）
   }
 }); // 沼泽草
 
@@ -517,13 +518,13 @@ const bookboxFront = { textureUrl: './src/world/assets/textures/Bookshelf_textur
 const bookboxSide = { textureUrl: './src/world/assets/textures/Bone_Block_side_texture_JE2_BE2.png' };
 const bookboxTopBottom = { textureUrl: './src/world/assets/textures/Bone_Block_top_texture_JE2_BE2.png' };
 materials.registerMaterial('bookbox', {
-  faces: {
-    0: bookboxSide,
-    1: bookboxSide,
-    2: bookboxTopBottom,
-    3: bookboxTopBottom,
-    4: bookboxFront,
-    5: bookboxSide
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: bookboxSide,       // 东面：书架侧面（骨块侧面纹理）
+    1: bookboxSide,       // 西面：书架侧面（骨块侧面纹理）
+    2: bookboxTopBottom,  // 上面：书架顶部（骨块顶部纹理）
+    3: bookboxTopBottom,  // 下面：书架底部（骨块顶部纹理）
+    4: bookboxFront,      // 南面：书架正面（书架纹理，有书本）
+    5: bookboxSide        // 北面：书架侧面（骨块侧面纹理）
   }
 }); // 书架
 
@@ -538,13 +539,13 @@ materials.registerMaterial('sky_leaves', mkMat('#FF69B4', 0.9)); // 天空树叶
 const mossSide = { textureUrl: './src/world/assets/textures/dirt_podzol_side.png' };
 const mossTopBottom = { textureUrl: './src/world/assets/textures/moss_block.png' };
 materials.registerMaterial('moss', {
-  faces: {
-    0: mossSide,
-    1: mossSide,
-    2: mossTopBottom,
-    3: mossTopBottom,
-    4: mossSide,
-    5: mossSide
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: mossSide,       // 东面：苔藓侧面（灰化土侧面纹理）
+    1: mossSide,       // 西面：苔藓侧面（灰化土侧面纹理）
+    2: mossTopBottom,  // 上面：苔藓顶部（苔藓块纹理）
+    3: mossTopBottom,  // 下面：苔藓底部（苔藓块纹理）
+    4: mossSide,       // 南面：苔藓侧面（灰化土侧面纹理）
+    5: mossSide        // 北面：苔藓侧面（灰化土侧面纹理）
   }
 }); // 苔藓
 
@@ -553,13 +554,13 @@ const chestSide = { textureUrl: './src/world/assets/textures/box_side.png' };
 const chestTop = { textureUrl: './src/world/assets/textures/box_top.png' };
 const chestFront = { textureUrl: './src/world/assets/textures/box_face.png' };
 materials.registerMaterial('chest', {
-  faces: {
-    0: chestSide,
-    1: chestSide,
-    2: chestTop,
-    3: chestSide,
-    4: chestFront,
-    5: chestSide
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: chestSide,   // 东面：宝箱侧面
+    1: chestSide,   // 西面：宝箱侧面
+    2: chestTop,    // 上面：宝箱顶部
+    3: chestSide,   // 下面：宝箱侧面（底面不可见，使用侧面纹理）
+    4: chestFront,  // 南面：宝箱正面（带锁扣）
+    5: chestSide    // 北面：宝箱侧面
   }
 }); // 宝箱
 
@@ -572,9 +573,9 @@ materials.registerMaterial('gold_apple', mkMat('#FFD700'));
 
 // 复杂材质（使用细节绘图函数）
 materials.registerMaterial('flower', mkDetailMat('#000000', '#FF4444', true, (ctx)=>{
-  ctx.fillStyle='#2E8B57'; ctx.fillRect(30,24,4,40);
-  ctx.fillStyle='#FF4444'; ctx.beginPath(); ctx.arc(32,24,12,0,Math.PI*2); ctx.fill();
-  ctx.fillStyle='#FFD700'; ctx.beginPath(); ctx.arc(32,24,4,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#2E8B57'; ctx.fillRect(30,24,4,40); // 茎干：位置(30,24)，宽4，高40像素
+  ctx.fillStyle='#FF4444'; ctx.beginPath(); ctx.arc(32,24,12,0,Math.PI*2); ctx.fill(); // 花瓣：圆心(32,24)，半径12
+  ctx.fillStyle='#FFD700'; ctx.beginPath(); ctx.arc(32,24,4,0,Math.PI*2); ctx.fill(); // 花蕊：圆心(32,24)，半径4
 }));
 
 materials.registerMaterial('azalea_leaves', {
@@ -590,17 +591,17 @@ materials.registerMaterial('azalea_flowers', {
 });
 
 materials.registerMaterial('vine', mkDetailMat(null, '#355E3B', true, (ctx) => {
-  ctx.strokeStyle = '#355E3B'; ctx.lineWidth = 3;
-  for(let i=0; i<5; i++) {
+  ctx.strokeStyle = '#355E3B'; ctx.lineWidth = 3; // 藤蔓线条宽度3像素
+  for(let i=0; i<5; i++) { // 绘制5条藤蔓
     ctx.beginPath();
-    ctx.moveTo(10+i*10, 0);
-    ctx.bezierCurveTo(Math.random()*64, 20, Math.random()*64, 40, 10+i*10, 64);
+    ctx.moveTo(10+i*10, 0); // 起始点：x坐标10+i*10（间隔10像素），y坐标0（顶部）
+    ctx.bezierCurveTo(Math.random()*64, 20, Math.random()*64, 40, 10+i*10, 64); // 贝塞尔曲线，控制点随机产生弯曲效果
     ctx.stroke();
   }
 }));
 
 materials.registerMaterial('lilypad', mkDetailMat(null, '#228B22', true, (ctx) => {
-  ctx.beginPath(); ctx.arc(32,32,28,0.3, Math.PI*1.8); ctx.fill();
+  ctx.beginPath(); ctx.arc(32,32,28,0.3, Math.PI*1.8); ctx.fill(); // 圆心(32,32)，半径28，起始弧度0.3，结束弧度1.8π（制造缺口效果）
 }));
 
 materials.registerMaterial('realistic_trunk_procedural', {
@@ -656,13 +657,13 @@ materials.registerMaterial('iron_ore', { textureUrl: './src/world/assets/texture
 const debrisSide = { textureUrl: './src/world/assets/textures/Ancient_Debris_side.png' };
 const debrisTop = { textureUrl: './src/world/assets/textures/Ancient_Debris_top.png' };
 materials.registerMaterial('debris', {
-  faces: {
-    0: debrisSide,
-    1: debrisSide,
-    2: debrisTop,
-    3: debrisTop,
-    4: debrisSide,
-    5: debrisSide
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: debrisSide,   // 东面：远古残骸侧面
+    1: debrisSide,   // 西面：远古残骸侧面
+    2: debrisTop,    // 上面：远古残骸顶部
+    3: debrisTop,    // 下面：远古残骸底部（同顶部纹理）
+    4: debrisSide,   // 南面：远古残骸侧面
+    5: debrisSide    // 北面：远古残骸侧面
   }
 });
 
@@ -675,13 +676,12 @@ materials.registerMaterial('yellow_leaves', {
 const tntSide = { textureUrl: './src/world/assets/textures/tnt_side.png' };
 const tntTopBottom = { textureUrl: './src/world/assets/textures/tnt_top.png' };
 materials.registerMaterial('tnt', {
-  faces: {
-    0: tntSide,
-    1: tntSide,
-    2: tntTopBottom,
-    3: tntTopBottom,
-    4: tntSide,
-    5: tntSide
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: tntSide,       // 东面：TNT侧面（带文字纹理）
+    1: tntSide,       // 西面：TNT侧面（带文字纹理）
+    2: tntTopBottom,  // 上面：TNT顶部（引线纹理）
+    3: tntTopBottom,  // 下面：TNT底部（引线纹理）
+    4: tntSide,       // 南面：TNT侧面（带文字纹理）
+    5: tntSide        // 北面：TNT侧面（带文字纹理）
   }
 });
-
