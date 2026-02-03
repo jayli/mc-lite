@@ -26,7 +26,7 @@ export class Player {
     this.inventory = new Inventory();
 
     // 碰撞检测偏移量，用于防止穿模（可微调）
-    this.collisionOffset = 0.34;
+    this.collisionOffset = 0.39;
 
     // 初始出生点逻辑
     let spawnFound = false;
