@@ -322,7 +322,10 @@ export class Player {
   _checkCameraCollision(x, z, yaw) {
     const bumperDist = 0.25;
     const cameraHalfWidth = 0.15; // 模拟相机半宽 (总宽0.3)
-    const headY = Math.floor(this.position.y + 1.65);
+
+    // 关键修复：确保相机探测高度至少在玩家当前脚下 +1 层以上
+    // 这样探测器永远不会碰撞到玩家正在尝试跨越的一级台阶 (y + 1.0)
+    const headY = Math.floor(this.position.y + 1.7);
 
     // 前进方向向量
     const fwdX = -Math.sin(yaw);
@@ -453,19 +456,26 @@ export class Player {
 
         // 如果没有尝试回弹（正面撞墙），或者回弹后依然有碰撞，则执行原有的“滑动/回退”逻辑
         if (camHit.any) {
-          const blockedX = this._checkCameraCollision(this.position.x, oldZ, this.rotation.y).any;
-          const blockedZ = this._checkCameraCollision(oldX, this.position.z, this.rotation.y).any;
-
-          if (!blockedX) {
-            // X轴滑动安全，应用 X 轴移动，回退 Z 轴
-            this.position.z = oldZ;
-          } else if (!blockedZ) {
-            // Z轴滑动安全，应用 Z 轴移动，回退 X 轴
-            this.position.x = oldX;
+          // 在执行最终回退前，最后检查一次是否是因为遇到一级台阶而停顿
+          // 如果前方是一级台阶，则执行紧急上台阶
+          if (this._canStepUpX(this.position.x + fwdX * 0.2) || this._canStepUpZ(this.position.z + fwdZ * 0.2)) {
+            this.position.y += 1.0;
+            // 既然上台阶了，这一帧就不再执行回退，允许继续前行
           } else {
-            // 两个方向都受阻，完全回退
-            this.position.x = oldX;
-            this.position.z = oldZ;
+            const blockedX = this._checkCameraCollision(this.position.x, oldZ, this.rotation.y).any;
+            const blockedZ = this._checkCameraCollision(oldX, this.position.z, this.rotation.y).any;
+
+            if (!blockedX) {
+              // X轴滑动安全，应用 X 轴移动，回退 Z 轴
+              this.position.z = oldZ;
+            } else if (!blockedZ) {
+              // Z轴滑动安全，应用 Z 轴移动，回退 X 轴
+              this.position.x = oldX;
+            } else {
+              // 两个方向都受阻，完全回退
+              this.position.x = oldX;
+              this.position.z = oldZ;
+            }
           }
         }
       }
