@@ -313,6 +313,42 @@ export class Player {
   }
 
   /**
+   * 检查相机（头部）是否与方块碰撞（包含宽度检测）
+   * @param {number} x - 玩家位置X
+   * @param {number} z - 玩家位置Z
+   * @param {number} yaw - 玩家朝向
+   * @returns {boolean} - 是否碰撞
+   */
+  _checkCameraCollision(x, z, yaw) {
+    const bumperDist = 0.25;
+    const cameraHalfWidth = 0.15; // 模拟相机半宽 (总宽0.3)
+    const headY = Math.floor(this.position.y + 1.65);
+
+    // 前进方向向量
+    const fwdX = -Math.sin(yaw);
+    const fwdZ = -Math.cos(yaw);
+
+    // 右侧向量 (垂直于前进方向)
+    const rightX = -fwdZ;
+    const rightZ = fwdX;
+
+    // 中心探测点
+    const cx = x + fwdX * bumperDist;
+    const cz = z + fwdZ * bumperDist;
+
+    // 检查中心、左、右三个点
+    if (this.physics.isSolid(cx, headY, cz)) return true;
+
+    // 左边缘
+    if (this.physics.isSolid(cx - rightX * cameraHalfWidth, headY, cz - rightZ * cameraHalfWidth)) return true;
+
+    // 右边缘
+    if (this.physics.isSolid(cx + rightX * cameraHalfWidth, headY, cz + rightZ * cameraHalfWidth)) return true;
+
+    return false;
+  }
+
+  /**
    * 每帧更新逻辑
    */
   update() {
@@ -387,37 +423,16 @@ export class Player {
     // 即使预判检测失效，如果移动导致摄像机前方极近处(0.25m)有方块，则强制回弹
     // 这能有效防止视觉上的穿模
     if (!isCurrentlyStuck) {
-      // 计算玩家面前 0.25 米处的探测点 (摄像机 NearPlane 约为 0.1)
-      const bumperDist = 0.25;
-      const probeX = this.position.x - Math.sin(this.rotation.y) * bumperDist;
-      const probeZ = this.position.z - Math.cos(this.rotation.y) * bumperDist;
-
-      // 只检测头部高度（防止穿模），忽略脚部高度（允许上台阶）
-      const headY = Math.floor(this.position.y + 1.65);
-
-      // 解决墙壁凸角防止穿模的问题加的逻辑
-      if (this.physics.isSolid(probeX, headY, probeZ)) {
+      // 使用带宽度的相机碰撞检测
+      if (this._checkCameraCollision(this.position.x, this.position.z, this.rotation.y)) {
         // 发生穿模！尝试进行“滑动”处理，而不是直接回弹停止
         // 这模拟了碰撞检测生效时的滑墙效果，同时修复了凸角穿模导致的卡顿
 
         // 1. 尝试只保留 X 轴移动 (回退 Z)
-        // 使用回退后的 Z 轴坐标重新计算探测点
-        const slideX_Pos = this.position.x; // current (nextX)
-        const slideX_Z = oldZ;
-
-        const probeX_SlideX = slideX_Pos - Math.sin(this.rotation.y) * bumperDist;
-        const probeZ_SlideX = slideX_Z - Math.cos(this.rotation.y) * bumperDist;
+        const blockedX = this._checkCameraCollision(this.position.x, oldZ, this.rotation.y);
 
         // 2. 尝试只保留 Z 轴移动 (回退 X)
-        const slideZ_X = oldX;
-        const slideZ_Pos = this.position.z; // current (nextZ)
-
-        const probeX_SlideZ = slideZ_X - Math.sin(this.rotation.y) * bumperDist;
-        const probeZ_SlideZ = slideZ_Pos - Math.cos(this.rotation.y) * bumperDist;
-
-        // 检查滑动路径是否安全
-        const blockedX = this.physics.isSolid(probeX_SlideX, headY, probeZ_SlideX);
-        const blockedZ = this.physics.isSolid(probeX_SlideZ, headY, probeZ_SlideZ);
+        const blockedZ = this._checkCameraCollision(oldX, this.position.z, this.rotation.y);
 
         if (!blockedX) {
           // X轴滑动安全，应用 X 轴移动，回退 Z 轴
