@@ -118,7 +118,6 @@ npx serve .
 ## 资源管理
 - **纹理资源**: `minecraft-bundles/textures/`
 - **材质定义**: `src/MaterialManager.js`
-- **方块类型**: `src/constants/blockTypes.js`
 
 ## 调试技巧
 1. **性能监控**: 查看 HUD 显示的 FPS 和区块信息
