@@ -317,7 +317,7 @@ export class Player {
    * @param {number} x - 玩家位置X
    * @param {number} z - 玩家位置Z
    * @param {number} yaw - 玩家朝向
-   * @returns {boolean} - 是否碰撞
+   * @returns {Object} - 碰撞详情 {any: boolean, left: boolean, right: boolean, center: boolean}
    */
   _checkCameraCollision(x, z, yaw) {
     const bumperDist = 0.25;
@@ -336,16 +336,17 @@ export class Player {
     const cx = x + fwdX * bumperDist;
     const cz = z + fwdZ * bumperDist;
 
-    // 检查中心、左、右三个点
-    if (this.physics.isSolid(cx, headY, cz)) return true;
+    // 分别检查三个探测点
+    const hitCenter = this.physics.isSolid(cx, headY, cz);
+    const hitLeft = this.physics.isSolid(cx - rightX * cameraHalfWidth, headY, cz - rightZ * cameraHalfWidth);
+    const hitRight = this.physics.isSolid(cx + rightX * cameraHalfWidth, headY, cz + rightZ * cameraHalfWidth);
 
-    // 左边缘
-    if (this.physics.isSolid(cx - rightX * cameraHalfWidth, headY, cz - rightZ * cameraHalfWidth)) return true;
-
-    // 右边缘
-    if (this.physics.isSolid(cx + rightX * cameraHalfWidth, headY, cz + rightZ * cameraHalfWidth)) return true;
-
-    return false;
+    return {
+      any: hitCenter || hitLeft || hitRight,
+      center: hitCenter,
+      left: hitLeft,
+      right: hitRight
+    };
   }
 
   /**
@@ -424,26 +425,48 @@ export class Player {
     // 这能有效防止视觉上的穿模
     if (!isCurrentlyStuck) {
       // 使用带宽度的相机碰撞检测
-      if (this._checkCameraCollision(this.position.x, this.position.z, this.rotation.y)) {
-        // 发生穿模！尝试进行“滑动”处理，而不是直接回弹停止
-        // 这模拟了碰撞检测生效时的滑墙效果，同时修复了凸角穿模导致的卡顿
+      let camHit = this._checkCameraCollision(this.position.x, this.position.z, this.rotation.y);
 
-        // 1. 尝试只保留 X 轴移动 (回退 Z)
-        const blockedX = this._checkCameraCollision(this.position.x, oldZ, this.rotation.y);
+      if (camHit.any) {
+        // 只有在完全没有正面碰撞的情况下，才尝试侧向回弹（Rebound）
+        // 这排除了“正面撞墙”的情况，确保正面撞墙时保持原有的滑动逻辑
+        if (!camHit.center) {
+          const fwdX = -Math.sin(this.rotation.y);
+          const fwdZ = -Math.cos(this.rotation.y);
+          const rightX = -fwdZ;
+          const rightZ = fwdX;
+          const nudgeDist = 0.05; // 回弹步长
 
-        // 2. 尝试只保留 Z 轴移动 (回退 X)
-        const blockedZ = this._checkCameraCollision(oldX, this.position.z, this.rotation.y);
+          if (camHit.left) {
+            // 左侧碰撞，向右回弹
+            this.position.x += rightX * nudgeDist;
+            this.position.z += rightZ * nudgeDist;
+          } else if (camHit.right) {
+            // 右侧碰撞，向左回弹
+            this.position.x -= rightX * nudgeDist;
+            this.position.z -= rightZ * nudgeDist;
+          }
 
-        if (!blockedX) {
-          // X轴滑动安全，应用 X 轴移动，回退 Z 轴
-          this.position.z = oldZ;
-        } else if (!blockedZ) {
-          // Z轴滑动安全，应用 Z 轴移动，回退 X 轴
-          this.position.x = oldX;
-        } else {
-          // 两个方向都受阻，完全回弹
-          this.position.x = oldX;
-          this.position.z = oldZ;
+          // 重新检查回弹后的碰撞状态
+          camHit = this._checkCameraCollision(this.position.x, this.position.z, this.rotation.y);
+        }
+
+        // 如果没有尝试回弹（正面撞墙），或者回弹后依然有碰撞，则执行原有的“滑动/回退”逻辑
+        if (camHit.any) {
+          const blockedX = this._checkCameraCollision(this.position.x, oldZ, this.rotation.y).any;
+          const blockedZ = this._checkCameraCollision(oldX, this.position.z, this.rotation.y).any;
+
+          if (!blockedX) {
+            // X轴滑动安全，应用 X 轴移动，回退 Z 轴
+            this.position.z = oldZ;
+          } else if (!blockedZ) {
+            // Z轴滑动安全，应用 Z 轴移动，回退 X 轴
+            this.position.x = oldX;
+          } else {
+            // 两个方向都受阻，完全回退
+            this.position.x = oldX;
+            this.position.z = oldZ;
+          }
         }
       }
     }
