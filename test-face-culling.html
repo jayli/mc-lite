@@ -69,10 +69,10 @@
 
     <div>
         <h2>手动测试</h2>
-        <button onclick="runAllTests()">运行所有测试</button>
-        <button onclick="testSimpleCase()">测试简单情况</button>
-        <button onclick="testTransparentBlocks()">测试透明方块</button>
-        <button onclick="testPerformance()">测试性能</button>
+        <button id="btn-run-all">运行所有测试</button>
+        <button id="btn-test-simple">测试简单情况</button>
+        <button id="btn-test-transparent">测试透明方块</button>
+        <button id="btn-test-performance">测试性能</button>
     </div>
 
     <div>
@@ -91,6 +91,12 @@
         import { faceMask, visualizeMask } from './src/core/face-culling-utils.js';
 
         const system = new FaceCullingSystem();
+
+        // 补充测试所需的透明方块类型，确保系统正确识别它们
+        system.addTransparentType('glass');
+        system.addTransparentType('ice');
+        system.addTransparentType('stained_glass');
+
         const resultsContainer = document.getElementById('results-container');
 
         function addTestResult(name, passed, details) {
@@ -349,12 +355,14 @@
             </div>
         `;
 
-        // 导出到全局用于控制台测试
+        // 绑定按钮事件
+        document.getElementById('btn-run-all').addEventListener('click', runAllTests);
+        document.getElementById('btn-test-simple').addEventListener('click', testSimpleCase);
+        document.getElementById('btn-test-transparent').addEventListener('click', testTransparentBlocks);
+        document.getElementById('btn-test-performance').addEventListener('click', testPerformance);
+
+        // 导出到全局用于控制台调试
         window.faceCullingSystem = system;
-        window.runAllTests = runAllTests;
-        window.testSimpleCase = testSimpleCase;
-        window.testTransparentBlocks = testTransparentBlocks;
-        window.testPerformance = testPerformance;
     </script>
 </body>
 </html>
