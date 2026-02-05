@@ -28,6 +28,7 @@ export class UIManager {
     const btnPerf = document.getElementById('btn-perf');
     const btnMid = document.getElementById('btn-mid');
     const btnQuality = document.getElementById('btn-quality');
+    const btnSave = document.getElementById('btn-save-game');
 
     if (!settingsBtn || !settingsModal || !settingsClose) return;
 
@@ -67,6 +68,26 @@ export class UIManager {
       this.hud.showMessage('已切换至画质模式 (1.0x)');
       this.updateActiveButtons();
     };
+
+    // 手动存档按钮处理
+    if (btnSave) {
+      btnSave.onclick = async (e) => {
+        e.stopPropagation();
+        btnSave.disabled = true;
+        btnSave.innerText = '正在存档...';
+
+        try {
+          await this.game.saveToDisk();
+          this.hud.showMessage('游戏存档成功！');
+        } catch (error) {
+          console.error('Save failed:', error);
+          this.hud.showMessage('存档失败，请重试');
+        } finally {
+          btnSave.disabled = false;
+          btnSave.innerText = '保存当前进度 (存档)';
+        }
+      };
+    }
 
     // 点击背景关闭
     settingsModal.onclick = (e) => {

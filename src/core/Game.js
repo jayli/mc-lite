@@ -1,6 +1,8 @@
 // src/core/Game.js
 // 游戏主类，负责协调游戏引擎、世界、玩家和UI的初始化与运行循环
 
+import { manualSaveService } from '../services/ManualSaveService.js';
+import { persistenceService } from '../services/PersistenceService.js';
 import { Engine } from './Engine.js';
 import { World } from '../world/World.js';
 import { UIManager } from '../ui/UIManager.js';
@@ -225,5 +227,54 @@ export class Game {
     this.engine.render(); // 调用引擎渲染方法
     const t2 = performance.now();
     this.perfStats.render = t2 - t1;
+  }
+
+  /**
+   * 收集当前游戏快照并保存到磁盘
+   */
+  async saveToDisk() {
+    const playerSnapshot = {
+      x: this.player.position.x,
+      y: this.player.position.y,
+      z: this.player.position.z,
+      pitch: this.player.cameraPitch,
+      yaw: this.player.rotation.y
+    };
+
+    // 序列化 persistenceService 中的所有区块增量
+    const worldDeltas = [];
+    for (const [key, data] of persistenceService.cache.entries()) {
+      worldDeltas.push({ key, ...data });
+    }
+
+    const snapshot = {
+      player: playerSnapshot,
+      worldDeltas: worldDeltas
+    };
+
+    await manualSaveService.save(snapshot);
+  }
+
+  /**
+   * 将保存的快照数据应用到当前游戏实例
+   */
+  async applySaveData(saveData) {
+    if (!saveData) return;
+
+    // 1. 恢复玩家位置
+    const p = saveData.player;
+    this.player.position.set(p.x, p.y, p.z);
+    this.player.rotation.y = p.yaw;
+    this.player.cameraPitch = p.pitch;
+
+    // 同步相机位置
+    this.player.camera.position.copy(this.player.position);
+    this.player.camera.position.y += 1.65;
+    this.player.camera.rotation.set(p.pitch, p.yaw, 0);
+
+    // 2. 注入方块增量缓存
+    if (saveData.worldDeltas && persistenceService.injectSaveData) {
+      persistenceService.injectSaveData(saveData.worldDeltas);
+    }
   }
 }

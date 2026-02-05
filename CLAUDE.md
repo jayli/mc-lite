@@ -138,9 +138,9 @@ npx serve .
 - 项目描述: "妈妈不让我玩我的世界，所以我用 AI 做了一个，自己玩。"
 
 ## Recent Changes
+- 008-save-game: Added JavaScript (ES6+ Modules) + Three.js (WebGL 2.0)
+- 008-save-game: Added JavaScript (ES6+ Modules) + Three.js (WebGL 2.0)
 - 007-chunk-optimization: Added JavaScript (ES6+ Modules) + Three.js (WebGL 2.0)
-- 005-player-physics-refactor: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
 
 ## Active Technologies
-- JavaScript (ES6+ Modules) + Three.js (WebGL 2.0) (007-chunk-optimization)
-- IndexedDB (via `PersistenceService.js`) (007-chunk-optimization)
+- 新的 IndexedDB 数据库 `mc_lite_manual_saves` (008-save-game)

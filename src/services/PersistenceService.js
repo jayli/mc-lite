@@ -131,6 +131,18 @@ export class PersistenceService {
       console.error('Failed to clear session:', error);
     }
   }
+
+  /**
+   * 注入存档数据到缓存中 (供加载存档使用)
+   * @param {Array} worldDeltas - 存档中的区块增量数组
+   */
+  injectSaveData(worldDeltas) {
+    this.cache.clear();
+    for (const chunk of worldDeltas) {
+      const { key, ...data } = chunk;
+      this.cache.set(key, data);
+    }
+  }
 }
 
 // 导出单例
