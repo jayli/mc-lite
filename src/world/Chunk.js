@@ -15,6 +15,11 @@ import { rookModel, carModel, gunManModel } from '../core/Engine.js';
 /** 区块尺寸 - 每个区块在 X 和 Z 方向上的方块数量 (16x16 是 Voxel 游戏的标准区块大小) */
 const CHUNK_SIZE = 16;
 
+/** 后台合并触发阈值 - 当动态添加的方块数量达到此值时，强制触发合并 */
+const DIRTY_THRESHOLD = 50;
+/** 后台合并延迟 (ms) - 玩家最后一次操作后的等待时间 */
+const CONSOLIDATION_DELAY = 1000;
+
 // --- Worker 设置 ---
 // 使用 Web Worker 处理计算密集型的地形生成，避免阻塞主线程（UI/渲染线程）
 const worldWorker = new Worker(new URL('./WorldWorker.js', import.meta.url), { type: 'module' });
@@ -136,7 +141,119 @@ export class Chunk {
     this.isReady = false;            // 区块是否已完成生成
     this.instanceIndexMap = new Map(); // Key: "type" -> Map("x,y,z" -> index)
     this.saveTimeout = null;         // 用于防抖保存
+
+    // --- 后台合并相关属性 ---
+    this.dirtyBlocks = 0;            // 未优化的动态方块计数
+    this.consolidationTimer = null;  // 合并防抖定时器
+    this.isConsolidating = false;    // 是否正在合并中
+    this.dynamicMeshes = new Map();  // 存储动态生成的单体 Mesh: Key "x,y,z" -> Mesh
+
     this.gen();                      // 生成区块内容
+  }
+
+  /**
+   * 调度后台合并任务
+   * 实现防抖和阈值立即触发逻辑
+   */
+  scheduleConsolidation() {
+    if (this.isConsolidating) return;
+
+    // 清除现有的定时器
+    if (this.consolidationTimer) {
+      clearTimeout(this.consolidationTimer);
+      this.consolidationTimer = null;
+    }
+
+    // 如果达到阈值，立即触发合并
+    if (this.dirtyBlocks >= DIRTY_THRESHOLD) {
+      this.consolidate();
+    } else {
+      // 否则，启动防抖定时器
+      this.consolidationTimer = setTimeout(() => {
+        this.consolidate();
+      }, CONSOLIDATION_DELAY);
+    }
+  }
+
+  /**
+   * 执行区块合并优化
+   * 将当前区块的最完整数据发送给 Worker 进行全量计算
+   */
+  async consolidate() {
+    if (this.isConsolidating || !this.isReady) return;
+    this.isConsolidating = true;
+
+    // 记录开始合并时的脏方块数量和动态 Mesh 键
+    const consolidatedCount = this.dirtyBlocks;
+    const consolidatedMeshKeys = new Set(this.dynamicMeshes.keys());
+
+    // 清除定时器（以防是通过阈值触发的）
+    if (this.consolidationTimer) {
+      clearTimeout(this.consolidationTimer);
+      this.consolidationTimer = null;
+    }
+
+    const callbackKey = `${this.cx},${this.cz}`;
+    // 注册 Worker 回调处理合并结果
+    workerCallbacks.set(callbackKey, (data) => {
+      const { d, visibleKeys } = data;
+
+      // 1. 更新可见性状态 (合并)
+      if (visibleKeys) {
+        visibleKeys.forEach(k => this.visibleKeys.add(k));
+      }
+
+      // 2. 执行平滑替换 (Swap)
+      consolidatedMeshKeys.forEach((key) => {
+        const mesh = this.dynamicMeshes.get(key);
+        if (mesh) {
+          if (mesh.geometry) mesh.geometry.dispose();
+          if (mesh.material) {
+            if (Array.isArray(mesh.material)) mesh.material.forEach(m => m.dispose());
+            else mesh.material.dispose();
+          }
+          this.group.remove(mesh);
+          this.dynamicMeshes.delete(key);
+        }
+      });
+
+      // 移除旧的 InstancedMesh (保留实体)
+      for (let i = this.group.children.length - 1; i >= 0; i--) {
+        const child = this.group.children[i];
+        if (child.isInstancedMesh) {
+          // 这里不 dispose 材质，因为材质是共享的，只清理几何体（如果是克隆的）
+          if (child.geometry && child.geometry !== geomMap[child.userData.type] && child.geometry !== geomMap['default']) {
+             child.geometry.dispose();
+          }
+          this.group.remove(child);
+        }
+      }
+
+      // 3. 构建新的渲染网格 (跳过实体，因为实体已存在)
+      this.buildMeshes(d, true);
+
+      // 4. 重置状态
+      this.dirtyBlocks = Math.max(0, this.dirtyBlocks - consolidatedCount);
+      this.isConsolidating = false;
+
+      if (this.dirtyBlocks > 0) this.scheduleConsolidation();
+    });
+
+    // 发送当前最完整的 blockData 作为 snapshot 给 Worker
+    worldWorker.postMessage({
+      cx: this.cx,
+      cz: this.cz,
+      seed: SEED,
+      snapshot: {
+        blocks: { ...this.blockData },
+        entities: {
+          realisticTrees: [], // 目前实体合并逻辑待定，暂时只合并方块
+          modGunMan: [],
+          rovers: []
+        }
+      },
+      isOptimization: true // 标记这是一个优化请求
+    });
   }
 
   /**
@@ -276,8 +393,9 @@ export class Chunk {
    * 1. 对于每个方块类型，只创建一个 InstancedMesh 实例。
    * 2. 通过一次 Draw Call 渲染该区块内所有的该类方块。
    * @param {Object} d - 数据收集对象，包含按类型分类的方块位置数组
+   * @param {boolean} skipEntities - 是否跳过实体生成逻辑（用于合并优化）
    */
-  buildMeshes(d) {
+  buildMeshes(d, skipEntities = false) {
     // 创建一个虚拟对象用于计算每个实例的变换矩阵 (Matrix4)
     const dummy = new THREE.Object3D();
 
@@ -343,7 +461,7 @@ export class Chunk {
       this.group.add(mesh);
 
       // --- Rook 模型生成逻辑 ---
-      if (type === 'grass' && rookModel && d[type].length > 0 && Math.random() < 0.3) {
+      if (!skipEntities && type === 'grass' && rookModel && d[type].length > 0 && Math.random() < 0.3) {
         // 随机选择一个草地方块的位置来放置 rook
         const pos = d[type][Math.floor(Math.random() * d[type].length)];
 
@@ -373,6 +491,12 @@ export class Chunk {
    * 在区块不再需要时调用
    */
   dispose() {
+    // 清除合并定时器
+    if (this.consolidationTimer) {
+      clearTimeout(this.consolidationTimer);
+      this.consolidationTimer = null;
+    }
+
     // 遍历组中的所有子对象
     this.group.children.forEach(c => {
       // 清理几何体
@@ -433,7 +557,6 @@ export class Chunk {
     // 计算隐藏面剔除掩码
     let mask = 63; // 默认全显示 (111111)
     if (faceCullingSystem && faceCullingSystem.isEnabled() && type !== 'air' && type !== 'collider') {
-      const position = new THREE.Vector3(x, y, z);
       const block = { type };
 
       const getNeighborBlock = (nx, ny, nz) => {
@@ -532,6 +655,10 @@ export class Chunk {
       if (Math.floor(child.position.x) === Math.floor(x) &&
           Math.floor(child.position.y) === Math.floor(y) &&
           Math.floor(child.position.z) === Math.floor(z)) {
+
+        // 从追踪映射中移除
+        this.dynamicMeshes.delete(key);
+
         if (child.geometry) child.geometry.dispose();
         if (child.material && !child.isInstancedMesh) {
           if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
@@ -551,6 +678,9 @@ export class Chunk {
 
     // 如果方块被移除（变成空气），检查并恢复周围隐藏的方块
     if (type === 'air') {
+      this.dirtyBlocks++;
+      this.scheduleConsolidation();
+
       const neighbors = [
         { dx: 1, dy: 0, dz: 0 }, { dx: -1, dy: 0, dz: 0 },
         { dx: 0, dy: 1, dz: 0 }, { dx: 0, dy: -1, dz: 0 },
@@ -624,6 +754,10 @@ export class Chunk {
 
       // 添加到区块组中
       this.group.add(mesh);
+      // 记录到动态 Mesh 映射中，以便后续合并时销毁
+      this.dynamicMeshes.set(key, mesh);
+      this.dirtyBlocks++;
+      this.scheduleConsolidation();
 
       mesh.updateMatrix();
       mesh.updateMatrixWorld();
@@ -631,7 +765,6 @@ export class Chunk {
 
     // 隐藏面剔除更新 (FaceCullingSystem integration)
     if (faceCullingSystem && faceCullingSystem.isEnabled()) {
-      // ... existing logic ...
       const position = new THREE.Vector3(x, y, z);
       const block = { type };
       // Helper to get neighbor block info
