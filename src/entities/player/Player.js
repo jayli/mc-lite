@@ -53,6 +53,9 @@ export class Player {
 
     this.velocity = new THREE.Vector3();
     this.jumping = false;
+    this.jumpCooldown = 0; // 跳跃冷却时间（秒）
+    this.jumpInterval = 0.25; // 连跳最小间隔（秒）
+    this.spaceKeyReleased = true; // 追踪空格键是否已释放，用于防止跳台阶后的非预期连跳
 
     this.keys = {};
     this.setupInput();
@@ -92,8 +95,15 @@ export class Player {
    * 设置输入监听器
    */
   setupInput() {
-    window.addEventListener('keydown', e => this.keys[e.code] = true);
-    window.addEventListener('keyup', e => this.keys[e.code] = false);
+    window.addEventListener('keydown', e => {
+      this.keys[e.code] = true;
+    });
+    window.addEventListener('keyup', e => {
+      this.keys[e.code] = false;
+      if (e.code === 'Space') {
+        this.spaceKeyReleased = true;
+      }
+    });
     window.addEventListener('mousedown', e => this.interact(e)); // 传递完整事件对象
 
     document.addEventListener('mousemove', e => {
@@ -124,12 +134,34 @@ export class Player {
    * @returns {boolean} 是否成功跨越台阶
    */
   tryStepUp(nx, nz) {
-    // T010: 跳跃状态下允许跨越 2 级台阶
-    const maxStep = this.jumping && this.velocity.y > 0 ? 2.0 : 1.0;
+    // 1. 首先判断当前位置脚下是否有实心支撑 (使用 AABB 多点探测确保边缘支撑也能触发)
+    // 这能防止在跳跃过程中因“踩空”而误将前方高层方块判定为台阶，解决 3 层墙跳跃误上顶的 bug
+    const feetY = Math.floor(this.position.y - 0.01);
+    let isSupported = false;
+    const halfW = this.physics.playerWidth / 2;
+    // 探测 5 个点：中心 + 4 个角（稍微收缩以避免蹭墙判定）
+    const checkCoords = [
+      [this.position.x, this.position.z],
+      [this.position.x - halfW + 0.05, this.position.z - halfW + 0.05],
+      [this.position.x + halfW - 0.05, this.position.z - halfW + 0.05],
+      [this.position.x - halfW + 0.05, this.position.z + halfW - 0.05],
+      [this.position.x + halfW - 0.05, this.position.z + halfW - 0.05]
+    ];
+    for (const [cx, cz] of checkCoords) {
+      if (this.physics.isSolid(cx, feetY, cz)) {
+        isSupported = true;
+        break;
+      }
+    }
+    if (!isSupported) return false;
 
-    // 只有当玩家前方确实有阻挡，且阻挡上方有空位时才触发
+    // 2. T010: 跳跃状态下允许跨越 2 级台阶。
+    // 注意：这里的 stepY 必须相对于当前的支撑面 (feetY + 1) 计算
+    const maxStep = (this.jumping && this.velocity.y > 0) ? 2.0 : 1.0;
+    const currentFloorY = feetY + 1;
+
     for (let h = 1; h <= maxStep; h++) {
-      const stepY = Math.floor(this.position.y) + h;
+      const stepY = currentFloorY + h;
       // 检查步进后的位置是否会卡住
       if (!this.physics.checkAABB(nx, stepY, nz)) {
         // 还要确保玩家不会在跨越过程中穿过天花板
@@ -138,6 +170,11 @@ export class Player {
           this.position.x = nx;
           this.position.z = nz;
           this.velocity.y = 0; // 踏上台阶后抵消垂直速度
+
+          // 如果是跳跃过程中跨越了 2 级台阶，强制要求释放空格才能再次跳跃
+          if (h > 1.0) {
+            this.spaceKeyReleased = false;
+          }
           return true;
         }
       }
@@ -372,9 +409,16 @@ export class Player {
       }
     }
 
-    if (this.keys['Space'] && !this.jumping) {
+    // 5. 更新跳跃冷却
+    if (this.jumpCooldown > 0) {
+      this.jumpCooldown -= dt;
+    }
+
+    if (this.keys['Space'] && !this.jumping && this.jumpCooldown <= 0 && this.spaceKeyReleased) {
       this.velocity.y = this.physics.jumpForce;
       this.jumping = true;
+      this.jumpCooldown = this.jumpInterval; // 设置冷却间隔
+      this.spaceKeyReleased = false; // 触发跳跃后，标记为已消耗按键
     }
 
     if (this.position.y < -20) {
