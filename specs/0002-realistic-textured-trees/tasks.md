@@ -1,6 +1,6 @@
 # Tasks: Realistic Textured Trees
 
-**Input**: Design documents from `/specs/001-realistic-textured-trees/`
+**Input**: Design documents from `/specs/0002-realistic-textured-trees/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md
 
 ## Format: `[ID] [P?] [Story] Description`

@@ -1,6 +1,6 @@
 # Feature Specification: Realistic Textured Trees
 
-**Feature Branch**: `001-realistic-textured-trees`
+**Feature Branch**: `0002-realistic-textured-trees`
 **Created**: 2026-01-20
 **Status**: Draft
 **Input**: User description: "我引入了一个我的世界的原版数据的一组模组，存放目录是项目根目录下的 assets/minecraft 中，请根据这个模组的数据，做一组新的建模，即用贴图的方式创建更加具有逼真效果的树，并部分替换深林里的一些树木。请只实现这个新模组里的贴图方式构建起来的树，并替换掉森林里的一部分树木，其他功能不要有变更。"
