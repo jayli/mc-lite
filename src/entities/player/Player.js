@@ -25,8 +25,11 @@ export class Player {
     this.physics = new Physics(this, world);
     this.inventory = new Inventory();
 
-    // 碰撞检测偏移量，用于防止穿模（可微调）
-    this.collisionOffset = 0.39;
+    // 物理与相机状态追踪
+    this.isStuck = false;
+    this.currentStepHeight = 0; // 用于平滑 Y 轴台阶过渡
+    this.bobAmount = 0;         // 当前晃动强度
+    this.lastInputDirection = new THREE.Vector3(); // 记录最后的输入方向
 
     // 初始出生点逻辑
     let spawnFound = false;
@@ -115,425 +118,334 @@ export class Player {
   }
 
   /**
-   * 检查带偏移的碰撞
-   * @param {number} x - 目标X坐标
-   * @param {number} z - 目标Z坐标
-   * @param {number} dx - X轴移动方向（可选）
-   * @param {number} dz - Z轴移动方向（可选）
-   * @returns {boolean} - 是否发生碰撞
+   * 尝试执行上台阶逻辑 (T009, T010)
+   * @param {number} nx - 目标 X
+   * @param {number} nz - 目标 Z
+   * @returns {boolean} 是否成功跨越台阶
    */
-  _checkCollisionWithOffset(x, z, dx = 0, dz = 0) {
-    const offset = this.collisionOffset;
+  tryStepUp(nx, nz) {
+    // T010: 跳跃状态下允许跨越 2 级台阶
+    const maxStep = this.jumping && this.velocity.y > 0 ? 2.0 : 1.0;
 
-    // 检查中心点 - 使用排除脚部支撑的碰撞检测
-    if (this.physics.checkCollisionForMovement(x, z)) {
-      return true;
-    }
-
-    var rat = 1.0;
-    // 基础偏移点：8个方向（4个正交 + 4个对角线）
-    const baseOffsetPoints = [
-      [x + offset, z],           // 东
-      [x - offset, z],           // 西
-      [x, z + offset],           // 南
-      [x, z - offset],           // 北
-      [x + offset * rat, z + offset * rat],  // 东南
-      [x + offset * rat, z - offset * rat],  // 东北
-      [x - offset * rat, z + offset * rat],  // 西南
-      [x - offset * rat, z - offset * rat],  // 西北
-    ];
-
-    // 检查所有基础偏移点
-    for (const [ox, oz] of baseOffsetPoints) {
-      if (this.physics.checkCollisionForMovement(ox, oz)) {
-        return true;
-      }
-    }
-
-    // 如果有移动方向，执行射线检测防止穿模
-    if (Math.abs(dx) > 0.001 || Math.abs(dz) > 0.001) {
-      const startX = this.position.x;
-      const startZ = this.position.z;
-      const endX = x;
-      const endZ = z;
-
-      // 计算距离
-      const distX = endX - startX;
-      const distZ = endZ - startZ;
-      const distance = Math.sqrt(distX * distX + distZ * distZ);
-
-      if (distance > 0) {
-        // 沿着移动方向进行射线采样
-        const steps = Math.ceil(distance / (offset * 0.5)); // 每半个偏移量采样一次
-        const stepSize = 1.0 / Math.max(1, steps);
-
-        for (let i = 1; i <= steps; i++) {
-          const t = i * stepSize;
-          const sampleX = startX + distX * t;
-          const sampleZ = startZ + distZ * t;
-
-          // 在采样点周围进行偏移检测
-          for (const [ox, oz] of baseOffsetPoints) {
-            // 将偏移点从目标位置调整到采样位置
-            const offsetFromSampleX = ox - x + sampleX;
-            const offsetFromSampleZ = oz - z + sampleZ;
-
-            if (this.physics.checkCollisionForMovement(offsetFromSampleX, offsetFromSampleZ)) {
-              return true;
-            }
-          }
+    // 只有当玩家前方确实有阻挡，且阻挡上方有空位时才触发
+    for (let h = 1; h <= maxStep; h++) {
+      const stepY = Math.floor(this.position.y) + h;
+      // 检查步进后的位置是否会卡住
+      if (!this.physics.checkAABB(nx, stepY, nz)) {
+        // 还要确保玩家不会在跨越过程中穿过天花板
+        if (!this.physics.checkAABB(this.position.x, stepY, this.position.z)) {
+          this.position.y = stepY;
+          this.position.x = nx;
+          this.position.z = nz;
+          this.velocity.y = 0; // 踏上台阶后抵消垂直速度
+          return true;
         }
       }
     }
-
     return false;
   }
 
   /**
-   * 检查是否可以上一级台阶（X轴方向）
-   * @param {number} nextX - 目标X坐标
-   * @returns {boolean} - 是否可以上台阶
+   * 检查头顶碰撞 (T012)
    */
-  _canStepUpX(nextX) {
-    const floorY = Math.floor(this.position.y);
-    const deltaX = nextX - this.position.x;
-    const threshold = 0.1;  // 移动阈值
-
-    // 如果移动太小，不检查上台阶
-    if (Math.abs(deltaX) < threshold) {
-      return false;
+  checkCeilingBump() {
+    if (this.velocity.y > 0) {
+      if (this.physics.checkAABB(this.position.x, this.position.y + 0.1, this.position.z)) {
+        // 头顶撞到东西
+        this.velocity.y = -0.01; // 给予微小的下弹速度
+        return true;
+      }
     }
-
-    // 根据移动方向确定目标整数位置
-    let targetX;
-    if (deltaX > 0) {
-      targetX = Math.floor(this.position.x) + 1;  // 向右移动
-    } else {
-      targetX = Math.floor(this.position.x) - 1;  // 向左移动
-    }
-
-    return (
-      this.physics.isSolid(targetX, floorY, this.position.z) &&
-      !this.physics.isSolid(targetX, floorY + 1, this.position.z) &&
-      !this.physics.isSolid(targetX, floorY + 2, this.position.z) &&
-      !this.physics.isSolid(this.position.x, floorY + 2, this.position.z)
-    );
+    return false;
   }
 
   /**
-   * 检查是否可以上一级台阶（Z轴方向）
-   * @param {number} nextZ - 目标Z坐标
-   * @returns {boolean} - 是否可以上台阶
+   * 应用坑道自动对中逻辑 (T008)
    */
-  _canStepUpZ(nextZ) {
-    const floorY = Math.floor(this.position.y);
-    const deltaZ = nextZ - this.position.z;
-    const threshold = 0.01;  // 移动阈值
+  applyTunnelCentering() {
+    const px = this.position.x;
+    const pz = this.position.z;
+    const py = this.position.y;
+    const floorX = Math.floor(px);
+    const floorZ = Math.floor(pz);
+    const floorY = Math.floor(py + 0.1); // 采样高度略高于底部
 
-    // 如果移动太小，不检查上台阶
-    if (Math.abs(deltaZ) < threshold) {
-      return false;
+    // 检查 X 轴向的坑道 (前后都有墙)
+    const northSolid = this.physics.isSolid(floorX, floorY, floorZ - 1);
+    const southSolid = this.physics.isSolid(floorX, floorY, floorZ + 1);
+    const northHeadSolid = this.physics.isSolid(floorX, floorY + 1, floorZ - 1);
+    const southHeadSolid = this.physics.isSolid(floorX, floorY + 1, floorZ + 1);
+
+    if ((northSolid && southSolid) || (northHeadSolid && southHeadSolid)) {
+      // 在 Z 轴上对中
+      this.position.z = THREE.MathUtils.lerp(this.position.z, floorZ + 0.5, 0.1);
     }
 
-    // 根据移动方向确定目标整数位置
-    let targetZ;
-    if (deltaZ > 0) {
-      targetZ = Math.floor(this.position.z) + 1;  // 向前移动
-    } else {
-      targetZ = Math.floor(this.position.z) - 1;  // 向后移动
-    }
+    // 检查 Z 轴向的坑道 (左右都有墙)
+    const westSolid = this.physics.isSolid(floorX - 1, floorY, floorZ);
+    const eastSolid = this.physics.isSolid(floorX + 1, floorY, floorZ);
+    const westHeadSolid = this.physics.isSolid(floorX - 1, floorY + 1, floorZ);
+    const eastHeadSolid = this.physics.isSolid(floorX + 1, floorY + 1, floorZ);
 
-    return (
-      this.physics.isSolid(this.position.x, floorY, targetZ) &&
-      !this.physics.isSolid(this.position.x, floorY + 1, targetZ) &&
-      !this.physics.isSolid(this.position.x, floorY + 2, targetZ) &&
-      !this.physics.isSolid(this.position.x, floorY + 2, this.position.z)
-    );
+    if ((westSolid && eastSolid) || (westHeadSolid && eastHeadSolid)) {
+      // 在 X 轴上对中
+      this.position.x = THREE.MathUtils.lerp(this.position.x, floorX + 0.5, 0.1);
+    }
   }
 
   /**
-   * 检查是否可以下一级台阶（X轴方向）
-   * @param {number} nextX - 目标X坐标
-   * @returns {boolean} - 是否可以下台阶
+   * 相机碰撞保护 (T013, T014)
+   * 确保相机在靠近墙壁旋转时不会穿模
    */
-  _canStepDownX(nextX) {
-    const floorY = Math.floor(this.position.y);
-    const deltaX = nextX - this.position.x;
-    const threshold = 0.01;
+  applyCameraBumper() {
+    const yaw = this.rotation.y;
+    const bumperDist = 0.25; // 探测距离
+    const cameraHalfWidth = 0.2; // 相机半宽
 
-    if (Math.abs(deltaX) < threshold) {
-      return false;
-    }
-
-    // 根据移动方向确定目标整数位置
-    let targetX;
-    if (deltaX > 0) {
-      targetX = Math.floor(this.position.x) + 1;  // 向右移动
-    } else {
-      targetX = Math.floor(this.position.x) - 1;  // 向左移动
-    }
-
-    // 下台阶条件：目标位置没有方块，但目标位置下方有方块支撑
-    // 且玩家当前位置到目标位置没有障碍
-    return (
-      !this.physics.isSolid(targetX, floorY, this.position.z) &&
-      !this.physics.isSolid(targetX, floorY + 1, this.position.z) &&
-      this.physics.isSolid(targetX, floorY - 1, this.position.z)
-    );
-  }
-
-  /**
-   * 检查是否可以下一级台阶（Z轴方向）
-   * @param {number} nextZ - 目标Z坐标
-   * @returns {boolean} - 是否可以下台阶
-   */
-  _canStepDownZ(nextZ) {
-    const floorY = Math.floor(this.position.y);
-    const deltaZ = nextZ - this.position.z;
-    const threshold = 0.01;
-
-    if (Math.abs(deltaZ) < threshold) {
-      return false;
-    }
-
-    // 根据移动方向确定目标整数位置
-    let targetZ;
-    if (deltaZ > 0) {
-      targetZ = Math.floor(this.position.z) + 1;  // 向前移动
-    } else {
-      targetZ = Math.floor(this.position.z) - 1;  // 向后移动
-    }
-
-    // 下台阶条件：目标位置没有方块，但目标位置下方有方块支撑
-    return (
-      !this.physics.isSolid(this.position.x, floorY, targetZ) &&
-      !this.physics.isSolid(this.position.x, floorY + 1, targetZ) &&
-      this.physics.isSolid(this.position.x, floorY - 1, targetZ)
-    );
-  }
-
-  /**
-   * 检查相机（头部）是否与方块碰撞（包含宽度检测）
-   * @param {number} x - 玩家位置X
-   * @param {number} z - 玩家位置Z
-   * @param {number} yaw - 玩家朝向
-   * @returns {Object} - 碰撞详情 {any: boolean, left: boolean, right: boolean, center: boolean}
-   */
-  _checkCameraCollision(x, z, yaw) {
-    const bumperDist = 0.25;
-    const cameraHalfWidth = 0.15; // 模拟相机半宽 (总宽0.3)
-
-    // 关键修复：确保相机探测高度至少在玩家当前脚下 +1 层以上
-    // 这样探测器永远不会碰撞到玩家正在尝试跨越的一级台阶 (y + 1.0)
-    const headY = Math.floor(this.position.y + 1.7);
-
-    // 前进方向向量
     const fwdX = -Math.sin(yaw);
     const fwdZ = -Math.cos(yaw);
-
-    // 右侧向量 (垂直于前进方向)
     const rightX = -fwdZ;
     const rightZ = fwdX;
 
-    // 中心探测点
-    const cx = x + fwdX * bumperDist;
-    const cz = z + fwdZ * bumperDist;
+    const eyeY = this.position.y + 1.65;
+    const floorY = Math.floor(eyeY);
 
-    // 分别检查三个探测点
-    const hitCenter = this.physics.isSolid(cx, headY, cz);
-    const hitLeft = this.physics.isSolid(cx - rightX * cameraHalfWidth, headY, cz - rightZ * cameraHalfWidth);
-    const hitRight = this.physics.isSolid(cx + rightX * cameraHalfWidth, headY, cz + rightZ * cameraHalfWidth);
+    // 探测三个点
+    const points = [
+      { x: this.position.x + fwdX * bumperDist, z: this.position.z + fwdZ * bumperDist },
+      { x: this.position.x + fwdX * bumperDist - rightX * cameraHalfWidth, z: this.position.z + fwdZ * bumperDist - rightZ * cameraHalfWidth },
+      { x: this.position.x + fwdX * bumperDist + rightX * cameraHalfWidth, z: this.position.z + fwdZ * bumperDist + rightZ * cameraHalfWidth }
+    ];
 
-    return {
-      any: hitCenter || hitLeft || hitRight,
-      center: hitCenter,
-      left: hitLeft,
-      right: hitRight
-    };
+    for (const p of points) {
+      if (this.physics.isSolid(Math.floor(p.x), floorY, Math.floor(p.z))) {
+        // 发现探测点在墙内，将逻辑位置反向推离墙壁
+        const pushForce = 0.05;
+        this.position.x -= fwdX * pushForce;
+        this.position.z -= fwdZ * pushForce;
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
    * 每帧更新逻辑
+   * @param {number} dt - 自上一帧以来的时间差（秒）
    */
-  update() {
-    // 更新相机仰角
+  update(dt = 0.016) {
+    // 1. 更新相机仰角 (Pitch)
     this.camera.rotation.x = this.cameraPitch;
 
-    // 记录移动前的位置，用于判断实际位移
+    // 2. 限制 dt 防止物理穿模
+    dt = Math.min(dt, 0.1);
+
+    // 3. 记录旧位置
     const oldX = this.position.x;
     const oldZ = this.position.z;
 
-    // 输入驱动移动
+    // 4. 输入驱动速度
     const speed = this.physics.speed;
-    let dx = 0, dz = 0;
+    let inputX = 0;
+    let inputZ = 0;
 
     if (this.keys['ArrowUp'] || this.keys['KeyW']) {
-      dx -= Math.sin(this.rotation.y) * speed;
-      dz -= Math.cos(this.rotation.y) * speed;
+      inputX -= Math.sin(this.rotation.y);
+      inputZ -= Math.cos(this.rotation.y);
     }
     if (this.keys['ArrowDown'] || this.keys['KeyS']) {
-      dx += Math.sin(this.rotation.y) * speed;
-      dz += Math.cos(this.rotation.y) * speed;
+      inputX += Math.sin(this.rotation.y);
+      inputZ += Math.cos(this.rotation.y);
     }
     if (this.keys['KeyA']) {
-      dx -= Math.cos(this.rotation.y) * speed;
-      dz += Math.sin(this.rotation.y) * speed;
+      inputX -= Math.cos(this.rotation.y);
+      inputZ += Math.sin(this.rotation.y);
     }
     if (this.keys['KeyD']) {
-      dx += Math.cos(this.rotation.y) * speed;
-      dz -= Math.sin(this.rotation.y) * speed;
+      inputX += Math.cos(this.rotation.y);
+      inputZ -= Math.sin(this.rotation.y);
     }
 
-    // 完整移动检测（防止对角线穿模）
-    let nextX = this.position.x + dx;
-    let nextZ = this.position.z + dz;
+    // 归一化输入并应用速度
+    const inputLen = Math.sqrt(inputX * inputX + inputZ * inputZ);
+    if (inputLen > 0) {
+      this.velocity.x = (inputX / inputLen) * speed;
+      this.velocity.z = (inputZ / inputLen) * speed;
+      this.lastInputDirection.set(inputX / inputLen, 0, inputZ / inputLen);
+    } else {
+      this.velocity.x = 0;
+      this.velocity.z = 0;
+    }
 
-    // 首先检查完整移动是否碰撞
-    const isCurrentlyStuck = this.physics.checkCollisionForMovement(this.position.x, this.position.z);
-    const hasCollisionFull = this._checkCollisionWithOffset(nextX, nextZ, dx, dz);
+    // --- 水平移动与碰撞处理 (T005, T006, T007) ---
+    const isCurrentlyStuck = this.physics.checkAABB(this.position.x, this.position.y, this.position.z);
+    this.isStuck = isCurrentlyStuck;
 
-    if (hasCollisionFull && !isCurrentlyStuck) {
-      // 完整移动有碰撞且当前未卡死，改为逐轴检查和应用位移，以实现更可靠的墙壁滑动
-      // ... 保持原有的顺序解析逻辑 ...
+    if (!isCurrentlyStuck) {
+      // 分轴尝试移动以实现滑动效果 (Sliding) (T019: dt 集成)
+      let nextX = this.position.x + this.velocity.x * dt;
+      let nextZ = this.position.z + this.velocity.z * dt;
 
-      // 1. 尝试在 X 轴上移动
-      const collisionX = this._checkCollisionWithOffset(nextX, this.position.z, dx, 0);
-      if (!collisionX) {
+      // 预先检查对角线移动是否会发生碰撞
+      const hasCollisionFull = this.physics.checkAABB(nextX, this.position.y, nextZ, true);
+
+      if (hasCollisionFull) {
+        // 应用凸角惩罚 (T007)
+        const penalty = this.physics.getCornerPenalty(this.velocity.x, this.velocity.z);
+
+        // 尝试 X 轴移动
+        if (!this.physics.checkAABB(nextX, this.position.y, this.position.z, true)) {
+          this.position.x = nextX;
+          this.velocity.x = this.physics.applyFriction(this.velocity.x);
+        } else {
+          // X 轴被阻挡，尝试上台阶 (T009)
+          if (!this.tryStepUp(nextX, this.position.z)) {
+            this.velocity.x = 0;
+          }
+        }
+
+        // 尝试 Z 轴移动
+        if (!this.physics.checkAABB(this.position.x, this.position.y, nextZ, true)) {
+          this.position.z = nextZ;
+          this.velocity.z = this.physics.applyFriction(this.velocity.z);
+        } else {
+          // Z 轴被阻挡，尝试上台阶 (T009)
+          if (!this.tryStepUp(this.position.x, nextZ)) {
+            this.velocity.z = 0;
+          }
+        }
+
+        // 应用凸角速度惩罚
+        if (penalty < 1.0) {
+          this.position.x = oldX + (this.position.x - oldX) * penalty;
+          this.position.z = oldZ + (this.position.z - oldZ) * penalty;
+        }
+      } else {
+        // 无碰撞，直接移动
         this.position.x = nextX;
-      } else if (this._canStepUpX(nextX)) { // 如果X轴被阻挡，检查是否可以上台阶
-        this.position.y += 1.0;
-        this.position.x = nextX;
-      } else if (this._canStepDownX(nextX)) { // 或下台阶
-        this.position.x = nextX;
-      }
-
-      // 2. 尝试在 Z 轴上移动 (注意：这次检查是基于可能已经更新过的 X 坐标)
-      const collisionZ = this._checkCollisionWithOffset(this.position.x, nextZ, 0, dz);
-      if (!collisionZ) {
-        this.position.z = nextZ;
-      } else if (this._canStepUpZ(nextZ)) { // 如果Z轴被阻挡，检查是否可以上台阶
-        this.position.y += 1.0;
-        this.position.z = nextZ;
-      } else if (this._canStepDownZ(nextZ)) { // 或下台阶
         this.position.z = nextZ;
       }
     } else {
-      // 完整移动没有碰撞，或者当前处于卡死状态，允许移动以脱困
-      this.position.x = nextX;
-      this.position.z = nextZ;
+      // 处于卡死状态，允许微小移动以尝试脱困 (Push-out 逻辑)
+      this.position.x += this.velocity.x * dt;
+      this.position.z += this.velocity.z * dt;
     }
 
-    // --- 防穿模回弹保护 (Camera Bumper) ---
-    // 即使预判检测失效，如果移动导致摄像机前方极近处(0.25m)有方块，则强制回弹
-    // 这能有效防止视觉上的穿模
-    if (!isCurrentlyStuck) {
-      // 使用带宽度的相机碰撞检测
-      let camHit = this._checkCameraCollision(this.position.x, this.position.z, this.rotation.y);
-
-      if (camHit.any) {
-        // 只有在完全没有正面碰撞的情况下，才尝试侧向回弹（Rebound）
-        // 这排除了“正面撞墙”的情况，确保正面撞墙时保持原有的滑动逻辑
-        if (!camHit.center) {
-          const fwdX = -Math.sin(this.rotation.y);
-          const fwdZ = -Math.cos(this.rotation.y);
-          const rightX = -fwdZ;
-          const rightZ = fwdX;
-          const nudgeDist = 0.05; // 回弹步长
-
-          if (camHit.left) {
-            // 左侧碰撞，向右回弹
-            this.position.x += rightX * nudgeDist;
-            this.position.z += rightZ * nudgeDist;
-          } else if (camHit.right) {
-            // 右侧碰撞，向左回弹
-            this.position.x -= rightX * nudgeDist;
-            this.position.z -= rightZ * nudgeDist;
-          }
-
-          // 重新检查回弹后的碰撞状态
-          camHit = this._checkCameraCollision(this.position.x, this.position.z, this.rotation.y);
-        }
-
-        // 如果没有尝试回弹（正面撞墙），或者回弹后依然有碰撞，则执行原有的“滑动/回退”逻辑
-        if (camHit.any) {
-          // 在执行最终回退前，最后检查一次是否是因为遇到一级台阶而停顿
-          // 如果前方是一级台阶，则执行紧急上台阶
-          if (this._canStepUpX(this.position.x + fwdX * 0.2) || this._canStepUpZ(this.position.z + fwdZ * 0.2)) {
-            this.position.y += 1.0;
-            // 既然上台阶了，这一帧就不再执行回退，允许继续前行
-          } else {
-            const blockedX = this._checkCameraCollision(this.position.x, oldZ, this.rotation.y).any;
-            const blockedZ = this._checkCameraCollision(oldX, this.position.z, this.rotation.y).any;
-
-            if (!blockedX) {
-              // X轴滑动安全，应用 X 轴移动，回退 Z 轴
-              this.position.z = oldZ;
-            } else if (!blockedZ) {
-              // Z轴滑动安全，应用 Z 轴移动，回退 X 轴
-              this.position.x = oldX;
-            } else {
-              // 两个方向都受阻，完全回退
-              this.position.x = oldX;
-              this.position.z = oldZ;
-            }
-          }
-        }
-      }
+    // --- T008: 坑道自动对中 ---
+    if (inputLen > 0) {
+      this.applyTunnelCentering();
     }
 
-    // Y轴物理（重力与地面检测）
+    // --- T013, T014: 相机保护 ---
+    this.applyCameraBumper();
+
+    // --- Y 轴物理 (T012: 头顶检测) ---
+    this.checkCeilingBump();
+
     let gy = -100;
     const px = Math.floor(this.position.x);
     const pz = Math.floor(this.position.z);
     const py = Math.floor(this.position.y);
 
-    // 向下寻找地面
     for(let k=0; k<=4; k++) {
       if(this.physics.isSolid(px, py - k, pz)) {
         gy = py - k + 1;
         break;
       }
     }
-    // 如果区块未加载或逻辑失效，使用高度图作为备选地面
     if(gy === -100) {
       gy = Math.floor(noise(px, pz) * 0.5) + 1;
     }
 
-    this.position.y += this.velocity.y;
+    this.position.y += this.velocity.y * dt;
 
     if (this.position.y < gy) {
+      // 落地
       this.position.y = gy;
       this.velocity.y = 0;
       this.jumping = false;
     } else {
-      this.velocity.y += this.physics.gravity;
+      this.velocity.y += this.physics.gravity * dt;
+      // 终端速度限制
+      if (this.velocity.y < this.physics.terminalVelocity) {
+        this.velocity.y = this.physics.terminalVelocity;
+      }
     }
 
-    // 跳跃控制
     if (this.keys['Space'] && !this.jumping) {
       this.velocity.y = this.physics.jumpForce;
       this.jumping = true;
     }
 
-    // 掉入虚空重生
     if (this.position.y < -20) {
       this.position.y = 60;
       this.velocity.y = 0;
     }
 
-    // 相机跟随与平滑处理
+    // 相机跟随与平滑处理 (T011: Y 轴插值)
     this.camera.position.x = this.position.x;
     this.camera.position.z = this.position.z;
-    // 1.65: 玩家眼睛的垂直偏移高度（相机高度）
-    // 0.25: lerp 的平滑系数，值越小相机跟随越平缓，值越大越实时
-    this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, this.position.y + 1.65, 0.25);
+    // 使用插值确保上下台阶不抖动
+    const targetCamY = this.position.y + 1.65;
+    this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, targetCamY, 0.2);
 
-    // 计算实际位移
+    // --- T018: 兜底推回 ---
+    this.physics.applyPushOut();
+
+    // 计算实际位移用于音效和晃动
     const actualDx = this.position.x - oldX;
     const actualDz = this.position.z - oldZ;
 
     this.updateArm();
-    this.updateCameraBob(actualDx, actualDz, hasCollisionFull);
+    this.updateCameraBob(actualDx, actualDz, dt, isCurrentlyStuck);
+  }
+
+  /**
+   * 更新镜头晃动效果 (T015)
+   * @param {number} dx - X 实际位移
+   * @param {number} dz - Z 实际位移
+   * @param {number} dt - 时间增量
+   * @param {boolean} isObstructed - 是否被卡住
+   */
+  updateCameraBob(dx, dz, dt, isObstructed) {
+    // 计算预期位移量
+    const inputSpeed = Math.sqrt(this.velocity.x ** 2 + this.velocity.z ** 2);
+    const expectedDist = inputSpeed * dt;
+    const actualDist = Math.sqrt(dx * dx + dz * dz);
+
+    // 判定是否为“全速前进”：实际位移达到预期的 95% 以上
+    // 同时也需要满足正在移动且未在跳跃中
+    const isMoving = actualDist > 0.001;
+    const isFullSpeed = inputSpeed > 0 && actualDist > expectedDist * 0.95;
+
+    // 只有在全速移动、未在跳跃、且未被阻挡（包括侧滑导致的减速）时才晃动
+    const shouldBob = isMoving && isFullSpeed && !this.jumping && !isObstructed;
+
+    if (shouldBob) {
+      this.bobbing_timer += this.bobbing_speed;
+      this.bobAmount = THREE.MathUtils.lerp(this.bobAmount, this.bobbing_intensity, 0.1);
+    } else {
+      this.bobbing_timer = 0;
+      this.bobAmount = THREE.MathUtils.lerp(this.bobAmount, 0, 0.2);
+    }
+
+    const bobX = Math.sin(this.bobbing_timer) * this.bobAmount;
+    const bobY = Math.cos(this.bobbing_timer * 2) * this.bobAmount * 0.5;
+
+    // 应用平滑后的偏移
+    this.bob_offset.x = THREE.MathUtils.lerp(this.bob_offset.x, bobX, 0.3);
+    this.bob_offset.y = THREE.MathUtils.lerp(this.bob_offset.y, bobY, 0.3);
+
+    this.camera.position.x += this.bob_offset.x;
+    this.camera.position.y += this.bob_offset.y;
+
+    // 处理脚步声
+    if (shouldBob) {
+      this.playFootstepSound();
+    } else {
+      audioManager.stopSound('running_land');
+      audioManager.stopSound('running_water');
+    }
   }
 
   /**
@@ -1011,61 +923,5 @@ export class Player {
     } else {
       this.arm.visible = false;
     }
-  }
-
-  /**
-   * 更新镜头晃动效果
-   * @param {number} dx - X轴上的实际移动量
-   * @param {number} dz - Z轴上的实际移动量
-   * @param {boolean} isObstructed - 玩家的预期移动是否被阻挡
-   */
-  updateCameraBob(dx, dz, isObstructed) {
-    // 只有在实际移动、不在跳跃中、且未被障碍物阻挡时，才应用晃动效果
-    const isMovingFreely = (Math.abs(dx) > 0 || Math.abs(dz) > 0) && !this.jumping && !isObstructed;
-
-    let targetBobX = 0;
-    let targetBobY = 0;
-
-    if (isMovingFreely) {
-      // 检查环境变化（陆地 vs 水面）
-      const px = Math.floor(this.position.x);
-      const py = Math.floor(this.position.y);
-      const pz = Math.floor(this.position.z);
-      const currentInWater = this.world.getBlock(px, py, pz) === 'water';
-
-      if (this.lastInWater !== undefined && this.lastInWater !== currentInWater) {
-        // 环境发生即时改变，切断之前的音效
-        if (currentInWater) {
-          audioManager.stopSound('running_land');
-        } else {
-          audioManager.stopSound('running_water');
-        }
-      }
-      this.lastInWater = currentInWater;
-
-      // 如果在自由移动，则启动对应的循环音效
-      this.playFootstepSound();
-
-      // 如果在自由移动，则更新晃动计时器并计算目标偏移
-      this.bobbing_timer += this.bobbing_speed;
-
-      targetBobX = Math.sin(this.bobbing_timer) * this.bobbing_intensity;
-      targetBobY = Math.cos(this.bobbing_timer * 2) * this.bobbing_intensity * 0.5;
-    } else {
-      // 如果停止移动或被阻挡，重置计时器并停止移动音效
-      this.bobbing_timer = 0;
-      audioManager.stopSound('running_land');
-      audioManager.stopSound('running_water');
-    }
-
-    // 使用线性插值 (Lerp) 平滑地将当前的晃动偏移过渡到目标偏移
-    // 当停止移动时，目标偏移为0，这将使镜头平滑地恢复到中心位置
-    const lerpFactor = 0.3; // 插值系数，控制恢复速度
-    this.bob_offset.x = THREE.MathUtils.lerp(this.bob_offset.x, targetBobX, lerpFactor);
-    this.bob_offset.y = THREE.MathUtils.lerp(this.bob_offset.y, targetBobY, lerpFactor);
-
-    // 将最终平滑处理过的偏移量应用到相机
-    this.camera.position.x += this.bob_offset.x;
-    this.camera.position.y += this.bob_offset.y;
   }
 }

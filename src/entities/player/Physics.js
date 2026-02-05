@@ -1,5 +1,23 @@
 // src/entities/player/Physics.js
 /**
+ * 物理系统常量定义
+ */
+export const PHYSICS_CONSTANTS = {
+  GRAVITY: -24.0,           // 调整为每秒重力 (约为 -0.4 * 60)
+  TERMINAL_VELOCITY: -50.0,
+  PLAYER_WIDTH: 0.6,
+  PLAYER_HEIGHT: 1.8,
+  HEAD_HEIGHT: 1.65,
+  MAX_STEP: 1.0,
+  MAX_JUMP_STEP: 2.0,
+  FRICTION_SLIDE: 0.9,
+  FRICTION_CORNER: 0.7,
+  JUMP_FORCE: 10.0,         // 调整为冲量速度
+  SPEED: 8.0,               // 调整为每秒速度 (约为 0.133 * 60)
+  CAMERA_WIDTH: 0.3
+};
+
+/**
  * 物理系统类，负责处理玩家的碰撞检测和运动物理常量
  */
 
@@ -11,11 +29,14 @@ export class Physics {
   constructor(player, world) {
     this.player = player;
     this.world = world;
-    this.gravity = -0.015;      // 重力加速度：每帧 Y 轴速度的改变量，负值表示向下坠落
-    this.terminalVelocity = -1.0; // 终端速度：最大下落速度，防止重力加速度导致速度无限增大，避免穿透地面
-    this.playerHeight = 1.9;     // 玩家碰撞高度：用于碰撞检测的高度，从 1.8 增加到 1.9 以匹配新的坐标系统
-    this.jumpForce = 0.20;       // 跳跃初速度：跳跃瞬间向上的速度冲量
-    this.speed = 0.13;           // 移动速度：每帧在 XZ 平面上移动的基础距离
+
+    // 物理参数（从常量初始化，以便后续可能的动态调整）
+    this.gravity = PHYSICS_CONSTANTS.GRAVITY;
+    this.terminalVelocity = PHYSICS_CONSTANTS.TERMINAL_VELOCITY;
+    this.playerHeight = PHYSICS_CONSTANTS.PLAYER_HEIGHT;
+    this.playerWidth = PHYSICS_CONSTANTS.PLAYER_WIDTH;
+    this.jumpForce = PHYSICS_CONSTANTS.JUMP_FORCE;
+    this.speed = PHYSICS_CONSTANTS.SPEED;
   }
 
   /**
@@ -43,23 +64,122 @@ export class Physics {
    * @returns {boolean} - 是否发生碰撞
    */
   checkCollisionForMovement(nx, nz) {
-    // 检查玩家高度范围内的所有方块（排除脚部，防止被台阶卡住）
-    // 使用循环检查覆盖整个身体高度，避免两点检测（头部+中部）在特殊对齐下失效
-    const x = nx;
-    const z = nz;
+    return this.checkAABB(nx, this.player.position.y, nz, true);
+  }
 
-    // 从脚部上方一定高度开始检查，直到头顶
-    // 0.5 的偏移量排除脚部，允许上台阶
-    const minY = Math.floor(this.player.position.y + 0.5);
-    const maxY = Math.floor(this.player.position.y + this.playerHeight - 0.2);
+  /**
+   * 检查 AABB 碰撞
+   * @param {number} x - 逻辑中心 X
+   * @param {number} y - 逻辑底部 Y
+   * @param {number} z - 逻辑中心 Z
+   * @param {boolean} excludeFeet - 是否排除脚部检测 (用于上台阶)
+   * @returns {boolean}
+   */
+  checkAABB(x, y, z, excludeFeet = false) {
+    const halfW = this.playerWidth / 2;
+    const minX = x - halfW;
+    const maxX = x + halfW;
+    const minZ = z - halfW;
+    const maxZ = z + halfW;
 
-    for (let y = minY; y <= maxY; y++) {
-      if (this.isSolid(x, y, z)) {
-        return true;
+    // Y 轴采样范围
+    // 0.1 和 0.2 的偏移量用于确保不会因为微小的浮点数误差检测到地板或天花板
+    const startY = excludeFeet ? y + 0.51 : y + 0.1;
+    const endY = y + this.playerHeight - 0.1;
+
+    // 检查 AABB 覆盖的所有方块
+    for (let bx = Math.floor(minX); bx <= Math.floor(maxX); bx++) {
+      for (let bz = Math.floor(minZ); bz <= Math.floor(maxZ); bz++) {
+        for (let by = Math.floor(startY); by <= Math.floor(endY); by++) {
+          if (this.isSolid(bx, by, bz)) return true;
+        }
       }
     }
-
     return false;
+  }
+
+  /**
+   * 获取 AABB 碰撞的详细信息
+   * @param {number} x
+   * @param {number} y
+   * @param {number} z
+   * @returns {Object|null} 碰撞点信息 {x, y, z, type}
+   */
+  getCollisionDetail(x, y, z) {
+    const halfW = this.playerWidth / 2;
+    const minX = x - halfW;
+    const maxX = x + halfW;
+    const minZ = z - halfW;
+    const maxZ = z + halfW;
+    const startY = y + 0.1;
+    const endY = y + this.playerHeight - 0.1;
+
+    for (let bx = Math.floor(minX); bx <= Math.floor(maxX); bx++) {
+      for (let bz = Math.floor(minZ); bz <= Math.floor(maxZ); bz++) {
+        for (let by = Math.floor(startY); by <= Math.floor(endY); by++) {
+          if (this.isSolid(bx, by, bz)) {
+            return { x: bx, y: by, z: bz };
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 处理滑动碰撞响应
+   * @param {number} velocity - 该轴的速度
+   * @returns {number} 调整后的速度
+   */
+  applyFriction(velocity) {
+    // T006: 应用滑动摩擦力
+    return velocity * PHYSICS_CONSTANTS.FRICTION_SLIDE;
+  }
+
+  /**
+   * 检查是否处于凸角碰撞状态并应用惩罚
+   * @param {number} dx - X 轴预期移动
+   * @param {number} dz - Z 轴预期移动
+   * @returns {number} 速度系数
+   */
+  getCornerPenalty(dx, dz) {
+    // T007: 如果是斜向移动且发生碰撞，应用 0.7 惩罚
+    if (Math.abs(dx) > 0.001 && Math.abs(dz) > 0.001) {
+      return PHYSICS_CONSTANTS.FRICTION_CORNER;
+    }
+    return 1.0;
+  }
+
+  /**
+   * 穿模推回逻辑 (T018)
+   * 如果玩家由于某种原因卡在方块内，将其推向最近的空气
+   */
+  applyPushOut() {
+    const px = this.player.position.x;
+    const py = this.player.position.y;
+    const pz = this.player.position.z;
+
+    // 如果当前位置没有卡住，不需要推回
+    if (!this.checkAABB(px, py, pz)) return;
+
+    // 检查 6 个邻居方向
+    const offsets = [
+      [1, 0, 0], [-1, 0, 0],
+      [0, 1, 0], [0, -1, 0],
+      [0, 0, 1], [0, 0, -1]
+    ];
+
+    const pushStep = 0.1;
+    for (const [ox, oy, oz] of offsets) {
+      const nx = px + ox * pushStep;
+      const ny = py + oy * pushStep;
+      const nz = pz + oz * pushStep;
+
+      if (!this.checkAABB(nx, ny, nz)) {
+        this.player.position.set(nx, ny, nz);
+        return;
+      }
+    }
   }
 
   /**
@@ -70,8 +190,18 @@ export class Physics {
   * @returns {boolean}
   */
   isSolid(x, y, z) {
-  // 询问世界系统该位置是否为实心方块
-    return this.world.isSolid(x, y, z);
+    // 1. 询问世界系统该位置是否为实心方块 (基于 solidBlocks 集合)
+    if (this.world.isSolid(x, y, z)) return true;
+
+    // 2. T004/T017: 显式兜底检查特殊类型 (树叶、玻璃、实体碰撞体)
+    // 这样做可以确保即使在区块加载边缘或动态更新时，这些方块也能正确阻挡玩家
+    const type = this.world.getBlock(x, y, z);
+    if (!type) return false;
+
+    // 包含所有变体的树叶和玻璃
+    return type === 'collider' ||
+           type.includes('leaves') ||
+           type.includes('glass');
   }
 
   /**

@@ -136,3 +136,6 @@ npx serve .
 ## 在线演示
 - 访问: https://js-perf.cn
 - 项目描述: "妈妈不让我玩我的世界，所以我用 AI 做了一个，自己玩。"
+
+## Recent Changes
+- 005-player-physics-refactor: Added [if applicable, e.g., PostgreSQL, CoreData, files or N/A]
