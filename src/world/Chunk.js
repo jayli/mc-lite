@@ -8,7 +8,7 @@ import { materials } from '../core/materials/MaterialManager.js';
 import { RealisticTree } from './entities/RealisticTree.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { persistenceService } from '../services/PersistenceService.js';
-import { SEED } from '../utils/MathUtils.js';
+import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
 import { rookModel, carModel, gunManModel } from '../core/Engine.js';
 
@@ -243,7 +243,7 @@ export class Chunk {
     worldWorker.postMessage({
       cx: this.cx,
       cz: this.cz,
-      seed: SEED,
+      seed: WORLD_CONFIG.SEED,
       snapshot: {
         blocks: { ...this.blockData },
         entities: {
@@ -357,7 +357,7 @@ export class Chunk {
       worldWorker.postMessage({
         cx: this.cx,
         cz: this.cz,
-        seed: SEED,
+        seed: WORLD_CONFIG.SEED,
         snapshot
       });
     });

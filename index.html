@@ -76,6 +76,7 @@ import { Game } from './src/core/Game.js';
         import { initializeMaterials } from './src/core/materials/MaterialManager.js';
         import { initializeAudio } from './src/core/AudioManager.js';
         import { manualSaveService } from './src/services/ManualSaveService.js';
+        import { setSeed } from './src/utils/MathUtils.js';
 
         async function main() {
             await Promise.all([
@@ -94,6 +95,15 @@ import { Game } from './src/core/Game.js';
 
               const startGame = async (saveData = null) => {
                 modal.style.display = 'none';
+
+                // 如果是加载存档，在创建 Game 实例前恢复种子
+                if (saveData && saveData.seed !== undefined) {
+                  console.log(`[Main] Restoring seed from save: ${saveData.seed}`);
+                  setSeed(saveData.seed);
+                } else if (saveData) {
+                  console.warn('[Main] Loading save but no seed found in saveData');
+                }
+
                 const game = new Game();
                 if (saveData) {
                   await game.applySaveData(saveData);

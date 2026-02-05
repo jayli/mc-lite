@@ -1,12 +1,15 @@
 // src/utils/MathUtils.js
-export let SEED = Math.random() * 9999;
+export const WORLD_CONFIG = {
+  SEED: Math.random() * 9999
+};
 
 export function setSeed(s) {
-  SEED = s;
+  console.log(`[Seed] Setting global seed to: ${s}`);
+  WORLD_CONFIG.SEED = s;
 }
 
 export function noise(x, z, scale = 0.05) {
-  const nx = x + SEED, nz = z + SEED;
+  const nx = x + WORLD_CONFIG.SEED, nz = z + WORLD_CONFIG.SEED;
   return Math.sin(nx * scale) * 2 + Math.cos(nz * scale) * 2;
 }
 

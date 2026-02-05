@@ -9,6 +9,7 @@ import { UIManager } from '../ui/UIManager.js';
 import { Player } from '../entities/player/Player.js';
 import { realisticTreeManager } from '../world/entities/RealisticTreeManager.js';
 import { faceCullingSystem } from './FaceCullingSystem.js';
+import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import Stats from 'stats';
 
 /**
@@ -249,9 +250,11 @@ export class Game {
 
     const snapshot = {
       player: playerSnapshot,
-      worldDeltas: worldDeltas
+      worldDeltas: worldDeltas,
+      seed: WORLD_CONFIG.SEED
     };
 
+    console.log(`[Save] Game saved with seed: ${WORLD_CONFIG.SEED}`);
     await manualSaveService.save(snapshot);
   }
 

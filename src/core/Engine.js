@@ -4,7 +4,7 @@ import { AMFLoader } from 'three/addons/loaders/AMFLoader.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
-import { SEED } from '../utils/MathUtils.js';
+import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { FaceCullingSystem, faceCullingSystem } from './FaceCullingSystem.js';
 
 // 海平面相比陆地低多少
@@ -329,7 +329,7 @@ export class Engine {
         uColor: { value: new THREE.Color(waterColor) },
         uSunDirection: { value: this.sunDirection },
         uOpacity: { value: waterOpacity },
-        uSeed: { value: SEED },
+        uSeed: { value: WORLD_CONFIG.SEED },
         uFogColor: { value: new THREE.Color(waterForgColor) },
         uFogNear: { value: 20 },
         uFogFar: { value: 70 }
@@ -505,6 +505,8 @@ export class Engine {
     // 更新水面动画时间
     if (this.waterMaterial) {
       this.waterMaterial.uniforms.uTime.value += 0.015;
+      // 强制同步种子，确保存档加载后的水面一致性
+      this.waterMaterial.uniforms.uSeed.value = WORLD_CONFIG.SEED;
     }
 
     // 水面跟随相机移动
@@ -521,7 +523,7 @@ export class Engine {
 
     // --- 模拟高度计算以判断是否在“近海”区域 ---
     const getNoise = (x, z, scale) => {
-      const nx = x + SEED, nz = z + SEED;
+      const nx = x + WORLD_CONFIG.SEED, nz = z + WORLD_CONFIG.SEED;
       return Math.sin(nx * scale) * 2 + Math.cos(nz * scale) * 2;
     };
 
