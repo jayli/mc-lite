@@ -24,7 +24,7 @@ export class FaceCullingSystem {
 
     // 透明方块类型集合
     this.transparentTypes = new Set(config.transparentTypes || [
-      'air', 'water', 'glass_block', 'glass_blink'
+      'air', 'water', 'glass_block', 'glass_blink', 'collider'
     ]);
 
     // 性能统计
@@ -1097,12 +1097,27 @@ export class FaceCullingSystem {
             const [x, y, z] = key.split(',').map(Number);
 
             // 检查 6 个方向的邻居
-            if (world.isSolid(x, y + 1, z)) hiddenFaces++; else visibleFaces++; // Top
-            if (world.isSolid(x, y - 1, z)) hiddenFaces++; else visibleFaces++; // Bottom
-            if (world.isSolid(x, y, z - 1)) hiddenFaces++; else visibleFaces++; // North
-            if (world.isSolid(x, y, z + 1)) hiddenFaces++; else visibleFaces++; // South
-            if (world.isSolid(x - 1, y, z)) hiddenFaces++; else visibleFaces++; // West
-            if (world.isSolid(x + 1, y, z)) hiddenFaces++; else visibleFaces++; // East
+            const directions = [
+              [0, 1, 0], [0, -1, 0], [0, 0, -1], [0, 0, 1], [-1, 0, 0], [1, 0, 0]
+            ];
+
+            for (const [dx, dy, dz] of directions) {
+              const nx = x + dx;
+              const ny = y + dy;
+              const nz = z + dz;
+
+              if (world.isSolid(nx, ny, nz)) {
+                // 如果是固体，进一步检查是否为透明/碰撞体（非遮挡方块）
+                const neighborType = world.getBlock(nx, ny, nz);
+                if (neighborType && this.isTransparent(neighborType)) {
+                  visibleFaces++;
+                } else {
+                  hiddenFaces++;
+                }
+              } else {
+                visibleFaces++;
+              }
+            }
           }
         }
 

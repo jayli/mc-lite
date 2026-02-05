@@ -401,7 +401,7 @@ export class Chunk {
 
     // 遍历每种方块类型，为每种类型创建一个 InstancedMesh
     for (const type in d) {
-      if (d[type].length === 0) continue;  // 跳过没有任何实例的方块类型
+      if (d[type].length === 0 || type === 'collider') continue;  // 跳过没有任何实例或碰撞体方块类型
 
       // 从材质管理器和几何体映射表获取资源
       const geometry = geomMap[type] || geomMap['default'];
