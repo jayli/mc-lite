@@ -294,11 +294,11 @@ export class Player {
       inputX += Math.sin(this.rotation.y);
       inputZ += Math.cos(this.rotation.y);
     }
-    if (this.keys['KeyA']) {
+    if (this.keys['KeyA'] || this.keys['ArrowLeft']) {
       inputX -= Math.cos(this.rotation.y);
       inputZ += Math.sin(this.rotation.y);
     }
-    if (this.keys['KeyD']) {
+    if (this.keys['KeyD'] || this.keys['ArrowRight']) {
       inputX += Math.cos(this.rotation.y);
       inputZ -= Math.sin(this.rotation.y);
     }
