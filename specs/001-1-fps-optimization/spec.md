@@ -1,6 +1,6 @@
 # Feature Specification: FPS Optimization through Voxel Reduction
 
-**Feature Branch**: `0001-fps-optimization`
+**Feature Branch**: `001-1-fps-optimization`
 **Created**: 2026-01-28
 **Status**: Draft
 **Input**: User description: "我需要提升游戏运行的 fps，现在帧率在 macbook 上是 40 不到，我希望能提升到至少60以上。现在我发现瓶颈在于渲染方块的数量太多。我希望能适当的减少一些方块的数量，我有两个思路，第一是去掉正常的（非RealisticTree）的树（包括森林里的树和草地里的树）的树叶模块中不接触空气的树叶方块，第二是将海平面以下的沙块只留两层，第一层是沙块sand，里面第二层是end_stone，在海水里的end_stone是不可被挖的，这样海水区域的深部的方块都不用再渲染了，这样能减少一部分方块的数量。第三是陆地（沙地、苔藓地、草地、森林）的地图中内部（地表两层以下）可以随机40%比例左右（可以按照你的建议值）生成大量的空心区域，即地洞，这样也可以减少一定量的方块数量。总之用是哪个面几个方法减少一定量的方块数量，进而降低渲染压力，最后提高fps帧率。"

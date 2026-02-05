@@ -1,6 +1,6 @@
 # Tasks: FPS Optimization through Voxel Reduction
 
-**Input**: Design documents from `/specs/0001-fps-optimization/`
+**Input**: Design documents from `/specs/001-1-fps-optimization/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
@@ -15,7 +15,7 @@
 
 **Purpose**: Project initialization and basic structure
 
-- [x] T001 Verify existing branch `0001-fps-optimization` and workspace state
+- [x] T001 Verify existing branch `001-1-fps-optimization` and workspace state
 - [x] T002 Review `src/world/assets/textures/End_Stone.png` and ensure it is available for use
 
 ---
