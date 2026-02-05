@@ -208,7 +208,8 @@ onmessage = function(e) {
     'vine', 'lilypad',
     'flower', 'short_grass', 'allium',
     'leaves', 'yellow_leaves', 'azalea_leaves', 'swamp_leaves',
-    'cactus'
+    'cactus',
+    'collider'
   ]);
 
   // 辅助函数：判断指定位置的方块是否遮挡视线
