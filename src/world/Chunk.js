@@ -699,8 +699,13 @@ export class Chunk {
           // 邻居在当前 Chunk
           const nKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
           // 如果邻居存在且当前不可见，则显示它
-          if (this.blockData[nKey] && !this.visibleKeys.has(nKey)) {
-            this.addBlockDynamic(nx, ny, nz, this.blockData[nKey]);
+          if (this.blockData[nKey]) {
+            if (!this.visibleKeys.has(nKey)) {
+              this.addBlockDynamic(nx, ny, nz, this.blockData[nKey]);
+            } else {
+              // 核心修复：如果本来就可见，也要重新触发 Face Culling 更新以显示新的暴露面
+              this._triggerFaceCullingUpdate(nx, ny, nz, this.blockData[nKey]);
+            }
           }
         } else {
           // 邻居在隔壁 Chunk
@@ -804,8 +809,13 @@ export class Chunk {
    */
   checkReveal(x, y, z) {
     const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-    if (this.blockData[key] && !this.visibleKeys.has(key)) {
-      this.addBlockDynamic(x, y, z, this.blockData[key]);
+    if (this.blockData[key]) {
+      if (!this.visibleKeys.has(key)) {
+        this.addBlockDynamic(x, y, z, this.blockData[key]);
+      } else {
+        // 如果原本可见，跨区块暴露也需要触发 Face Culling 更新
+        this._triggerFaceCullingUpdate(x, y, z, this.blockData[key]);
+      }
     }
   }
 
