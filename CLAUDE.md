@@ -67,3 +67,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **007-chunk-optimization**: 区块合并优化，提升玩家交互后的性能。
 - **004-hidden-face-culling**: 隐藏面剔除优化。
 - **003-land-caves**: 洞穴生成系统。
+
+## Active Technologies
+- ES6 Modules (JavaScript) + Three.js, GLTFLoader (009-009-player-gun)
+
+## Recent Changes
+- 009-009-player-gun: Added ES6 Modules (JavaScript) + Three.js, GLTFLoader

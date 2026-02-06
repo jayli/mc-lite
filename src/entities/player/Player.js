@@ -8,6 +8,7 @@ import { Physics } from './Physics.js';
 import { Inventory } from './Slots.js';
 import { getBiome, noise } from '../../utils/MathUtils.js';
 import { chestManager } from '../../world/entities/Chest.js';
+import { gunModel } from '../../core/Engine.js';
 
 export class Player {
   /**
@@ -89,6 +90,11 @@ export class Player {
 
     // 追踪引燃中的 TNT
     this.ignitingTNTs = new Set();
+
+    // 持枪系统 (Feature 009)
+    this.isHoldingGun = false;
+    this.gun = null;
+    console.log('Player 初始化，当前 Engine.gunModel 状态:', !!gunModel);
   }
 
   /**
@@ -97,6 +103,10 @@ export class Player {
   setupInput() {
     window.addEventListener('keydown', e => {
       this.keys[e.code] = true;
+      if (e.code === 'KeyR') {
+        this.isHoldingGun = !this.isHoldingGun;
+        console.log('持枪状态切换(keydown):', this.isHoldingGun);
+      }
     });
     window.addEventListener('keyup', e => {
       this.keys[e.code] = false;
@@ -441,7 +451,41 @@ export class Player {
     const actualDz = this.position.z - oldZ;
 
     this.updateArm();
+    this.updateGun();
     this.updateCameraBob(actualDx, actualDz, dt, isCurrentlyStuck);
+  }
+
+  /**
+   * 更新枪支状态 (Feature 009)
+   */
+  updateGun() {
+    // 增加状态检查日志（频率限制，防止刷屏）
+    if (!this.gun && !this._lastGunLog || Date.now() - this._lastGunLog > 5000) {
+      console.log('持枪系统检查: this.gun=', !!this.gun, 'gunModel=', !!gunModel);
+      this._lastGunLog = Date.now();
+    }
+
+    if (!this.gun && gunModel) {
+      console.log('检测到枪支模型已加载，正在克隆并添加到相机...');
+      this.gun = gunModel.clone();
+      this.camera.add(this.gun);
+
+      // 调整位置和旋转 (根据经验微调)
+      // X: 0.3 (右), Y: -0.3 (下), Z: -0.4 (前) - 距离更近更中心
+      this.gun.position.set(0.3, -0.3, -0.4);
+
+      // 暂时移除旋转，看看模型原始朝向
+      this.gun.rotation.y = 0;
+
+      // 进一步增大缩放比例，确保能看到
+      this.gun.scale.set(0.5, 0.5, 0.5);
+
+      console.log('枪支模型已挂载到相机，位置:', this.gun.position);
+    }
+
+    if (this.gun) {
+      this.gun.visible = this.isHoldingGun;
+    }
   }
 
   /**
@@ -960,6 +1004,10 @@ export class Player {
    * 更新手臂动画
    */
   updateArm() {
+    if (this.isHoldingGun) {
+      this.arm.visible = false;
+      return;
+    }
     if (this.swingTime > 0) {
       this.arm.visible = true;
       this.arm.rotation.x = -Math.PI / 2 + Math.sin(this.swingTime * 0.3);

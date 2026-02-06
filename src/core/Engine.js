@@ -17,6 +17,7 @@ const waterForgColor = 0xa7d1e2; // 水雾颜色
 export let rookModel = null;
 export let carModel = null;
 export let gunManModel = null;
+export let gunModel = null;
 
 // 定义并导出 Engine 类，用于管理游戏的核心渲染引擎
 export class Engine {
@@ -221,6 +222,20 @@ export class Engine {
       });
     }, undefined, (error) => {
       console.error('Failed to load gun_man.mtl:', error);
+    });
+
+    gltfLoader.load('src/world/assets/mod/gun.gltf', (gltf) => {
+      gunModel = gltf.scene;
+      // 遍历设置阴影
+      gunModel.traverse(child => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+      console.log('Gun model loaded successfully');
+    }, undefined, (error) => {
+      console.error('Failed to load gun.gltf:', error);
     });
   }
 
