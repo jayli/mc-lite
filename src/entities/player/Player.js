@@ -95,6 +95,9 @@ export class Player {
     this.isHoldingGun = false;
     this.gun = null;
     this.tracers = []; // 初始化追踪线数组
+    this.isShooting = false; // 是否正在射击 (按住左键)
+    this.shootCooldown = 0;  // 射击冷却计时器
+    this.shootInterval = 0.4; // 连发间隔 (400ms)
     console.log('Player 初始化，当前 Engine.gunModel 状态:', !!gunModel);
   }
 
@@ -116,6 +119,9 @@ export class Player {
       }
     });
     window.addEventListener('mousedown', e => this.interact(e)); // 传递完整事件对象
+    window.addEventListener('mouseup', e => {
+      if (e.button === 0) this.isShooting = false;
+    });
 
     document.addEventListener('mousemove', e => {
       if (document.pointerLockElement === document.body) {
@@ -453,8 +459,47 @@ export class Player {
 
     this.updateArm();
     this.updateGun();
+    this.handleShooting(dt); // 处理连发逻辑
     this.updateCameraBob(actualDx, actualDz, dt, isCurrentlyStuck);
     this.updateTracers(dt);
+  }
+
+  /**
+   * 处理连发逻辑
+   */
+  handleShooting(dt) {
+    if (this.shootCooldown > 0) {
+      this.shootCooldown -= dt;
+    }
+
+    if (this.isHoldingGun && this.isShooting && this.shootCooldown <= 0) {
+      // 获取所有可交互的区块物体
+      const targets = [];
+      for (const chunk of this.world.chunks.values()) {
+        targets.push(chunk.group);
+      }
+      this.executeShot(targets);
+      this.shootCooldown = this.shootInterval;
+    }
+  }
+
+  /**
+   * 执行单次射击计算
+   */
+  executeShot(targets) {
+    // 使用更长的射线探测距离 (40)
+    this.raycaster.far = 40;
+    this.raycaster.setFromCamera(this.center, this.camera);
+    const gunHits = this.raycaster.intersectObjects(targets, true);
+    this.raycaster.far = Infinity; // 恢复默认值
+
+    if (gunHits.length > 0) {
+      const hit = gunHits[0];
+      this.shoot(hit);
+      this.removeBlock(hit);
+    } else {
+      this.shoot(null);
+    }
   }
 
   /**
@@ -505,17 +550,17 @@ export class Player {
     if (hit) {
       targetPos = hit.point;
     } else {
-      // 如果没打中，射向 30 米远处
+      // 如果没打中，射向 40 米远处
       const direction = new THREE.Vector3();
       this.camera.getWorldDirection(direction);
-      targetPos = new THREE.Vector3().copy(this.camera.position).add(direction.multiplyScalar(30));
+      targetPos = new THREE.Vector3().copy(this.camera.position).add(direction.multiplyScalar(40));
     }
 
     // 3. 生成示踪线
     this.spawnTracer(muzzlePos, targetPos);
 
-    // 4. 播放射击音效 (如果有的话，暂时使用挖掘声代替或添加新音效)
-    audioManager.playSound('put', 0.5); // 临时音效
+    // 4. 播放射击音效
+    audioManager.playSound('gun_fire', 0.4);
   }
 
   /**
@@ -711,18 +756,11 @@ export class Player {
     } else if (button === 0) { // 左键点击 - 挖掘或射击
       // 射击逻辑 (Feature 009)
       if (this.isHoldingGun) {
-        // 使用更长的射线探测距离 (30)
-        this.raycaster.far = 30;
-        this.raycaster.setFromCamera(this.center, this.camera);
-        const gunHits = this.raycaster.intersectObjects(targets, true);
-        this.raycaster.far = Infinity; // 恢复默认值
-
-        if (gunHits.length > 0) {
-          const hit = gunHits[0];
-          this.shoot(hit);
-          this.removeBlock(hit);
-        } else {
-          this.shoot(null);
+        this.isShooting = true;
+        // 只有在冷却结束时才发射第一枪（防止点击过快导致的频率异常，虽然通常 interval 很大）
+        if (this.shootCooldown <= 0) {
+          this.executeShot(targets);
+          this.shootCooldown = this.shootInterval;
         }
         return; // 射击后跳过常规挖掘逻辑
       }
