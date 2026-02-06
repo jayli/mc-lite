@@ -37,8 +37,12 @@ onmessage = function(e) {
         const type = snapshot.blocks[key];
         const [bx, by, bz] = key.split(',').map(Number);
         // 简单逻辑：部分方块非实心
-        const nonSolid = ['air', 'water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass', 'allium'];
-        const solid = !nonSolid.includes(type);
+        // const nonSolid = ['air', 'water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass', 'allium'];
+        // const solid = !nonSolid.includes(type);
+        const solid = ![
+          'air', // 原来没有 air，我学着 AI 添加了 air // jayli
+          'water', 'swamp_water', 'cloud', 'vine',
+          'lilypad', 'flower', 'short_grass', 'allium'].includes(type);
         blockMap.set(key, { x: bx, y: by, z: bz, type, solid });
       }
     }
@@ -282,10 +286,10 @@ onmessage = function(e) {
   const visibleKeys = [];
 
   for (const [key, block] of blockMap) {
-    if (block.type === 'air') {
-        allBlockTypes[key] = 'air';
-        continue;
-    }
+    // if (block.type === 'air') {
+    //     allBlockTypes[key] = 'air';
+    //     continue;
+    // }
     if (block.solid) solidBlocks.push(key);
     let visible = true;
     if (block.solid) {

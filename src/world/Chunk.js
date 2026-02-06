@@ -544,11 +544,12 @@ export class Chunk {
 
     // 更新数据和可见性状态
     if (type === 'air') {
-        this.blockData[key] = 'air';
-        this.visibleKeys.delete(key);
+      // this.blockData[key] = 'air';
+      delete this.blockData[key];
+      this.visibleKeys.delete(key);
     } else {
-        this.blockData[key] = type;
-        this.visibleKeys.add(key);
+      this.blockData[key] = type;
+      this.visibleKeys.add(key);
     }
 
     // 触发持久化刷新 (防抖)
@@ -841,7 +842,8 @@ export class Chunk {
 
       if (oldType) {
         affectedTypes.add(oldType);
-        this.blockData[key] = 'air';
+        // this.blockData[key] = 'air';
+        delete this.blockData[key];
         this.visibleKeys.delete(key);
         this.solidBlocks.delete(key);
         persistenceService.recordChange(px, py, pz, 'air');

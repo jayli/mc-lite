@@ -89,7 +89,12 @@ export class PersistenceService {
 
     const chunkData = this.cache.get(chunkKey);
     if (chunkData && chunkData.blocks) {
-      chunkData.blocks[blockKey] = type;
+      // chunkData.blocks[blockKey] = type;
+      if (type === 'air') {
+        delete chunkData.blocks[blockKey];
+      } else {
+        chunkData.blocks[blockKey] = type;
+      }
     }
   }
 
