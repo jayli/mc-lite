@@ -98,6 +98,7 @@ export class Player {
     this.isShooting = false; // 是否正在射击 (按住左键)
     this.shootCooldown = 0;  // 射击冷却计时器
     this.shootInterval = 0.15; // 连发间隔 (150ms) jayli
+    this.gunRecoil = 0;      // 枪支后坐力偏移量
     console.log('Player 初始化，当前 Engine.gunModel 状态:', !!gunModel);
   }
 
@@ -555,6 +556,12 @@ export class Player {
 
     if (this.gun) {
       this.gun.visible = this.isHoldingGun;
+
+      // 应用后坐力到位置 (向后偏移 Z 轴)
+      this.gun.position.set(0.3, -0.85, -0.4 + this.gunRecoil);
+
+      // 逐渐恢复后坐力
+      this.gunRecoil = THREE.MathUtils.lerp(this.gunRecoil, 0, 0.2);
     }
   }
 
@@ -562,6 +569,9 @@ export class Player {
    * 执行射击交互
    */
   shoot(hit) {
+    // 0. 触发枪支后坐力位移
+    this.gunRecoil = 0.05;
+
     // 1. 计算枪口的大致世界坐标 (基于枪支在相机中的偏移)
     // Y 调整为 -0.82 以匹配枪管高度，Z 调整为 -0.44 使起点处于枪口内侧（实现遮挡感）
     const muzzleOffset = new THREE.Vector3(0.3, -0.82, -0.44);
