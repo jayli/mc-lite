@@ -474,13 +474,13 @@ export class Player {
 
       // 调整位置和旋转 (根据经验微调)
       // X: 0.3 (右), Y: -0.3 (下), Z: -0.4 (前) - 距离更近更中心
-      this.gun.position.set(0.3, -0.3, -0.4);
+      this.gun.position.set(0.3, -0.85, -0.4);
 
       // 暂时移除旋转，看看模型原始朝向
       this.gun.rotation.y = 0;
 
       // 进一步增大缩放比例，确保能看到
-      this.gun.scale.set(0.5, 0.5, 0.5);
+      this.gun.scale.set(0.1, 0.1, 0.1);
 
       console.log('枪支模型已挂载到相机，位置:', this.gun.position);
     }

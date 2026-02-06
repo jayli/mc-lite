@@ -224,18 +224,38 @@ export class Engine {
       console.error('Failed to load gun_man.mtl:', error);
     });
 
-    gltfLoader.load('src/world/assets/mod/gun.gltf', (gltf) => {
-      gunModel = gltf.scene;
+    gltfLoader.load('src/world/assets/mod/silahful.glb', (gltf) => {
+      const model = gltf.scene;
+
       // 遍历设置阴影
-      gunModel.traverse(child => {
+      model.traverse(child => {
         if (child.isMesh) {
           child.castShadow = true;
           child.receiveShadow = true;
         }
       });
-      console.log('Gun model loaded successfully');
+
+      // 计算边界框并进行标准化处理
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+
+      // 平移模型使其中心位于原点，并旋转 180 度使枪口向前 (-Z 方向)
+      model.position.set(-center.x, -center.y, -center.z);
+      model.rotation.y = Math.PI;
+
+      const group = new THREE.Group();
+      group.add(model);
+
+      // 将模型缩放到一个标准的单位大小 (最大维度为 1)，方便在 Player.js 中进一步微调
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const scale = 1.0 / (maxDim || 1);
+      group.scale.set(scale, scale, scale);
+
+      gunModel = group;
+      console.log('Gun model loaded successfully and normalized');
     }, undefined, (error) => {
-      console.error('Failed to load gun.gltf:', error);
+      console.error('Failed to load silahful.glb:', error);
     });
   }
 
