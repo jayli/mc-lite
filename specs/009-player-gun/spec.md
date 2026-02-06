@@ -1,6 +1,6 @@
 # Feature Specification: 009-player-gun
 
-**Feature Branch**: `009-009-player-gun`
+**Feature Branch**: `009-player-gun`
 **Created**: 2026-02-06
 **Status**: Draft
 **Input**: 实现玩家手持枪支效果，支持 'R' 键切换状态，模型位于 src/world/assets/mod/gun.gltf

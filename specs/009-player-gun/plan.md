@@ -1,7 +1,7 @@
 # Implementation Plan: 009-player-gun
 
-**Branch**: `009-009-player-gun` | **Date**: 2026-02-06 | **Spec**: [specs/009-009-player-gun/spec.md](spec.md)
-**Input**: Feature specification from `/specs/009-009-player-gun/spec.md`
+**Branch**: `009-player-gun` | **Date**: 2026-02-06 | **Spec**: [specs/009-player-gun/spec.md](spec.md)
+**Input**: Feature specification from `/specs/009-player-gun/spec.md`
 
 ## Summary
 
@@ -33,7 +33,7 @@
 ### Documentation (this feature)
 
 ```text
-specs/009-009-player-gun/
+specs/009-player-gun/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output
 ├── data-model.md        # Phase 1 output
