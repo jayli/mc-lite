@@ -567,23 +567,29 @@ export class Player {
    * 生成示踪线效果
    */
   spawnTracer(start, end) {
-    const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
-    const material = new THREE.LineBasicMaterial({
+    const distance = start.distanceTo(end);
+    const geometry = new THREE.BoxGeometry(0.05, 0.05, 1);
+    // 将几何体向 Z 正方向移动 0.5，使原点位于盒子的一端起始处
+    geometry.translate(0, 0, 0.5);
+
+    const material = new THREE.MeshBasicMaterial({
       color: 0xffff00,
       transparent: true,
       opacity: 0.8
     });
 
-    const line = new THREE.Line(geometry, material);
-    this.world.scene.add(line);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.copy(start);
+    mesh.lookAt(end);
+    mesh.scale.set(1, 1, distance);
+
+    this.world.scene.add(mesh);
 
     // 计算起点相对于相机的本地偏移 (需与 shoot 方法中的 muzzleOffset 保持一致)
-    // 调整跟踪线（曳光起点）起点，调整第三个参数，调整前后的
-    // 第二个参数是调整左右的
     const localStart = new THREE.Vector3(0.3, -0.33, -0.98);
 
     this.tracers.push({
-      line: line,
+      mesh: mesh,
       lifetime: 0.1, // 持续 0.1 秒
       maxLifetime: 0.1,
       localStart: localStart, // 存储本地起点偏移
@@ -602,9 +608,9 @@ export class Player {
       tracer.lifetime -= dt;
 
       if (tracer.lifetime <= 0) {
-        this.world.scene.remove(tracer.line);
-        tracer.line.geometry.dispose();
-        tracer.line.material.dispose();
+        this.world.scene.remove(tracer.mesh);
+        tracer.mesh.geometry.dispose();
+        tracer.mesh.material.dispose();
         this.tracers.splice(i, 1);
       } else {
         // 动态更新起点：使其始终相对于当前相机位置固定
@@ -612,10 +618,13 @@ export class Player {
         tempStart.applyQuaternion(this.camera.quaternion);
         tempStart.add(this.camera.position);
 
-        // 更新示踪线几何体
-        tracer.line.geometry.setFromPoints([tempStart, tracer.worldEnd]);
+        // 更新示踪线网格
+        tracer.mesh.position.copy(tempStart);
+        tracer.mesh.lookAt(tracer.worldEnd);
+        const newDist = tempStart.distanceTo(tracer.worldEnd);
+        tracer.mesh.scale.set(1, 1, newDist);
 
-        tracer.line.material.opacity = (tracer.lifetime / tracer.maxLifetime) * 0.8;
+        tracer.mesh.material.opacity = (tracer.lifetime / tracer.maxLifetime) * 0.8;
       }
     }
   }
