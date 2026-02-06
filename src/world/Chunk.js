@@ -544,7 +544,7 @@ export class Chunk {
 
     // 更新数据和可见性状态
     if (type === 'air') {
-        delete this.blockData[key];
+        this.blockData[key] = 'air';
         this.visibleKeys.delete(key);
     } else {
         this.blockData[key] = type;
@@ -841,7 +841,7 @@ export class Chunk {
 
       if (oldType) {
         affectedTypes.add(oldType);
-        delete this.blockData[key];
+        this.blockData[key] = 'air';
         this.visibleKeys.delete(key);
         this.solidBlocks.delete(key);
         persistenceService.recordChange(px, py, pz, 'air');
