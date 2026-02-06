@@ -97,7 +97,7 @@ export class Player {
     this.tracers = []; // 初始化追踪线数组
     this.isShooting = false; // 是否正在射击 (按住左键)
     this.shootCooldown = 0;  // 射击冷却计时器
-    this.shootInterval = 0.2; // 连发间隔 (400ms)
+    this.shootInterval = 0.15; // 连发间隔 (150ms) jayli
     console.log('Player 初始化，当前 Engine.gunModel 状态:', !!gunModel);
   }
 
@@ -560,7 +560,7 @@ export class Player {
     this.spawnTracer(muzzlePos, targetPos);
 
     // 4. 播放射击音效
-    audioManager.playSound('gun_fire', 0.2);
+    audioManager.playSound('gun_fire', 0.15); // jayli
   }
 
   /**
