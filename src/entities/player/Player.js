@@ -94,6 +94,7 @@ export class Player {
     // 持枪系统 (Feature 009)
     this.isHoldingGun = false;
     this.gun = null;
+    this.tracers = []; // 初始化追踪线数组
     console.log('Player 初始化，当前 Engine.gunModel 状态:', !!gunModel);
   }
 
@@ -453,6 +454,7 @@ export class Player {
     this.updateArm();
     this.updateGun();
     this.updateCameraBob(actualDx, actualDz, dt, isCurrentlyStuck);
+    this.updateTracers(dt);
   }
 
   /**
@@ -485,6 +487,88 @@ export class Player {
 
     if (this.gun) {
       this.gun.visible = this.isHoldingGun;
+    }
+  }
+
+  /**
+   * 执行射击交互
+   */
+  shoot(hit) {
+    // 1. 计算枪口的大致世界坐标 (基于枪支在相机中的偏移)
+    const muzzleOffset = new THREE.Vector3(0.3, -0.3, -0.6);
+    muzzleOffset.applyQuaternion(this.camera.quaternion);
+    const muzzlePos = new THREE.Vector3().copy(this.camera.position).add(muzzleOffset);
+
+    // 2. 确定目标点
+    let targetPos;
+    if (hit) {
+      targetPos = hit.point;
+    } else {
+      // 如果没打中，射向 30 米远处
+      const direction = new THREE.Vector3();
+      this.camera.getWorldDirection(direction);
+      targetPos = new THREE.Vector3().copy(this.camera.position).add(direction.multiplyScalar(30));
+    }
+
+    // 3. 生成示踪线
+    this.spawnTracer(muzzlePos, targetPos);
+
+    // 4. 播放射击音效 (如果有的话，暂时使用挖掘声代替或添加新音效)
+    audioManager.playSound('put', 0.5); // 临时音效
+  }
+
+  /**
+   * 生成示踪线效果
+   */
+  spawnTracer(start, end) {
+    const geometry = new THREE.BufferGeometry().setFromPoints([start, end]);
+    const material = new THREE.LineBasicMaterial({
+      color: 0xffff00,
+      transparent: true,
+      opacity: 0.8
+    });
+
+    const line = new THREE.Line(geometry, material);
+    this.world.scene.add(line);
+
+    // 计算起点相对于相机的本地偏移
+    const localStart = new THREE.Vector3(0.3, -0.3, -0.6);
+
+    this.tracers.push({
+      line: line,
+      lifetime: 0.1, // 持续 0.1 秒
+      maxLifetime: 0.1,
+      localStart: localStart, // 存储本地起点偏移
+      worldEnd: end.clone()   // 存储固定的世界落点
+    });
+  }
+
+  /**
+   * 更新并清理示踪线
+   */
+  updateTracers(dt) {
+    const tempStart = new THREE.Vector3();
+
+    for (let i = this.tracers.length - 1; i >= 0; i--) {
+      const tracer = this.tracers[i];
+      tracer.lifetime -= dt;
+
+      if (tracer.lifetime <= 0) {
+        this.world.scene.remove(tracer.line);
+        tracer.line.geometry.dispose();
+        tracer.line.material.dispose();
+        this.tracers.splice(i, 1);
+      } else {
+        // 动态更新起点：使其始终相对于当前相机位置固定
+        tempStart.copy(tracer.localStart);
+        tempStart.applyQuaternion(this.camera.quaternion);
+        tempStart.add(this.camera.position);
+
+        // 更新示踪线几何体
+        tracer.line.geometry.setFromPoints([tempStart, tracer.worldEnd]);
+
+        tracer.line.material.opacity = (tracer.lifetime / tracer.maxLifetime) * 0.8;
+      }
     }
   }
 
@@ -621,7 +705,25 @@ export class Player {
         // 虚空搭路辅助（空中放置）
         this.doSkyPlace(heldItem);
       }
-    } else if (button === 0) { // 左键点击 - 挖掘
+    } else if (button === 0) { // 左键点击 - 挖掘或射击
+      // 射击逻辑 (Feature 009)
+      if (this.isHoldingGun) {
+        // 使用更长的射线探测距离 (30)
+        this.raycaster.far = 30;
+        this.raycaster.setFromCamera(this.center, this.camera);
+        const gunHits = this.raycaster.intersectObjects(targets, true);
+        this.raycaster.far = Infinity; // 恢复默认值
+
+        if (gunHits.length > 0) {
+          const hit = gunHits[0];
+          this.shoot(hit);
+          this.removeBlock(hit);
+        } else {
+          this.shoot(null);
+        }
+        return; // 射击后跳过常规挖掘逻辑
+      }
+
       if (hits.length > 0 && hits[0].distance < 9) {
         const hit = hits[0];
         const m = hit.object;
