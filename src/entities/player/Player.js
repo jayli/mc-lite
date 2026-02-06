@@ -496,7 +496,30 @@ export class Player {
     if (gunHits.length > 0) {
       const hit = gunHits[0];
       this.shoot(hit);
-      this.removeBlock(hit);
+
+      // 检查命中的方块类型
+      const m = hit.object;
+      const type = m.userData.type || 'unknown';
+
+      if (type === 'tnt') {
+        const instanceId = hit.instanceId;
+        let pos = new THREE.Vector3();
+        if (m.isInstancedMesh) {
+          const dummy = new THREE.Matrix4();
+          m.getMatrixAt(instanceId, dummy);
+          dummy.decompose(pos, new THREE.Quaternion(), new THREE.Vector3());
+        } else {
+          pos.copy(m.position);
+        }
+
+        const key = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
+        if (!this.ignitingTNTs.has(key)) {
+          this.ignitingTNTs.add(key);
+          this.explode(pos.x, pos.y, pos.z);
+        }
+      } else {
+        this.removeBlock(hit);
+      }
     } else {
       this.shoot(null);
     }
