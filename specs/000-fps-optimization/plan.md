@@ -1,7 +1,7 @@
 # Implementation Plan: FPS Optimization through Voxel Reduction
 
-**Branch**: `001-1-fps-optimization` | **Date**: 2026-01-28 | **Spec**: [specs/001-1-fps-optimization/spec.md](specs/001-1-fps-optimization/spec.md)
-**Input**: Feature specification from `/specs/001-1-fps-optimization/spec.md`
+**Branch**: `000-fps-optimization` | **Date**: 2026-01-28 | **Spec**: [specs/000-fps-optimization/spec.md](specs/000-fps-optimization/spec.md)
+**Input**: Feature specification from `/specs/000-fps-optimization/spec.md`
 
 ## Summary
 
@@ -34,7 +34,7 @@ This plan optimizes the game's performance by reducing the number of blocks gene
 ### Documentation (this feature)
 
 ```text
-specs/001-1-fps-optimization/
+specs/000-fps-optimization/
 ├── plan.md              # This file
 ├── research.md          # Technical analysis
 ├── data-model.md        # Voxel layout changes
