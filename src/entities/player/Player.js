@@ -480,7 +480,7 @@ export class Player {
       this.gun.rotation.y = 0;
 
       // 进一步增大缩放比例，确保能看到
-      this.gun.scale.set(0.1, 0.1, 0.1);
+      this.gun.scale.set(0.09, 0.09, 0.09);
 
       console.log('枪支模型已挂载到相机，位置:', this.gun.position);
     }
@@ -495,7 +495,8 @@ export class Player {
    */
   shoot(hit) {
     // 1. 计算枪口的大致世界坐标 (基于枪支在相机中的偏移)
-    const muzzleOffset = new THREE.Vector3(0.3, -0.3, -0.6);
+    // Y 调整为 -0.82 以匹配枪管高度，Z 调整为 -0.44 使起点处于枪口内侧（实现遮挡感）
+    const muzzleOffset = new THREE.Vector3(0.3, -0.82, -0.44);
     muzzleOffset.applyQuaternion(this.camera.quaternion);
     const muzzlePos = new THREE.Vector3().copy(this.camera.position).add(muzzleOffset);
 
@@ -531,8 +532,10 @@ export class Player {
     const line = new THREE.Line(geometry, material);
     this.world.scene.add(line);
 
-    // 计算起点相对于相机的本地偏移
-    const localStart = new THREE.Vector3(0.3, -0.3, -0.6);
+    // 计算起点相对于相机的本地偏移 (需与 shoot 方法中的 muzzleOffset 保持一致)
+    // 调整跟踪线（曳光起点）起点，调整第三个参数，调整前后的
+    // 第二个参数是调整左右的
+    const localStart = new THREE.Vector3(0.3, -0.33, -0.98);
 
     this.tracers.push({
       line: line,
