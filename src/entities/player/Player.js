@@ -100,6 +100,27 @@ export class Player {
     this.shootInterval = 0.09; // 连发间隔 (090ms) jayli
     this.gunRecoil = 0;      // 枪支后坐力偏移量
     console.log('Player 初始化，当前 Engine.gunModel 状态:', !!gunModel);
+
+    // --- 性能优化：复用实例与池 (Feature 009 Optimization) ---
+    this._muzzleOffset = new THREE.Vector3();
+    this._muzzlePos = new THREE.Vector3();
+    this._targetPos = new THREE.Vector3();
+    this._direction = new THREE.Vector3();
+    this._tempVector = new THREE.Vector3();
+    this._dummyMatrix = new THREE.Matrix4();
+    this._dummyQuaternion = new THREE.Quaternion();
+    this._dummyScale = new THREE.Vector3();
+    this._zeroVector = new THREE.Vector3(0, 0, 0);
+
+    // 示踪线池
+    this.tracerPool = [];
+    this.tracerGeometry = new THREE.BoxGeometry(0.05, 0.05, 1);
+    this.tracerGeometry.translate(0, 0, 0.5); // 将原点移至一端
+    this.tracerMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffff00,
+      transparent: true,
+      opacity: 0.8
+    });
   }
 
   /**
@@ -504,19 +525,17 @@ export class Player {
 
       if (type === 'tnt') {
         const instanceId = hit.instanceId;
-        let pos = new THREE.Vector3();
         if (m.isInstancedMesh) {
-          const dummy = new THREE.Matrix4();
-          m.getMatrixAt(instanceId, dummy);
-          dummy.decompose(pos, new THREE.Quaternion(), new THREE.Vector3());
+          m.getMatrixAt(instanceId, this._dummyMatrix);
+          this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
         } else {
-          pos.copy(m.position);
+          this._tempVector.copy(m.position);
         }
 
-        const key = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
+        const key = `${Math.floor(this._tempVector.x)},${Math.floor(this._tempVector.y)},${Math.floor(this._tempVector.z)}`;
         if (!this.ignitingTNTs.has(key)) {
           this.ignitingTNTs.add(key);
-          this.explode(pos.x, pos.y, pos.z);
+          this.explode(this._tempVector.x, this._tempVector.y, this._tempVector.z);
         }
       } else {
         this.removeBlock(hit);
@@ -574,23 +593,21 @@ export class Player {
 
     // 1. 计算枪口的大致世界坐标 (基于枪支在相机中的偏移)
     // Y 调整为 -0.82 以匹配枪管高度，Z 调整为 -0.44 使起点处于枪口内侧（实现遮挡感）
-    const muzzleOffset = new THREE.Vector3(0.3, -0.82, -0.44);
-    muzzleOffset.applyQuaternion(this.camera.quaternion);
-    const muzzlePos = new THREE.Vector3().copy(this.camera.position).add(muzzleOffset);
+    this._muzzleOffset.set(0.3, -0.82, -0.44);
+    this._muzzleOffset.applyQuaternion(this.camera.quaternion);
+    this._muzzlePos.copy(this.camera.position).add(this._muzzleOffset);
 
     // 2. 确定目标点
-    let targetPos;
     if (hit) {
-      targetPos = hit.point;
+      this._targetPos.copy(hit.point);
     } else {
       // 如果没打中，射向 40 米远处
-      const direction = new THREE.Vector3();
-      this.camera.getWorldDirection(direction);
-      targetPos = new THREE.Vector3().copy(this.camera.position).add(direction.multiplyScalar(40));
+      this.camera.getWorldDirection(this._direction);
+      this._targetPos.copy(this.camera.position).add(this._direction.multiplyScalar(40));
     }
 
     // 3. 生成示踪线
-    this.spawnTracer(muzzlePos, targetPos);
+    this.spawnTracer(this._muzzlePos, this._targetPos);
 
     // 4. 播放射击音效
     audioManager.playSound('gun_fire', 0.09); // jayli
@@ -601,17 +618,15 @@ export class Player {
    */
   spawnTracer(start, end) {
     const distance = start.distanceTo(end);
-    const geometry = new THREE.BoxGeometry(0.05, 0.05, 1);
-    // 将几何体向 Z 正方向移动 0.5，使原点位于盒子的一端起始处
-    geometry.translate(0, 0, 0.5);
 
-    const material = new THREE.MeshBasicMaterial({
-      color: 0xffff00,
-      transparent: true,
-      opacity: 0.8
-    });
+    let mesh;
+    if (this.tracerPool.length > 0) {
+      mesh = this.tracerPool.pop();
+      mesh.visible = true;
+    } else {
+      mesh = new THREE.Mesh(this.tracerGeometry, this.tracerMaterial);
+    }
 
-    const mesh = new THREE.Mesh(geometry, material);
     mesh.position.copy(start);
     mesh.lookAt(end);
     mesh.scale.set(1, 1, distance);
@@ -634,27 +649,25 @@ export class Player {
    * 更新并清理示踪线
    */
   updateTracers(dt) {
-    const tempStart = new THREE.Vector3();
-
     for (let i = this.tracers.length - 1; i >= 0; i--) {
       const tracer = this.tracers[i];
       tracer.lifetime -= dt;
 
       if (tracer.lifetime <= 0) {
         this.world.scene.remove(tracer.mesh);
-        tracer.mesh.geometry.dispose();
-        tracer.mesh.material.dispose();
+        tracer.mesh.visible = false;
+        this.tracerPool.push(tracer.mesh);
         this.tracers.splice(i, 1);
       } else {
         // 动态更新起点：使其始终相对于当前相机位置固定
-        tempStart.copy(tracer.localStart);
-        tempStart.applyQuaternion(this.camera.quaternion);
-        tempStart.add(this.camera.position);
+        this._tempVector.copy(tracer.localStart);
+        this._tempVector.applyQuaternion(this.camera.quaternion);
+        this._tempVector.add(this.camera.position);
 
         // 更新示踪线网格
-        tracer.mesh.position.copy(tempStart);
+        tracer.mesh.position.copy(this._tempVector);
         tracer.mesh.lookAt(tracer.worldEnd);
-        const newDist = tempStart.distanceTo(tracer.worldEnd);
+        const newDist = this._tempVector.distanceTo(tracer.worldEnd);
         tracer.mesh.scale.set(1, 1, newDist);
 
         tracer.mesh.material.opacity = (tracer.lifetime / tracer.maxLifetime) * 0.8;
@@ -754,19 +767,17 @@ export class Player {
 
       if (hits.length > 0 && hits[0].distance < 9) { // 9: 最大交互距离 (格)
         const hit = hits[0];
-        const dummy = new THREE.Matrix4();
         const m = hit.object;
         const instanceId = hit.instanceId;
 
         // 检查是否点击了箱子
         const type = m.userData.type || 'unknown';
         if (type === 'chest' && m.isInstancedMesh) {
-          let targetPos = new THREE.Vector3();
-          m.getMatrixAt(instanceId, dummy);
-          dummy.decompose(targetPos, new THREE.Quaternion(), new THREE.Vector3());
+          m.getMatrixAt(instanceId, this._dummyMatrix);
+          this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
           const info = m.userData.chests[instanceId];
           if (!info.open) {
-            this.openChest(m, instanceId, targetPos);
+            this.openChest(m, instanceId, this._tempVector);
             this.swing();
             return;
           }
@@ -775,17 +786,16 @@ export class Player {
         // 处理方块放置
         if (heldItem && this.inventory.has(heldItem)) {
           const normal = hit.face.normal;
-          let targetPos = new THREE.Vector3();
           if (m.isInstancedMesh) {
-            m.getMatrixAt(instanceId, dummy);
-            dummy.decompose(targetPos, new THREE.Quaternion(), new THREE.Vector3());
+            m.getMatrixAt(instanceId, this._dummyMatrix);
+            this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
           } else {
-            targetPos.copy(m.position);
+            this._tempVector.copy(m.position);
           }
 
-          const px = Math.floor(targetPos.x + normal.x);
-          const py = Math.floor(targetPos.y + normal.y);
-          const pz = Math.floor(targetPos.z + normal.z);
+          const px = Math.floor(this._tempVector.x + normal.x);
+          const py = Math.floor(this._tempVector.y + normal.y);
+          const pz = Math.floor(this._tempVector.z + normal.z);
 
           if (this.tryPlaceBlock(px, py, pz, heldItem)) {
             this.swing();
@@ -816,18 +826,16 @@ export class Player {
         // 处理功能组合键 (Ctrl + 左键)
         if (e.ctrlKey) {
           if (type === 'tnt') {
-            let pos = new THREE.Vector3();
             if (m.isInstancedMesh) {
-              const dummy = new THREE.Matrix4();
-              m.getMatrixAt(instanceId, dummy);
-              dummy.decompose(pos, new THREE.Quaternion(), new THREE.Vector3());
+              m.getMatrixAt(instanceId, this._dummyMatrix);
+              this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
             } else {
-              pos.copy(m.position);
+              this._tempVector.copy(m.position);
             }
-            const key = `${pos.x},${pos.y},${pos.z}`;
+            const key = `${this._tempVector.x},${this._tempVector.y},${this._tempVector.z}`;
             if (!this.ignitingTNTs.has(key)) {
               this.ignitingTNTs.add(key);
-              this.explode(pos.x, pos.y, pos.z);
+              this.explode(this._tempVector.x, this._tempVector.y, this._tempVector.z);
               this.swing();
             }
           }
@@ -837,13 +845,11 @@ export class Player {
 
         // 处理箱子挖掘（如果未打开则直接打开）
         if (type === 'chest' && m.isInstancedMesh) {
-          let targetPos = new THREE.Vector3();
-          const dummy = new THREE.Matrix4();
-          m.getMatrixAt(instanceId, dummy);
-          dummy.decompose(targetPos, new THREE.Quaternion(), new THREE.Vector3());
+          m.getMatrixAt(instanceId, this._dummyMatrix);
+          this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
           const info = m.userData.chests[instanceId];
           if (!info.open) {
-            this.openChest(m, instanceId, targetPos);
+            this.openChest(m, instanceId, this._tempVector);
             this.swing();
             return;
           }
@@ -868,10 +874,9 @@ export class Player {
     chestManager.spawnChestAnimation(pos, this.world.scene);
 
     // 从实例化网格中“移除”原始箱子方块
-    const dummy = new THREE.Matrix4();
-    mesh.getMatrixAt(instanceId, dummy);
-    dummy.scale(new THREE.Vector3(0, 0, 0));
-    mesh.setMatrixAt(instanceId, dummy);
+    mesh.getMatrixAt(instanceId, this._dummyMatrix);
+    this._dummyMatrix.scale(this._zeroVector);
+    mesh.setMatrixAt(instanceId, this._dummyMatrix);
     mesh.instanceMatrix.needsUpdate = true;
 
     // 根据高度确定掉落物品（天域宝藏 vs 普通）
@@ -951,25 +956,22 @@ export class Player {
     // 不可破坏方块检查
     if (type === 'end_stone') return;
 
-    const dummy = new THREE.Matrix4();
-
-    let pos = new THREE.Vector3();
     if (m.isInstancedMesh) {
-      m.getMatrixAt(instanceId, dummy);
-      dummy.decompose(pos, new THREE.Quaternion(), new THREE.Vector3());
+      m.getMatrixAt(instanceId, this._dummyMatrix);
+      this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
 
       // 通过缩放为0实现“视觉移除”
-      dummy.scale(new THREE.Vector3(0, 0, 0));
-      m.setMatrixAt(instanceId, dummy);
+      this._dummyMatrix.scale(this._zeroVector);
+      m.setMatrixAt(instanceId, this._dummyMatrix);
       m.instanceMatrix.needsUpdate = true;
 
       // 生成挖掘粒子
-      this.spawnParticles(pos, m.userData.type);
+      this.spawnParticles(this._tempVector, m.userData.type);
 
       // 逻辑移除
-      const x = Math.floor(pos.x);
-      const y = Math.floor(pos.y);
-      const z = Math.floor(pos.z);
+      const x = Math.floor(this._tempVector.x);
+      const y = Math.floor(this._tempVector.y);
+      const z = Math.floor(this._tempVector.z);
       this.world.removeBlock(x, y, z);
       audioManager.playSound('delete_get', 0.3);
 
@@ -1064,9 +1066,9 @@ export class Player {
       });
 
       // 4. 视觉与听觉效果
-      const centerPos = new THREE.Vector3(center.x + 0.5, center.y + 0.5, center.z + 0.5);
+      this._tempVector.set(center.x + 0.5, center.y + 0.5, center.z + 0.5);
       if (this.world.spawnExplosionParticles) {
-        this.world.spawnExplosionParticles(centerPos);
+        this.world.spawnExplosionParticles(this._tempVector);
       }
 
       // 播放爆炸音效 (使用 AudioManager)
@@ -1124,13 +1126,12 @@ export class Player {
     * 空中/虚空放置方块逻辑
     */
   doSkyPlace(type) {
-    const origin = this.camera.position.clone();
-    const direction = new THREE.Vector3();
-    this.camera.getWorldDirection(direction);
+    const origin = this.camera.position;
+    this.camera.getWorldDirection(this._direction);
 
     const step = 0.1;
     const maxDist = 9;
-    const rayPos = origin.clone();
+    this._tempVector.copy(origin);
 
     const neighborOffsets = [
       [1, 0, 0],   // 东
@@ -1142,10 +1143,13 @@ export class Player {
     ];
 
     for(let d=0; d<maxDist; d+=step) {
-      rayPos.add(direction.clone().multiplyScalar(step));
-      const rx = Math.floor(rayPos.x);
-      const ry = Math.floor(rayPos.y);
-      const rz = Math.floor(rayPos.z);
+      // 步进：rayPos.add(direction * step)
+      this._muzzleOffset.copy(this._direction).multiplyScalar(step);
+      this._tempVector.add(this._muzzleOffset);
+
+      const rx = Math.floor(this._tempVector.x);
+      const ry = Math.floor(this._tempVector.y);
+      const rz = Math.floor(this._tempVector.z);
 
       if (!this.physics.isSolid(rx, ry, rz)) {
         let hasSolidNeighbor = false;
@@ -1157,8 +1161,9 @@ export class Player {
           const nz = rz + dz;
           if (this.physics.isSolid(nx, ny, nz)) {
             hasSolidNeighbor = true;
-            const normal = new THREE.Vector3(dx, dy, dz).normalize();
-            const dot = direction.dot(normal);
+            // 复用 _muzzlePos 作为临时 normal
+            this._muzzlePos.set(dx, dy, dz).normalize();
+            const dot = this._direction.dot(this._muzzlePos);
             if (dot > 0.01) {
               allInvisible = false;
               break;
