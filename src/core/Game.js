@@ -97,6 +97,9 @@ export class Game {
     this.player.inventory.add('gold', 1500);
     this.player.inventory.add('gold_ore', 1500);
     this.player.inventory.add('leaves', 1500);
+    this.player.inventory.add('yellow_leaves', 1500);
+    this.player.inventory.add('azalea_leaves', 1500);
+    this.player.inventory.add('azalea_flowers', 1500);
     this.player.inventory.add('flower', 1500);
     this.player.inventory.add('short_grass', 1500);
     this.player.inventory.add('allium', 1500);
