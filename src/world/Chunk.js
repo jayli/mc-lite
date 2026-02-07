@@ -867,23 +867,41 @@ export class Chunk {
       const child = this.group.children[i];
 
       if (child.isInstancedMesh) {
-        if (affectedTypes.has(child.userData.type)) {
+        const type = child.userData.type;
+        if (affectedTypes.has(type)) {
+          const typeMap = this.instanceIndexMap[type];
           let updated = false;
-          for (let j = 0; j < child.count; j++) {
-            child.getMatrixAt(j, dummy);
-            pos.setFromMatrixPosition(dummy);
-            const mx = Math.floor(pos.x);
-            const my = Math.floor(pos.y);
-            const mz = Math.floor(pos.z);
 
-            const isMatch = positions.some(p =>
-              Math.floor(p.x) === mx && Math.floor(p.y) === my && Math.floor(p.z) === mz
-            );
+          if (typeMap) {
+            // 优化：使用 Map 直接查找索引，避免扫描全量实例
+            positions.forEach(p => {
+              const key = `${Math.floor(p.x)},${Math.floor(p.y)},${Math.floor(p.z)}`;
+              if (typeMap.has(key)) {
+                const idx = typeMap.get(key);
+                dummy.makeScale(0, 0, 0);
+                child.setMatrixAt(idx, dummy);
+                typeMap.delete(key);
+                updated = true;
+              }
+            });
+          } else {
+            // Fallback: 如果没有 Map，进行全量扫描 (降级处理)
+            for (let j = 0; j < child.count; j++) {
+              child.getMatrixAt(j, dummy);
+              pos.setFromMatrixPosition(dummy);
+              const mx = Math.floor(pos.x);
+              const my = Math.floor(pos.y);
+              const mz = Math.floor(pos.z);
 
-            if (isMatch) {
-              dummy.makeScale(0, 0, 0);
-              child.setMatrixAt(j, dummy);
-              updated = true;
+              const isMatch = positions.some(p =>
+                Math.floor(p.x) === mx && Math.floor(p.y) === cy && Math.floor(p.z) === cz
+              );
+
+              if (isMatch) {
+                dummy.makeScale(0, 0, 0);
+                child.setMatrixAt(j, dummy);
+                updated = true;
+              }
             }
           }
           if (updated) child.instanceMatrix.needsUpdate = true;

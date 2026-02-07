@@ -141,6 +141,8 @@ export class Player {
       opacity: 1.0,
       blending: THREE.AdditiveBlending // 叠加混合，产生发光感
     });
+
+    this.mag7Timeouts = []; // 存储 MAG7 射击相关的定时器
   }
 
   /**
@@ -602,6 +604,10 @@ export class Player {
     const up = new THREE.Vector3();
     const dir = new THREE.Vector3();
 
+    // 清理之前的未执行定时器，防止重叠导致的性能风暴
+    this.mag7Timeouts.forEach(t => clearTimeout(t));
+    this.mag7Timeouts = [];
+
     // 从相机矩阵中提取本地坐标系轴
     this.camera.matrixWorld.extractBasis(right, up, dir);
     dir.negate(); // extractBasis 提取的是 +Z (后方)，取反得到前方
@@ -611,7 +617,8 @@ export class Player {
 
     // 遍历 15 格深度，每层 3x3，使用更小的步进以确保覆盖连续空间
     for (let d = 1; d <= 15; d += 0.5) {
-      const distanceStep = Math.floor(d); // 按整数距离分组
+      // 优化：将 15 层合并为 5 个波次 (每 3 格一波)，减少 removeBlocksBatch 调用次数
+      const distanceStep = Math.floor((d - 1) / 3);
       for (let i = -1; i <= 1; i++) {
         for (let j = -1; j <= 1; j++) {
           // 计算该点在世界坐标系中的位置
@@ -653,9 +660,12 @@ export class Player {
       // 分批次延迟移除方块
       sortedDistances.forEach((dist, index) => {
         const group = blocksByDistance.get(dist);
-        setTimeout(() => {
+        const timeoutId = setTimeout(() => {
           this.world.removeBlocksBatch(group);
-        }, index * 25); // 每波间隔 25ms，总跨度约 15 * 25 = 375ms
+          // 执行完后从列表中移除自己 (可选)
+          this.mag7Timeouts = this.mag7Timeouts.filter(id => id !== timeoutId);
+        }, index * 60); // 增加每波间隔到 60ms，总时长 5 * 60 = 300ms
+        this.mag7Timeouts.push(timeoutId);
       });
     }
 
