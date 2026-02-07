@@ -17,6 +17,8 @@ export const PHYSICS_CONSTANTS = {
   CAMERA_WIDTH: 0.3
 };
 
+import { getBlockProperties } from '../../constants/BlockData.js';
+
 /**
  * 物理系统类，负责处理玩家的碰撞检测和运动物理常量
  */
@@ -193,15 +195,11 @@ export class Physics {
     // 1. 询问世界系统该位置是否为实心方块 (基于 solidBlocks 集合)
     if (this.world.isSolid(x, y, z)) return true;
 
-    // 2. T004/T017: 显式兜底检查特殊类型 (树叶、玻璃、实体碰撞体)
-    // 这样做可以确保即使在区块加载边缘或动态更新时，这些方块也能正确阻挡玩家
+    // 2. 从方块属性配置中获取是否为实心
     const type = this.world.getBlock(x, y, z);
     if (!type) return false;
 
-    // 包含所有变体的树叶和玻璃
-    return type === 'collider' ||
-           type.includes('leaves') ||
-           type.includes('glass');
+    return getBlockProperties(type).isSolid;
   }
 
   /**

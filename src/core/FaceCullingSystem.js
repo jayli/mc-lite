@@ -7,6 +7,7 @@
 
 import * as THREE from 'three';
 import { faceMask, countVisibleFaces } from './face-culling-utils.js';
+import { getBlockProperties, getTransparentTypes } from '../constants/BlockData.js';
 
 /**
  * 隐藏面剔除系统类
@@ -23,9 +24,7 @@ export class FaceCullingSystem {
     this.debugMode = config.debugMode || false;
 
     // 透明方块类型集合
-    this.transparentTypes = new Set(config.transparentTypes || [
-      'air', 'water', 'glass_block', 'glass_blink', 'collider'
-    ]);
+    this.transparentTypes = config.transparentTypes ? new Set(config.transparentTypes) : getTransparentTypes();
 
     // 性能统计
     this.stats = {
@@ -167,7 +166,11 @@ export class FaceCullingSystem {
    * @returns {boolean}
    */
   isTransparent(blockType) {
-    return this.transparentTypes.has(blockType);
+    // 优先使用动态配置的透明类型，如果没有则从全局配置获取
+    if (this.transparentTypes.size > 0 && this.transparentTypes.has(blockType)) {
+      return true;
+    }
+    return getBlockProperties(blockType).isTransparent;
   }
 
   /**

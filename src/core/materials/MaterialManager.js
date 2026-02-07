@@ -3,6 +3,7 @@
 // 支持纹理预加载、程序化纹理生成和材质定义注册
 
 import * as THREE from 'three';
+import { getBlockProperties } from '../../constants/BlockData.js';
 
 /**
  * 材质管理器类，负责管理游戏中的所有材质
@@ -80,9 +81,9 @@ export class MaterialManager {
    * @returns {THREE.Material} 创建的 Three.js 材质
    */
   _createMaterial(def, type) {
-    // 定义允许使用 AO 阴影的材质列表
-    const aoAllowedTypes = ['sand', 'stone', 'mossy_stone', 'cobblestone', 'bricks']; // 支持环境遮蔽（AO）的材质类型，这些材质会在着色器中应用AO效果
-    const useAO = aoAllowedTypes.includes(type);
+    // 根据配置判断是否允许使用 AO 阴影
+    const props = getBlockProperties(type);
+    const useAO = props.isAOEnabled;
 
     // 情况0：多面材质（用于立方体不同面使用不同材质）
     if (def.faces) {

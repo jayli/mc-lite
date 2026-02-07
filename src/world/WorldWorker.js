@@ -4,6 +4,7 @@ import { terrainGen } from './TerrainGen.js';
 import { Tree } from './entities/Tree.js';
 import { Cloud } from './entities/Cloud.js';
 import { Island } from './entities/Island.js';
+import { getBlockProperties, BLOCK_DATA } from '../constants/BlockData.js';
 
 const CHUNK_SIZE = 16;
 const ROOMS_PER_CHUNK = 2;
@@ -36,13 +37,8 @@ onmessage = function(e) {
       for (const key in snapshot.blocks) {
         const type = snapshot.blocks[key];
         const [bx, by, bz] = key.split(',').map(Number);
-        // 简单逻辑：部分方块非实心
-        // const nonSolid = ['air', 'water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass', 'allium'];
-        // const solid = !nonSolid.includes(type);
-        const solid = ![
-          'air', // 原来没有 air，我学着 AI 添加了 air // jayli
-          'water', 'swamp_water', 'cloud', 'vine',
-          'lilypad', 'flower', 'short_grass', 'allium'].includes(type);
+        // 从全局配置获取实心属性
+        const solid = getBlockProperties(type).isSolid;
         blockMap.set(key, { x: bx, y: by, z: bz, type, solid });
       }
     }
@@ -204,26 +200,14 @@ onmessage = function(e) {
   const d = {};
   const solidBlocks = [];
 
-  // 定义非遮挡方块列表（视线可穿透）
-  const nonOccludingTypes = new Set([
-    'air',
-    'water', 'swamp_water',
-    'glass_block', 'glass_blink',
-    'cloud',
-    'vine', 'lilypad',
-    'flower', 'short_grass', 'allium',
-    'leaves', 'yellow_leaves', 'azalea_leaves', 'swamp_leaves',
-    'cactus',
-    'collider'
-  ]);
-
   // 辅助函数：判断指定位置的方块是否遮挡视线
   const isOccluding = (x, y, z) => {
     const k = `${x},${y},${z}`;
     const b = blockMap.get(k);
     if (!b) return false;
     if (!b.solid) return false;
-    if (nonOccludingTypes.has(b.type)) return false;
+    // 如果方块是透明的，则不遮挡视线
+    if (getBlockProperties(b.type).isTransparent) return false;
     return true;
   };
 
@@ -267,15 +251,7 @@ onmessage = function(e) {
   };
 
   // 初始化所有可能的类型数组
-  const allTypes = [
-    'grass', 'dirt', 'stone', 'sand', 'wood', 'birch_log', 'planks', 'oak_planks', 'white_planks',
-    'obsidian', 'leaves', 'water', 'cactus', 'flower', 'short_grass', 'allium', 'chest', 'bookbox',
-    'carBody', 'wheel', 'cloud', 'sky_stone', 'sky_grass', 'sky_wood', 'sky_leaves', 'moss',
-    'azalea_log', 'azalea_leaves', 'azalea_flowers', 'swamp_water', 'swamp_grass', 'vine',
-    'lilypad', 'diamond', 'gold', 'apple', 'gold_apple', 'god_sword', 'glass_block', 'glass_blink',
-    'gold_ore', 'calcite', 'bricks', 'chimney', 'gold_block', 'emerald', 'amethyst', 'debris', 'iron', 'iron_ore', 'end_stone',
-    'yellow_leaves'
-  ];
+  const allTypes = Object.keys(BLOCK_DATA); // 包含所有定义在 BLOCK_DATA 中的类型
   for(const type of allTypes) {
     d[type] = [];
   }
@@ -308,8 +284,8 @@ onmessage = function(e) {
       if (!d[block.type]) d[block.type] = [];
       let aoLow = 0;
       let aoHigh = 0;
-      const boxTypes = ['sand', 'stone', 'mossy_stone', 'cobblestone', 'bricks'];
-      if (boxTypes.includes(block.type)) {
+      const props = getBlockProperties(block.type);
+      if (props.isAOEnabled) {
         for (let f = 0; f < 6; f++) {
           const aos = getAO(block.x, block.y, block.z, f);
           for (let v = 0; v < 4; v++) {

@@ -11,6 +11,7 @@ import { persistenceService } from '../services/PersistenceService.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
 import { rookModel, carModel, gunManModel } from '../core/Engine.js';
+import { getBlockProperties } from '../constants/BlockData.js';
 
 /** 区块尺寸 - 每个区块在 X 和 Z 方向上的方块数量 (16x16 是 Voxel 游戏的标准区块大小) */
 const CHUNK_SIZE = 16;
@@ -401,17 +402,17 @@ export class Chunk {
 
     // 遍历每种方块类型，为每种类型创建一个 InstancedMesh
     for (const type in d) {
-      if (d[type].length === 0 || type === 'collider') continue;  // 跳过没有任何实例或碰撞体方块类型
+      const props = getBlockProperties(type);
+      if (d[type].length === 0 || !props.isRendered) continue;  // 跳过没有任何实例或不需渲染的方块类型
 
       // 从材质管理器和几何体映射表获取资源
-      const geometry = geomMap[type] || geomMap['default'];
+      const geometry = geomMap[props.geometryType] || geomMap['default'];
       const material = materials.getMaterial(type);
       // 创建实例化网格：指定几何体、材质和实例总数
       const mesh = new THREE.InstancedMesh(geometry, material, d[type].length);
 
       // --- 添加 AO 属性 ---
-      const aoAllowedTypes = ['sand', 'stone', 'mossy_stone', 'cobblestone', 'bricks'];
-      if (aoAllowedTypes.includes(type)) {
+      if (props.isAOEnabled) {
         const aoLowArray = new Float32Array(d[type].length);
         const aoHighArray = new Float32Array(d[type].length);
         d[type].forEach((pos, i) => {
@@ -451,8 +452,8 @@ export class Chunk {
     // 重要：标记 instanceMatrix 需要更新，否则 GPU 不会重新加载数据
     mesh.instanceMatrix.needsUpdate = true;
 
-      // 阴影配置优化：半透明物体、植物和云朵默认不投射/接收阴影，以节省渲染开销并避免视觉错误
-      if(!['water','swamp_water','cloud','vine','lilypad','flower','short_grass'].includes(type)) {
+      // 阴影配置优化
+      if(props.isShadowEnabled) {
         mesh.castShadow = true;    // 开启实时阴影投射
         mesh.receiveShadow = true; // 开启实时阴影接收
       }
@@ -670,8 +671,8 @@ export class Chunk {
     }
 
     // 更新碰撞体集合
-    const nonSolidTypes = ['air', 'water', 'swamp_water', 'cloud', 'vine', 'lilypad', 'flower', 'short_grass', 'allium'];
-    if (!nonSolidTypes.includes(type)) {
+    const props = getBlockProperties(type);
+    if (props.isSolid) {
       this.solidBlocks.add(key);
     } else {
       this.solidBlocks.delete(key);
@@ -720,11 +721,11 @@ export class Chunk {
     }
 
     // 对于空气方块和碰撞体方块，或者因完全遮挡而不可见的方块，不创建网格
-    if (type === 'air' || type === 'collider' || !this.visibleKeys.has(key)) {
+    if (!props.isRendered || !this.visibleKeys.has(key)) {
        // ...
     } else {
       // 获取几何体和材质
-      const geometry = geomMap[type] || geomMap['default'];
+      const geometry = geomMap[props.geometryType] || geomMap['default'];
       let material = materials.getMaterial(type);
       // 克隆材质以避免潜在问题
       if (material) {
@@ -742,8 +743,7 @@ export class Chunk {
       mesh.frustumCulled = false; // 防止视锥剔除误判
 
       // --- 为动态方块设置空的 AO 属性，防止报错 ---
-      const aoAllowedTypes = ['sand', 'stone', 'mossy_stone', 'cobblestone', 'bricks'];
-      if (aoAllowedTypes.includes(type)) {
+      if (props.isAOEnabled) {
         mesh.geometry = geometry.clone();
         const count = mesh.geometry.attributes.position.count;
         const aoLowArray = new Float32Array(count).fill(16777215); // AO = 3 for all vertices
@@ -753,7 +753,7 @@ export class Chunk {
       }
 
       // 设置阴影
-      if(!nonSolidTypes.includes(type)) {
+      if(props.isShadowEnabled) {
         mesh.castShadow = true;
         mesh.receiveShadow = true;
       }

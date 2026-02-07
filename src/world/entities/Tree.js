@@ -2,6 +2,8 @@
 // 多种树木类型生成模块
 // 提供多种树木类型生成器（默认、天空树、大型、杜鹃花、沼泽树）
 
+import { getBlockProperties } from '../../constants/BlockData.js';
+
 /**
  * 树木生成器类
  * 提供多种树木类型的生成功能
@@ -107,12 +109,13 @@ export class Tree {
    * @private
    */
   static _addOptimized(chunk, blocks, dObj) {
-    const leafTypes = ['leaves', 'sky_leaves', 'azalea_leaves', 'azalea_flowers', 'yellow_leaves'];
     const blockMap = new Set();
     blocks.forEach(b => blockMap.add(`${Math.floor(b.x)},${Math.floor(b.y)},${Math.floor(b.z)}`));
 
     blocks.forEach(b => {
-      if (leafTypes.includes(b.type)) {
+      const props = getBlockProperties(b.type);
+      // 如果是透明方块（如树叶），进行遮挡剔除优化
+      if (props.isTransparent && b.type !== 'vine') {
         // 检查6个相邻位置是否都在 blockMap 中
         const neighbors = [
           [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]
@@ -126,7 +129,7 @@ export class Tree {
           chunk.add(b.x, b.y, b.z, b.type, dObj, b.solid !== false);
         }
       } else {
-        // 非树叶方块（树干、藤蔓等）直接添加
+        // 非透明方块或藤蔓直接添加
         chunk.add(b.x, b.y, b.z, b.type, dObj, b.solid !== false);
       }
     });
