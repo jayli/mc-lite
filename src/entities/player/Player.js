@@ -606,11 +606,12 @@ export class Player {
     this.camera.matrixWorld.extractBasis(right, up, dir);
     dir.negate(); // extractBasis 提取的是 +Z (后方)，取反得到前方
 
-    const blocksToDestroy = [];
+    const blocksByDistance = new Map();
     const origin = this.camera.position;
 
     // 遍历 15 格深度，每层 3x3，使用更小的步进以确保覆盖连续空间
     for (let d = 1; d <= 15; d += 0.5) {
+      const distanceStep = Math.floor(d); // 按整数距离分组
       for (let i = -1; i <= 1; i++) {
         for (let j = -1; j <= 1; j++) {
           // 计算该点在世界坐标系中的位置
@@ -625,23 +626,37 @@ export class Player {
 
           const type = this.world.getBlock(bx, by, bz);
           if (type && type !== 'end_stone') {
-            // 避免重复添加
             const key = `${bx},${by},${bz}`;
-            if (!blocksToDestroy.some(b => b.key === key)) {
-              blocksToDestroy.push({ x: bx, y: by, z: bz, key: key });
+            if (!blocksByDistance.has(distanceStep)) {
+              blocksByDistance.set(distanceStep, []);
+            }
+            const group = blocksByDistance.get(distanceStep);
+            if (!group.some(b => b.key === key)) {
+              group.push({ x: bx, y: by, z: bz, key: key });
             }
           }
         }
       }
     }
 
-    // 批量销毁方块
-    if (blocksToDestroy.length > 0) {
-      this.world.removeBlocksBatch(blocksToDestroy);
-      // 产生挖掘粒子效果 (取中间层的一个位置)
-      const midBlock = blocksToDestroy[Math.floor(blocksToDestroy.length / 2)];
+    // 获取所有有方块的距离并排序
+    const sortedDistances = Array.from(blocksByDistance.keys()).sort((a, b) => a - b);
+
+    if (sortedDistances.length > 0) {
+      // 产生挖掘粒子效果 (取最近的一个位置作为起始粒子效果)
+      const firstDist = sortedDistances[0];
+      const firstGroup = blocksByDistance.get(firstDist);
+      const midBlock = firstGroup[Math.floor(firstGroup.length / 2)];
       this._tempVector.set(midBlock.x + 0.5, midBlock.y + 0.5, midBlock.z + 0.5);
       this.spawnParticles(this._tempVector, 'stone');
+
+      // 分批次延迟移除方块
+      sortedDistances.forEach((dist, index) => {
+        const group = blocksByDistance.get(dist);
+        setTimeout(() => {
+          this.world.removeBlocksBatch(group);
+        }, index * 25); // 每波间隔 25ms，总跨度约 15 * 25 = 375ms
+      });
     }
 
     // 触发射击视觉效果 (后坐力、示踪线)
