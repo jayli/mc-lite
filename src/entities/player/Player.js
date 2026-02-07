@@ -665,8 +665,8 @@ export class Player {
       } else if (this.weaponMode === WEAPON_MAG7) {
         // MAG7 使用专属配置：确保在视口右下角可见
         // 三个参数，左右(越大越靠右)，上下（越小越靠下），前后(越小越靠前方)
-        this.gun.position.set(0.7, -0.9, -2.0 + this.gunRecoil);
-        var scale_size = 2.3;
+        this.gun.position.set(0.44, -0.5, -0.8 + this.gunRecoil);
+        var scale_size = 1.3;
         this.gun.scale.set(scale_size, scale_size, scale_size);
         this.gun.rotation.y = - Math.PI / 2; // 纠正朝向：从之前的向左转为向前
       }
@@ -930,7 +930,7 @@ export class Player {
             this.shootCooldown = this.shootInterval;
           } else if (this.weaponMode === WEAPON_MAG7) {
             this.executeMag7Shot();
-            this.shootCooldown = 0.8; // MAG7 射击间隔较长 (800ms)
+            this.shootCooldown = 1.5; // MAG7 射击间隔较长 (1500ms)
           }
         }
         return; // 射击后跳过常规挖掘逻辑
