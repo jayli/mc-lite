@@ -221,6 +221,22 @@ export class Player {
 
     for (let h = 1; h <= maxStep; h++) {
       const stepY = currentFloorY + h;
+
+      // 限制：如果目标台阶位置有栏杆 (handrail)，禁止自动跨越
+      const halfW = 0.3;
+      const ty = Math.floor(stepY - 1);
+      let foundHandrail = false;
+      for (const ox of [-halfW, 0, halfW]) {
+        for (const oz of [-halfW, 0, halfW]) {
+          if (this.world.getBlock(Math.floor(nx + ox), ty, Math.floor(nz + oz)) === 'handrail') {
+            foundHandrail = true;
+            break;
+          }
+        }
+        if (foundHandrail) break;
+      }
+      if (foundHandrail) continue;
+
       // 检查步进后的位置是否会卡住
       if (!this.physics.checkAABB(nx, stepY, nz)) {
         // 还要确保玩家不会在跨越过程中穿过天花板
