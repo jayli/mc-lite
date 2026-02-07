@@ -105,6 +105,10 @@ export const BLOCK_DATA = {
     isTransparent: true,
     geometryType: 'cactus'
   },
+  'handrail': {
+    isTransparent: true,
+    geometryType: 'handrail'
+  },
   'chimney': {
     geometryType: 'chimney'
   },
