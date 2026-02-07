@@ -197,7 +197,7 @@ export class Engine {
       // 遍历设置阴影
       model.traverse(child => {
         if (child.isMesh) {
-          child.castShadow = true;
+          child.castShadow = false;
           child.receiveShadow = true;
         }
       });
@@ -230,7 +230,7 @@ export class Engine {
 
       model.traverse(child => {
         if (child.isMesh) {
-          child.castShadow = true;
+          child.castShadow = false;
           child.receiveShadow = true;
         }
       });
