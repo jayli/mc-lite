@@ -117,14 +117,29 @@ export class Player {
     this._dummyScale = new THREE.Vector3();
     this._zeroVector = new THREE.Vector3(0, 0, 0);
 
-    // 示踪线池
-    this.tracerPool = [];
+    // 示踪线池相关
+    this.tracerPool = [];      // Mesh 池
+    this.tracerInfoPool = [];  // 状态对象池
+    this.vectorPool = [];      // 向量池 (用于 worldEnd)
+
+    // 预制本地偏移常量，消除 new Vector3
+    this._gunLocalStart = new THREE.Vector3(0.3, -0.33, -0.98);
+    this._mag7LocalStart = new THREE.Vector3(0.55, -0.4, -1.8);
+
     this.tracerGeometry = new THREE.BoxGeometry(0.05, 0.05, 1);
     this.tracerGeometry.translate(0, 0, 0.5); // 将原点移至一端
     this.tracerMaterial = new THREE.MeshBasicMaterial({
       color: 0xffff00,
       transparent: true,
       opacity: 0.8
+    });
+
+    // MAG7 专用强力曳光材质 (更亮，更猛)
+    this.mag7TracerMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff6600, // 亮橙色
+      transparent: true,
+      opacity: 1.0,
+      blending: THREE.AdditiveBlending // 叠加混合，产生发光感
     });
   }
 
@@ -650,7 +665,7 @@ export class Player {
       } else if (this.weaponMode === WEAPON_MAG7) {
         // MAG7 使用专属配置：确保在视口右下角可见
         // 三个参数，左右(越大越靠右)，上下（越小越靠下），前后(越小越靠前方)
-        this.gun.position.set(0.55, -0.9, -2.0 + this.gunRecoil);
+        this.gun.position.set(0.7, -0.9, -2.0 + this.gunRecoil);
         var scale_size = 2.3;
         this.gun.scale.set(scale_size, scale_size, scale_size);
         this.gun.rotation.y = - Math.PI / 2; // 纠正朝向：从之前的向左转为向前
@@ -697,7 +712,9 @@ export class Player {
    */
   spawnTracer(start, end) {
     const distance = start.distanceTo(end);
+    const isMag7 = this.weaponMode === WEAPON_MAG7;
 
+    // 1. 获取或创建 Mesh
     let mesh;
     if (this.tracerPool.length > 0) {
       mesh = this.tracerPool.pop();
@@ -706,22 +723,36 @@ export class Player {
       mesh = new THREE.Mesh(this.tracerGeometry, this.tracerMaterial);
     }
 
+    // 设置材质和尺寸
+    if (isMag7) {
+      mesh.material = this.mag7TracerMaterial;
+      mesh.scale.set(6, 6, distance);
+    } else {
+      mesh.material = this.tracerMaterial;
+      mesh.scale.set(1, 1, distance);
+    }
+
     mesh.position.copy(start);
     mesh.lookAt(end);
-    mesh.scale.set(1, 1, distance);
-
     this.world.scene.add(mesh);
 
-    // 计算起点相对于相机的本地偏移 (需与 shoot 方法中的 muzzleOffset 保持一致)
-    const localStart = new THREE.Vector3(0.3, -0.33, -0.98);
+    // 2. 获取或创建状态信息对象
+    let info;
+    if (this.tracerInfoPool.length > 0) {
+      info = this.tracerInfoPool.pop();
+    } else {
+      info = { mesh: null, worldEnd: new THREE.Vector3() };
+    }
 
-    this.tracers.push({
-      mesh: mesh,
-      lifetime: 0.1, // 持续 0.1 秒
-      maxLifetime: 0.1,
-      localStart: localStart, // 存储本地起点偏移
-      worldEnd: end.clone()   // 存储固定的世界落点
-    });
+    // 3. 复用向量存储终点，避免 end.clone()
+    info.mesh = mesh;
+    info.lifetime = isMag7 ? 0.15 : 0.1;
+    info.maxLifetime = info.lifetime;
+    info.localStart = isMag7 ? this._mag7LocalStart : this._gunLocalStart; // 使用缓存的常量
+    info.worldEnd.copy(end); // 直接复制值，不 new
+    info.isMag7 = isMag7;
+
+    this.tracers.push(info);
   }
 
   /**
@@ -733,9 +764,11 @@ export class Player {
       tracer.lifetime -= dt;
 
       if (tracer.lifetime <= 0) {
+        // 回收资源
         this.world.scene.remove(tracer.mesh);
         tracer.mesh.visible = false;
         this.tracerPool.push(tracer.mesh);
+        this.tracerInfoPool.push(tracer); // 回收状态对象
         this.tracers.splice(i, 1);
       } else {
         // 动态更新起点：使其始终相对于当前相机位置固定
@@ -747,9 +780,11 @@ export class Player {
         tracer.mesh.position.copy(this._tempVector);
         tracer.mesh.lookAt(tracer.worldEnd);
         const newDist = this._tempVector.distanceTo(tracer.worldEnd);
-        tracer.mesh.scale.set(1, 1, newDist);
 
-        tracer.mesh.material.opacity = (tracer.lifetime / tracer.maxLifetime) * 0.8;
+        const thickness = tracer.isMag7 ? 6 : 1;
+        tracer.mesh.scale.set(thickness, thickness, newDist);
+
+        tracer.mesh.material.opacity = (tracer.lifetime / tracer.maxLifetime);
       }
     }
   }
