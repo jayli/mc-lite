@@ -10,7 +10,7 @@ import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 import { persistenceService } from '../services/PersistenceService.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
-import { rookModel, carModel, gunManModel } from '../core/Engine.js';
+import { carModel, gunManModel } from '../core/Engine.js';
 import { getBlockProperties } from '../constants/BlockData.js';
 
 /** 区块尺寸 - 每个区块在 X 和 Z 方向上的方块数量 (16x16 是 Voxel 游戏的标准区块大小) */
@@ -143,6 +143,13 @@ export class Chunk {
     this.instanceIndexMap = new Map(); // Key: "type" -> Map("x,y,z" -> index)
     this.saveTimeout = null;         // 用于防抖保存
 
+    // 存储实体数据，用于合并优化
+    this.entities = {
+      realisticTrees: [],
+      modGunMan: [],
+      rovers: []
+    };
+
     // --- 后台合并相关属性 ---
     this.dirtyBlocks = 0;            // 未优化的动态方块计数
     this.consolidationTimer = null;  // 合并防抖定时器
@@ -247,11 +254,7 @@ export class Chunk {
       seed: WORLD_CONFIG.SEED,
       snapshot: {
         blocks: { ...this.blockData },
-        entities: {
-          realisticTrees: [], // 目前实体合并逻辑待定，暂时只合并方块
-          modGunMan: [],
-          rovers: []
-        }
+        entities: { ...this.entities }
       },
       isOptimization: true // 标记这是一个优化请求
     });
@@ -278,6 +281,11 @@ export class Chunk {
         // 1.1 同步全量方块数据和可见性状态
         if (allBlockTypes) this.blockData = allBlockTypes;
         if (visibleKeys) visibleKeys.forEach(k => this.visibleKeys.add(k));
+
+        // 1.2 保存实体快照，用于后续合并
+        this.entities.realisticTrees = realisticTrees || [];
+        this.entities.modGunMan = modGunMan || [];
+        this.entities.rovers = rovers || [];
 
         // 2. 构建渲染网格 (InstancedMesh)
         this.buildMeshes(d);
@@ -460,30 +468,6 @@ export class Chunk {
 
       // 将实例化网格添加到区块的分S组中
       this.group.add(mesh);
-
-      // --- Rook 模型生成逻辑 ---
-      if (!skipEntities && type === 'grass' && rookModel && d[type].length > 0 && Math.random() < 0.3) {
-        // 随机选择一个草地方块的位置来放置 rook
-        const pos = d[type][Math.floor(Math.random() * d[type].length)];
-
-        const rook = rookModel.clone();
-        rook.userData.isEntity = true; // 添加实体标记
-        rook.userData.type = 'rook';   // 添加类型标记
-        rook.position.set(pos.x + 0.5, pos.y + 1, pos.z + 0.5);
-
-        // --- 建立实体与其碰撞体的链接 ---
-        rook.userData.collisionBlocks = [
-          { x: pos.x, y: pos.y + 1, z: pos.z },
-          { x: pos.x, y: pos.y + 2, z: pos.z }
-        ];
-
-        this.group.add(rook);
-
-        // --- 添加碰撞体 ---
-        // 在 rook 模型占据的两个方块空间内添加隐形的实心碰撞块
-        this.addBlockDynamic(pos.x, pos.y + 1, pos.z, 'collider');
-        this.addBlockDynamic(pos.x, pos.y + 2, pos.z, 'collider');
-      }
     }
   }
 

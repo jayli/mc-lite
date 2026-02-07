@@ -18,7 +18,7 @@ onmessage = function(e) {
 
   // 使用 Map 暂存方块，确保同一位置后生成的方块覆盖旧方块
   const blockMap = new Map();
-  let realisticTrees = []; // 记录真实树木的位置
+  let realisticTrees = []; // 记录真实 tree 的位置
   let modGunMan = []; // 记录模型人 (gun_man.glb) 的位置
   let rovers = []; // 记录火星车的位置
   const structureQueue = []; // 结构生成队列，确保结构覆盖地形
@@ -76,6 +76,12 @@ onmessage = function(e) {
 
     const centerBiome = terrainGen.getBiome(cx * CHUNK_SIZE, cz * CHUNK_SIZE);
     const dPlaceholder = {};
+
+    // 确定性随机函数
+    const seededRandom = (x, z, s) => {
+      const val = Math.sin(x * 12.9898 + z * 78.233 + s) * 43758.5453123;
+      return val - Math.floor(val);
+    };
 
     for (let x = 0; x < CHUNK_SIZE; x++) {
       for (let z = 0; z < CHUNK_SIZE; z++) {
@@ -147,7 +153,8 @@ onmessage = function(e) {
             }
           } else {
             let occupied = false;
-            if (surf === 'grass' && Math.random() < 0.0005) { // gunman士兵的生成比例
+            const spawnRand = seededRandom(wx, wz, seed);
+            if (surf === 'grass' && spawnRand < 0.0005) {
               modGunMan.push({ x: wx, y: h + 1, z: wz });
               occupied = true;
             }
