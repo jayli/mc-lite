@@ -8,7 +8,12 @@ import { Physics } from './Physics.js';
 import { Inventory } from './Slots.js';
 import { getBiome, noise } from '../../utils/MathUtils.js';
 import { chestManager } from '../../world/entities/Chest.js';
-import { gunModel } from '../../core/Engine.js';
+import { gunModel, mag7Model } from '../../core/Engine.js';
+
+// 武器常量
+const WEAPON_ARM = 0;
+const WEAPON_GUN = 1;
+const WEAPON_MAG7 = 2;
 
 export class Player {
   /**
@@ -92,14 +97,14 @@ export class Player {
     this.ignitingTNTs = new Set();
 
     // 持枪系统 (Feature 009)
-    this.isHoldingGun = false;
-    this.gun = null;
+    this.weaponMode = WEAPON_ARM;
+    this.gun = null; // 当前显示的枪支模型
     this.tracers = []; // 初始化追踪线数组
     this.isShooting = false; // 是否正在射击 (按住左键)
     this.shootCooldown = 0;  // 射击冷却计时器
     this.shootInterval = 0.09; // 连发间隔 (090ms) jayli
     this.gunRecoil = 0;      // 枪支后坐力偏移量
-    console.log('Player 初始化，当前 Engine.gunModel 状态:', !!gunModel);
+    console.log('Player 初始化，当前武器模式:', this.weaponMode);
 
     // --- 性能优化：复用实例与池 (Feature 009 Optimization) ---
     this._muzzleOffset = new THREE.Vector3();
@@ -130,8 +135,8 @@ export class Player {
     window.addEventListener('keydown', e => {
       this.keys[e.code] = true;
       if (e.code === 'KeyR') {
-        this.isHoldingGun = !this.isHoldingGun;
-        console.log('持枪状态切换(keydown):', this.isHoldingGun);
+        this.weaponMode = (this.weaponMode + 1) % 3;
+        console.log('武器切换:', this.weaponMode);
       }
     });
     window.addEventListener('keyup', e => {
@@ -494,7 +499,8 @@ export class Player {
       this.shootCooldown -= dt;
     }
 
-    if (this.isHoldingGun && this.isShooting && this.shootCooldown <= 0) {
+    // 只有 Gun 支持连发
+    if (this.weaponMode === WEAPON_GUN && this.isShooting && this.shootCooldown <= 0) {
       // 获取所有可交互的区块物体
       const targets = [];
       for (const chunk of this.world.chunks.values()) {
@@ -546,38 +552,109 @@ export class Player {
   }
 
   /**
+   * 执行 MAG7 霰弹枪射击 (3x3x15 范围破坏)
+   */
+  executeMag7Shot() {
+    const right = new THREE.Vector3();
+    const up = new THREE.Vector3();
+    const dir = new THREE.Vector3();
+
+    // 从相机矩阵中提取本地坐标系轴
+    this.camera.matrixWorld.extractBasis(right, up, dir);
+    dir.negate(); // extractBasis 提取的是 +Z (后方)，取反得到前方
+
+    const blocksToDestroy = [];
+    const origin = this.camera.position;
+
+    // 遍历 15 格深度，每层 3x3，使用更小的步进以确保覆盖连续空间
+    for (let d = 1; d <= 15; d += 0.5) {
+      for (let i = -1; i <= 1; i++) {
+        for (let j = -1; j <= 1; j++) {
+          // 计算该点在世界坐标系中的位置
+          this._tempVector.copy(origin)
+            .addScaledVector(dir, d)
+            .addScaledVector(right, i)
+            .addScaledVector(up, j);
+
+          const bx = Math.floor(this._tempVector.x);
+          const by = Math.floor(this._tempVector.y);
+          const bz = Math.floor(this._tempVector.z);
+
+          const type = this.world.getBlock(bx, by, bz);
+          if (type && type !== 'end_stone') {
+            // 避免重复添加
+            const key = `${bx},${by},${bz}`;
+            if (!blocksToDestroy.some(b => b.key === key)) {
+              blocksToDestroy.push({ x: bx, y: by, z: bz, key: key });
+            }
+          }
+        }
+      }
+    }
+
+    // 批量销毁方块
+    if (blocksToDestroy.length > 0) {
+      this.world.removeBlocksBatch(blocksToDestroy);
+      // 产生挖掘粒子效果 (取中间层的一个位置)
+      const midBlock = blocksToDestroy[Math.floor(blocksToDestroy.length / 2)];
+      this._tempVector.set(midBlock.x + 0.5, midBlock.y + 0.5, midBlock.z + 0.5);
+      this.spawnParticles(this._tempVector, 'stone');
+    }
+
+    // 触发射击视觉效果 (后坐力、示踪线)
+    // 探测中心射线，确定示踪线终点
+    this.raycaster.far = 15;
+    this.raycaster.setFromCamera(this.center, this.camera);
+    const targets = [];
+    for (const chunk of this.world.chunks.values()) {
+      targets.push(chunk.group);
+    }
+    const hits = this.raycaster.intersectObjects(targets, true);
+    this.raycaster.far = Infinity;
+
+    this.shoot(hits.length > 0 ? hits[0] : null);
+  }
+
+  /**
    * 更新枪支状态 (Feature 009)
    */
   updateGun() {
-    // 增加状态检查日志（频率限制，防止刷屏）
-    if (!this.gun && !this._lastGunLog || Date.now() - this._lastGunLog > 5000) {
-      console.log('持枪系统检查: this.gun=', !!this.gun, 'gunModel=', !!gunModel);
-      this._lastGunLog = Date.now();
+    // 检查模型是否需要更换或移除
+    const targetModel = this.weaponMode === WEAPON_GUN ? gunModel : (this.weaponMode === WEAPON_MAG7 ? mag7Model : null);
+
+    // 如果当前模型与目标模型不符，则移除当前模型
+    if (this.gun && this.gun.userData.sourceModel !== targetModel) {
+      this.camera.remove(this.gun);
+      this.gun = null;
     }
 
-    if (!this.gun && gunModel) {
-      console.log('检测到枪支模型已加载，正在克隆并添加到相机...');
-      this.gun = gunModel.clone();
+    // 如果需要显示枪支且尚未加载当前枪支
+    if (!this.gun && targetModel) {
+      console.log('正在切换并加载武器模型...', this.weaponMode);
+      this.gun = targetModel.clone();
+      this.gun.userData.sourceModel = targetModel; // 标记来源以便追踪
       this.camera.add(this.gun);
-
-      // 调整位置和旋转 (根据经验微调)
-      // X: 0.3 (右), Y: -0.3 (下), Z: -0.4 (前) - 距离更近更中心
-      this.gun.position.set(0.3, -0.85, -0.4);
-
-      // 暂时移除旋转，看看模型原始朝向
       this.gun.rotation.y = 0;
-
-      // 进一步增大缩放比例，确保能看到
-      this.gun.scale.set(0.09, 0.09, 0.09);
-
-      console.log('枪支模型已挂载到相机，位置:', this.gun.position);
     }
 
     if (this.gun) {
-      this.gun.visible = this.isHoldingGun;
+      this.gun.visible = true;
 
-      // 应用后坐力到位置 (向后偏移 Z 轴)
-      this.gun.position.set(0.3, -0.85, -0.4 + this.gunRecoil);
+      // 根据不同武器模式设置独立的位置、缩放和旋转
+      if (this.weaponMode === WEAPON_GUN) {
+        // Gun 恢复原始配置
+        // 三个参数，左右(越大越靠右)，上下（越小越靠下），前后(越小越靠前方)
+        this.gun.position.set(0.3, -0.85, -0.4 + this.gunRecoil);
+        this.gun.scale.set(0.09, 0.09, 0.09);
+        // this.gun.rotation.y = Math.PI; // 纠正 Gun 朝向
+      } else if (this.weaponMode === WEAPON_MAG7) {
+        // MAG7 使用专属配置：确保在视口右下角可见
+        // 三个参数，左右(越大越靠右)，上下（越小越靠下），前后(越小越靠前方)
+        this.gun.position.set(0.55, -0.9, -2.0 + this.gunRecoil);
+        var scale_size = 2.3;
+        this.gun.scale.set(scale_size, scale_size, scale_size);
+        this.gun.rotation.y = - Math.PI / 2; // 纠正朝向：从之前的向左转为向前
+      }
 
       // 逐渐恢复后坐力
       this.gunRecoil = THREE.MathUtils.lerp(this.gunRecoil, 0, 0.2);
@@ -589,10 +666,10 @@ export class Player {
    */
   shoot(hit) {
     // 0. 触发枪支后坐力位移
-    this.gunRecoil = 0.05;
+    // MAG7 后坐力更大
+    this.gunRecoil = this.weaponMode === WEAPON_MAG7 ? 0.15 : 0.05;
 
-    // 1. 计算枪口的大致世界坐标 (基于枪支在相机中的偏移)
-    // Y 调整为 -0.82 以匹配枪管高度，Z 调整为 -0.44 使起点处于枪口内侧（实现遮挡感）
+    // 1. 计算枪口的大致世界坐标
     this._muzzleOffset.set(0.3, -0.82, -0.44);
     this._muzzleOffset.applyQuaternion(this.camera.quaternion);
     this._muzzlePos.copy(this.camera.position).add(this._muzzleOffset);
@@ -610,7 +687,9 @@ export class Player {
     this.spawnTracer(this._muzzlePos, this._targetPos);
 
     // 4. 播放射击音效
-    audioManager.playSound('gun_fire', 0.09); // jayli
+    const sound = this.weaponMode === WEAPON_MAG7 ? 'explosion' : 'gun_fire'; // 暂时用 explosion 模拟大威力声音，后续可替换
+    const volume = this.weaponMode === WEAPON_MAG7 ? 0.2 : 0.09;
+    audioManager.playSound(sound, volume);
   }
 
   /**
@@ -807,12 +886,17 @@ export class Player {
       }
     } else if (button === 0) { // 左键点击 - 挖掘或射击
       // 射击逻辑 (Feature 009)
-      if (this.isHoldingGun) {
+      if (this.weaponMode !== WEAPON_ARM) {
         this.isShooting = true;
-        // 只有在冷却结束时才发射第一枪（防止点击过快导致的频率异常，虽然通常 interval 很大）
+        // 只有在冷却结束时才发射第一枪
         if (this.shootCooldown <= 0) {
-          this.executeShot(targets);
-          this.shootCooldown = this.shootInterval;
+          if (this.weaponMode === WEAPON_GUN) {
+            this.executeShot(targets);
+            this.shootCooldown = this.shootInterval;
+          } else if (this.weaponMode === WEAPON_MAG7) {
+            this.executeMag7Shot();
+            this.shootCooldown = 0.8; // MAG7 射击间隔较长 (800ms)
+          }
         }
         return; // 射击后跳过常规挖掘逻辑
       }
@@ -1194,7 +1278,7 @@ export class Player {
    * 更新手臂动画
    */
   updateArm() {
-    if (this.isHoldingGun) {
+    if (this.weaponMode !== WEAPON_ARM) {
       this.arm.visible = false;
       return;
     }

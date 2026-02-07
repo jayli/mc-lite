@@ -18,6 +18,7 @@ export let rookModel = null;
 export let carModel = null;
 export let gunManModel = null;
 export let gunModel = null;
+export let mag7Model = null;
 
 // 定义并导出 Engine 类，用于管理游戏的核心渲染引擎
 export class Engine {
@@ -256,6 +257,38 @@ export class Engine {
       console.log('Gun model loaded successfully and normalized');
     }, undefined, (error) => {
       console.error('Failed to load silahful.glb:', error);
+    });
+
+    gltfLoader.load('src/world/assets/mod/mag7.glb', (gltf) => {
+      const model = gltf.scene;
+
+      model.traverse(child => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+
+      const box = new THREE.Box3().setFromObject(model);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+
+      // 标准化：中心归零，并根据需要调整朝向
+      model.position.set(-center.x, -center.y, -center.z);
+      // MAG7 可能需要不同的初始旋转，先参考 gun 的设置
+      model.rotation.y = Math.PI;
+
+      const group = new THREE.Group();
+      group.add(model);
+
+      const maxDim = Math.max(size.x, size.y, size.z);
+      const scale = 1.0 / (maxDim || 1);
+      group.scale.set(scale, scale, scale);
+
+      mag7Model = group;
+      console.log('MAG7 model loaded successfully and normalized');
+    }, undefined, (error) => {
+      console.error('Failed to load mag7.glb:', error);
     });
   }
 
