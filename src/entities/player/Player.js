@@ -507,6 +507,22 @@ export class Player {
   }
 
   /**
+   * 获取所有可交互的物体目标（包括区块和实体）
+   * @returns {THREE.Object3D[]}
+   */
+  getInteractionTargets() {
+    const targets = [];
+    for (const chunk of this.world.chunks.values()) {
+      targets.push(chunk.group);
+    }
+    // 添加处于开启状态的宝箱动画物体
+    chestManager.chestAnimations.forEach(anim => {
+      if (anim.mesh) targets.push(anim.mesh);
+    });
+    return targets;
+  }
+
+  /**
    * 处理连发逻辑
    */
   handleShooting(dt) {
@@ -516,11 +532,7 @@ export class Player {
 
     // 只有 Gun 支持连发
     if (this.weaponMode === WEAPON_GUN && this.isShooting && this.shootCooldown <= 0) {
-      // 获取所有可交互的区块物体
-      const targets = [];
-      for (const chunk of this.world.chunks.values()) {
-        targets.push(chunk.group);
-      }
+      const targets = this.getInteractionTargets();
       this.executeShot(targets);
       this.shootCooldown = this.shootInterval;
     }
@@ -620,10 +632,7 @@ export class Player {
     // 探测中心射线，确定示踪线终点
     this.raycaster.far = 15;
     this.raycaster.setFromCamera(this.center, this.camera);
-    const targets = [];
-    for (const chunk of this.world.chunks.values()) {
-      targets.push(chunk.group);
-    }
+    const targets = this.getInteractionTargets();
     const hits = this.raycaster.intersectObjects(targets, true);
     this.raycaster.far = Infinity;
 
@@ -867,11 +876,7 @@ export class Player {
     const button = e.button;
     this.raycaster.setFromCamera(this.center, this.camera);
 
-    // 获取所有可交互的区块物体
-    const targets = [];
-    for (const chunk of this.world.chunks.values()) {
-      targets.push(chunk.group);
-    }
+    const targets = this.getInteractionTargets();
 
     const hits = this.raycaster.intersectObjects(targets, true);
 
@@ -1119,7 +1124,12 @@ export class Player {
         // 3. 生成粒子效果
         this.spawnParticles(m.position, m.userData.type || 'stone'); // 使用石头作为后备粒子类型
 
-        // 4. (可选) 给予物品 - 这里暂时不给，因为没有定义 rook 的掉落物
+        // 4. (可选) 给予物品
+        if (m.userData.type === 'chest') {
+          this.world.removeBlock(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z));
+          this.inventory.add('chest', 1);
+          audioManager.playSound('delete_get', 0.3);
+        }
 
       } else {
         // --- 如果是普通的动态方块 (非实体) ---

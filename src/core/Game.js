@@ -109,6 +109,7 @@ export class Game {
     this.player.inventory.add('marble', 1500);
     this.player.inventory.add('cactus', 1500);
     this.player.inventory.add('tnt', 1500);
+    this.player.inventory.add('chest', 1500);
     // this.player.inventory.add('cloud', 1500);
 
     // 延迟执行 Face Culling 审计并同步场景

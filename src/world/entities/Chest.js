@@ -22,19 +22,22 @@ export class Chest {
   spawnChestAnimation(pos, parent) {
     const group = new THREE.Group();
     group.position.copy(pos);
+    group.position.y -= 0.5; // 将坐标从方块中心下移到方块底部，修复悬浮问题
 
     const mat = materials.getMaterial('chest');
-    const body = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.8), mat);
-    body.position.y = 0.3;
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.7, 1.0), mat);
+    body.position.y = 0.35; // 高度一半
 
     const pivot = new THREE.Group();
-    pivot.position.set(0, 0.6, -0.4);
+    pivot.position.set(0, 0.7, -0.5); // 位于箱体顶部后方边缘
 
-    const lid = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.2, 0.8), mat);
-    lid.position.set(0, 0.1, 0.4);
+    const lid = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.3, 1.0), mat);
+    lid.position.set(0, 0.15, 0.5); // 盖子厚度一半，向前方偏移一半长度
 
     pivot.add(lid);
     group.add(body, pivot);
+    group.userData.isEntity = true;
+    group.userData.type = 'chest';
     parent.add(group);
 
     this.chestAnimations.push({
