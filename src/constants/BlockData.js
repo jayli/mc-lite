@@ -128,7 +128,10 @@ export const BLOCK_DATA = {
   'stone': { isAOEnabled: true },
   'mossy_stone': { isAOEnabled: true },
   'cobblestone': { isAOEnabled: true },
-  'bricks': { isAOEnabled: true }
+  'bricks': { isAOEnabled: true },
+  'planks': { isAOEnabled: true },
+  'white_planks': { isAOEnabled: true },
+  'marble': { isAOEnabled: true }
 };
 
 /**
