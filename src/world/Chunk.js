@@ -223,11 +223,27 @@ export class Chunk {
     const callbackKey = `${this.cx},${this.cz}`;
     // 注册 Worker 回调处理合并结果
     workerCallbacks.set(callbackKey, (data) => {
-      const { d, visibleKeys } = data;
+      const { d, visibleKeys, solidBlocks } = data;
 
-      // 1. 更新可见性状态 (合并)
+      // 1. 同步可见性状态与碰撞状态 (完全替换，确保剔除状态同步)
+      // 注意：需要保留在合并过程中新产生的动态数据
       if (visibleKeys) {
-        visibleKeys.forEach(k => this.visibleKeys.add(k));
+        this.visibleKeys = new Set(visibleKeys);
+        // 重新添加当前仍在 dynamicMeshes 中的方块 (即在合并期间新产生的)
+        for (const key of this.dynamicMeshes.keys()) {
+          this.visibleKeys.add(key);
+        }
+      }
+
+      if (solidBlocks) {
+        this.solidBlocks = new Set(solidBlocks);
+        // 同理，保留合并期间新产生的碰撞体
+        for (const [key, mesh] of this.dynamicMeshes.entries()) {
+          const type = mesh.userData.type;
+          if (getBlockProperties(type).isSolid) {
+            this.solidBlocks.add(key);
+          }
+        }
       }
 
       // 2. 执行平滑替换 (Swap)
@@ -294,12 +310,14 @@ export class Chunk {
       workerCallbacks.set(callbackKey, (data) => {
         const { d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot: newSnapshot } = data;
 
-        // 1. 同步实心方块数据 (用于碰撞检测)
-        solidBlocks.forEach(k => this.solidBlocks.add(k));
-
-        // 1.1 同步全量方块数据和可见性状态
+        // 1. 同步全量方块数据和可见性状态 (完全替换，确保剔除状态同步)
         if (allBlockTypes) this.blockData = allBlockTypes;
-        if (visibleKeys) visibleKeys.forEach(k => this.visibleKeys.add(k));
+        if (visibleKeys) {
+          this.visibleKeys = new Set(visibleKeys);
+        }
+        if (solidBlocks) {
+          this.solidBlocks = new Set(solidBlocks);
+        }
 
         // 1.2 保存实体快照，用于后续合并
         this.entities.realisticTrees = realisticTrees || [];
@@ -548,7 +566,6 @@ export class Chunk {
 
     // 更新数据和可见性状态
     if (type === 'air') {
-      // this.blockData[key] = 'air';
       delete this.blockData[key];
       this.visibleKeys.delete(key);
     } else {
@@ -559,30 +576,31 @@ export class Chunk {
     // 触发持久化刷新 (防抖)
     this.saveDebounced();
 
-    // 计算隐藏面剔除掩码
+    // --- 定义邻居获取辅助函数，供后续逻辑复用 ---
+    const getNeighborBlock = (nx, ny, nz) => {
+      const cx = Math.floor(nx / 16);
+      const cz = Math.floor(nz / 16);
+      let chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(`${cx},${cz}`);
+      if (!chunk || !chunk.isReady) return null;
+      const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
+      const t = chunk.blockData[key];
+      return t ? { type: t } : null;
+    };
+
+    const getNeighborsOf = (nx, ny, nz) => ({
+      top: getNeighborBlock(nx, ny + 1, nz),
+      bottom: getNeighborBlock(nx, ny - 1, nz),
+      north: getNeighborBlock(nx, ny, nz - 1),
+      south: getNeighborBlock(nx, ny, nz + 1),
+      west: getNeighborBlock(nx - 1, ny, nz),
+      east: getNeighborBlock(nx + 1, ny, nz)
+    });
+
+    // 计算隐藏面剔除掩码与方块可见性
     let mask = 63; // 默认全显示 (111111)
     if (faceCullingSystem && faceCullingSystem.isEnabled() && type !== 'air' && type !== 'collider') {
       const block = { type };
-
-      const getNeighborBlock = (nx, ny, nz) => {
-        const cx = Math.floor(nx / 16);
-        const cz = Math.floor(nz / 16);
-        let chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(`${cx},${cz}`);
-        if (!chunk || !chunk.isReady) return null;
-        const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-        const t = chunk.blockData[key];
-        return t ? { type: t } : null;
-      };
-
-      const neighbors = {
-        top: getNeighborBlock(x, y + 1, z),
-        bottom: getNeighborBlock(x, y - 1, z),
-        north: getNeighborBlock(x, y, z - 1),
-        south: getNeighborBlock(x, y, z + 1),
-        west: getNeighborBlock(x - 1, y, z),
-        east: getNeighborBlock(x + 1, y, z)
-      };
-
+      const neighbors = getNeighborsOf(x, y, z);
       mask = faceCullingSystem.calculateFaceVisibility(block, neighbors);
 
       // 如果方块完全被遮挡且不是透明方块，则标记为不可见
@@ -772,38 +790,18 @@ export class Chunk {
       mesh.updateMatrixWorld();
     }
 
-    // 隐藏面剔除更新 (FaceCullingSystem integration)
+    // 隐藏面剔除系统更新 (通知邻居)
     if (faceCullingSystem && faceCullingSystem.isEnabled()) {
       const position = new THREE.Vector3(x, y, z);
       const block = { type };
-      // Helper to get neighbor block info
-      const getNeighborBlock = (nx, ny, nz) => {
-        const cx = Math.floor(nx / 16);
-        const cz = Math.floor(nz / 16);
-        const chunkKey = `${cx},${cz}`;
-        let chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(chunkKey);
-        if (!chunk || !chunk.isReady) return null;
-        const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-        if (chunk.deltas && chunk.deltas[key]) return { type: chunk.deltas[key] };
-        if (chunk.solidBlocks.has(key)) return { type: 'stone' };
-        return null;
-      };
-      const getNeighborsOf = (nx, ny, nz) => {
-        return {
-          top: getNeighborBlock(nx, ny + 1, nz),
-          bottom: getNeighborBlock(nx, ny - 1, nz),
-          north: getNeighborBlock(nx, ny, nz - 1),
-          south: getNeighborBlock(nx, ny, nz + 1),
-          west: getNeighborBlock(nx - 1, ny, nz),
-          east: getNeighborBlock(nx + 1, ny, nz)
-        };
-      };
-      const neighbors = getNeighborsOf(x, y, z);
-      faceCullingSystem.updateBlock(position, block, neighbors);
+
+      // 使用上面定义的辅助函数触发更新
+      faceCullingSystem.updateBlock(position, block, getNeighborsOf(x, y, z));
       faceCullingSystem.updateNeighbors(position, (neighborPos) => {
-        const nb = getNeighborBlock(neighborPos.x, neighborPos.y, neighborPos.z);
+        const nx = neighborPos.x, ny = neighborPos.y, nz = neighborPos.z;
+        const nb = getNeighborBlock(nx, ny, nz);
         if (!nb) return null;
-        return { block: nb, neighbors: getNeighborsOf(neighborPos.x, neighborPos.y, neighborPos.z) };
+        return { block: nb, neighbors: getNeighborsOf(nx, ny, nz) };
       });
     }
   }
@@ -959,7 +957,11 @@ export class Chunk {
       }
     });
 
-    // 4. 触发持久化刷新 (防抖)
+    // 4. 标记区块为脏并调度合并
+    this.dirtyBlocks += positions.length;
+    this.scheduleConsolidation();
+
+    // 5. 触发持久化刷新 (防抖)
     this.saveDebounced();
   }
 
