@@ -646,6 +646,8 @@ materials.registerMaterial('allium', {
 
 materials.registerMaterial('chimney', mkMat('#7f5b37')); // 深棕色烟囱
 materials.registerMaterial('handrail', mkMat('#b98e5b')); // 栏杆
+materials.registerMaterial('handrailA', mkMat('#b98e5b')); // 栏杆 A
+materials.registerMaterial('handrailB', mkMat('#b98e5b')); // 栏杆 B
 materials.registerMaterial('collider', { transparent: true, opacity: 0 }); // 碰撞体材质
 
 

@@ -124,6 +124,30 @@ const geoHandrail = (() => {
 })();
 
 /**
+ * 栏杆 A 几何体 - 中心柱子和 X 轴向把手 (东西向)
+ */
+const geoHandrailA = (() => {
+  const geoms = [];
+  geoms.push(new THREE.BoxGeometry(0.3, 1, 0.3));
+  const barX = new THREE.BoxGeometry(1, 0.15, 0.15);
+  barX.translate(0, 0.35, 0);
+  geoms.push(barX);
+  return addVertexIdAttribute(BufferGeometryUtils.mergeGeometries(geoms));
+})();
+
+/**
+ * 栏杆 B 几何体 - 中心柱子和 Z 轴向把手 (南北向)
+ */
+const geoHandrailB = (() => {
+  const geoms = [];
+  geoms.push(new THREE.BoxGeometry(0.3, 1, 0.3));
+  const barZ = new THREE.BoxGeometry(0.15, 0.15, 1);
+  barZ.translate(0, 0.35, 0);
+  geoms.push(barZ);
+  return addVertexIdAttribute(BufferGeometryUtils.mergeGeometries(geoms));
+})();
+
+/**
  * 几何体映射表 - 将方块类型映射到对应的几何体
  */
 const geomMap = {
@@ -135,6 +159,8 @@ const geomMap = {
   'cactus': geoCactus,
   'chimney': geoChimney,
   'handrail': geoHandrail,
+  'handrailA': geoHandrailA,
+  'handrailB': geoHandrailB,
   'default': addVertexIdAttribute(new THREE.BoxGeometry(1, 1, 1))
 };
 

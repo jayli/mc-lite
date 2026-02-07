@@ -230,7 +230,8 @@ export class Player {
       let foundHandrail = false;
       for (const ox of [-halfW, 0, halfW]) {
         for (const oz of [-halfW, 0, halfW]) {
-          if (this.world.getBlock(Math.floor(nx + ox), ty, Math.floor(nz + oz)) === 'handrail') {
+          const bType = this.world.getBlock(Math.floor(nx + ox), ty, Math.floor(nz + oz));
+          if (bType === 'handrail' || bType === 'handrailA' || bType === 'handrailB') {
             foundHandrail = true;
             break;
           }
