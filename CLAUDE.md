@@ -17,6 +17,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - 强制使用 ES6 Modules (`import`/`export`)，通过 CDN 加载 Three.js。
   - 遵循面向对象编程模式（类名大写，属性驼峰命名）。
   - 资源必须通过 `src/core/materials/MaterialManager.js` 统一管理。
+  - 方块属性（碰撞、透明度、AO等）必须通过 `src/constants/BlockData.js` 统一配置。
   - 所有新功能必须在 `specs/` 目录下创建规格文档。
 
 ## 项目架构
@@ -27,49 +28,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 1. **表示层 (Engine)**: `src/core/Engine.js` 处理渲染、相机、光照（太阳同步）和阴影。
 2. **逻辑层 (Game/Player)**:
    - `src/core/Game.js`: 驱动主循环，协调各子系统。
-   - `src/entities/player/Player.js` & `src/core/Physics.js`: 处理控制、重力和方块碰撞。
+   - `src/entities/player/Player.js` & `src/entities/player/Physics.js`: 处理控制、重力和方块碰撞。
 3. **数据/世界层 (World)**:
    - `src/world/World.js`: 管理区块的动态加载/卸载（渲染距离：3）。
    - `src/world/Chunk.js`: 核心渲染单元，使用 `THREE.InstancedMesh` 优化性能。
-   - **区块合并 (Consolidation)**: 玩家交互后的修改会异步合并到区块的主网格中，以减少实例数量并提升渲染性能。
-   - `src/world/TerrainGen.js` & `src/workers/WorldWorker.js`: 包含噪声算法和生物群系判定，在 Web Worker 中异步执行。
+   - **区块合并 (Consolidation)**: 玩家交互后的修改会异步合并到区块的主网格中。
+   - `src/world/TerrainGen.js` & `src/world/WorldWorker.js`: 地形生成与后处理逻辑，在 Web Worker 中异步执行。
 4. **持久化层**:
-   - **自动保存**: `src/services/PersistenceService.js` 使用 IndexedDB (`mc_lite_db`) 存储世界增量修改（Deltas）。
-   - **手动存档**: 使用独立的 IndexedDB (`mc_lite_manual_saves`) 存储完整世界快照。
+   - `src/services/PersistenceService.js`: 使用 IndexedDB 存储世界修改。
 
-### 关键性能优化
-- **InstancedMesh**: 区块通过 `InstancedMesh` 渲染同类方块，大幅减少 Draw Calls。
-- **隐藏面剔除 (Face Culling)**: `src/core/face-culling/FaceCullingSystem.js` 通过位掩码管理方块可见面，仅渲染暴露在外的面（结合 `alphaTest` 处理透明材质）。
-- **材质优化**: `MaterialManager.js` 禁用纹理 Mipmaps，使用 `NearestFilter` 保持像素风格并减少内存占用。
-- **碰撞检测占位**: 当区块尚未准备好时，`Physics.isSolid` 使用噪声函数进行快速物理估算。
+### 关键系统
+- **方块数据系统**: `src/constants/BlockData.js` 是所有方块属性的单一真理来源，决定了物理碰撞、面剔除和 AO 渲染行为。
+- **隐藏面剔除 (Face Culling)**: `src/core/FaceCullingSystem.js` 结合 `BlockData.js` 管理方块可见面，优化渲染性能。
+- **材质系统**: `MaterialManager.js` 负责材质注册与纹理预加载，支持程序化纹理和 AO 着色器注入。
 
 ## 开发工作流
 
-1. **修改方块/材质**: 先在 `MaterialManager.js` 定义纹理映射，然后在 `constants/` 中添加 ID。
-2. **调试**:
-   - 使用 HUD (由 `src/ui/UIManager.js` 管理) 查看实时 FPS、坐标和区块状态。
-   - 物理问题可在 `Physics.js` 中通过辅助线进行可视化。
-3. **代码提交**:
-   - 必须遵循约定式提交 (Conventional Commits)。
-   - 优先使用 `Skill("commit")` 进行提交操作。
-   - 避免使用 `git add .` 或 `git add -A`，应添加特定文件。
-
-## 目录结构摘要
-- `src/core/`: 核心引擎、物理、材质管理、面剔除系统。
-- `src/world/`: 世界管理、区块逻辑、地形生成。
-- `src/entities/`: 玩家及实体定义。
-- `src/services/`: 数据持久化及后台服务。
-- `specs/`: 功能规格文档 (`spec.md`, `plan.md`, `tasks.md`)。
-- `workers/`: Web Workers 脚本。
+1. **添加/修改方块**:
+   - 在 `src/constants/BlockData.js` 定义方块属性（`isSolid`, `isTransparent`, `isAOEnabled` 等）。
+   - 在 `MaterialManager.js` 注册对应的材质定义和纹理映射。
+2. **调试**: 使用 HUD 查看实时状态。物理逻辑在 `src/entities/player/Physics.js`。
+3. **代码提交**: 遵循约定式提交 (Conventional Commits)，优先使用 `Skill("commit")`。
 
 ## 最近功能
-- **008-save-game**: 手动存档系统，包含专用 IndexedDB 和 Worker。
-- **007-chunk-optimization**: 区块合并优化，提升玩家交互后的性能。
+- **010-block-data-refactor**: 集中化方块属性管理系统。
+- **008-save-game**: 手动存档系统。
+- **007-chunk-optimization**: 区块合并优化。
 - **004-hidden-face-culling**: 隐藏面剔除优化。
-- **003-land-caves**: 洞穴生成系统。
-
-## Active Technologies
-- ES6 Modules (JavaScript) + Three.js, GLTFLoader (009-009-player-gun)
-
-## Recent Changes
-- 009-009-player-gun: Added ES6 Modules (JavaScript) + Three.js, GLTFLoader
