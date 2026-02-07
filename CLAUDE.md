@@ -52,6 +52,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 最近功能
 - **010-block-data-refactor**: 集中化方块属性管理系统。
-- **008-save-game**: 手动存档系统。
-- **007-chunk-optimization**: 区块合并优化。
-- **004-hidden-face-culling**: 隐藏面剔除优化。
+- **009-player-gun**: 玩家射击系统与后坐力反馈。
+- **008-save-game**: 手动存档与导出系统。
+- **007-chunk-optimization**: 区块网格合并与异步优化。
+- **006-realistic-textured-trees**: 真实感树木生成。
+- **005-player-physics-refactor**: 物理碰撞与上台阶逻辑重构。
+- **004-hidden-face-culling**: 基于位掩码的隐藏面剔除。
+- **003-land-caves**: 洞穴生成系统。
+- **002-warm-sun-light**: 动态光照与阴影系统。
+- **001-world-persistence**: 自动保存与持久化服务。
+- **000-fps-optimization**: 渲染管线与性能监控优化。
