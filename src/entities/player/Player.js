@@ -1373,12 +1373,18 @@ export class Player {
 
     this.arm.visible = true; // 徒手模式下始终可见
 
+    // 始终确保手臂处于正确的基础位置和缩放，防止挥动时位置跳变
+    this.arm.position.set(0.07, -0.10, -0.12);
+    this.arm.scale.set(0.1, 0.1, 0.1);
+
     if (this.swingTime > 0) {
-      this.arm.rotation.x = -Math.PI / 2 + Math.sin(this.swingTime * 0.3);
+      // 优化挥臂动作：平滑的正弦曲线，从静止(-0.8)挥下再回到静止
+      const p = (10 - this.swingTime) / 10;
+      this.arm.rotation.x = -0.8 - Math.sin(p * Math.PI) * 0.87;
       this.swingTime--;
     } else {
-      // 静止时的旋转角度，与构造函数中的初始值一致
-      this.arm.rotation.x = 0.2;
+      // 静止时的旋转角度
+      this.arm.rotation.x = -0.8;
     }
   }
 }
