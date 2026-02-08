@@ -62,3 +62,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **002-warm-sun-light**: 动态光照与阴影系统。
 - **001-world-persistence**: 自动保存与持久化服务。
 - **000-fps-optimization**: 渲染管线与性能监控优化。
+
+## Active Technologies
+- JavaScript (ES6 Modules) + Three.js (via CDN), GLTFLoader (011-minigun-weapon)
+- N/A (武器状态不持久化，仅位置/修改通过 PersistenceService 存储) (011-minigun-weapon)
+
+## Recent Changes
+- 011-minigun-weapon: Added JavaScript (ES6 Modules) + Three.js (via CDN), GLTFLoader

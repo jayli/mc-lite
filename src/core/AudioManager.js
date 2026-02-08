@@ -134,7 +134,8 @@ export async function initializeAudio() {
     './src/world/assets/sound/bgm.mp3',
     './src/world/assets/sound/gun_fire.mp3',
     './src/world/assets/sound/gun_load.mp3',
-    './src/world/assets/sound/mag7_fire.mp3'
+    './src/world/assets/sound/mag7_fire.mp3',
+    './src/world/assets/sound/minigun_fire.mp3'
   ];
   await audioManager.preloadSounds(soundUrls);
 }

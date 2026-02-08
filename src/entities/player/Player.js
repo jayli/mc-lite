@@ -8,12 +8,13 @@ import { Physics } from './Physics.js';
 import { Inventory } from './Slots.js';
 import { getBiome, noise } from '../../utils/MathUtils.js';
 import { chestManager } from '../../world/entities/Chest.js';
-import { gunModel, mag7Model } from '../../core/Engine.js';
+import { gunModel, mag7Model, minigunModel } from '../../core/Engine.js';
 
 // 武器常量
 const WEAPON_ARM = 0;
 const WEAPON_GUN = 1;
 const WEAPON_MAG7 = 2;
+const WEAPON_MINIGUN = 3;
 
 export class Player {
   /**
@@ -123,8 +124,10 @@ export class Player {
     this.vectorPool = [];      // 向量池 (用于 worldEnd)
 
     // 预制本地偏移常量，消除 new Vector3
+    // 子弹开火曳光发出去的起始位置, 第三个参数是前后
     this._gunLocalStart = new THREE.Vector3(0.3, -0.33, -0.98);
     this._mag7LocalStart = new THREE.Vector3(0.55, -0.4, -1.8);
+    this._minigunLocalStart = new THREE.Vector3(0.5, -0.5, -1.8);
 
     this.tracerGeometry = new THREE.BoxGeometry(0.05, 0.05, 1);
     this.tracerGeometry.translate(0, 0, 0.5); // 将原点移至一端
@@ -153,12 +156,13 @@ export class Player {
     window.addEventListener('keydown', e => {
       this.keys[e.code] = true;
       if (e.code === 'KeyR') {
-        this.weaponMode = (this.weaponMode + 1) % 3;
+        this.weaponMode = (this.weaponMode + 1) % 4;
         this.drawProgress = 0; // 切换武器时重置拿起动画进度
+        this.isShooting = false; // 切换武器时停止射击
         console.log('武器切换:', this.weaponMode);
 
-        // 切换到 Gun 或 Mag7 时播放换弹/上膛音效
-        if (this.weaponMode === WEAPON_GUN || this.weaponMode === WEAPON_MAG7) {
+        // 切换到 Gun, Mag7 或 Minigun 时播放换弹/上膛音效
+        if (this.weaponMode === WEAPON_GUN || this.weaponMode === WEAPON_MAG7 || this.weaponMode === WEAPON_MINIGUN) {
           audioManager.playSound('gun_load', 0.4);
         }
       }
@@ -557,11 +561,11 @@ export class Player {
       this.shootCooldown -= dt;
     }
 
-    // 只有 Gun 支持连发
-    if (this.weaponMode === WEAPON_GUN && this.isShooting && this.shootCooldown <= 0) {
+    // 只有 Gun 和 Minigun 支持连发
+    if ((this.weaponMode === WEAPON_GUN || this.weaponMode === WEAPON_MINIGUN) && this.isShooting && this.shootCooldown <= 0) {
       const targets = this.getInteractionTargets();
       this.executeShot(targets);
-      this.shootCooldown = this.shootInterval;
+      this.shootCooldown = this.weaponMode === WEAPON_MINIGUN ? 0.05 : this.shootInterval;
     }
   }
 
@@ -694,7 +698,9 @@ export class Player {
    */
   updateGun(dt) {
     // 检查模型是否需要更换或移除
-    const targetModel = this.weaponMode === WEAPON_GUN ? gunModel : (this.weaponMode === WEAPON_MAG7 ? mag7Model : null);
+    const targetModel = this.weaponMode === WEAPON_GUN ? gunModel :
+                      (this.weaponMode === WEAPON_MAG7 ? mag7Model :
+                      (this.weaponMode === WEAPON_MINIGUN ? minigunModel : null));
 
     // 如果当前模型与目标模型不符，则移除当前模型
     if (this.gun && this.gun.userData.sourceModel !== targetModel) {
@@ -723,6 +729,7 @@ export class Player {
       const drawYOffset = Math.pow(1 - this.drawProgress, 2) * 1.2;
 
       // 根据不同武器模式设置独立的位置、缩放和旋转
+      // 枪的位置定义
       if (this.weaponMode === WEAPON_GUN) {
         // Gun 恢复原始配置
         // 三个参数，左右(越大越靠右)，上下（越小越靠下），前后(越小越靠前方)
@@ -736,6 +743,12 @@ export class Player {
         var scale_size = 1.3;
         this.gun.scale.set(scale_size, scale_size, scale_size);
         this.gun.rotation.y = - Math.PI / 2; // 纠正朝向：从之前的向左转为向前
+      } else if (this.weaponMode === WEAPON_MINIGUN) {
+        // Minigun 配置：修正前后和上下反转
+        this.gun.position.set(0.48, - 0.7 - drawYOffset, /*-*/ 0.6 + this.gunRecoil);
+        this.gun.scale.set(0.5, 0.5, 0.5);
+        this.gun.rotation.y = - Math.PI / 2;  // 修正前后：从 -PI/2 改为 PI/2
+        this.gun.rotation.x = Math.PI;      // 修正上下：旋转 180 度
       }
 
       // 逐渐恢复后坐力
@@ -748,8 +761,14 @@ export class Player {
    */
   shoot(hit) {
     // 0. 触发枪支后坐力位移
-    // MAG7 后坐力更大
-    this.gunRecoil = this.weaponMode === WEAPON_MAG7 ? 0.15 : 0.05;
+    // MAG7 后坐力最大，Minigun 后坐力较小但高频
+    if (this.weaponMode === WEAPON_MAG7) {
+      this.gunRecoil = 0.15;
+    } else if (this.weaponMode === WEAPON_MINIGUN) {
+      this.gunRecoil = 0.03;
+    } else {
+      this.gunRecoil = 0.05;
+    }
 
     // 1. 计算枪口的大致世界坐标
     this._muzzleOffset.set(0.3, -0.82, -0.44);
@@ -769,8 +788,17 @@ export class Player {
     this.spawnTracer(this._muzzlePos, this._targetPos);
 
     // 4. 播放射击音效
-    const sound = this.weaponMode === WEAPON_MAG7 ? 'mag7_fire' : 'gun_fire';
-    const volume = this.weaponMode === WEAPON_MAG7 ? 0.2 : 0.09;
+    let sound = 'gun_fire';
+    let volume = 0.09;
+
+    if (this.weaponMode === WEAPON_MAG7) {
+      sound = 'mag7_fire';
+      volume = 0.2;
+    } else if (this.weaponMode === WEAPON_MINIGUN) {
+      sound = 'minigun_fire';
+      volume = 0.15;
+    }
+
     audioManager.playSound(sound, volume);
   }
 
@@ -780,6 +808,7 @@ export class Player {
   spawnTracer(start, end) {
     const distance = start.distanceTo(end);
     const isMag7 = this.weaponMode === WEAPON_MAG7;
+    const isMinigun = this.weaponMode === WEAPON_MINIGUN;
 
     // 1. 获取或创建 Mesh
     let mesh;
@@ -794,6 +823,9 @@ export class Player {
     if (isMag7) {
       mesh.material = this.mag7TracerMaterial;
       mesh.scale.set(6, 6, distance);
+    } else if (isMinigun) {
+      mesh.material = this.tracerMaterial; // 复用黄色材质
+      mesh.scale.set(0.5, 0.5, distance); // 示踪线更细
     } else {
       mesh.material = this.tracerMaterial;
       mesh.scale.set(1, 1, distance);
@@ -813,11 +845,12 @@ export class Player {
 
     // 3. 复用向量存储终点，避免 end.clone()
     info.mesh = mesh;
-    info.lifetime = isMag7 ? 0.15 : 0.1;
+    info.lifetime = isMag7 ? 0.15 : (isMinigun ? 0.08 : 0.1);
     info.maxLifetime = info.lifetime;
-    info.localStart = isMag7 ? this._mag7LocalStart : this._gunLocalStart; // 使用缓存的常量
+    info.localStart = isMag7 ? this._mag7LocalStart : (isMinigun ? this._minigunLocalStart : this._gunLocalStart); // 使用缓存的常量
     info.worldEnd.copy(end); // 直接复制值，不 new
     info.isMag7 = isMag7;
+    info.isMinigun = isMinigun;
 
     this.tracers.push(info);
   }
@@ -848,7 +881,11 @@ export class Player {
         tracer.mesh.lookAt(tracer.worldEnd);
         const newDist = this._tempVector.distanceTo(tracer.worldEnd);
 
-        const thickness = tracer.isMag7 ? 6 : 1;
+        let thickness = 1;
+        // 曳光，示踪线粗细
+        if (tracer.isMag7) thickness = 6;
+        else if (tracer.isMinigun) thickness = 0.5;
+
         tracer.mesh.scale.set(thickness, thickness, newDist);
 
         tracer.mesh.material.opacity = (tracer.lifetime / tracer.maxLifetime);
@@ -988,9 +1025,9 @@ export class Player {
         this.isShooting = true;
         // 只有在冷却结束时才发射第一枪
         if (this.shootCooldown <= 0) {
-          if (this.weaponMode === WEAPON_GUN) {
+          if (this.weaponMode === WEAPON_GUN || this.weaponMode === WEAPON_MINIGUN) {
             this.executeShot(targets);
-            this.shootCooldown = this.shootInterval;
+            this.shootCooldown = this.weaponMode === WEAPON_MINIGUN ? 0.05 : this.shootInterval;
           } else if (this.weaponMode === WEAPON_MAG7) {
             this.executeMag7Shot();
             this.shootCooldown = 1.5; // MAG7 射击间隔较长 (1500ms)
