@@ -135,6 +135,11 @@ export const BLOCK_DATA = {
   'moss': {
     isAOEnabled: false
   },
+  'chest': {
+    isSolid: true,
+    isTransparent: true,
+    isAOEnabled: false
+  },
   // AO 启用的方块 (严格匹配原 aoAllowedTypes 列表)
   'sand': { isAOEnabled: true },
   'stone': { isAOEnabled: true },

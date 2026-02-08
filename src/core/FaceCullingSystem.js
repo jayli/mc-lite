@@ -183,8 +183,8 @@ export class FaceCullingSystem {
   calculateFaceVisibility(block, neighbors) {
     if (!this.enabled) return faceMask.ALL; // 系统禁用时，默认所有面都可见
 
-    // 透明方块的所有面都可见
-    if (this.isTransparent(block.type)) {
+    // 宝箱或透明方块的所有面都可见
+    if (block.type === 'chest' || this.isTransparent(block.type)) {
       return faceMask.ALL;
     }
 

@@ -284,7 +284,7 @@ onmessage = function(e) {
         isOccluding(x, y - 1, z) &&
         isOccluding(x, y, z + 1) &&
         isOccluding(x, y, z - 1);
-      if (covered) visible = false;
+      if (covered && block.type !== 'chest') visible = false;
     }
 
     if (visible) {

@@ -272,6 +272,20 @@ export class Chunk {
         }
       }
 
+      // --- 关键：保存宝箱状态 ---
+      const savedChestStates = new Map();
+      const oldChestIndices = this.instanceIndexMap['chest'];
+      if (oldChestIndices) {
+        const oldChestMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'chest');
+        if (oldChestMesh && oldChestMesh.userData.chests) {
+          for (const [posKey, idx] of oldChestIndices) {
+            if (oldChestMesh.userData.chests[idx]) {
+              savedChestStates.set(posKey, { ...oldChestMesh.userData.chests[idx] });
+            }
+          }
+        }
+      }
+
       // 2. 执行平滑替换 (Swap)
       consolidatedMeshKeys.forEach((key) => {
         const mesh = this.dynamicMeshes.get(key);
@@ -300,6 +314,29 @@ export class Chunk {
 
       // 3. 构建新的渲染网格 (跳过实体，因为实体已存在)
       this.buildMeshes(d, true);
+
+      // --- 关键：还原宝箱状态 ---
+      if (savedChestStates.size > 0) {
+        const newChestMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'chest');
+        const newChestIndices = this.instanceIndexMap['chest'];
+        if (newChestMesh && newChestIndices) {
+          const dummy = new THREE.Matrix4();
+          const zeroScale = new THREE.Vector3(0, 0, 0);
+          for (const [posKey, state] of savedChestStates) {
+            if (newChestIndices.has(posKey)) {
+              const newIdx = newChestIndices.get(posKey);
+              newChestMesh.userData.chests[newIdx] = state;
+              // 如果宝箱已开启，确保新网格中的对应实例也是隐藏的（缩放为0）
+              if (state.open) {
+                newChestMesh.getMatrixAt(newIdx, dummy);
+                dummy.scale(zeroScale);
+                newChestMesh.setMatrixAt(newIdx, dummy);
+              }
+            }
+          }
+          newChestMesh.instanceMatrix.needsUpdate = true;
+        }
+      }
 
       // 4. 重置状态
       this.dirtyBlocks = Math.max(0, this.dirtyBlocks - consolidatedCount);
@@ -624,7 +661,7 @@ export class Chunk {
 
     // 计算隐藏面剔除掩码与方块可见性
     let mask = 63; // 默认全显示 (111111)
-    if (faceCullingSystem && faceCullingSystem.isEnabled() && type !== 'air' && type !== 'collider') {
+    if (faceCullingSystem && faceCullingSystem.isEnabled() && type !== 'air' && type !== 'collider' && type !== 'chest') {
       const block = { type };
       const neighbors = getNeighborsOf(x, y, z);
       mask = faceCullingSystem.calculateFaceVisibility(block, neighbors);
