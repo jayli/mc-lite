@@ -619,10 +619,10 @@ export class Player {
     const blocksByDistance = new Map();
     const origin = this.camera.position;
 
-    // 遍历 15 格深度，每层 3x3，使用更小的步进以确保覆盖连续空间
-    for (let d = 1; d <= 15; d += 0.5) {
-      // 优化：将 15 层合并为 5 个波次 (每 3 格一波)，减少 removeBlocksBatch 调用次数
-      const distanceStep = Math.floor((d - 1) / 3);
+    // 遍历 10 格深度，每层 3x3，使用更小的步进以确保覆盖连续空间
+    for (let d = 1; d <= 10; d += 0.5) {
+      // 优化：将 10 层合并为 5 个波次 (每 2 格一波)，减少 removeBlocksBatch 调用次数
+      const distanceStep = Math.floor((d - 1) / 2);
       for (let i = -1; i <= 1; i++) {
         for (let j = -1; j <= 1; j++) {
           // 计算该点在世界坐标系中的位置
@@ -668,14 +668,14 @@ export class Player {
           this.world.removeBlocksBatch(group);
           // 执行完后从列表中移除自己 (可选)
           this.mag7Timeouts = this.mag7Timeouts.filter(id => id !== timeoutId);
-        }, index * 60); // 增加每波间隔到 60ms，总时长 5 * 60 = 300ms
+        }, index * 90); // 增加每波间隔到 90ms，总时长 5 * 90 = 450ms
         this.mag7Timeouts.push(timeoutId);
       });
     }
 
     // 触发射击视觉效果 (后坐力、示踪线)
     // 探测中心射线，确定示踪线终点
-    this.raycaster.far = 15;
+    this.raycaster.far = 10;
     this.raycaster.setFromCamera(this.center, this.camera);
     const targets = this.getInteractionTargets();
     const hits = this.raycaster.intersectObjects(targets, true);
