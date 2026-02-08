@@ -143,6 +143,7 @@ export class Player {
     });
 
     this.mag7Timeouts = []; // 存储 MAG7 射击相关的定时器
+    this.drawProgress = 1;  // 拿起动画进度 (0-1)
   }
 
   /**
@@ -153,6 +154,7 @@ export class Player {
       this.keys[e.code] = true;
       if (e.code === 'KeyR') {
         this.weaponMode = (this.weaponMode + 1) % 3;
+        this.drawProgress = 0; // 切换武器时重置拿起动画进度
         console.log('武器切换:', this.weaponMode);
       }
     });
@@ -519,8 +521,8 @@ export class Player {
     const actualDx = this.position.x - oldX;
     const actualDz = this.position.z - oldZ;
 
-    this.updateArm();
-    this.updateGun();
+    this.updateArm(dt);
+    this.updateGun(dt);
     this.handleShooting(dt); // 处理连发逻辑
     this.updateCameraBob(actualDx, actualDz, dt, isCurrentlyStuck);
     this.updateTracers(dt);
@@ -685,7 +687,7 @@ export class Player {
   /**
    * 更新枪支状态 (Feature 009)
    */
-  updateGun() {
+  updateGun(dt) {
     // 检查模型是否需要更换或移除
     const targetModel = this.weaponMode === WEAPON_GUN ? gunModel : (this.weaponMode === WEAPON_MAG7 ? mag7Model : null);
 
@@ -707,17 +709,25 @@ export class Player {
     if (this.gun) {
       this.gun.visible = true;
 
+      // 更新拿起动画进度
+      if (this.drawProgress < 1) {
+        this.drawProgress = Math.min(1, this.drawProgress + dt * 4); // 约 0.25 秒完成拿起动作
+      }
+
+      // 计算拿起动画的垂直偏移 (使用二次方缓动使动作更平滑)
+      const drawYOffset = Math.pow(1 - this.drawProgress, 2) * 1.2;
+
       // 根据不同武器模式设置独立的位置、缩放和旋转
       if (this.weaponMode === WEAPON_GUN) {
         // Gun 恢复原始配置
         // 三个参数，左右(越大越靠右)，上下（越小越靠下），前后(越小越靠前方)
-        this.gun.position.set(0.3, -0.85, -0.4 + this.gunRecoil);
+        this.gun.position.set(0.3, -0.85 - drawYOffset, -0.4 + this.gunRecoil);
         this.gun.scale.set(0.09, 0.09, 0.09);
         // this.gun.rotation.y = Math.PI; // 纠正 Gun 朝向
       } else if (this.weaponMode === WEAPON_MAG7) {
         // MAG7 使用专属配置：确保在视口右下角可见
         // 三个参数，左右(越大越靠右)，上下（越小越靠下），前后(越小越靠前方)
-        this.gun.position.set(0.44, -0.5, -0.8 + this.gunRecoil);
+        this.gun.position.set(0.44, -0.5 - drawYOffset, -0.8 + this.gunRecoil);
         var scale_size = 1.3;
         this.gun.scale.set(scale_size, scale_size, scale_size);
         this.gun.rotation.y = - Math.PI / 2; // 纠正朝向：从之前的向左转为向前
@@ -1365,7 +1375,7 @@ export class Player {
   /**
    * 更新手臂动画
    */
-  updateArm() {
+  updateArm(dt) {
     if (this.weaponMode !== WEAPON_ARM) {
       this.arm.visible = false;
       return;
@@ -1373,8 +1383,16 @@ export class Player {
 
     this.arm.visible = true; // 徒手模式下始终可见
 
+    // 更新拿起动画进度
+    if (this.drawProgress < 1) {
+      this.drawProgress = Math.min(1, this.drawProgress + dt * 4);
+    }
+
+    // 计算拿起动画的垂直偏移
+    const drawYOffset = Math.pow(1 - this.drawProgress, 2) * 0.5;
+
     // 始终确保手臂处于正确的基础位置和缩放，防止挥动时位置跳变
-    this.arm.position.set(0.07, -0.10, -0.12);
+    this.arm.position.set(0.07, -0.10 - drawYOffset, -0.12);
     this.arm.scale.set(0.1, 0.1, 0.1);
 
     if (this.swingTime > 0) {
