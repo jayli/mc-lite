@@ -1370,12 +1370,15 @@ export class Player {
       this.arm.visible = false;
       return;
     }
+
+    this.arm.visible = true; // 徒手模式下始终可见
+
     if (this.swingTime > 0) {
-      this.arm.visible = true;
       this.arm.rotation.x = -Math.PI / 2 + Math.sin(this.swingTime * 0.3);
       this.swingTime--;
     } else {
-      this.arm.visible = false;
+      // 静止时的旋转角度，与构造函数中的初始值一致
+      this.arm.rotation.x = 0.2;
     }
   }
 }
