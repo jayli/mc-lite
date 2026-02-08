@@ -1,4 +1,4 @@
-// src/core/face-culling-utils.js
+// src/utils/FaceCullingUtils.js
 /**
  * 隐藏面剔除算法工具函数
  * 提供位掩码操作、方向计算等工具函数

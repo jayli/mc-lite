@@ -4,7 +4,7 @@
  * 使用 InstancedMesh 优化渲染性能，管理区块内的所有方块和实体
  */
 import * as THREE from 'three';
-import { materials } from '../core/materials/MaterialManager.js';
+import { materials } from '../core/MaterialManager.js';
 import { RealisticTree } from './entities/RealisticTree.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { persistenceService } from '../services/PersistenceService.js';
@@ -166,18 +166,19 @@ const geomMap = {
 
 /**
  * 区块类 - 负责单个区块的生成、管理和渲染
- * 使用 InstancedMesh 优化相同类型方块的渲染性能
+ * 采用 InstancedMesh 架构：相同类型的方块在同一个区块内仅通过一次绘制调用（Draw Call）渲染
+ * 支持动态更新与后台合并优化系统
  */
 export class Chunk {
   /**
    * 创建区块实例
-   * @param {number} cx - 区块的X坐标（区块坐标）
-   * @param {number} cz - 区块的Z坐标（区块坐标）
-   * @param {World} world - 世界引用
+   * @param {number} cx - 区块的 X 坐标（区块空间坐标，世界坐标 / 16）
+   * @param {number} cz - 区块的 Z 坐标（区块空间坐标）
+   * @param {World} world - 对所属 World 实例的引用，用于跨区块通信和资源访问
    */
   constructor(cx, cz, world) {
-    this.cx = cx;                    // 区块的X坐标（区块坐标）
-    this.cz = cz;                    // 区块的Z坐标（区块坐标）
+    this.cx = cx;                    // 区块的X坐标
+    this.cz = cz;                    // 区块的Z坐标
     this.world = world;              // 世界引用
     this.group = new THREE.Group();  // Three.js 组，包含区块内所有网格
     this.keys = [];                  // 区块标识符（当前未使用）
@@ -195,7 +196,7 @@ export class Chunk {
       rovers: []
     };
 
-    // --- 后台合并相关属性 ---
+    // --- 后台合并系统 (Background Consolidation) ---
     this.dirtyBlocks = 0;            // 未优化的动态方块计数
     this.consolidationTimer = null;  // 合并防抖定时器
     this.isConsolidating = false;    // 是否正在合并中
@@ -230,7 +231,8 @@ export class Chunk {
 
   /**
    * 执行区块合并优化
-   * 将当前区块的最完整数据发送给 Worker 进行全量计算
+   * 将当前区块的所有逻辑数据发送回 Worker，重新计算所有方块的可见面（Face Culling）和 AO
+   * 生成全新的 InstancedMesh 并替换掉当前分散的动态 Mesh
    */
   async consolidate() {
     if (this.isConsolidating || !this.isReady) return;

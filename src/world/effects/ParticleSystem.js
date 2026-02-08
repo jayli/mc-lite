@@ -16,7 +16,7 @@ export class ParticleSystem {
     this.MAX_DIG_BILLBOARDS = 20;
     this.digBillboards = [];
     this.initEffectPool(
-      'src/world/assets/gif/pick.png',
+      'src/assets/gif/pick.png',
       5, 3, // 5x3 布局
       0.35,  // 持续 0.35s
       this.MAX_DIG_BILLBOARDS,
@@ -28,7 +28,7 @@ export class ParticleSystem {
     this.MAX_EXPLOSION_BILLBOARDS = 10;
     this.explosionBillboards = [];
     this.initEffectPool(
-      'src/world/assets/gif/big_blow.png',
+      'src/assets/gif/big_blow.png',
       5, 2, // 5x2 布局
       0.5,   // 持续 0.5s
       this.MAX_EXPLOSION_BILLBOARDS,

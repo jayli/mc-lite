@@ -6,7 +6,7 @@
  */
 
 import * as THREE from 'three';
-import { faceMask, countVisibleFaces } from './face-culling-utils.js';
+import { faceMask, countVisibleFaces } from '../utils/FaceCullingUtils.js';
 import { getBlockProperties, getTransparentTypes } from '../constants/BlockData.js';
 
 /**

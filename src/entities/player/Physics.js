@@ -17,6 +17,7 @@ export const PHYSICS_CONSTANTS = {
   CAMERA_WIDTH: 0.3
 };
 
+import * as THREE from 'three';
 import { getBlockProperties } from '../../constants/BlockData.js';
 
 /**
@@ -32,7 +33,7 @@ export class Physics {
     this.player = player;
     this.world = world;
 
-    // 物理参数（从常量初始化，以便后续可能的动态调整）
+    // 物理参数
     this.gravity = PHYSICS_CONSTANTS.GRAVITY;
     this.terminalVelocity = PHYSICS_CONSTANTS.TERMINAL_VELOCITY;
     this.playerHeight = PHYSICS_CONSTANTS.PLAYER_HEIGHT;
@@ -43,13 +44,8 @@ export class Physics {
 
   /**
    * 检查指定坐标是否发生碰撞
-   * @param {number} nx - 下一步的 X 坐标
-   * @param {number} nz - 下一步的 Z 坐标
-   * @returns {boolean} - 是否发生碰撞
    */
   checkCollision(nx, nz) {
-    // 简单的 AABB / 体素碰撞检测
-    // 同时检查脚部和头部水平
     const x = nx;
     const z = nz;
     const y1 = Math.floor(this.player.position.y);
@@ -59,23 +55,7 @@ export class Physics {
   }
 
   /**
-   * 检查指定坐标是否发生碰撞（排除脚部支撑碰撞）
-   * 用于水平移动检测，防止脚部支撑方块误判为阻挡
-   * @param {number} nx - 下一步的 X 坐标
-   * @param {number} nz - 下一步的 Z 坐标
-   * @returns {boolean} - 是否发生碰撞
-   */
-  checkCollisionForMovement(nx, nz) {
-    return this.checkAABB(nx, this.player.position.y, nz, true);
-  }
-
-  /**
    * 检查 AABB 碰撞
-   * @param {number} x - 逻辑中心 X
-   * @param {number} y - 逻辑底部 Y
-   * @param {number} z - 逻辑中心 Z
-   * @param {boolean} excludeFeet - 是否排除脚部检测 (用于上台阶)
-   * @returns {boolean}
    */
   checkAABB(x, y, z, excludeFeet = false) {
     const halfW = this.playerWidth / 2;
@@ -84,12 +64,9 @@ export class Physics {
     const minZ = z - halfW;
     const maxZ = z + halfW;
 
-    // Y 轴采样范围
-    // 0.1 和 0.2 的偏移量用于确保不会因为微小的浮点数误差检测到地板或天花板
     const startY = excludeFeet ? y + 0.51 : y + 0.1;
     const endY = y + this.playerHeight - 0.1;
 
-    // 检查 AABB 覆盖的所有方块
     for (let bx = Math.floor(minX); bx <= Math.floor(maxX); bx++) {
       for (let bz = Math.floor(minZ); bz <= Math.floor(maxZ); bz++) {
         for (let by = Math.floor(startY); by <= Math.floor(endY); by++) {
@@ -101,51 +78,16 @@ export class Physics {
   }
 
   /**
-   * 获取 AABB 碰撞的详细信息
-   * @param {number} x
-   * @param {number} y
-   * @param {number} z
-   * @returns {Object|null} 碰撞点信息 {x, y, z, type}
-   */
-  getCollisionDetail(x, y, z) {
-    const halfW = this.playerWidth / 2;
-    const minX = x - halfW;
-    const maxX = x + halfW;
-    const minZ = z - halfW;
-    const maxZ = z + halfW;
-    const startY = y + 0.1;
-    const endY = y + this.playerHeight - 0.1;
-
-    for (let bx = Math.floor(minX); bx <= Math.floor(maxX); bx++) {
-      for (let bz = Math.floor(minZ); bz <= Math.floor(maxZ); bz++) {
-        for (let by = Math.floor(startY); by <= Math.floor(endY); by++) {
-          if (this.isSolid(bx, by, bz)) {
-            return { x: bx, y: by, z: bz };
-          }
-        }
-      }
-    }
-    return null;
-  }
-
-  /**
-   * 处理滑动碰撞响应
-   * @param {number} velocity - 该轴的速度
-   * @returns {number} 调整后的速度
+   * 处理滑动摩擦力
    */
   applyFriction(velocity) {
-    // T006: 应用滑动摩擦力
     return velocity * PHYSICS_CONSTANTS.FRICTION_SLIDE;
   }
 
   /**
-   * 检查是否处于凸角碰撞状态并应用惩罚
-   * @param {number} dx - X 轴预期移动
-   * @param {number} dz - Z 轴预期移动
-   * @returns {number} 速度系数
+   * 应用凸角惩罚
    */
   getCornerPenalty(dx, dz) {
-    // T007: 如果是斜向移动且发生碰撞，应用 0.7 惩罚
     if (Math.abs(dx) > 0.001 && Math.abs(dz) > 0.001) {
       return PHYSICS_CONSTANTS.FRICTION_CORNER;
     }
@@ -153,18 +95,15 @@ export class Physics {
   }
 
   /**
-   * 穿模推回逻辑 (T018)
-   * 如果玩家由于某种原因卡在方块内，将其推向最近的空气
+   * 穿模推回逻辑
    */
   applyPushOut() {
     const px = this.player.position.x;
     const py = this.player.position.y;
     const pz = this.player.position.z;
 
-    // 如果当前位置没有卡住，不需要推回
     if (!this.checkAABB(px, py, pz)) return;
 
-    // 检查 6 个邻居方向
     const offsets = [
       [1, 0, 0], [-1, 0, 0],
       [0, 1, 0], [0, -1, 0],
@@ -185,28 +124,147 @@ export class Physics {
   }
 
   /**
-  * 判断指定方块坐标是否为实心
-  * @param {number} x
-  * @param {number} y
-  * @param {number} z
-  * @returns {boolean}
-  */
-  isSolid(x, y, z) {
-    // 1. 询问世界系统该位置是否为实心方块 (基于 solidBlocks 集合)
-    if (this.world.isSolid(x, y, z)) return true;
+   * 尝试执行上台阶逻辑
+   */
+  tryStepUp(nx, nz) {
+    const feetY = Math.floor(this.player.position.y - 0.01);
+    let isSupported = false;
+    const halfW = this.playerWidth / 2;
+    const checkCoords = [
+      [this.player.position.x, this.player.position.z],
+      [this.player.position.x - halfW + 0.05, this.player.position.z - halfW + 0.05],
+      [this.player.position.x + halfW - 0.05, this.player.position.z - halfW + 0.05],
+      [this.player.position.x - halfW + 0.05, this.player.position.z + halfW - 0.05],
+      [this.player.position.x + halfW - 0.05, this.player.position.z + halfW - 0.05]
+    ];
+    for (const [cx, cz] of checkCoords) {
+      if (this.isSolid(cx, feetY, cz)) {
+        isSupported = true;
+        break;
+      }
+    }
+    if (!isSupported) return false;
 
-    // 2. 从方块属性配置中获取是否为实心
-    const type = this.world.getBlock(x, y, z);
-    if (!type) return false;
+    const maxStep = (this.player.jumping && this.player.velocity.y > 0) ? 2.0 : 1.0;
+    const currentFloorY = feetY + 1;
 
-    return getBlockProperties(type).isSolid;
+    for (let h = 1; h <= maxStep; h++) {
+      const stepY = currentFloorY + h;
+      const halfW_check = 0.3;
+      const ty = Math.floor(stepY - 1);
+      let foundHandrail = false;
+      for (const ox of [-halfW_check, 0, halfW_check]) {
+        for (const oz of [-halfW_check, 0, halfW_check]) {
+          const bType = this.world.getBlock(Math.floor(nx + ox), ty, Math.floor(nz + oz));
+          if (bType === 'handrail' || bType === 'handrailA' || bType === 'handrailB') {
+            foundHandrail = true;
+            break;
+          }
+        }
+        if (foundHandrail) break;
+      }
+      if (foundHandrail) continue;
+
+      if (!this.checkAABB(nx, stepY, nz)) {
+        if (!this.checkAABB(this.player.position.x, stepY, this.player.position.z)) {
+          this.player.position.y = stepY;
+          this.player.position.x = nx;
+          this.player.position.z = nz;
+          this.player.velocity.y = 0;
+
+          if (h > 1.0) {
+            this.player.spaceKeyReleased = false;
+          }
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**
-  * 物理更新逻辑
+   * 检查头顶碰撞
+   */
+  checkCeilingBump() {
+    if (this.player.velocity.y > 0) {
+      if (this.checkAABB(this.player.position.x, this.player.position.y + 0.1, this.player.position.z)) {
+        this.player.velocity.y = -0.01;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * 应用坑道自动对中逻辑
+   */
+  applyTunnelCentering() {
+    const px = this.player.position.x;
+    const pz = this.player.position.z;
+    const py = this.player.position.y;
+    const floorX = Math.floor(px);
+    const floorZ = Math.floor(pz);
+    const floorY = Math.floor(py + 0.1);
+
+    const northSolid = this.isSolid(floorX, floorY, floorZ - 1);
+    const southSolid = this.isSolid(floorX, floorY, floorZ + 1);
+    const northHeadSolid = this.isSolid(floorX, floorY + 1, floorZ - 1);
+    const southHeadSolid = this.isSolid(floorX, floorY + 1, floorZ + 1);
+
+    if ((northSolid && southSolid) || (northHeadSolid && southHeadSolid)) {
+      this.player.position.z = THREE.MathUtils.lerp(this.player.position.z, floorZ + 0.5, 0.1);
+    }
+
+    const westSolid = this.isSolid(floorX - 1, floorY, floorZ);
+    const eastSolid = this.isSolid(floorX + 1, floorY, floorZ);
+    const westHeadSolid = this.isSolid(floorX - 1, floorY + 1, floorZ);
+    const eastHeadSolid = this.isSolid(floorX + 1, floorY + 1, floorZ);
+
+    if ((westSolid && eastSolid) || (westHeadSolid && eastHeadSolid)) {
+      this.player.position.x = THREE.MathUtils.lerp(this.player.position.x, floorX + 0.5, 0.1);
+    }
+  }
+
+  /**
+   * 相机碰撞保护
+   */
+  applyCameraBumper() {
+    const yaw = this.player.rotation.y;
+    const bumperDist = 0.25;
+    const cameraHalfWidth = 0.2;
+
+    const fwdX = -Math.sin(yaw);
+    const fwdZ = -Math.cos(yaw);
+    const rightX = -fwdZ;
+    const rightZ = fwdX;
+
+    const eyeY = this.player.position.y + 1.65;
+    const floorY = Math.floor(eyeY);
+
+    const points = [
+      { x: this.player.position.x + fwdX * bumperDist, z: this.player.position.z + fwdZ * bumperDist },
+      { x: this.player.position.x + fwdX * bumperDist - rightX * cameraHalfWidth, z: this.player.position.z + fwdZ * bumperDist - rightZ * cameraHalfWidth },
+      { x: this.player.position.x + fwdX * bumperDist + rightX * cameraHalfWidth, z: this.player.position.z + fwdZ * bumperDist + rightZ * cameraHalfWidth }
+    ];
+
+    for (const p of points) {
+      if (this.isSolid(Math.floor(p.x), floorY, Math.floor(p.z))) {
+        const pushForce = 0.05;
+        this.player.position.x -= fwdX * pushForce;
+        this.player.position.z -= fwdZ * pushForce;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+  * 判断指定方块坐标是否为实心
   */
-  update() {
-    // 物理更新由 Player 类调用
-    // 此类目前主要提供辅助方法和存储物理参数
+  isSolid(x, y, z) {
+    if (this.world.isSolid(x, y, z)) return true;
+    const type = this.world.getBlock(x, y, z);
+    if (!type) return false;
+    return getBlockProperties(type).isSolid;
   }
 }

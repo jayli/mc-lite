@@ -126,16 +126,16 @@ export const audioManager = new AudioManager();
  */
 export async function initializeAudio() {
   const soundUrls = [
-    './src/world/assets/sound/explosion.mp3',
-    './src/world/assets/sound/put.mp3',
-    './src/world/assets/sound/delete_get.mp3',
-    './src/world/assets/sound/running_water.mp3',
-    './src/world/assets/sound/running_land.mp3',
-    './src/world/assets/sound/bgm.mp3',
-    './src/world/assets/sound/gun_fire.mp3',
-    './src/world/assets/sound/gun_load.mp3',
-    './src/world/assets/sound/mag7_fire.mp3',
-    './src/world/assets/sound/minigun_fire.mp3'
+    './src/assets/sound/explosion.mp3',
+    './src/assets/sound/put.mp3',
+    './src/assets/sound/delete_get.mp3',
+    './src/assets/sound/running_water.mp3',
+    './src/assets/sound/running_land.mp3',
+    './src/assets/sound/bgm.mp3',
+    './src/assets/sound/gun_fire.mp3',
+    './src/assets/sound/gun_load.mp3',
+    './src/assets/sound/mag7_fire.mp3',
+    './src/assets/sound/minigun_fire.mp3'
   ];
   await audioManager.preloadSounds(soundUrls);
 }

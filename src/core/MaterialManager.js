@@ -1,9 +1,9 @@
-// src/core/materials/MaterialManager.js
+// src/core/MaterialManager.js
 // 材质管理器，负责加载、缓存和创建 Three.js 材质
 // 支持纹理预加载、程序化纹理生成和材质定义注册
 
 import * as THREE from 'three';
-import { getBlockProperties } from '../../constants/BlockData.js';
+import { getBlockProperties } from '../constants/BlockData.js';
 
 /**
  * 材质管理器类，负责管理游戏中的所有材质
@@ -238,62 +238,62 @@ export const materials = new MaterialManager();
  */
 export async function initializeMaterials() {
   const textureUrls = [
-    './src/world/assets/textures/oak_leaves_branch_medium.png',
-    './src/world/assets/textures/azalea_leaves.png',
-    './src/world/assets/textures/flowering_azalea_leaves.png',
-    './src/world/assets/textures/grass_carried.png',
-    './src/world/assets/textures/grass_side_carried.png',
-    './src/world/assets/textures/moss_block.png',
-    './src/world/assets/textures/planks_birch.png',
-    './src/world/assets/textures/dark_planks.png',
-    './src/world/assets/textures/stone_andesite.png',
-    './src/world/assets/textures/stone.png',
-    './src/world/assets/textures/sand.png',
-    './src/world/assets/textures/sand_side.png',
-    './src/world/assets/textures/dirt.png',
-    './src/world/assets/textures/dirt_podzol_side.png',
-    './src/world/assets/textures/dirt_podzol_top.png',
-    './src/world/assets/textures/stone_diorite.png',
-    './src/world/assets/textures/log_big_oak.png',
-    './src/world/assets/textures/log_big_oak_top.png',
-    './src/world/assets/textures/leaves.png',
-    './src/world/assets/textures/box_side.png',
-    './src/world/assets/textures/box_top.png',
-    './src/world/assets/textures/box_face.png',
-    './src/world/assets/textures/Bookshelf_texture_JE2_BE2.png',
-    './src/world/assets/textures/Bone_Block_side_texture_JE2_BE2.png',
-    './src/world/assets/textures/Bone_Block_top_texture_JE2_BE2.png',
-    './src/world/assets/textures/double_plant_grass_carried.png',
-    './src/world/assets/textures/Glass.png',
-    './src/world/assets/textures/Deepslate_Gold.png',
-    './src/world/assets/textures/Bricks.png',
-    './src/world/assets/textures/flower_Allium.png',
-    './src/world/assets/textures/Cobblestone.png',
-    './src/world/assets/textures/Blue_Wood_Planks.png',
-    './src/world/assets/textures/End_Stone.png',
-    './src/world/assets/textures/Green_Wood_Planks.png',
-    './src/world/assets/textures/Hay_Bale.png',
-    './src/world/assets/textures/Hay_Bale_top.png',
-    './src/world/assets/textures/Mossy_Cobblestone.png',
-    './src/world/assets/textures/Mossy_Cobblestone_side.png',
-    './src/world/assets/textures/Oak_Planks.png',
-    './src/world/assets/textures/White_Wood_Planks.png',
-    './src/world/assets/textures/Birch_Log_top.png',
-    './src/world/assets/textures/Birch_Log_side.png',
-    './src/world/assets/textures/Obsidian.png',
-    './src/world/assets/textures/diamond.png',
-    './src/world/assets/textures/gold.png',
-    './src/world/assets/textures/glass_blink.png',
-    './src/world/assets/textures/gold_block.png',
-    './src/world/assets/textures/emerald.png',
-    './src/world/assets/textures/amethyst.png',
-    './src/world/assets/textures/Ancient_Debris_top.png',
-    './src/world/assets/textures/Ancient_Debris_side.png',
-    './src/world/assets/textures/iron.png',
-    './src/world/assets/textures/Iron_Ore.png',
-    './src/world/assets/textures/leaves_yellow.png',
-    './src/world/assets/textures/tnt_side.png',
-    './src/world/assets/textures/tnt_top.png'
+    './src/assets/textures/oak_leaves_branch_medium.png',
+    './src/assets/textures/azalea_leaves.png',
+    './src/assets/textures/flowering_azalea_leaves.png',
+    './src/assets/textures/grass_carried.png',
+    './src/assets/textures/grass_side_carried.png',
+    './src/assets/textures/moss_block.png',
+    './src/assets/textures/planks_birch.png',
+    './src/assets/textures/dark_planks.png',
+    './src/assets/textures/stone_andesite.png',
+    './src/assets/textures/stone.png',
+    './src/assets/textures/sand.png',
+    './src/assets/textures/sand_side.png',
+    './src/assets/textures/dirt.png',
+    './src/assets/textures/dirt_podzol_side.png',
+    './src/assets/textures/dirt_podzol_top.png',
+    './src/assets/textures/stone_diorite.png',
+    './src/assets/textures/log_big_oak.png',
+    './src/assets/textures/log_big_oak_top.png',
+    './src/assets/textures/leaves.png',
+    './src/assets/textures/box_side.png',
+    './src/assets/textures/box_top.png',
+    './src/assets/textures/box_face.png',
+    './src/assets/textures/Bookshelf_texture_JE2_BE2.png',
+    './src/assets/textures/Bone_Block_side_texture_JE2_BE2.png',
+    './src/assets/textures/Bone_Block_top_texture_JE2_BE2.png',
+    './src/assets/textures/double_plant_grass_carried.png',
+    './src/assets/textures/Glass.png',
+    './src/assets/textures/Deepslate_Gold.png',
+    './src/assets/textures/Bricks.png',
+    './src/assets/textures/flower_Allium.png',
+    './src/assets/textures/Cobblestone.png',
+    './src/assets/textures/Blue_Wood_Planks.png',
+    './src/assets/textures/End_Stone.png',
+    './src/assets/textures/Green_Wood_Planks.png',
+    './src/assets/textures/Hay_Bale.png',
+    './src/assets/textures/Hay_Bale_top.png',
+    './src/assets/textures/Mossy_Cobblestone.png',
+    './src/assets/textures/Mossy_Cobblestone_side.png',
+    './src/assets/textures/Oak_Planks.png',
+    './src/assets/textures/White_Wood_Planks.png',
+    './src/assets/textures/Birch_Log_top.png',
+    './src/assets/textures/Birch_Log_side.png',
+    './src/assets/textures/Obsidian.png',
+    './src/assets/textures/diamond.png',
+    './src/assets/textures/gold.png',
+    './src/assets/textures/glass_blink.png',
+    './src/assets/textures/gold_block.png',
+    './src/assets/textures/emerald.png',
+    './src/assets/textures/amethyst.png',
+    './src/assets/textures/Ancient_Debris_top.png',
+    './src/assets/textures/Ancient_Debris_side.png',
+    './src/assets/textures/iron.png',
+    './src/assets/textures/Iron_Ore.png',
+    './src/assets/textures/leaves_yellow.png',
+    './src/assets/textures/tnt_side.png',
+    './src/assets/textures/tnt_top.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -346,8 +346,8 @@ function mkDetailMat(baseCol, detailCol, isTransparent=false, drawFunc) {
 // ============================================
 
 // 基础方块材质
-const grassSide = { textureUrl: './src/world/assets/textures/grass_side_carried.png' };
-const grassTop = { textureUrl: './src/world/assets/textures/grass_carried.png' };
+const grassSide = { textureUrl: './src/assets/textures/grass_side_carried.png' };
+const grassTop = { textureUrl: './src/assets/textures/grass_carried.png' };
 const grassBottom = mkMat('#559944');
 
 materials.registerMaterial('grass', {
@@ -361,8 +361,8 @@ materials.registerMaterial('grass', {
   }
 });
 
-const dirtSide = { textureUrl: './src/world/assets/textures/dirt.png' };
-const dirtTopBottom = { textureUrl: './src/world/assets/textures/dirt_podzol_top.png' };
+const dirtSide = { textureUrl: './src/assets/textures/dirt.png' };
+const dirtTopBottom = { textureUrl: './src/assets/textures/dirt_podzol_top.png' };
 materials.registerMaterial('dirt', {
   faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
     0: dirtSide,       // 东面：泥土侧面
@@ -374,9 +374,9 @@ materials.registerMaterial('dirt', {
   }
 }); // 土
 
-const stoneSide1 = { textureUrl: './src/world/assets/textures/stone.png' };
-const stoneSide = { textureUrl: './src/world/assets/textures/stone_diorite.png' };
-const stoneTopBottom = { textureUrl: './src/world/assets/textures/stone_andesite.png' };
+const stoneSide1 = { textureUrl: './src/assets/textures/stone.png' };
+const stoneSide = { textureUrl: './src/assets/textures/stone_diorite.png' };
+const stoneTopBottom = { textureUrl: './src/assets/textures/stone_andesite.png' };
 materials.registerMaterial('stone', {
   faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
     0: stoneSide,       // 东面：石头侧面（闪长岩）
@@ -389,45 +389,45 @@ materials.registerMaterial('stone', {
 }); // 石头
 
 materials.registerMaterial('gold_ore', {
-  textureUrl: './src/world/assets/textures/Deepslate_Gold.png'
+  textureUrl: './src/assets/textures/Deepslate_Gold.png'
 }); // 黄金矿石
 
 materials.registerMaterial('bricks', {
-  textureUrl: './src/world/assets/textures/Bricks.png'
+  textureUrl: './src/assets/textures/Bricks.png'
 }); // 砖块
 
 materials.registerMaterial('cobblestone', {
-  textureUrl: './src/world/assets/textures/Cobblestone.png'
+  textureUrl: './src/assets/textures/Cobblestone.png'
 }); // 鹅卵石
 
 materials.registerMaterial('obsidian', {
-  textureUrl: './src/world/assets/textures/Obsidian.png'
+  textureUrl: './src/assets/textures/Obsidian.png'
 }); // 黑曜石
 
 materials.registerMaterial('marble', mkMat('#F2F0E6')); // 大理石
 
 materials.registerMaterial('dark_planks', {
-  textureUrl: './src/world/assets/textures/dark_planks.png'
+  textureUrl: './src/assets/textures/dark_planks.png'
 }); // 深木板
 
 materials.registerMaterial('mossy_stone', {
-  textureUrl: './src/world/assets/textures/Mossy_Cobblestone.png'
+  textureUrl: './src/assets/textures/Mossy_Cobblestone.png'
 }); // 苔藓石
 
 materials.registerMaterial('blue_planks', {
-  textureUrl: './src/world/assets/textures/Blue_Wood_Planks.png'
+  textureUrl: './src/assets/textures/Blue_Wood_Planks.png'
 }); // 蓝色木板
 
 materials.registerMaterial('end_stone', {
-  textureUrl: './src/world/assets/textures/End_Stone.png'
+  textureUrl: './src/assets/textures/End_Stone.png'
 }); // 末端石头
 
 materials.registerMaterial('green_planks', {
-  textureUrl: './src/world/assets/textures/Green_Wood_Planks.png'
+  textureUrl: './src/assets/textures/Green_Wood_Planks.png'
 }); // 绿色木板
 
-const hayBaleSide = { textureUrl: './src/world/assets/textures/Hay_Bale.png' };
-const hayBaleTopBottom = { textureUrl: './src/world/assets/textures/Hay_Bale_top.png' };
+const hayBaleSide = { textureUrl: './src/assets/textures/Hay_Bale.png' };
+const hayBaleTopBottom = { textureUrl: './src/assets/textures/Hay_Bale_top.png' };
 materials.registerMaterial('hay_bale', {
   faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
     0: hayBaleSide,      // 东面：干草堆侧面
@@ -439,8 +439,8 @@ materials.registerMaterial('hay_bale', {
   }
 }); // 干草堆
 
-const sandSide = { textureUrl: './src/world/assets/textures/sand_side.png' };
-const sandTopBottom = { textureUrl: './src/world/assets/textures/sand.png' };
+const sandSide = { textureUrl: './src/assets/textures/sand_side.png' };
+const sandTopBottom = { textureUrl: './src/assets/textures/sand.png' };
 materials.registerMaterial('sand', {
   faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
     0: sandSide,       // 东面：沙地侧面
@@ -452,8 +452,8 @@ materials.registerMaterial('sand', {
   }
 }); // 沙地
 
-const woodSide = { textureUrl: './src/world/assets/textures/log_big_oak.png' };
-const woodTopBottom = { textureUrl: './src/world/assets/textures/log_big_oak_top.png' };
+const woodSide = { textureUrl: './src/assets/textures/log_big_oak.png' };
+const woodTopBottom = { textureUrl: './src/assets/textures/log_big_oak_top.png' };
 materials.registerMaterial('wood', {
   faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
     0: woodSide,       // 东面：木头侧面（树干纹理）
@@ -465,8 +465,8 @@ materials.registerMaterial('wood', {
   }
 }); // 木头
 
-const birchLogSide = { textureUrl: './src/world/assets/textures/Birch_Log_side.png' };
-const birchLogTopBottom = { textureUrl: './src/world/assets/textures/Birch_Log_top.png' };
+const birchLogSide = { textureUrl: './src/assets/textures/Birch_Log_side.png' };
+const birchLogTopBottom = { textureUrl: './src/assets/textures/Birch_Log_top.png' };
 materials.registerMaterial('birch_log', {
   faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
     0: birchLogSide,       // 东面：桦木树干侧面
@@ -478,30 +478,30 @@ materials.registerMaterial('birch_log', {
   }
 }); // 桦木树干
 
-materials.registerMaterial('planks', { textureUrl: './src/world/assets/textures/planks_birch.png' }); // 木板
-materials.registerMaterial('oak_planks', { textureUrl: './src/world/assets/textures/Oak_Planks.png' }); // 大橡木木板
-materials.registerMaterial('white_planks', { textureUrl: './src/world/assets/textures/White_Wood_Planks.png' }); // 白色木板
+materials.registerMaterial('planks', { textureUrl: './src/assets/textures/planks_birch.png' }); // 木板
+materials.registerMaterial('oak_planks', { textureUrl: './src/assets/textures/Oak_Planks.png' }); // 大橡木木板
+materials.registerMaterial('white_planks', { textureUrl: './src/assets/textures/White_Wood_Planks.png' }); // 白色木板
 materials.registerMaterial('glass_block', {
-  textureUrl: './src/world/assets/textures/Glass.png',
+  textureUrl: './src/assets/textures/Glass.png',
   transparent: true,
   alphaTest: 0.1,
   // side: THREE.DoubleSide
 }); // 玻璃
 materials.registerMaterial('glass_blink', {
-  textureUrl: './src/world/assets/textures/glass_blink.png',
+  textureUrl: './src/assets/textures/glass_blink.png',
   transparent: true,
   alphaTest: 0.1,
   // side: THREE.DoubleSide
 }); // 闪闪玻璃
 materials.registerMaterial('leaves', {
-  textureUrl: './src/world/assets/textures/leaves.png',
+  textureUrl: './src/assets/textures/leaves.png',
   transparent: true,
   alphaTest: 0.3
 }); // 树叶
 materials.registerMaterial('water', mkMat('#205099', 0.6)); // 水
 materials.registerMaterial('swamp_water', mkMat('#2F4F4F', 0.7)); // 沼泽水
 
-const swampGrassSide = { textureUrl: './src/world/assets/textures/Mossy_Cobblestone_side.png' };
+const swampGrassSide = { textureUrl: './src/assets/textures/Mossy_Cobblestone_side.png' };
 const swampGrassTopBottom = mkMat('#4C5E34');
 materials.registerMaterial('swamp_grass', {
   faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
@@ -515,9 +515,9 @@ materials.registerMaterial('swamp_grass', {
 }); // 沼泽草
 
 materials.registerMaterial('cactus', mkMat('#2E8B57')); // 仙人掌
-const bookboxFront = { textureUrl: './src/world/assets/textures/Bookshelf_texture_JE2_BE2.png' };
-const bookboxSide = { textureUrl: './src/world/assets/textures/Bone_Block_side_texture_JE2_BE2.png' };
-const bookboxTopBottom = { textureUrl: './src/world/assets/textures/Bone_Block_top_texture_JE2_BE2.png' };
+const bookboxFront = { textureUrl: './src/assets/textures/Bookshelf_texture_JE2_BE2.png' };
+const bookboxSide = { textureUrl: './src/assets/textures/Bone_Block_side_texture_JE2_BE2.png' };
+const bookboxTopBottom = { textureUrl: './src/assets/textures/Bone_Block_top_texture_JE2_BE2.png' };
 materials.registerMaterial('bookbox', {
   faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
     0: bookboxSide,       // 东面：书架侧面（骨块侧面纹理）
@@ -537,8 +537,8 @@ materials.registerMaterial('sky_grass', mkMat('#88CCFF')); // 天空草
 materials.registerMaterial('sky_wood', mkMat('#DDA0DD')); // 天空木头
 materials.registerMaterial('sky_leaves', mkMat('#FF69B4', 0.9)); // 天空树叶
 
-const mossSide = { textureUrl: './src/world/assets/textures/dirt_podzol_side.png' };
-const mossTopBottom = { textureUrl: './src/world/assets/textures/moss_block.png' };
+const mossSide = { textureUrl: './src/assets/textures/dirt_podzol_side.png' };
+const mossTopBottom = { textureUrl: './src/assets/textures/moss_block.png' };
 materials.registerMaterial('moss', {
   faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
     0: mossSide,       // 东面：苔藓侧面（灰化土侧面纹理）
@@ -551,9 +551,9 @@ materials.registerMaterial('moss', {
 }); // 苔藓
 
 materials.registerMaterial('azalea_log', mkMat('#635338')); // 杜鹃花
-const chestSide = { textureUrl: './src/world/assets/textures/box_side.png' };
-const chestTop = { textureUrl: './src/world/assets/textures/box_top.png' };
-const chestFront = { textureUrl: './src/world/assets/textures/box_face.png' };
+const chestSide = { textureUrl: './src/assets/textures/box_side.png' };
+const chestTop = { textureUrl: './src/assets/textures/box_top.png' };
+const chestFront = { textureUrl: './src/assets/textures/box_face.png' };
 materials.registerMaterial('chest', {
   faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
     0: chestSide,   // 东面：宝箱侧面
@@ -566,8 +566,8 @@ materials.registerMaterial('chest', {
 }); // 宝箱
 
 // 额外物品材质
-materials.registerMaterial('diamond', { textureUrl: './src/world/assets/textures/diamond.png' });
-materials.registerMaterial('gold', { textureUrl: './src/world/assets/textures/gold.png' });
+materials.registerMaterial('diamond', { textureUrl: './src/assets/textures/diamond.png' });
+materials.registerMaterial('gold', { textureUrl: './src/assets/textures/gold.png' });
 materials.registerMaterial('apple', mkMat('#FF0000'));
 materials.registerMaterial('god_sword', mkMat('#9400D3'));
 materials.registerMaterial('gold_apple', mkMat('#FFD700'));
@@ -580,13 +580,13 @@ materials.registerMaterial('flower', mkDetailMat('#000000', '#FF4444', true, (ct
 }));
 
 materials.registerMaterial('azalea_leaves', {
-  textureUrl: './src/world/assets/textures/azalea_leaves.png',
+  textureUrl: './src/assets/textures/azalea_leaves.png',
   transparent: true,
   alphaTest: 0.5
 });
 
 materials.registerMaterial('azalea_flowers', {
-  textureUrl: './src/world/assets/textures/flowering_azalea_leaves.png',
+  textureUrl: './src/assets/textures/flowering_azalea_leaves.png',
   transparent: true,
   alphaTest: 0.5
 });
@@ -618,27 +618,27 @@ materials.registerMaterial('realistic_trunk_procedural', {
 
 // 新树木材质（使用预加载纹理）
 materials.registerMaterial('realistic_oak_leaves', {
-  textureUrl: './src/world/assets/textures/oak_leaves_branch_medium.png',
+  textureUrl: './src/assets/textures/oak_leaves_branch_medium.png',
   transparent: true,
   alphaTest: 0.5,
   side: THREE.DoubleSide
 });
 
 materials.registerMaterial('realistic_yellow_leaves', {
-  textureUrl: './src/world/assets/textures/leaves_yellow.png',
+  textureUrl: './src/assets/textures/leaves_yellow.png',
   transparent: true,
   alphaTest: 0.3
 });
 
 materials.registerMaterial('short_grass', {
-  textureUrl: './src/world/assets/textures/double_plant_grass_carried.png',
+  textureUrl: './src/assets/textures/double_plant_grass_carried.png',
   transparent: true,
   alphaTest: 0.5,
   side: THREE.DoubleSide
 });
 
 materials.registerMaterial('allium', {
-  textureUrl: './src/world/assets/textures/flower_Allium.png',
+  textureUrl: './src/assets/textures/flower_Allium.png',
   transparent: true,
   alphaTest: 0.5,
   side: THREE.DoubleSide
@@ -652,14 +652,14 @@ materials.registerMaterial('collider', { transparent: true, opacity: 0 }); // �
 
 
 // 新增金属与宝石方块
-materials.registerMaterial('gold_block', { textureUrl: './src/world/assets/textures/gold_block.png' });
-materials.registerMaterial('emerald', { textureUrl: './src/world/assets/textures/emerald.png' });
-materials.registerMaterial('amethyst', { textureUrl: './src/world/assets/textures/amethyst.png' });
-materials.registerMaterial('iron', { textureUrl: './src/world/assets/textures/iron.png' });
-materials.registerMaterial('iron_ore', { textureUrl: './src/world/assets/textures/Iron_Ore.png' });
+materials.registerMaterial('gold_block', { textureUrl: './src/assets/textures/gold_block.png' });
+materials.registerMaterial('emerald', { textureUrl: './src/assets/textures/emerald.png' });
+materials.registerMaterial('amethyst', { textureUrl: './src/assets/textures/amethyst.png' });
+materials.registerMaterial('iron', { textureUrl: './src/assets/textures/iron.png' });
+materials.registerMaterial('iron_ore', { textureUrl: './src/assets/textures/Iron_Ore.png' });
 
-const debrisSide = { textureUrl: './src/world/assets/textures/Ancient_Debris_side.png' };
-const debrisTop = { textureUrl: './src/world/assets/textures/Ancient_Debris_top.png' };
+const debrisSide = { textureUrl: './src/assets/textures/Ancient_Debris_side.png' };
+const debrisTop = { textureUrl: './src/assets/textures/Ancient_Debris_top.png' };
 materials.registerMaterial('debris', {
   faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
     0: debrisSide,   // 东面：远古残骸侧面
@@ -672,13 +672,13 @@ materials.registerMaterial('debris', {
 });
 
 materials.registerMaterial('yellow_leaves', {
-  textureUrl: './src/world/assets/textures/leaves_yellow.png',
+  textureUrl: './src/assets/textures/leaves_yellow.png',
   transparent: true,
   alphaTest: 0.3
 });
 
-const tntSide = { textureUrl: './src/world/assets/textures/tnt_side.png' };
-const tntTopBottom = { textureUrl: './src/world/assets/textures/tnt_top.png' };
+const tntSide = { textureUrl: './src/assets/textures/tnt_side.png' };
+const tntTopBottom = { textureUrl: './src/assets/textures/tnt_top.png' };
 materials.registerMaterial('tnt', {
   faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
     0: tntSide,       // 东面：TNT侧面（带文字纹理）

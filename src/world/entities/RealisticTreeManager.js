@@ -2,7 +2,7 @@
 // 真实树木模板管理器模块
 // 创建可重用的树木模板以供高效生成
 import * as THREE from 'three';
-import { materials } from '../../core/materials/MaterialManager.js';
+import { materials } from '../../core/MaterialManager.js';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 
 /**

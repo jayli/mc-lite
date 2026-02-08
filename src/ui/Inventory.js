@@ -1,5 +1,5 @@
 // src/ui/Inventory.js
-import { materials } from '../core/materials/MaterialManager.js';
+import { materials } from '../core/MaterialManager.js';
 
 /**
  * 物品颜色配置表（与HUD.js中的相同）

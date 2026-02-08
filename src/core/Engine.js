@@ -6,131 +6,113 @@ import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { FaceCullingSystem, faceCullingSystem } from './FaceCullingSystem.js';
 
-// 海平面相比陆地低多少
-const warterLeverHightOffset = -1.5;
-// 雾颜色
-const forgColor = 0x94bcf5; // 原单色天空球的雾色：0x62b4d5
-const waterColor = 0x588be4; // 原来的颜色 0x4488ff; // 水颜色
-const waterOpacity = 0.7; // 水透明度
-const waterForgColor = 0xa7d1e2; // 水雾颜色
-export let carModel = null;
-export let gunManModel = null;
-export let gunModel = null;
-export let mag7Model = null;
-export let minigunModel = null;
+// --- 引擎配置常量 ---
+// 海平面相比陆地中心 y=0 的偏移量
+export const WATER_LEVEL_OFFSET = -1.5;
+// 环境雾的颜色 (天蓝色)
+export const FOG_COLOR = 0x94bcf5;
+// 水面的基本颜色
+export const WATER_COLOR = 0x588be4;
+// 水面的初始透明度
+export const WATER_OPACITY = 0.7;
+// 水下雾的颜色 (更深的蓝色)
+export const WATER_FOG_COLOR = 0xa7d1e2;
+// 雾的起始距离（米）
+export const FOG_NEAR = 30;
+// 雾的完全覆盖距离（米）
+export const FOG_FAR = 70;
+// 阴影贴图的分辨率大小（像素）
+export const SHADOW_MAP_SIZE = 712;
+// 阴影相机的覆盖范围大小（米）
+export const SHADOW_CAMERA_SIZE = 30;
 
-// 定义并导出 Engine 类，用于管理游戏的核心渲染引擎
+export let carModel = null;      // 汽车模型缓存
+export let gunManModel = null;   // 枪手模型缓存
+export let gunModel = null;      // 普通手枪模型缓存
+export let mag7Model = null;     // MAG7 散弹枪模型缓存
+export let minigunModel = null;  // 加特林机枪模型缓存
+
+/**
+ * Engine 类
+ * 管理游戏的核心渲染引擎，包括场景、相机、渲染器、灯光、水面和天空
+ */
 export class Engine {
-  // Engine 类的构造函数
   constructor() {
-    // 创建一个新的 Three.js 场景
+    // 1. 核心三维场景初始化
     this.scene = new THREE.Scene();
-    // 场景背景设为 null，因为我们将使用天空球
     this.scene.background = null;
-    // 在场景中添加雾效
-    // forgColor: 雾的颜色（浅蓝色），与背景/地平线颜色匹配
-    // 20: 雾开始出现的近距，此距离内物体完全清晰
-    // 70: 雾完全覆盖的远距，此距离外物体被完全遮盖，用于平滑过渡区块卸载的边界
-    this.scene.fog = new THREE.Fog(forgColor, 30, 70);
+    this.scene.fog = new THREE.Fog(FOG_COLOR, FOG_NEAR, FOG_FAR);
 
-    // 创建一个透视相机
-    // 75: 视野角度 (FOV)，典型第一人称游戏设定
-    // innerWidth / innerHeight: 宽高比，自动适配窗口
-    // 0.1: 近裁剪面，物体离相机多近时开始不可见
-    // 200: 远裁剪面，物体离相机多远时开始不可见，应大于雾的最大距离 (70)
+    // 2. 相机初始化 (FOV, Aspect, Near, Far)
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
-    // 设置相机的旋转顺序为 YXZ，这对于第一人称控制器很重要
-    this.camera.rotation.order = 'YXZ';
-    // 将相机添加到场景中
+    this.camera.rotation.order = 'YXZ'; // 关键：锁定 YXZ 顺序以匹配 FPS 视角控制
     this.scene.add(this.camera);
 
-    // 创建一个 WebGL 渲染器
-    // antialias: false 禁用抗锯齿，以提高性能
-    // powerPreference: "high-performance" 请求高性能模式
+    // 3. 渲染器初始化
     this.renderer = new THREE.WebGLRenderer({
-      antialias: false,
-      powerPreference: "high-performance"
+      antialias: false,               // 关闭抗锯齿以换取性能
+      powerPreference: "high-performance" // 提示浏览器使用高性能 GPU
     });
-    // 启用渲染器的阴影贴图
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = true; // 启用阴影系统
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.resolutionScale = 0.7;
+    this.resolutionScale = 0.7;        // 初始渲染分辨率缩放系数
     this.renderer.setPixelRatio(this.resolutionScale);
 
-    // --- 氛围渲染优化 ---
-    // ACESFilmicToneMapping: 电影级色调映射，使高亮部分不过曝成纯白，而是有自然的色彩过渡，提升视觉质感
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.25; // 全局曝光度，提升到 1.25 使阳光感更强，画面更明亮
+    this.renderer.toneMappingExposure = 1.25;
 
-    // --- 灯光与天空设置 ---
-    // 太阳位置, x 水平1（越大，越靠右），高度，z 水平2（越大，越低）
-    this.sunDirection = new THREE.Vector3(0, 0.8, 0.6).normalize(); // 初始太阳方向向量
-    this.sunColor = 0xfff7c2; // 太阳本体颜色 (金黄色)
-    this.lightColor = 0xfffaf0; // 阳光颜色 (接近白色的暖黄色)
-    this.zenithColor = 0x87CEEB;  // 天空顶点颜色 (深蓝色)
-    this.horizonColor = 0xb2e0f2; // 天空地平线颜色 (浅蓝色)
+    // 灯光与天空设置
+    this.sunDirection = new THREE.Vector3(0, 0.8, 0.6).normalize();
+    this.sunColor = 0xfff7c2;
+    this.lightColor = 0xfffaf0;
+    this.zenithColor = 0x87CEEB;
+    this.horizonColor = 0xb2e0f2;
 
-    // 创建一个平行光 (模拟太阳光)
-    const light = new THREE.DirectionalLight(this.lightColor, 3.2); // 强度 3.2，提供强烈的直射光照
-    // 关键优化：将 light.target 直接添加到场景中，方便后续同步灯光指向的方向
+    const light = new THREE.DirectionalLight(this.lightColor, 3.2);
     this.scene.add(light.target);
 
-    // 允许此光源投射阴影
     light.castShadow = true;
-    // 设置阴影贴图的分辨率，更高的值意味着更清晰的阴影，但会增加 GPU 开销
-    light.shadow.mapSize.set(712, 712);
-    // 设置平行光阴影相机的视锥体范围，决定了阴影覆盖的区域大小
-    var shadowSize = 30;
-    light.shadow.camera.left = -1 * shadowSize;
-    light.shadow.camera.right = shadowSize;
-    light.shadow.camera.top = shadowSize;
-    light.shadow.camera.bottom = -1 * shadowSize;
+    light.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+
+    light.shadow.camera.left = -SHADOW_CAMERA_SIZE;
+    light.shadow.camera.right = SHADOW_CAMERA_SIZE;
+    light.shadow.camera.top = SHADOW_CAMERA_SIZE;
+    light.shadow.camera.bottom = -SHADOW_CAMERA_SIZE;
     light.shadow.camera.near = 0.1;
     light.shadow.camera.far = 400;
-    // shadow.bias: 阴影偏移，用于减少阴影失真 (shadow acne)
-    // normalBias: 法线偏移，通过沿表面法线偏移深度来进一步优化阴影边缘
     light.shadow.bias = 0.0001;
     light.shadow.normalBias = 0.078;
 
     this.scene.add(light);
-    // 环境光：使用微弱的冷蓝色（天空散射光），与暖色阳光形成对比，增加画面的层次感
     this.scene.add(new THREE.AmbientLight(0xddeeff, 1));
 
     this.light = light;
 
-    // 创建全局水面
     this.createWaterPlane();
 
-    // 预分配向量以优化性能，避免在主循环中产生垃圾回收
     this._tmpVec = new THREE.Vector3();
     this._lastUpdatePos = new THREE.Vector3(Infinity, Infinity, Infinity);
 
-    // 创建太阳
     this.createSun();
-    // 创建渐变天空
-    // this.createSky();
     this.createSkybox();
 
-    // 调用初始化方法
     this.init();
     this.loadModel();
   }
+
   loadModel() {
     const gltfLoader = new GLTFLoader();
-    gltfLoader.load('src/world/assets/mod/free_car_001.gltf', (gltf) => {
+    gltfLoader.load('src/assets/mod/free_car_001.gltf', (gltf) => {
       const car = gltf.scene;
-      // 计算边界框
       const box = new THREE.Box3().setFromObject(car);
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3());
 
-      // 平移使基座底部中心位于 (0,0,0)
       car.position.set(-center.x, -box.min.y, -center.z);
 
       const carParent = new THREE.Group();
       carParent.add(car);
 
-      // 目标尺寸：长(Z)=5, 宽(X)=3, 高(Y)=3
       const targetSize = new THREE.Vector3(3, 3, 5);
       carParent.scale.set(
         targetSize.x / size.x,
@@ -142,17 +124,15 @@ export class Engine {
     });
 
     const mtlLoader = new MTLLoader();
-    mtlLoader.load('src/world/assets/mod/gun_man.mtl', (materials) => {
+    mtlLoader.load('src/assets/mod/gun_man.mtl', (materials) => {
       materials.preload();
       const objLoader = new OBJLoader();
       objLoader.setMaterials(materials);
-      objLoader.load('src/world/assets/mod/gun_man.obj', (model) => {
-        // 遍历设置阴影和材质属性
+      objLoader.load('src/assets/mod/gun_man.obj', (model) => {
         model.traverse(child => {
           if (child.isMesh) {
             child.castShadow = true;
             child.receiveShadow = true;
-            // 确保材质可见
             if (child.material) {
               if (Array.isArray(child.material)) {
                 child.material.forEach(m => {
@@ -173,13 +153,11 @@ export class Engine {
         const center = box.getCenter(new THREE.Vector3());
         const size = box.getSize(new THREE.Vector3());
 
-        // 平移使基座底部中心位于 (0,0,0)
         model.position.set(-center.x, -box.min.y, -center.z);
 
         const parent = new THREE.Group();
         parent.add(model);
 
-        // 目标尺寸：高度设为 2 个方块高度
         const targetHeight = 2.0;
         const scale = targetHeight / (size.y || 1);
         parent.scale.set(scale, scale, scale);
@@ -192,10 +170,8 @@ export class Engine {
       console.error('Failed to load gun_man.mtl:', error);
     });
 
-    gltfLoader.load('src/world/assets/mod/silahful.glb', (gltf) => {
+    gltfLoader.load('src/assets/mod/silahful.glb', (gltf) => {
       const model = gltf.scene;
-
-      // 遍历设置阴影
       model.traverse(child => {
         if (child.isMesh) {
           child.castShadow = false;
@@ -203,19 +179,16 @@ export class Engine {
         }
       });
 
-      // 计算边界框并进行标准化处理
       const box = new THREE.Box3().setFromObject(model);
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
 
-      // 平移模型使其中心位于原点，并旋转 180 度使枪口向前 (-Z 方向)
       model.position.set(-center.x, -center.y, -center.z);
       model.rotation.y = Math.PI;
 
       const group = new THREE.Group();
       group.add(model);
 
-      // 将模型缩放到一个标准的单位大小 (最大维度为 1)，方便在 Player.js 中进一步微调
       const maxDim = Math.max(size.x, size.y, size.z);
       const scale = 1.0 / (maxDim || 1);
       group.scale.set(scale, scale, scale);
@@ -226,9 +199,8 @@ export class Engine {
       console.error('Failed to load silahful.glb:', error);
     });
 
-    gltfLoader.load('src/world/assets/mod/mag7.glb', (gltf) => {
+    gltfLoader.load('src/assets/mod/mag7.glb', (gltf) => {
       const model = gltf.scene;
-
       model.traverse(child => {
         if (child.isMesh) {
           child.castShadow = false;
@@ -240,9 +212,7 @@ export class Engine {
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
 
-      // 标准化：中心归零，并根据需要调整朝向
       model.position.set(-center.x, -center.y, -center.z);
-      // MAG7 可能需要不同的初始旋转，先参考 gun 的设置
       model.rotation.y = Math.PI;
 
       const group = new THREE.Group();
@@ -258,9 +228,8 @@ export class Engine {
       console.error('Failed to load mag7.glb:', error);
     });
 
-    gltfLoader.load('src/world/assets/mod/minugun.glb', (gltf) => {
+    gltfLoader.load('src/assets/mod/minigun.glb', (gltf) => {
       const model = gltf.scene;
-
       model.traverse(child => {
         if (child.isMesh) {
           child.castShadow = false;
@@ -272,7 +241,6 @@ export class Engine {
       const size = box.getSize(new THREE.Vector3());
       const center = box.getCenter(new THREE.Vector3());
 
-      // 标准化：中心归零
       model.position.set(-center.x, -center.y, -center.z);
       model.rotation.y = Math.PI;
 
@@ -286,38 +254,32 @@ export class Engine {
       minigunModel = group;
       console.log('Minigun model loaded successfully and normalized');
     }, undefined, (error) => {
-      console.error('Failed to load minugun.glb:', error);
+      console.error('Failed to load minigun.glb:', error);
     });
   }
 
-
-  // 设置渲染分辨率倍率
   setResolution(scale) {
     this.resolutionScale = scale;
     this.renderer.setPixelRatio(scale);
-    // 更新渲染器尺寸以应用新的像素比
     this.onResize();
   }
 
-  // 创建太阳 Sprite
   createSun() {
     const canvas = document.createElement('canvas');
     canvas.width = 128;
     canvas.height = 128;
     const context = canvas.getContext('2d');
 
-    // 创建径向渐变
     const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 64);
     const sunColor = new THREE.Color(this.sunColor);
     const r = Math.floor(sunColor.r * 255);
     const g = Math.floor(sunColor.g * 255);
     const b = Math.floor(sunColor.b * 255);
 
-    // 优化渐变：添加白色核心，提升亮度
-    gradient.addColorStop(0, `rgba(255, 205, 177, 1)`); // 核心纯白
-    gradient.addColorStop(0.1, `rgba(255, 182, 142, 1)`); // 亮色过渡
-    gradient.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.7)`); // 太阳原色，开始变淡
-    gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`); // 边缘全透明
+    gradient.addColorStop(0, `rgba(255, 205, 177, 1)`);
+    gradient.addColorStop(0.1, `rgba(255, 182, 142, 1)`);
+    gradient.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.7)`);
+    gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
 
     context.fillStyle = gradient;
     context.fillRect(0, 0, 128, 128);
@@ -326,20 +288,19 @@ export class Engine {
     const sunMaterial = new THREE.SpriteMaterial({
       map: texture,
       transparent: true,
-      fog: false, // 太阳不受雾效影响，保持明亮
-      depthTest: true // 开启深度测试，允许被方块遮挡
+      fog: false,
+      depthTest: true
     });
 
     this.sunSprite = new THREE.Sprite(sunMaterial);
-    this.sunSprite.visible = false; // 天空盒已包含太阳，隐藏程序化太阳
-    // 太阳形状
+    this.sunSprite.visible = false;
     this.sunSprite.scale.set(20, 20, 1);
     this.scene.add(this.sunSprite);
   }
 
   createSkybox() {
     const loader = new THREE.CubeTextureLoader();
-    const texture = loader.setPath('src/world/assets/skyBox4/').load([
+    const texture = loader.setPath('src/assets/skyBox4/').load([
       'posx.jpg', 'negx.jpg',
       'posy.jpg', 'negy.jpg',
       'posz.jpg', 'negz.jpg'
@@ -347,56 +308,17 @@ export class Engine {
     this.scene.background = texture;
   }
 
-  // 创建渐变天空球
-  createSky() {
-    // 180: 球体半径，必须大于相机远裁剪面以防被裁剪
-    const skyGeo = new THREE.SphereGeometry(180, 32, 15);
-    const skyMat = new THREE.ShaderMaterial({
-      uniforms: {
-        topColor: { value: new THREE.Color(this.zenithColor) },
-        bottomColor: { value: new THREE.Color(this.horizonColor) },
-        offset: { value: 33 }, // 颜色过渡的垂直偏移量
-        exponent: { value: 0.6 } // 渐变指数，值越小渐变越陡峭
-      },
-      vertexShader: `
-        varying vec3 vWorldPosition;
-        void main() {
-          vec4 worldPosition = modelMatrix * vec4( position, 1.0 );
-          vWorldPosition = worldPosition.xyz;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
-        }
-      `,
-      fragmentShader: `
-        uniform vec3 topColor;
-        uniform vec3 bottomColor;
-        uniform float offset;
-        uniform float exponent;
-        varying vec3 vWorldPosition;
-        void main() {
-          float h = normalize( vWorldPosition + offset ).y;
-          gl_FragColor = vec4( mix( bottomColor, topColor, max( pow( max( h, 0.0 ), exponent ), 0.0 ) ), 1.0 );
-        }
-      `,
-      side: THREE.BackSide,
-      depthWrite: false
-    });
-
-    // this.skyMesh = new THREE.Mesh(skyGeo, skyMat);
-    // this.scene.add(this.skyMesh);
-  }
-
-  // 创建全局水面平面
   createWaterPlane() {
     const waterGeo = new THREE.PlaneGeometry(800, 800);
 
     this.waterMaterial = new THREE.ShaderMaterial({
       uniforms: {
         uTime: { value: 0 },
-        uColor: { value: new THREE.Color(waterColor) },
+        uColor: { value: new THREE.Color(WATER_COLOR) },
         uSunDirection: { value: this.sunDirection },
-        uOpacity: { value: waterOpacity },
+        uOpacity: { value: WATER_OPACITY },
         uSeed: { value: WORLD_CONFIG.SEED },
-        uFogColor: { value: new THREE.Color(waterForgColor) },
+        uFogColor: { value: new THREE.Color(WATER_FOG_COLOR) },
         uFogNear: { value: 20 },
         uFogFar: { value: 70 }
       },
@@ -407,7 +329,6 @@ export class Engine {
           vec4 worldPosition = modelMatrix * vec4(position, 1.0);
           vWorldPosition = worldPosition.xyz;
 
-          // 计算相对于相机的深度
           vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
           vDepth = -mvPosition.z;
 
@@ -435,8 +356,8 @@ export class Engine {
           float temp = getNoise(x, z, 0.01);
           float hum = getNoise(x + 1000.0, z + 1000.0, 0.015);
 
-          if (temp < -1.5) return h * 0.5 + 2.0; // DESERT
-          if (temp > -1.5 && temp < -0.8 && hum > 0.5) return h * 0.3 - 2.0; // SWAMP
+          if (temp < -1.5) return h * 0.5 + 2.0;
+          if (temp > -1.5 && temp < -0.8 && hum > 0.5) return h * 0.3 - 2.0;
           return h;
         }
 
@@ -445,7 +366,6 @@ export class Engine {
           vec3 viewDir = normalize(cameraPosition - vWorldPosition);
           float dist = length(vWorldPosition.xz - cameraPosition.xz);
 
-          // --- 陆地/海洋显示逻辑 ---
           if (dist < 60.0) {
             bool nearOcean = false;
             if (getHeight(pos.x, pos.y) < -0.8) {
@@ -464,10 +384,7 @@ export class Engine {
             }
           }
 
-          // 1. 距离掩码 (控制波纹细节)
           float detailMask = smoothstep(50.0, 30.0, dist);
-
-          // 2. 波动计算
           float waves = sin(pos.x * 1.5 + uTime * 5.5) * 0.1 + sin(pos.y * 1.3 - uTime * 3.2) * 0.1;
           if (detailMask > 0.0) {
              waves += sin(pos.x * 2.8 + pos.y * 2.2 + uTime * 3.5) * 0.08 * detailMask;
@@ -477,22 +394,15 @@ export class Engine {
 
           vec3 normal = normalize(vec3(waves * 2.0, 1.0, waves * 2.0));
 
-          // 3. 太阳镜面反射
           vec3 halfDir = normalize(uSunDirection + viewDir);
           float spec = pow(max(dot(normal, halfDir), 0.0), 100.0) * 8.0 * detailMask;
-
-          // 4. 漫反射与背景散射
           float diffuse = max(dot(normal, uSunDirection), 0.0) * 0.15 * detailMask;
           float scatter = (max(0.0, normal.y) * 0.08 + (waves * 0.05)) * detailMask;
-
-          // 5. 菲涅尔
           float fresnel = pow(1.0 - max(dot(vec3(0.0, 1.0, 0.0), viewDir), 0.0), 3.0);
 
-          // 最终颜色混合
           vec3 highlightColor = vec3(0.95, 0.98, 1.0);
           vec3 finalColor = uColor + highlightColor * (diffuse + scatter + spec + fresnel * 0.1);
 
-          // --- 雾效计算 ---
           float fogFactor = smoothstep(uFogNear, uFogFar, vDepth);
           vec3 colorWithFog = mix(finalColor, uFogColor, fogFactor);
 
@@ -505,22 +415,17 @@ export class Engine {
     });
 
     this.waterPlane = new THREE.Mesh(waterGeo, this.waterMaterial);
-    this.waterPlane.rotation.x = -Math.PI / 2; // 将平面旋转到水平位置
-    this.waterPlane.position.y = warterLeverHightOffset; // 设置水平面高度，略低于地面基准面
+    this.waterPlane.rotation.x = -Math.PI / 2;
+    this.waterPlane.position.y = WATER_LEVEL_OFFSET;
     this.scene.add(this.waterPlane);
 
-    // --- 隐藏面剔除系统初始化 ---
     this.faceCullingSystem = new FaceCullingSystem({
       transparentTypes: ['air', 'water']
     });
 
-    // 启用系统
     this.faceCullingSystem.enable();
-
-    // 设置调试场景
     this.faceCullingSystem.initDebugScene(this.scene);
 
-    // 监听系统事件
     this.faceCullingSystem.on('update', (stats) => {
       if (stats.optimizationRate > 0.3) {
         console.log(`隐藏面剔除优化率: ${(stats.optimizationRate * 100).toFixed(1)}%`);
@@ -538,56 +443,37 @@ export class Engine {
     console.log('隐藏面剔除系统已集成到渲染引擎');
   }
 
-  // 初始化方法
   init() {
-    // 设置渲染器的尺寸为窗口的内部宽高
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    // 将渲染器的 DOM 元素（canvas）添加到 body 中
     document.body.appendChild(this.renderer.domElement);
-
-    // 添加窗口大小变化的监听事件，当窗口大小改变时调用 onResize 方法
     window.addEventListener('resize', () => this.onResize());
   }
 
-  // 窗口大小变化时的回调函数
   onResize() {
-    // 更新相机的宽高比
     this.camera.aspect = window.innerWidth / window.innerHeight;
-    // 更新相机的投影矩阵
     this.camera.updateProjectionMatrix();
-    // 更新渲染器的尺寸
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
-  // 渲染方法
   render() {
-    // --- 隐藏面剔除系统更新 ---
     if (this.faceCullingSystem && this.faceCullingSystem.isEnabled()) {
-      // 这里可以添加基于相机位置的区块更新逻辑
-      // 实际实现将在后续任务中与World.js集成时完成
     }
 
-    // --- 主场景渲染阶段 ---
-    // 更新水面动画时间
     if (this.waterMaterial) {
       this.waterMaterial.uniforms.uTime.value += 0.015;
-      // 强制同步种子，确保存档加载后的水面一致性
       this.waterMaterial.uniforms.uSeed.value = WORLD_CONFIG.SEED;
     }
 
-    // 水面跟随相机移动
     if (this.waterPlane) {
       this.waterPlane.position.x = this.camera.position.x;
       this.waterPlane.position.z = this.camera.position.z;
     }
 
-    // 动态水下雾效更新
     const camX = this.camera.position.x;
     const camY = this.camera.position.y;
     const camZ = this.camera.position.z;
-    const waterLevel = warterLeverHightOffset; // 动态水雾效果高度，和waterPlane.position.y要一起配合配置
+    const waterLevel = WATER_LEVEL_OFFSET;
 
-    // --- 模拟高度计算以判断是否在“近海”区域 ---
     const getNoise = (x, z, scale) => {
       const nx = x + WORLD_CONFIG.SEED, nz = z + WORLD_CONFIG.SEED;
       return Math.sin(nx * scale) * 2 + Math.cos(nz * scale) * 2;
@@ -606,7 +492,6 @@ export class Engine {
     if (getHeight(camX, camZ) < -0.8) {
       isNearOcean = true;
     } else {
-      // 检查周围 4 个单位
       if (getHeight(camX + 4, camZ) < -0.8 || getHeight(camX - 4, camZ) < -0.8 ||
           getHeight(camX, camZ + 4) < -0.8 || getHeight(camX, camZ - 4) < -0.8) {
         isNearOcean = true;
@@ -628,15 +513,15 @@ export class Engine {
       }
     } else {
       if (this.isUnderwater) {
-        this.scene.fog.color.set(forgColor);
-        this.scene.fog.near = 20;
-        this.scene.fog.far = 60;
+        this.scene.fog.color.set(FOG_COLOR);
+        this.scene.fog.near = FOG_NEAR;
+        this.scene.fog.far = FOG_FAR;
         this.isUnderwater = false;
 
         if (this.waterMaterial) {
-          this.waterMaterial.uniforms.uFogColor.value.set(forgColor);
-          this.waterMaterial.uniforms.uFogNear.value = 20;
-          this.waterMaterial.uniforms.uFogFar.value = 60;
+          this.waterMaterial.uniforms.uFogColor.value.set(FOG_COLOR);
+          this.waterMaterial.uniforms.uFogNear.value = FOG_NEAR;
+          this.waterMaterial.uniforms.uFogFar.value = FOG_FAR;
         }
       }
     }
@@ -644,11 +529,6 @@ export class Engine {
     this.renderer.render(this.scene, this.camera);
   }
 
-  // --- 隐藏面剔除系统调试方法 ---
-
-  /**
-   * 切换隐藏面剔除系统
-   */
   toggleFaceCulling() {
     if (this.faceCullingSystem.isEnabled()) {
       this.faceCullingSystem.disable('manual toggle');
@@ -659,18 +539,11 @@ export class Engine {
     }
   }
 
-  /**
-   * 切换调试模式
-   */
   toggleFaceCullingDebug() {
     this.faceCullingSystem.toggleDebug();
     console.log('隐藏面剔除调试模式:', this.faceCullingSystem.isDebugMode() ? '开启' : '关闭');
   }
 
-  /**
-   * 获取隐藏面剔除系统状态
-   * @returns {Object} 系统状态
-   */
   getFaceCullingStats() {
     if (!this.faceCullingSystem) {
       return { error: '系统未初始化' };
@@ -678,9 +551,6 @@ export class Engine {
     return this.faceCullingSystem.getStats();
   }
 
-  /**
-   * 打印隐藏面剔除系统状态
-   */
   printFaceCullingStats() {
     const stats = this.getFaceCullingStats();
     console.group('隐藏面剔除系统状态');
@@ -698,9 +568,6 @@ export class Engine {
     console.groupEnd();
   }
 
-  /**
-   * 强制更新所有区块的可见面状态
-   */
   forceFaceCullingUpdate() {
     if (this.faceCullingSystem && this.faceCullingSystem.isEnabled()) {
       this.faceCullingSystem.forceUpdate();
@@ -708,16 +575,10 @@ export class Engine {
     }
   }
 
-  /**
-   * 测试调试可视化
-   */
   testFaceCullingDebug() {
     if (!this.faceCullingSystem) return;
-
-    // 启用调试模式
     this.faceCullingSystem.setDebugMode(true);
 
-    // 添加测试方块
     const testPositions = [
       new THREE.Vector3(0, 2, -5),
       new THREE.Vector3(2, 2, -5),
@@ -725,9 +586,9 @@ export class Engine {
     ];
 
     const testMasks = [
-      0b00111111, // 所有面可见
-      0b00010101, // 上、北、东面可见
-      0b00101010  // 下、南、西面可见
+      0b00111111,
+      0b00010101,
+      0b00101010
     ];
 
     for (let i = 0; i < testPositions.length; i++) {
@@ -741,9 +602,6 @@ export class Engine {
     console.log('调试可视化测试已启动，添加了', testPositions.length, '个测试方块');
   }
 
-  /**
-   * 清理调试可视化
-   */
   clearFaceCullingDebug() {
     if (this.faceCullingSystem) {
       this.faceCullingSystem.clearDebugObjects();

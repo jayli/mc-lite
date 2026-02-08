@@ -9,63 +9,42 @@ import { Inventory } from './Slots.js';
 import { getBiome, noise } from '../../utils/MathUtils.js';
 import { chestManager } from '../../world/entities/Chest.js';
 import { gunModel, mag7Model, minigunModel } from '../../core/Engine.js';
-
-// 武器常量
-const WEAPON_ARM = 0;
-const WEAPON_GUN = 1;
-const WEAPON_MAG7 = 2;
-const WEAPON_MINIGUN = 3;
+import { Gun, WEAPON_TYPES } from '../weapon/Gun.js';
 
 export class Player {
   /**
-    * @param {World} world - 游戏世界对象
-    * @param {THREE.Camera} camera - 游戏相机对象
+    * @param {World} world - 游戏世界对象引用，用于查询方块和更新世界
+    * @param {THREE.Camera} camera - 游戏相机对象，玩家视角以此为准
     */
   constructor(world, camera) {
     this.world = world;
     this.camera = camera;
 
-    // 将逻辑位置与相机解耦，以便后续实现平滑处理
-    this.position = new THREE.Vector3().copy(camera.position);
-    this.rotation = camera.rotation;
+    // 状态与属性
+    this.position = new THREE.Vector3().copy(camera.position); // 玩家逻辑位置
+    this.rotation = camera.rotation;                           // 玩家旋转 (与相机同步)
 
-    this.physics = new Physics(this, world);
-    this.inventory = new Inventory();
+    this.physics = new Physics(this, world);                   // 物理计算组件
+    this.inventory = new Inventory();                          // 背包系统组件
 
-    // 物理与相机状态追踪
-    this.isStuck = false;
-    this.currentStepHeight = 0; // 用于平滑 Y 轴台阶过渡
-    this.bobAmount = 0;         // 当前晃动强度
-    this.lastInputDirection = new THREE.Vector3(); // 记录最后的输入方向
+    // 状态追踪
+    this.isStuck = false;          // 是否卡在方块中
+    this.bobAmount = 0;            // 当前视角晃动强度 (步行动画)
+    this.lastInputDirection = new THREE.Vector3(); // 记录最后的移动输入方向
 
-    // 初始出生点逻辑
-    let spawnFound = false;
-    for (let i = 0; i < 1000; i++) {
-      const tx = (Math.random() - 0.5) * 20000;
-      const tz = (Math.random() - 0.5) * 20000;
+    // 移动与跳跃属性
+    this.velocity = new THREE.Vector3(); // 玩家当前速度向量 (x, y, z)
+    this.jumping = false;                // 是否处于跳跃/空中状态
+    this.jumpCooldown = 0;               // 跳跃冷却计时
+    this.jumpInterval = 0.25;            // 跳跃最小间隔（秒）
+    this.spaceKeyReleased = true;        // 空格键是否已松开（防止连跳）
 
-      const biome = getBiome(tx, tz);
-      // 尝试在森林或平原生物群系出生
-      if (biome === 'FOREST' || biome === 'PLAINS') {
-        // 计算预估地形高度，确保不在水面上（海平面约 -1.5）
-        const h = Math.floor(noise(tx, tz, 0.08) + noise(tx, tz, 0.02) * 3);
-        if (h > -0.5) {
-          this.position.set(tx, 70, tz);
-          spawnFound = true;
-          break;
-        }
-      }
-    }
-    if (!spawnFound) this.position.set(0, 70, 0);
+    this.keys = {};                      // 按键状态映射表
+    this.setupInput();                   // 初始化输入监听
 
-    this.velocity = new THREE.Vector3();
-    this.jumping = false;
-    this.jumpCooldown = 0; // 跳跃冷却时间（秒）
-    this.jumpInterval = 0.25; // 连跳最小间隔（秒）
-    this.spaceKeyReleased = true; // 追踪空格键是否已释放，用于防止跳台阶后的非预期连跳
-
-    this.keys = {};
-    this.setupInput();
+    this.swingTime = 0;                  // 手臂摆动动画剩余时间
+    this.drawProgress = 0;               // 手臂/武器拿出动画进度 (0-1)
+    this.cameraPitch = 0;                // 相机俯仰角 (上下看)
 
     // 添加第一人称手臂模型
     this.arm = new THREE.Mesh(new THREE.BoxGeometry(0.4, 1.2, 0.4), new THREE.MeshStandardMaterial({ color: 0xeebb99 }));
@@ -74,97 +53,69 @@ export class Player {
     this.arm.visible = false;
     this.camera.add(this.arm);
 
-    this.swingTime = 0;
-    this.cameraPitch = 0;
+    // 交互系统
+    this.raycaster = new THREE.Raycaster(); // 用于射线检测（挖掘、放置、射击）
+    this.center = new THREE.Vector2(0, 0);  // 屏幕中心点坐标
 
-    // 交互系统相关
-    this.raycaster = new THREE.Raycaster();
-    this.center = new THREE.Vector2(0, 0);
-
-    // 镜头晃动（bobbing）相关参数
-    this.bobbing_timer = 0;
-    this.bobbing_intensity = 0.05; // 晃动幅度
-    this.bobbing_speed = 0.2;     // 晃动速度
-    this.bob_offset = new THREE.Vector2(); // 用于平滑处理晃动偏移
+    // 镜头晃动（Head Bobbing）相关
+    this.bobbing_timer = 0;        // 晃动周期计时器
+    this.bobbing_intensity = 0.05; // 基础晃动强度
+    this.bobbing_speed = 0.2;      // 基础晃动速度
+    this.bob_offset = new THREE.Vector2(); // 最终应用到相机的偏移量
 
     // 初始化爆炸 Worker
     this.explosionWorker = new Worker(new URL('../../workers/ExplosionWorker.js', import.meta.url), { type: 'module' });
     this.explosionWorker.onmessage = (e) => this.handleExplosionResult(e.data);
 
-    // --- 音频系统初始化 ---
+    // 音频系统初始化
     audioManager.init(this.camera);
 
     // 追踪引燃中的 TNT
     this.ignitingTNTs = new Set();
 
-    // 持枪系统 (Feature 009)
-    this.weaponMode = WEAPON_ARM;
-    this.gun = null; // 当前显示的枪支模型
-    this.tracers = []; // 初始化追踪线数组
-    this.isShooting = false; // 是否正在射击 (按住左键)
-    this.shootCooldown = 0;  // 射击冷却计时器
-    this.shootInterval = 0.09; // 连发间隔 (090ms) jayli
-    this.gunRecoil = 0;      // 枪支后坐力偏移量
-    console.log('Player 初始化，当前武器模式:', this.weaponMode);
+    // 持枪系统 (Refactored)
+    this.weaponMode = WEAPON_TYPES.ARM; // 当前选择的武器模式 (0: 手臂, 1: 手枪, 2: MAG7, 3: 加特林)
+    this.weapon = null;                 // 当前处于激活状态的 Gun 实例
+    this.tracers = [];                  // 当前在场景中的所有弹道轨迹
+    this.isShooting = false;            // 是否正处于射击按下状态
+    this.shootCooldown = 0;             // 射击冷却剩余时间
 
-    // --- 性能优化：复用实例与池 (Feature 009 Optimization) ---
-    this._muzzleOffset = new THREE.Vector3();
-    this._muzzlePos = new THREE.Vector3();
-    this._targetPos = new THREE.Vector3();
-    this._direction = new THREE.Vector3();
+    // 性能优化：池与复用
     this._tempVector = new THREE.Vector3();
+    this._direction = new THREE.Vector3();
     this._dummyMatrix = new THREE.Matrix4();
     this._dummyQuaternion = new THREE.Quaternion();
     this._dummyScale = new THREE.Vector3();
     this._zeroVector = new THREE.Vector3(0, 0, 0);
 
-    // 示踪线池相关
-    this.tracerPool = [];      // Mesh 池
-    this.tracerInfoPool = [];  // 状态对象池
-    this.vectorPool = [];      // 向量池 (用于 worldEnd)
-
-    // 预制本地偏移常量，消除 new Vector3
-    // 子弹开火曳光发出去的起始位置, 第三个参数是前后
-    this._gunLocalStart = new THREE.Vector3(0.3, -0.33, -0.98);
-    this._mag7LocalStart = new THREE.Vector3(0.55, -0.4, -1.8);
-    this._minigunLocalStart = new THREE.Vector3(0.5, -0.5, -1.8);
+    this.tracerPool = [];
+    this.tracerInfoPool = [];
 
     this.tracerGeometry = new THREE.BoxGeometry(0.05, 0.05, 1);
-    this.tracerGeometry.translate(0, 0, 0.5); // 将原点移至一端
+    this.tracerGeometry.translate(0, 0, 0.5);
     this.tracerMaterial = new THREE.MeshBasicMaterial({
       color: 0xffff00,
       transparent: true,
       opacity: 0.8
     });
 
-    // MAG7 专用强力曳光材质 (更亮，更猛)
     this.mag7TracerMaterial = new THREE.MeshBasicMaterial({
-      color: 0xff6600, // 亮橙色
+      color: 0xff6600,
       transparent: true,
       opacity: 1.0,
-      blending: THREE.AdditiveBlending // 叠加混合，产生发光感
+      blending: THREE.AdditiveBlending
     });
 
-    this.mag7Timeouts = []; // 存储 MAG7 射击相关的定时器
-    this.drawProgress = 1;  // 拿起动画进度 (0-1)
-    this.minigunRotation = 0; // Minigun 枪管旋转角度
-    this.minigunSpinSpeed = 0; // Minigun 旋转速度
+    this.mag7Timeouts = [];
   }
 
-  /**
-   * 设置输入监听器
-   */
   setupInput() {
     window.addEventListener('keydown', e => {
       this.keys[e.code] = true;
       if (e.code === 'KeyR') {
         this.weaponMode = (this.weaponMode + 1) % 4;
-        this.drawProgress = 0; // 切换武器时重置拿起动画进度
-        this.isShooting = false; // 切换武器时停止射击
-        console.log('武器切换:', this.weaponMode);
-
-        // 切换到 Gun, Mag7 或 Minigun 时播放换弹/上膛音效
-        if (this.weaponMode === WEAPON_GUN || this.weaponMode === WEAPON_MAG7 || this.weaponMode === WEAPON_MINIGUN) {
+        this.isShooting = false;
+        if (this.weaponMode !== WEAPON_TYPES.ARM) {
           audioManager.playSound('gun_load', 0.4);
         }
       }
@@ -175,7 +126,7 @@ export class Player {
         this.spaceKeyReleased = true;
       }
     });
-    window.addEventListener('mousedown', e => this.interact(e)); // 传递完整事件对象
+    window.addEventListener('mousedown', e => this.interact(e));
     window.addEventListener('mouseup', e => {
       if (e.button === 0) this.isShooting = false;
     });
@@ -184,16 +135,13 @@ export class Player {
       if (document.pointerLockElement === document.body) {
         this.rotation.y -= e.movementX * 0.002;
         this.cameraPitch -= e.movementY * 0.002;
-        // 限制仰角范围
         this.cameraPitch = Math.max(-1.5, Math.min(1.5, this.cameraPitch));
       }
     });
+
     this.bgmStarted = false;
     document.body.addEventListener('click', () => {
-      // 请求鼠标锁定
       if (document.pointerLockElement !== document.body) document.body.requestPointerLock();
-
-      // 首次点击启动背景音乐
       if (!this.bgmStarted) {
         audioManager.playBGM('bgm', 0.15);
         this.bgmStarted = true;
@@ -201,178 +149,13 @@ export class Player {
     });
   }
 
-  /**
-   * 尝试执行上台阶逻辑 (T009, T010)
-   * @param {number} nx - 目标 X
-   * @param {number} nz - 目标 Z
-   * @returns {boolean} 是否成功跨越台阶
-   */
-  tryStepUp(nx, nz) {
-    // 1. 首先判断当前位置脚下是否有实心支撑 (使用 AABB 多点探测确保边缘支撑也能触发)
-    // 这能防止在跳跃过程中因“踩空”而误将前方高层方块判定为台阶，解决 3 层墙跳跃误上顶的 bug
-    const feetY = Math.floor(this.position.y - 0.01);
-    let isSupported = false;
-    const halfW = this.physics.playerWidth / 2;
-    // 探测 5 个点：中心 + 4 个角（稍微收缩以避免蹭墙判定）
-    const checkCoords = [
-      [this.position.x, this.position.z],
-      [this.position.x - halfW + 0.05, this.position.z - halfW + 0.05],
-      [this.position.x + halfW - 0.05, this.position.z - halfW + 0.05],
-      [this.position.x - halfW + 0.05, this.position.z + halfW - 0.05],
-      [this.position.x + halfW - 0.05, this.position.z + halfW - 0.05]
-    ];
-    for (const [cx, cz] of checkCoords) {
-      if (this.physics.isSolid(cx, feetY, cz)) {
-        isSupported = true;
-        break;
-      }
-    }
-    if (!isSupported) return false;
-
-    // 2. T010: 跳跃状态下允许跨越 2 级台阶。
-    // 注意：这里的 stepY 必须相对于当前的支撑面 (feetY + 1) 计算
-    const maxStep = (this.jumping && this.velocity.y > 0) ? 2.0 : 1.0;
-    const currentFloorY = feetY + 1;
-
-    for (let h = 1; h <= maxStep; h++) {
-      const stepY = currentFloorY + h;
-
-      // 限制：如果目标台阶位置有栏杆 (handrail)，禁止自动跨越
-      const halfW = 0.3;
-      const ty = Math.floor(stepY - 1);
-      let foundHandrail = false;
-      for (const ox of [-halfW, 0, halfW]) {
-        for (const oz of [-halfW, 0, halfW]) {
-          const bType = this.world.getBlock(Math.floor(nx + ox), ty, Math.floor(nz + oz));
-          if (bType === 'handrail' || bType === 'handrailA' || bType === 'handrailB') {
-            foundHandrail = true;
-            break;
-          }
-        }
-        if (foundHandrail) break;
-      }
-      if (foundHandrail) continue;
-
-      // 检查步进后的位置是否会卡住
-      if (!this.physics.checkAABB(nx, stepY, nz)) {
-        // 还要确保玩家不会在跨越过程中穿过天花板
-        if (!this.physics.checkAABB(this.position.x, stepY, this.position.z)) {
-          this.position.y = stepY;
-          this.position.x = nx;
-          this.position.z = nz;
-          this.velocity.y = 0; // 踏上台阶后抵消垂直速度
-
-          // 如果是跳跃过程中跨越了 2 级台阶，强制要求释放空格才能再次跳跃
-          if (h > 1.0) {
-            this.spaceKeyReleased = false;
-          }
-          return true;
-        }
-      }
-    }
-    return false;
-  }
-
-  /**
-   * 检查头顶碰撞 (T012)
-   */
-  checkCeilingBump() {
-    if (this.velocity.y > 0) {
-      if (this.physics.checkAABB(this.position.x, this.position.y + 0.1, this.position.z)) {
-        // 头顶撞到东西
-        this.velocity.y = -0.01; // 给予微小的下弹速度
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * 应用坑道自动对中逻辑 (T008)
-   */
-  applyTunnelCentering() {
-    const px = this.position.x;
-    const pz = this.position.z;
-    const py = this.position.y;
-    const floorX = Math.floor(px);
-    const floorZ = Math.floor(pz);
-    const floorY = Math.floor(py + 0.1); // 采样高度略高于底部
-
-    // 检查 X 轴向的坑道 (前后都有墙)
-    const northSolid = this.physics.isSolid(floorX, floorY, floorZ - 1);
-    const southSolid = this.physics.isSolid(floorX, floorY, floorZ + 1);
-    const northHeadSolid = this.physics.isSolid(floorX, floorY + 1, floorZ - 1);
-    const southHeadSolid = this.physics.isSolid(floorX, floorY + 1, floorZ + 1);
-
-    if ((northSolid && southSolid) || (northHeadSolid && southHeadSolid)) {
-      // 在 Z 轴上对中
-      this.position.z = THREE.MathUtils.lerp(this.position.z, floorZ + 0.5, 0.1);
-    }
-
-    // 检查 Z 轴向的坑道 (左右都有墙)
-    const westSolid = this.physics.isSolid(floorX - 1, floorY, floorZ);
-    const eastSolid = this.physics.isSolid(floorX + 1, floorY, floorZ);
-    const westHeadSolid = this.physics.isSolid(floorX - 1, floorY + 1, floorZ);
-    const eastHeadSolid = this.physics.isSolid(floorX + 1, floorY + 1, floorZ);
-
-    if ((westSolid && eastSolid) || (westHeadSolid && eastHeadSolid)) {
-      // 在 X 轴上对中
-      this.position.x = THREE.MathUtils.lerp(this.position.x, floorX + 0.5, 0.1);
-    }
-  }
-
-  /**
-   * 相机碰撞保护 (T013, T014)
-   * 确保相机在靠近墙壁旋转时不会穿模
-   */
-  applyCameraBumper() {
-    const yaw = this.rotation.y;
-    const bumperDist = 0.25; // 探测距离
-    const cameraHalfWidth = 0.2; // 相机半宽
-
-    const fwdX = -Math.sin(yaw);
-    const fwdZ = -Math.cos(yaw);
-    const rightX = -fwdZ;
-    const rightZ = fwdX;
-
-    const eyeY = this.position.y + 1.65;
-    const floorY = Math.floor(eyeY);
-
-    // 探测三个点
-    const points = [
-      { x: this.position.x + fwdX * bumperDist, z: this.position.z + fwdZ * bumperDist },
-      { x: this.position.x + fwdX * bumperDist - rightX * cameraHalfWidth, z: this.position.z + fwdZ * bumperDist - rightZ * cameraHalfWidth },
-      { x: this.position.x + fwdX * bumperDist + rightX * cameraHalfWidth, z: this.position.z + fwdZ * bumperDist + rightZ * cameraHalfWidth }
-    ];
-
-    for (const p of points) {
-      if (this.physics.isSolid(Math.floor(p.x), floorY, Math.floor(p.z))) {
-        // 发现探测点在墙内，将逻辑位置反向推离墙壁
-        const pushForce = 0.05;
-        this.position.x -= fwdX * pushForce;
-        this.position.z -= fwdZ * pushForce;
-        return true;
-      }
-    }
-    return false;
-  }
-
-  /**
-   * 每帧更新逻辑
-   * @param {number} dt - 自上一帧以来的时间差（秒）
-   */
   update(dt = 0.016) {
-    // 1. 更新相机仰角 (Pitch)
     this.camera.rotation.x = this.cameraPitch;
-
-    // 2. 限制 dt 防止物理穿模
     dt = Math.min(dt, 0.1);
 
-    // 3. 记录旧位置
     const oldX = this.position.x;
     const oldZ = this.position.z;
 
-    // 4. 输入驱动速度
     const speed = this.physics.speed;
     let inputX = 0;
     let inputZ = 0;
@@ -394,7 +177,6 @@ export class Player {
       inputZ -= Math.sin(this.rotation.y);
     }
 
-    // 归一化输入并应用速度
     const inputLen = Math.sqrt(inputX * inputX + inputZ * inputZ);
     if (inputLen > 0) {
       this.velocity.x = (inputX / inputLen) * speed;
@@ -405,70 +187,46 @@ export class Player {
       this.velocity.z = 0;
     }
 
-    // --- 水平移动与碰撞处理 (T005, T006, T007) ---
     const isCurrentlyStuck = this.physics.checkAABB(this.position.x, this.position.y, this.position.z);
     this.isStuck = isCurrentlyStuck;
 
     if (!isCurrentlyStuck) {
-      // 分轴尝试移动以实现滑动效果 (Sliding) (T019: dt 集成)
       let nextX = this.position.x + this.velocity.x * dt;
       let nextZ = this.position.z + this.velocity.z * dt;
-
-      // 预先检查对角线移动是否会发生碰撞
       const hasCollisionFull = this.physics.checkAABB(nextX, this.position.y, nextZ, true);
 
       if (hasCollisionFull) {
-        // 应用凸角惩罚 (T007)
         const penalty = this.physics.getCornerPenalty(this.velocity.x, this.velocity.z);
-
-        // 尝试 X 轴移动
         if (!this.physics.checkAABB(nextX, this.position.y, this.position.z, true)) {
           this.position.x = nextX;
           this.velocity.x = this.physics.applyFriction(this.velocity.x);
-        } else {
-          // X 轴被阻挡，尝试上台阶 (T009)
-          if (!this.tryStepUp(nextX, this.position.z)) {
-            this.velocity.x = 0;
-          }
+        } else if (!this.physics.tryStepUp(nextX, this.position.z)) {
+          this.velocity.x = 0;
         }
 
-        // 尝试 Z 轴移动
         if (!this.physics.checkAABB(this.position.x, this.position.y, nextZ, true)) {
           this.position.z = nextZ;
           this.velocity.z = this.physics.applyFriction(this.velocity.z);
-        } else {
-          // Z 轴被阻挡，尝试上台阶 (T009)
-          if (!this.tryStepUp(this.position.x, nextZ)) {
-            this.velocity.z = 0;
-          }
+        } else if (!this.physics.tryStepUp(this.position.x, nextZ)) {
+          this.velocity.z = 0;
         }
 
-        // 应用凸角速度惩罚
         if (penalty < 1.0) {
           this.position.x = oldX + (this.position.x - oldX) * penalty;
           this.position.z = oldZ + (this.position.z - oldZ) * penalty;
         }
       } else {
-        // 无碰撞，直接移动
         this.position.x = nextX;
         this.position.z = nextZ;
       }
     } else {
-      // 处于卡死状态，允许微小移动以尝试脱困 (Push-out 逻辑)
       this.position.x += this.velocity.x * dt;
       this.position.z += this.velocity.z * dt;
     }
 
-    // --- T008: 坑道自动对中 ---
-    if (inputLen > 0) {
-      this.applyTunnelCentering();
-    }
-
-    // --- T013, T014: 相机保护 ---
-    this.applyCameraBumper();
-
-    // --- Y 轴物理 (T012: 头顶检测) ---
-    this.checkCeilingBump();
+    if (inputLen > 0) this.physics.applyTunnelCentering();
+    this.physics.applyCameraBumper();
+    this.physics.checkCeilingBump();
 
     let gy = -100;
     const px = Math.floor(this.position.x);
@@ -482,35 +240,24 @@ export class Player {
         break;
       }
     }
-    if(gy === -100) {
-      gy = Math.floor(noise(px, pz) * 0.5) + 1;
-    }
+    if(gy === -100) gy = Math.floor(noise(px, pz) * 0.5) + 1;
 
     this.position.y += this.velocity.y * dt;
-
     if (this.position.y < gy) {
-      // 落地
       this.position.y = gy;
       this.velocity.y = 0;
       this.jumping = false;
     } else {
       this.velocity.y += this.physics.gravity * dt;
-      // 终端速度限制
-      if (this.velocity.y < this.physics.terminalVelocity) {
-        this.velocity.y = this.physics.terminalVelocity;
-      }
+      if (this.velocity.y < this.physics.terminalVelocity) this.velocity.y = this.physics.terminalVelocity;
     }
 
-    // 5. 更新跳跃冷却
-    if (this.jumpCooldown > 0) {
-      this.jumpCooldown -= dt;
-    }
-
+    if (this.jumpCooldown > 0) this.jumpCooldown -= dt;
     if (this.keys['Space'] && !this.jumping && this.jumpCooldown <= 0 && this.spaceKeyReleased) {
       this.velocity.y = this.physics.jumpForce;
       this.jumping = true;
-      this.jumpCooldown = this.jumpInterval; // 设置冷却间隔
-      this.spaceKeyReleased = false; // 触发跳跃后，标记为已消耗按键
+      this.jumpCooldown = this.jumpInterval;
+      this.spaceKeyReleased = false;
     }
 
     if (this.position.y < -20) {
@@ -518,97 +265,81 @@ export class Player {
       this.velocity.y = 0;
     }
 
-    // 相机跟随与平滑处理 (T011: Y 轴插值)
     this.camera.position.x = this.position.x;
     this.camera.position.z = this.position.z;
-    // 使用插值确保上下台阶不抖动
     const targetCamY = this.position.y + 1.65;
     this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, targetCamY, 0.2);
 
-    // --- T018: 兜底推回 ---
     this.physics.applyPushOut();
 
-    // 计算实际位移用于音效和晃动
     const actualDx = this.position.x - oldX;
     const actualDz = this.position.z - oldZ;
 
     this.updateArm(dt);
-
-    // 更新 Minigun 旋转逻辑
-    if (this.weaponMode === WEAPON_MINIGUN) {
-      if (this.isShooting) {
-        this.minigunSpinSpeed = THREE.MathUtils.lerp(this.minigunSpinSpeed, 25 * dt, 0.1);
-      } else {
-        this.minigunSpinSpeed = THREE.MathUtils.lerp(this.minigunSpinSpeed, 0, 0.05);
-      }
-      this.minigunRotation += this.minigunSpinSpeed;
-    }
-
-    this.updateGun(dt);
-    this.handleShooting(dt); // 处理连发逻辑
+    this.updateWeapon(dt);
+    this.handleShooting(dt);
     this.updateCameraBob(actualDx, actualDz, dt, isCurrentlyStuck);
     this.updateTracers(dt);
   }
 
-  /**
-   * 获取所有可交互的物体目标（包括区块和实体）
-   * @returns {THREE.Object3D[]}
-   */
   getInteractionTargets() {
     const targets = [];
-    for (const chunk of this.world.chunks.values()) {
-      targets.push(chunk.group);
-    }
-    // 添加处于开启状态的宝箱动画物体
+    for (const chunk of this.world.chunks.values()) targets.push(chunk.group);
     chestManager.chestAnimations.forEach(anim => {
       if (anim.mesh) targets.push(anim.mesh);
     });
     return targets;
   }
 
-  /**
-   * 处理连发逻辑
-   */
   handleShooting(dt) {
-    if (this.shootCooldown > 0) {
-      this.shootCooldown -= dt;
-    }
-
-    // 只有 Gun 和 Minigun 支持连发
-    if ((this.weaponMode === WEAPON_GUN || this.weaponMode === WEAPON_MINIGUN) && this.isShooting && this.shootCooldown <= 0) {
-      const targets = this.getInteractionTargets();
-      this.executeShot(targets);
-      this.shootCooldown = this.weaponMode === WEAPON_MINIGUN ? 0.05 : this.shootInterval;
+    if (this.shootCooldown > 0) this.shootCooldown -= dt;
+    if (this.weapon && this.isShooting && this.shootCooldown <= 0) {
+      if (this.weaponMode === WEAPON_TYPES.GUN || this.weaponMode === WEAPON_TYPES.MINIGUN) {
+        this.executeShot(this.getInteractionTargets());
+        this.shootCooldown = this.weapon.config.fireRate;
+      }
     }
   }
 
-  /**
-   * 执行单次射击计算
-   */
+  updateWeapon(dt) {
+    const targetModel = this.weaponMode === WEAPON_TYPES.GUN ? gunModel :
+                      (this.weaponMode === WEAPON_TYPES.MAG7 ? mag7Model :
+                      (this.weaponMode === WEAPON_TYPES.MINIGUN ? minigunModel : null));
+
+    if (this.weapon && (this.weapon.type !== this.weaponMode || !targetModel)) {
+      this.weapon.destroy();
+      this.weapon = null;
+    }
+
+    if (!this.weapon && targetModel) {
+      this.weapon = new Gun(this.weaponMode, targetModel, this.camera, this.world);
+    }
+
+    if (this.weapon) {
+      this.weapon.update(dt, this.isShooting);
+    }
+  }
+
   executeShot(targets) {
-    // 使用更长的射线探测距离 (40)
     this.raycaster.far = 40;
     this.raycaster.setFromCamera(this.center, this.camera);
-    const gunHits = this.raycaster.intersectObjects(targets, true);
-    this.raycaster.far = Infinity; // 恢复默认值
+    const hits = this.raycaster.intersectObjects(targets, true);
+    this.raycaster.far = Infinity;
 
-    if (gunHits.length > 0) {
-      const hit = gunHits[0];
-      this.shoot(hit);
+    const hit = hits.length > 0 ? hits[0] : null;
+    const effect = this.weapon.onFire(hit ? hit.point : null);
+    this.spawnTracer(effect.start, effect.end, effect.config);
 
-      // 检查命中的方块类型
+    if (hit) {
       const m = hit.object;
       const type = m.userData.type || 'unknown';
-
       if (type === 'tnt') {
-        const instanceId = hit.instanceId;
         if (m.isInstancedMesh) {
-          m.getMatrixAt(instanceId, this._dummyMatrix);
+          m.getMatrixAt(hit.instanceId, this._dummyMatrix);
           this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
         } else {
           this._tempVector.copy(m.position);
         }
-
         const key = `${Math.floor(this._tempVector.x)},${Math.floor(this._tempVector.y)},${Math.floor(this._tempVector.z)}`;
         if (!this.ignitingTNTs.has(key)) {
           this.ignitingTNTs.add(key);
@@ -617,220 +348,66 @@ export class Player {
       } else {
         this.removeBlock(hit);
       }
-    } else {
-      this.shoot(null);
     }
   }
 
-  /**
-   * 执行 MAG7 霰弹枪射击 (3x3x15 范围破坏)
-   */
   executeMag7Shot() {
-    const right = new THREE.Vector3();
-    const up = new THREE.Vector3();
-    const dir = new THREE.Vector3();
-
-    // 清理之前的未执行定时器，防止重叠导致的性能风暴
     this.mag7Timeouts.forEach(t => clearTimeout(t));
     this.mag7Timeouts = [];
 
-    // 从相机矩阵中提取本地坐标系轴
+    const right = new THREE.Vector3(), up = new THREE.Vector3(), dir = new THREE.Vector3();
     this.camera.matrixWorld.extractBasis(right, up, dir);
-    dir.negate(); // extractBasis 提取的是 +Z (后方)，取反得到前方
+    dir.negate();
 
     const blocksByDistance = new Map();
     const origin = this.camera.position;
 
-    // 遍历 10 格深度，每层 3x3，使用更小的步进以确保覆盖连续空间
     for (let d = 1; d <= 10; d += 0.5) {
-      // 优化：将 10 层合并为 5 个波次 (每 2 格一波)，减少 removeBlocksBatch 调用次数
       const distanceStep = Math.floor((d - 1) / 2);
       for (let i = -1; i <= 1; i++) {
         for (let j = -1; j <= 1; j++) {
-          // 计算该点在世界坐标系中的位置
-          this._tempVector.copy(origin)
-            .addScaledVector(dir, d)
-            .addScaledVector(right, i)
-            .addScaledVector(up, j);
-
-          const bx = Math.floor(this._tempVector.x);
-          const by = Math.floor(this._tempVector.y);
-          const bz = Math.floor(this._tempVector.z);
-
+          this._tempVector.copy(origin).addScaledVector(dir, d).addScaledVector(right, i).addScaledVector(up, j);
+          const bx = Math.floor(this._tempVector.x), by = Math.floor(this._tempVector.y), bz = Math.floor(this._tempVector.z);
           const type = this.world.getBlock(bx, by, bz);
           if (type && type !== 'end_stone') {
             const key = `${bx},${by},${bz}`;
-            if (!blocksByDistance.has(distanceStep)) {
-              blocksByDistance.set(distanceStep, []);
-            }
+            if (!blocksByDistance.has(distanceStep)) blocksByDistance.set(distanceStep, []);
             const group = blocksByDistance.get(distanceStep);
-            if (!group.some(b => b.key === key)) {
-              group.push({ x: bx, y: by, z: bz, key: key });
-            }
+            if (!group.some(b => b.key === key)) group.push({ x: bx, y: by, z: bz, key: key });
           }
         }
       }
     }
 
-    // 获取所有有方块的距离并排序
     const sortedDistances = Array.from(blocksByDistance.keys()).sort((a, b) => a - b);
-
     if (sortedDistances.length > 0) {
-      // 产生挖掘粒子效果 (取最近的一个位置作为起始粒子效果)
-      const firstDist = sortedDistances[0];
-      const firstGroup = blocksByDistance.get(firstDist);
+      const firstGroup = blocksByDistance.get(sortedDistances[0]);
       const midBlock = firstGroup[Math.floor(firstGroup.length / 2)];
       this._tempVector.set(midBlock.x + 0.5, midBlock.y + 0.5, midBlock.z + 0.5);
       this.spawnParticles(this._tempVector, 'stone');
 
-      // 分批次延迟移除方块
       sortedDistances.forEach((dist, index) => {
         const group = blocksByDistance.get(dist);
         const timeoutId = setTimeout(() => {
           this.world.removeBlocksBatch(group);
-          // 执行完后从列表中移除自己 (可选)
           this.mag7Timeouts = this.mag7Timeouts.filter(id => id !== timeoutId);
-        }, index * 90); // 增加每波间隔到 90ms，总时长 5 * 90 = 450ms
+        }, index * 90);
         this.mag7Timeouts.push(timeoutId);
       });
     }
 
-    // 触发射击视觉效果 (后坐力、示踪线)
-    // 探测中心射线，确定示踪线终点
     this.raycaster.far = 10;
     this.raycaster.setFromCamera(this.center, this.camera);
-    const targets = this.getInteractionTargets();
-    const hits = this.raycaster.intersectObjects(targets, true);
+    const hits = this.raycaster.intersectObjects(this.getInteractionTargets(), true);
     this.raycaster.far = Infinity;
 
-    this.shoot(hits.length > 0 ? hits[0] : null);
+    const hit = hits.length > 0 ? hits[0] : null;
+    const effect = this.weapon.onFire(hit ? hit.point : null);
+    this.spawnTracer(effect.start, effect.end, effect.config);
   }
 
-  /**
-   * 更新枪支状态 (Feature 009)
-   */
-  updateGun(dt) {
-    // 检查模型是否需要更换或移除
-    const targetModel = this.weaponMode === WEAPON_GUN ? gunModel :
-                      (this.weaponMode === WEAPON_MAG7 ? mag7Model :
-                      (this.weaponMode === WEAPON_MINIGUN ? minigunModel : null));
-
-    // 如果当前模型与目标模型不符，则移除当前模型
-    if (this.gun && this.gun.userData.sourceModel !== targetModel) {
-      this.camera.remove(this.gun);
-      this.gun = null;
-    }
-
-    // 如果需要显示枪支且尚未加载当前枪支
-    if (!this.gun && targetModel) {
-      console.log('正在切换并加载武器模型...', this.weaponMode);
-      this.gun = targetModel.clone();
-      this.gun.userData.sourceModel = targetModel; // 标记来源以便追踪
-
-      // 修复 Minigun 旋转死锁 (Gimbal Lock)
-      if (this.weaponMode === WEAPON_MINIGUN) {
-        this.gun.rotation.order = 'YXZ';
-      }
-
-      this.camera.add(this.gun);
-      this.gun.rotation.y = 0;
-    }
-
-    if (this.gun) {
-      this.gun.visible = true;
-
-      // 更新拿起动画进度
-      if (this.drawProgress < 1) {
-        this.drawProgress = Math.min(1, this.drawProgress + dt * 4); // 约 0.25 秒完成拿起动作
-      }
-
-      // 计算拿起动画的垂直偏移 (使用二次方缓动使动作更平滑)
-      const drawYOffset = Math.pow(1 - this.drawProgress, 2) * 1.2;
-
-      // 根据不同武器模式设置独立的位置、缩放和旋转
-      // 枪的位置定义
-      if (this.weaponMode === WEAPON_GUN) {
-        // Gun 恢复原始配置
-        // 三个参数，左右(越大越靠右)，上下（越小越靠下），前后(越小越靠前方)
-        this.gun.position.set(0.3, -0.85 - drawYOffset, -0.4 + this.gunRecoil);
-        this.gun.scale.set(0.09, 0.09, 0.09);
-        // this.gun.rotation.y = Math.PI; // 纠正 Gun 朝向
-      } else if (this.weaponMode === WEAPON_MAG7) {
-        // MAG7 使用专属配置：确保在视口右下角可见
-        // 三个参数，左右(越大越靠右)，上下（越小越靠下），前后(越小越靠前方)
-        this.gun.position.set(0.44, -0.5 - drawYOffset, -0.8 + this.gunRecoil);
-        var scale_size = 1.3;
-        this.gun.scale.set(scale_size, scale_size, scale_size);
-        this.gun.rotation.y = - Math.PI / 2; // 纠正朝向：从之前的向左转为向前
-      } else if (this.weaponMode === WEAPON_MINIGUN) {
-        // Minigun 配置：修正前后和上下反转
-        this.gun.position.set(0.48, - 0.56 - drawYOffset, /*-*/ /*0.6*/ 0.6 + this.gunRecoil);
-        this.gun.scale.set(0.5, 0.5, 0.5);
-        this.gun.rotation.y = - Math.PI / 2;  // 修正前后 (Yaw)
-        this.gun.rotation.x = - Math.PI / 2 + this.minigunRotation;      // 修正上下 (Pitch)
-        this.gun.rotation.z = - Math.PI; // 应用枪管旋转 (Roll)
-      }
-
-      // 逐渐恢复后坐力
-      this.gunRecoil = THREE.MathUtils.lerp(this.gunRecoil, 0, 0.2);
-    }
-  }
-
-  /**
-   * 执行射击交互
-   */
-  shoot(hit) {
-    // 0. 触发枪支后坐力位移
-    // MAG7 后坐力最大，Minigun 后坐力较小但高频
-    if (this.weaponMode === WEAPON_MAG7) {
-      this.gunRecoil = 0.15;
-    } else if (this.weaponMode === WEAPON_MINIGUN) {
-      this.gunRecoil = 0; // 去掉 Minigun 后坐力
-    } else {
-      this.gunRecoil = 0.05;
-    }
-
-    // 1. 计算枪口的大致世界坐标
-    this._muzzleOffset.set(0.3, -0.82, -0.44);
-    this._muzzleOffset.applyQuaternion(this.camera.quaternion);
-    this._muzzlePos.copy(this.camera.position).add(this._muzzleOffset);
-
-    // 2. 确定目标点
-    if (hit) {
-      this._targetPos.copy(hit.point);
-    } else {
-      // 如果没打中，射向 40 米远处
-      this.camera.getWorldDirection(this._direction);
-      this._targetPos.copy(this.camera.position).add(this._direction.multiplyScalar(40));
-    }
-
-    // 3. 生成示踪线
-    this.spawnTracer(this._muzzlePos, this._targetPos);
-
-    // 4. 播放射击音效
-    let sound = 'gun_fire';
-    let volume = 0.09;
-
-    if (this.weaponMode === WEAPON_MAG7) {
-      sound = 'mag7_fire';
-      volume = 0.2;
-    } else if (this.weaponMode === WEAPON_MINIGUN) {
-      sound = 'minigun_fire';
-      volume = 0.15;
-    }
-
-    audioManager.playSound(sound, volume);
-  }
-
-  /**
-   * 生成示踪线效果
-   */
-  spawnTracer(start, end) {
+  spawnTracer(start, end, config) {
     const distance = start.distanceTo(end);
-    const isMag7 = this.weaponMode === WEAPON_MAG7;
-    const isMinigun = this.weaponMode === WEAPON_MINIGUN;
-
-    // 1. 获取或创建 Mesh
     let mesh;
     if (this.tracerPool.length > 0) {
       mesh = this.tracerPool.pop();
@@ -839,256 +416,150 @@ export class Player {
       mesh = new THREE.Mesh(this.tracerGeometry, this.tracerMaterial);
     }
 
-    // 设置材质和尺寸
-    if (isMag7) {
-      mesh.material = this.mag7TracerMaterial;
-      mesh.scale.set(6, 6, distance);
-    } else if (isMinigun) {
-      mesh.material = this.tracerMaterial; // 复用黄色材质
-      mesh.scale.set(0.5, 0.5, distance); // 示踪线更细
-    } else {
-      mesh.material = this.tracerMaterial;
-      mesh.scale.set(1, 1, distance);
-    }
-
+    mesh.material = config.isShotgun ? this.mag7TracerMaterial : this.tracerMaterial;
+    mesh.scale.set(config.tracerThickness, config.tracerThickness, distance);
     mesh.position.copy(start);
     mesh.lookAt(end);
     this.world.scene.add(mesh);
 
-    // 2. 获取或创建状态信息对象
-    let info;
-    if (this.tracerInfoPool.length > 0) {
-      info = this.tracerInfoPool.pop();
-    } else {
-      info = { mesh: null, worldEnd: new THREE.Vector3() };
-    }
-
-    // 3. 复用向量存储终点，避免 end.clone()
+    let info = this.tracerInfoPool.length > 0 ? this.tracerInfoPool.pop() : { mesh: null, worldEnd: new THREE.Vector3() };
     info.mesh = mesh;
-    info.lifetime = isMag7 ? 0.15 : (isMinigun ? 0.08 : 0.1);
+    info.lifetime = config.tracerLifetime;
     info.maxLifetime = info.lifetime;
-    info.localStart = isMag7 ? this._mag7LocalStart : (isMinigun ? this._minigunLocalStart : this._gunLocalStart); // 使用缓存的常量
-    info.worldEnd.copy(end); // 直接复制值，不 new
-    info.isMag7 = isMag7;
-    info.isMinigun = isMinigun;
-
+    info.localStart = config.localStart;
+    info.worldEnd.copy(end);
+    info.thickness = config.tracerThickness;
     this.tracers.push(info);
   }
 
-  /**
-   * 更新并清理示踪线
-   */
   updateTracers(dt) {
     for (let i = this.tracers.length - 1; i >= 0; i--) {
       const tracer = this.tracers[i];
       tracer.lifetime -= dt;
-
       if (tracer.lifetime <= 0) {
-        // 回收资源
         this.world.scene.remove(tracer.mesh);
         tracer.mesh.visible = false;
         this.tracerPool.push(tracer.mesh);
-        this.tracerInfoPool.push(tracer); // 回收状态对象
+        this.tracerInfoPool.push(tracer);
         this.tracers.splice(i, 1);
       } else {
-        // 动态更新起点：使其始终相对于当前相机位置固定
-        this._tempVector.copy(tracer.localStart);
-        this._tempVector.applyQuaternion(this.camera.quaternion);
-        this._tempVector.add(this.camera.position);
-
-        // 更新示踪线网格
+        this._tempVector.copy(tracer.localStart).applyQuaternion(this.camera.quaternion).add(this.camera.position);
         tracer.mesh.position.copy(this._tempVector);
         tracer.mesh.lookAt(tracer.worldEnd);
-        const newDist = this._tempVector.distanceTo(tracer.worldEnd);
-
-        let thickness = 1;
-        // 曳光，示踪线粗细
-        if (tracer.isMag7) thickness = 6;
-        else if (tracer.isMinigun) thickness = 0.5;
-
-        tracer.mesh.scale.set(thickness, thickness, newDist);
-
+        tracer.mesh.scale.set(tracer.thickness, tracer.thickness, this._tempVector.distanceTo(tracer.worldEnd));
         tracer.mesh.material.opacity = (tracer.lifetime / tracer.maxLifetime);
       }
     }
   }
 
-  /**
-   * 更新镜头晃动效果 (T015)
-   * @param {number} dx - X 实际位移
-   * @param {number} dz - Z 实际位移
-   * @param {number} dt - 时间增量
-   * @param {boolean} isObstructed - 是否被卡住
-   */
   updateCameraBob(dx, dz, dt, isObstructed) {
-    // 计算预期位移量
     const inputSpeed = Math.sqrt(this.velocity.x ** 2 + this.velocity.z ** 2);
     const expectedDist = inputSpeed * dt;
     const actualDist = Math.sqrt(dx * dx + dz * dz);
-
-    // 判定是否为“全速前进”：实际位移达到预期的 95% 以上
-    // 同时也需要满足正在移动且未在跳跃中
     const isMoving = actualDist > 0.001;
     const isFullSpeed = inputSpeed > 0 && actualDist > expectedDist * 0.95;
-
-    // 只有在全速移动、未在跳跃、且未被阻挡（包括侧滑导致的减速）时才晃动
     const shouldBob = isMoving && isFullSpeed && !this.jumping && !isObstructed;
 
     if (shouldBob) {
       this.bobbing_timer += this.bobbing_speed;
       this.bobAmount = THREE.MathUtils.lerp(this.bobAmount, this.bobbing_intensity, 0.1);
+      this.playFootstepSound();
     } else {
       this.bobbing_timer = 0;
       this.bobAmount = THREE.MathUtils.lerp(this.bobAmount, 0, 0.2);
+      audioManager.stopSound('running_land');
+      audioManager.stopSound('running_water');
     }
 
     const bobX = Math.sin(this.bobbing_timer) * this.bobAmount;
     const bobY = Math.cos(this.bobbing_timer * 2) * this.bobAmount * 0.5;
-
-    // 应用平滑后的偏移
     this.bob_offset.x = THREE.MathUtils.lerp(this.bob_offset.x, bobX, 0.3);
     this.bob_offset.y = THREE.MathUtils.lerp(this.bob_offset.y, bobY, 0.3);
 
     this.camera.position.x += this.bob_offset.x;
     this.camera.position.y += this.bob_offset.y;
-
-    // 处理脚步声
-    if (shouldBob) {
-      this.playFootstepSound();
-    } else {
-      audioManager.stopSound('running_land');
-      audioManager.stopSound('running_water');
-    }
   }
 
-  /**
-   * 播放脚步声，根据环境选择水声或陆地声
-   */
   playFootstepSound() {
-    const px = Math.floor(this.position.x);
-    const py = Math.floor(this.position.y);
-    const pz = Math.floor(this.position.z);
-    const blockType = this.world.getBlock(px, py, pz);
-
+    const blockType = this.world.getBlock(Math.floor(this.position.x), Math.floor(this.position.y), Math.floor(this.position.z));
     if (blockType === 'water') {
-      // 切换到循环的水面音效
       audioManager.stopSound('running_land');
       audioManager.playSound('running_water', 0.25, true);
     } else {
-      // 切换到循环的陆地音效
       audioManager.stopSound('running_water');
       audioManager.playSound('running_land', 0.2, true);
     }
   }
 
-  /**
-   * 处理交互逻辑（左键挖掘，右键放置/打开）
-   * @param {MouseEvent} e - 鼠标事件对象
-   */
   interact(e) {
     if (document.pointerLockElement !== document.body) return;
-
     const button = e.button;
     this.raycaster.setFromCamera(this.center, this.camera);
-
     const targets = this.getInteractionTargets();
-
     const hits = this.raycaster.intersectObjects(targets, true);
 
-    if (button === 2) { // 右键点击 - 放置方块或打开交互容器 (如箱子)
-      const slot = this.inventory.getSelected();
-      const heldItem = slot ? slot.item : null;
-
-      if (hits.length > 0 && hits[0].distance < 9) { // 9: 最大交互距离 (格)
-        const hit = hits[0];
-        const m = hit.object;
-        const instanceId = hit.instanceId;
-
-        // 检查是否点击了箱子
-        const type = m.userData.type || 'unknown';
-        if (type === 'chest' && m.isInstancedMesh) {
+    if (button === 2) {
+      const heldItem = this.inventory.getSelected()?.item;
+      if (hits.length > 0 && hits[0].distance < 9) {
+        const hit = hits[0], m = hit.object, instanceId = hit.instanceId;
+        if (m.userData.type === 'chest' && m.isInstancedMesh) {
           m.getMatrixAt(instanceId, this._dummyMatrix);
           this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
-          const info = m.userData.chests[instanceId];
-          if (!info.open) {
+          if (!m.userData.chests[instanceId].open) {
             this.openChest(m, instanceId, this._tempVector);
             this.swing();
             return;
           }
         }
-
-        // 处理方块放置
         if (heldItem && this.inventory.has(heldItem)) {
-          const normal = hit.face.normal;
           if (m.isInstancedMesh) {
             m.getMatrixAt(instanceId, this._dummyMatrix);
             this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
           } else {
             this._tempVector.copy(m.position);
           }
-
-          const px = Math.floor(this._tempVector.x + normal.x);
-          const py = Math.floor(this._tempVector.y + normal.y);
-          const pz = Math.floor(this._tempVector.z + normal.z);
-
-          if (this.tryPlaceBlock(px, py, pz, heldItem)) {
-            this.swing();
-          }
+          if (this.tryPlaceBlock(Math.floor(this._tempVector.x + hit.face.normal.x), Math.floor(this._tempVector.y + hit.face.normal.y), Math.floor(this._tempVector.z + hit.face.normal.z), heldItem)) this.swing();
         }
       } else if (heldItem && this.inventory.has(heldItem)) {
-        // 虚空搭路辅助（空中放置）
         this.doSkyPlace(heldItem);
       }
-    } else if (button === 0) { // 左键点击 - 挖掘或射击
-      // 射击逻辑 (Feature 009)
-      if (this.weaponMode !== WEAPON_ARM) {
+    } else if (button === 0) {
+      if (this.weaponMode !== WEAPON_TYPES.ARM) {
         this.isShooting = true;
-        // 只有在冷却结束时才发射第一枪
         if (this.shootCooldown <= 0) {
-          if (this.weaponMode === WEAPON_GUN || this.weaponMode === WEAPON_MINIGUN) {
-            this.executeShot(targets);
-            this.shootCooldown = this.weaponMode === WEAPON_MINIGUN ? 0.05 : this.shootInterval;
-          } else if (this.weaponMode === WEAPON_MAG7) {
+          if (this.weaponMode === WEAPON_TYPES.MAG7) {
             this.executeMag7Shot();
-            this.shootCooldown = 1.5; // MAG7 射击间隔较长 (1500ms)
+            this.shootCooldown = 1.5;
+          } else {
+            this.executeShot(targets);
+            this.shootCooldown = this.weapon.config.fireRate;
           }
         }
-        return; // 射击后跳过常规挖掘逻辑
+        return;
       }
-
       if (hits.length > 0 && hits[0].distance < 9) {
-        const hit = hits[0];
-        const m = hit.object;
-        const instanceId = hit.instanceId;
-        const type = m.userData.type || 'unknown';
-
-        // 处理功能组合键 (Ctrl + 左键)
+        const hit = hits[0], m = hit.object, type = m.userData.type || 'unknown';
         if (e.ctrlKey) {
           if (type === 'tnt') {
             if (m.isInstancedMesh) {
-              m.getMatrixAt(instanceId, this._dummyMatrix);
+              m.getMatrixAt(hit.instanceId, this._dummyMatrix);
               this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
             } else {
               this._tempVector.copy(m.position);
             }
-            const key = `${this._tempVector.x},${this._tempVector.y},${this._tempVector.z}`;
-            if (!this.ignitingTNTs.has(key)) {
-              this.ignitingTNTs.add(key);
+            if (!this.ignitingTNTs.has(`${this._tempVector.x},${this._tempVector.y},${this._tempVector.z}`)) {
+              this.ignitingTNTs.add(`${this._tempVector.x},${this._tempVector.y},${this._tempVector.z}`);
               this.explode(this._tempVector.x, this._tempVector.y, this._tempVector.z);
               this.swing();
             }
           }
-          // 只要按住了 Ctrl，无论是否是 TNT，都阻止常规挖掘动作
           return;
         }
-
-        // 处理箱子挖掘（如果未打开则直接打开）
         if (type === 'chest' && m.isInstancedMesh) {
-          m.getMatrixAt(instanceId, this._dummyMatrix);
+          m.getMatrixAt(hit.instanceId, this._dummyMatrix);
           this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
-          const info = m.userData.chests[instanceId];
-          if (!info.open) {
-            this.openChest(m, instanceId, this._tempVector);
+          if (!m.userData.chests[hit.instanceId].open) {
+            this.openChest(m, hit.instanceId, this._tempVector);
             this.swing();
             return;
           }
@@ -1101,370 +572,144 @@ export class Player {
     }
   }
 
-  /**
-    * 打开箱子逻辑
-    */
   openChest(mesh, instanceId, pos) {
     const info = mesh.userData.chests[instanceId];
     if (!info || info.open) return;
     info.open = true;
-
-    // 生成箱子开启旋转动画
     chestManager.spawnChestAnimation(pos, this.world.scene);
-
-    // 从实例化网格中“移除”原始箱子方块
     mesh.getMatrixAt(instanceId, this._dummyMatrix);
     this._dummyMatrix.scale(this._zeroVector);
     mesh.setMatrixAt(instanceId, this._dummyMatrix);
     mesh.instanceMatrix.needsUpdate = true;
-
-    // 根据高度确定掉落物品（天域宝藏 vs 普通）
-    let drops = [];
-    if (pos.y > 60) {
-      drops = ['diamond', 'god_sword', 'gold_apple'];
-      if (this.game && this.game.ui && this.game.ui.hud) {
-        this.game.ui.hud.showMessage(`发现天域宝藏！获得: 钻石, 神剑, 金苹果!`);
-      }
-    } else {
-      const possible = ['diamond', 'gold', 'apple', 'bookbox', 'planks'];
-      const item = possible[Math.floor(Math.random() * possible.length)];
-      drops = [item, item];
-      if (this.game && this.game.ui && this.game.ui.hud) {
-        this.game.ui.hud.showMessage(`你打开了箱子，发现了: ${item} x2`);
-      }
-    }
+    const drops = pos.y > 60 ? ['diamond', 'god_sword', 'gold_apple'] : [['diamond', 'gold', 'apple', 'bookbox', 'planks'][Math.floor(Math.random() * 5)]].concat([['diamond', 'gold', 'apple', 'bookbox', 'planks'][Math.floor(Math.random() * 5)]]);
     drops.forEach(item => this.inventory.add(item, 1));
   }
 
-  /**
-    * 尝试在指定位置放置方块
-    */
   tryPlaceBlock(x, y, z, type) {
-    // 如果位置已有实心方块，无法放置
     if (this.physics.isSolid(x, y, z)) return false;
-
-    // 检查是否与玩家自身碰撞 (AABB 碰撞检测)
-    // 玩家占据的空间：[x - 0.3, x + 0.3], [y, y + 1.8], [z - 0.3, z + 0.3] (略微缩小判定区以提升放置体验)
-    // 方块占据的空间：[x, x + 1], [y, y + 1], [z, z + 1]
-    const playerMinX = this.position.x - 0.3;
-    const playerMaxX = this.position.x + 0.3;
-    const playerMinZ = this.position.z - 0.3;
-    const playerMaxZ = this.position.z + 0.3;
-    const playerMinY = this.position.y;
-    const playerMaxY = this.position.y + 1.8;
-
-    const blockMinX = x;
-    const blockMaxX = x + 1;
-    const blockMinY = y;
-    const blockMaxY = y + 1;
-    const blockMinZ = z;
-    const blockMaxZ = z + 1;
-
-    if (playerMinX < blockMaxX && playerMaxX > blockMinX &&
-        playerMinY < blockMaxY && playerMaxY > blockMinY &&
-        playerMinZ < blockMaxZ && playerMaxZ > blockMinZ) {
-      return false;
-    }
-
-    // 添加到世界
+    if (this.position.x - 0.3 < x + 1 && this.position.x + 0.3 > x && this.position.y < y + 1 && this.position.y + 1.8 > y && this.position.z - 0.3 < z + 1 && this.position.z + 0.3 > z) return false;
     this.world.setBlock(x, y, z, type);
     this.inventory.remove(type, 1);
     audioManager.playSound('put', 0.3);
     return true;
   }
 
-  /**
-    * 移除方块并生成掉落物和粒子
-    */
   removeBlock(hit) {
     let m = hit.object;
-    const instanceId = hit.instanceId;
-
-    // 向上查找实体父节点，确保能正确识别 Rook 等复合实体
-    let entity = m;
-    while (entity && !entity.userData.isEntity && entity.parent) {
-      if (entity.isInstancedMesh || entity.type === 'Scene') break;
-      entity = entity.parent;
-    }
-    if (entity && entity.userData.isEntity) {
-      m = entity;
-    }
-
+    while (m && !m.userData.isEntity && m.parent && !m.isInstancedMesh && m.type !== 'Scene') m = m.parent;
     const type = m.userData.type || 'unknown';
-
-    // 不可破坏方块检查
     if (type === 'end_stone') return;
-
     if (m.isInstancedMesh) {
-      m.getMatrixAt(instanceId, this._dummyMatrix);
+      m.getMatrixAt(hit.instanceId, this._dummyMatrix);
       this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
-
-      // 通过缩放为0实现“视觉移除”
       this._dummyMatrix.scale(this._zeroVector);
-      m.setMatrixAt(instanceId, this._dummyMatrix);
+      m.setMatrixAt(hit.instanceId, this._dummyMatrix);
       m.instanceMatrix.needsUpdate = true;
-
-      // 生成挖掘粒子
-      this.spawnParticles(this._tempVector, m.userData.type);
-
-      // 逻辑移除
-      const x = Math.floor(this._tempVector.x);
-      const y = Math.floor(this._tempVector.y);
-      const z = Math.floor(this._tempVector.z);
-      this.world.removeBlock(x, y, z);
+      this.spawnParticles(this._tempVector, type);
+      this.world.removeBlock(Math.floor(this._tempVector.x), Math.floor(this._tempVector.y), Math.floor(this._tempVector.z));
       audioManager.playSound('delete_get', 0.3);
-
-      // 给予物品
-      const type = m.userData.type;
-      if (type !== 'water' && type !== 'cloud') {
-        this.inventory.add(type === 'grass' ? 'dirt' : type, 1);
-      }
+      if (type !== 'water' && type !== 'cloud') this.inventory.add(type === 'grass' ? 'dirt' : type, 1);
     } else {
-      // --- 处理标准网格 (非 InstancedMesh) ---
-
-      // 检查是否为我们定义的实体 (如 Rook)
       if (m.userData.isEntity) {
-        // 1. 如果实体有关联的碰撞块，则使用专用的无副作用函数移除它们
-        if (m.userData.collisionBlocks && Array.isArray(m.userData.collisionBlocks)) {
-          m.userData.collisionBlocks.forEach(blockPos => {
-            this.world.removeBlockCollider(blockPos.x, blockPos.y, blockPos.z);
-          });
-        }
-
-        // 2. 移除实体本身的可视化模型
-        if (m.parent) {
-          m.parent.remove(m);
-        }
-
-        // 3. 生成粒子效果
-        this.spawnParticles(m.position, m.userData.type || 'stone'); // 使用石头作为后备粒子类型
-
-        // 4. (可选) 给予物品
-        if (m.userData.type === 'chest') {
+        if (m.userData.collisionBlocks) m.userData.collisionBlocks.forEach(p => this.world.removeBlockCollider(p.x, p.y, p.z));
+        if (m.parent) m.parent.remove(m);
+        this.spawnParticles(m.position, type || 'stone');
+        if (type === 'chest') {
           this.world.removeBlock(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z));
           this.inventory.add('chest', 1);
           audioManager.playSound('delete_get', 0.3);
         }
-
       } else {
-        // --- 如果是普通的动态方块 (非实体) ---
-        this.world.removeBlock(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z));
+        const bx = Math.floor(m.position.x), by = Math.floor(m.position.y), bz = Math.floor(m.position.z);
+        this.world.removeBlock(bx, by, bz);
         audioManager.playSound('delete_get', 0.3);
-        this.spawnParticles(m.position, m.userData.type);
+        this.spawnParticles(m.position, type);
         if (m.parent) m.parent.remove(m);
-
-        const type = m.userData.type;
-        if (type === 'realistic_trunk') {
-          this.inventory.add('wood', 1);
-        } else if (type === 'realistic_leaves') {
-          if (Math.random() < 0.8) this.inventory.add('leaves', 1);
-        } else {
-          this.inventory.add(type, 1);
-        }
+        if (type === 'realistic_trunk') this.inventory.add('wood', 1);
+        else if (type === 'realistic_leaves') { if (Math.random() < 0.8) this.inventory.add('leaves', 1); }
+        else this.inventory.add(type, 1);
       }
     }
   }
 
-  /**
-   * 处理从 Worker 返回的爆炸计算结果
-   */
   handleExplosionResult(data) {
-    const { action, payload } = data;
-    if (action === 'explosionResult') {
-      const { blocksToDestroy, tntToIgnite, center } = payload;
-
-      // 1. 追踪引燃中的 TNT
+    if (data.action === 'explosionResult') {
+      const { blocksToDestroy, tntToIgnite, center } = data.payload;
       const ignitingKeys = new Set(this.ignitingTNTs);
       tntToIgnite.forEach(tnt => ignitingKeys.add(`${tnt.x},${tnt.y},${tnt.z}`));
-
-      // 2. 执行批量销毁
-      // 过滤掉不可破坏方块和正在引燃中的 TNT
-      const validDestruction = blocksToDestroy.filter(p => {
-        const key = `${p.x},${p.y},${p.z}`;
-        if (ignitingKeys.has(key)) return false;
-
+      this.world.removeBlocksBatch(blocksToDestroy.filter(p => {
+        if (ignitingKeys.has(`${p.x},${p.y},${p.z}`)) return false;
         const type = this.world.getBlock(p.x, p.y, p.z);
-        if (!type) return false;
-        if (type === 'end_stone') {
-          const below = this.world.getBlock(p.x, p.y - 1, p.z);
-          if (!below) return false;
-        }
-        return true;
-      });
-
-      this.world.removeBlocksBatch(validDestruction);
-
-      // 3. 调度连锁反应
+        return type && (type !== 'end_stone' || this.world.getBlock(p.x, p.y - 1, p.z));
+      }));
       tntToIgnite.forEach(tnt => {
         const key = `${tnt.x},${tnt.y},${tnt.z}`;
         if (this.ignitingTNTs.has(key)) return;
-
         this.ignitingTNTs.add(key);
-
         setTimeout(() => {
-          // 在爆炸时刻移除方块
           this.world.removeBlock(tnt.x, tnt.y, tnt.z);
           this.ignitingTNTs.delete(key);
           this.explode(tnt.x, tnt.y, tnt.z);
         }, tnt.delay);
       });
-
-      // 4. 视觉与听觉效果
       this._tempVector.set(center.x + 0.5, center.y + 0.5, center.z + 0.5);
-      if (this.world.spawnExplosionParticles) {
-        this.world.spawnExplosionParticles(this._tempVector);
-      }
-
-      // 播放爆炸音效 (使用 AudioManager)
+      if (this.world.spawnExplosionParticles) this.world.spawnExplosionParticles(this._tempVector);
       audioManager.playSound('explosion', 0.4);
     }
   }
 
-  /**
-   * 执行 TNT 爆炸逻辑
-   */
   explode(x, y, z) {
-    const bx = Math.floor(x);
-    const by = Math.floor(y);
-    const bz = Math.floor(z);
-
-    // 在正式计算爆炸前，确保移除方块（如果是手动触发）
-    const key = `${bx},${by},${bz}`;
+    const bx = Math.floor(x), by = Math.floor(y), bz = Math.floor(z);
     if (this.world.getBlock(bx, by, bz) === 'tnt') {
       this.world.removeBlock(bx, by, bz);
-      this.ignitingTNTs.delete(key);
+      this.ignitingTNTs.delete(`${bx},${by},${bz}`);
     }
-
-    // 收集周围区块的 Deltas 发送给 Worker
     const nearbyDeltas = {};
-
-    // 只需要 5x5x5 范围涉及的方块状态
-    for (let dx = -3; dx <= 3; dx++) {
-      for (let dy = -3; dy <= 3; dy++) {
+    for (let dx = -3; dx <= 3; dx++)
+      for (let dy = -3; dy <= 3; dy++)
         for (let dz = -3; dz <= 3; dz++) {
-          const tx = bx + dx;
-          const ty = by + dy;
-          const tz = bz + dz;
+          const tx = bx + dx, ty = by + dy, tz = bz + dz;
           const type = this.world.getBlock(tx, ty, tz);
           if (type) nearbyDeltas[`${tx},${ty},${tz}`] = type;
         }
-      }
-    }
-
-    this.explosionWorker.postMessage({
-      action: 'calculateExplosion',
-      payload: { x, y, z, nearbyDeltas }
-    });
+    this.explosionWorker.postMessage({ action: 'calculateExplosion', payload: { x, y, z, nearbyDeltas } });
   }
 
-  /**
-   * 生成挖掘粒子效果
-   */
-  spawnParticles(pos, type) {
-    if (this.world.spawnParticles) {
-      this.world.spawnParticles(pos, type);
-    }
-  }
+  spawnParticles(pos, type) { if (this.world.spawnParticles) this.world.spawnParticles(pos, type); }
 
-  /**
-    * 空中/虚空放置方块逻辑
-    */
   doSkyPlace(type) {
     const origin = this.camera.position;
     this.camera.getWorldDirection(this._direction);
-
-    const step = 0.1;
-    const maxDist = 9;
+    const step = 0.1, maxDist = 9;
     this._tempVector.copy(origin);
-
-    const neighborOffsets = [
-      [1, 0, 0],   // 东
-      [-1, 0, 0],  // 西
-      [0, 1, 0],   // 上
-      [0, -1, 0],  // 下
-      [0, 0, 1],   // 南
-      [0, 0, -1]   // 北
-    ];
-
+    const neighborOffsets = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
     for(let d=0; d<maxDist; d+=step) {
-      // 步进：rayPos.add(direction * step)
-      this._muzzleOffset.copy(this._direction).multiplyScalar(step);
-      this._tempVector.add(this._muzzleOffset);
-
-      const rx = Math.floor(this._tempVector.x);
-      const ry = Math.floor(this._tempVector.y);
-      const rz = Math.floor(this._tempVector.z);
-
+      this._tempVector.addScaledVector(this._direction, step);
+      const rx = Math.floor(this._tempVector.x), ry = Math.floor(this._tempVector.y), rz = Math.floor(this._tempVector.z);
       if (!this.physics.isSolid(rx, ry, rz)) {
-        let hasSolidNeighbor = false;
-        let allInvisible = true;
-
+        let hasSolidNeighbor = false, allInvisible = true;
         for (const [dx, dy, dz] of neighborOffsets) {
-          const nx = rx + dx;
-          const ny = ry + dy;
-          const nz = rz + dz;
-          if (this.physics.isSolid(nx, ny, nz)) {
+          if (this.physics.isSolid(rx + dx, ry + dy, rz + dz)) {
             hasSolidNeighbor = true;
-            // 复用 _muzzlePos 作为临时 normal
-            this._muzzlePos.set(dx, dy, dz).normalize();
-            const dot = this._direction.dot(this._muzzlePos);
-            if (dot > 0.01) {
-              allInvisible = false;
-              break;
-            }
+            if (this._direction.dot(new THREE.Vector3(dx, dy, dz).normalize()) > 0.01) { allInvisible = false; break; }
           }
         }
-
-        if (hasSolidNeighbor && allInvisible) {
-          if (this.tryPlaceBlock(rx, ry, rz, type)) {
-            this.swing();
-            return;
-          }
-        }
-      } else {
-        break;
-      }
+        if (hasSolidNeighbor && allInvisible) { if (this.tryPlaceBlock(rx, ry, rz, type)) { this.swing(); return; } }
+      } else break;
     }
   }
 
-  /**
-   * 挥动手臂动作
-   */
-  swing() {
-    this.swingTime = 10;
-  }
+  swing() { this.swingTime = 10; }
 
-  /**
-   * 更新手臂动画
-   */
   updateArm(dt) {
-    if (this.weaponMode !== WEAPON_ARM) {
-      this.arm.visible = false;
-      return;
-    }
-
-    this.arm.visible = true; // 徒手模式下始终可见
-
-    // 更新拿起动画进度
-    if (this.drawProgress < 1) {
-      this.drawProgress = Math.min(1, this.drawProgress + dt * 4);
-    }
-
-    // 计算拿起动画的垂直偏移
-    const drawYOffset = Math.pow(1 - this.drawProgress, 2) * 0.5;
-
-    // 始终确保手臂处于正确的基础位置和缩放，防止挥动时位置跳变
-    this.arm.position.set(0.07, -0.10 - drawYOffset, -0.12);
+    if (this.weaponMode !== WEAPON_TYPES.ARM) { this.arm.visible = false; return; }
+    this.arm.visible = true;
+    if (this.drawProgress < 1) this.drawProgress = Math.min(1, this.drawProgress + dt * 4);
+    this.arm.position.set(0.07, -0.10 - Math.pow(1 - this.drawProgress, 2) * 0.5, -0.12);
     this.arm.scale.set(0.1, 0.1, 0.1);
-
     if (this.swingTime > 0) {
-      // 优化挥臂动作：平滑的正弦曲线，从静止(-0.8)挥下再回到静止
-      const p = (10 - this.swingTime) / 10;
-      this.arm.rotation.x = -0.8 - Math.sin(p * Math.PI) * 0.87;
+      this.arm.rotation.x = -0.8 - Math.sin((10 - this.swingTime) / 10 * Math.PI) * 0.87;
       this.swingTime--;
-    } else {
-      // 静止时的旋转角度
-      this.arm.rotation.x = -0.8;
-    }
+    } else this.arm.rotation.x = -0.8;
   }
 }

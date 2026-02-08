@@ -2,7 +2,7 @@
 // 宝箱动画管理模块
 // 负责宝箱开启动画的生成、更新和移除
 import * as THREE from 'three';
-import { materials } from '../../core/materials/MaterialManager.js';
+import { materials } from '../../core/MaterialManager.js';
 
 /**
  * 宝箱动画管理器类

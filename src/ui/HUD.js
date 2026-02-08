@@ -1,5 +1,5 @@
 // src/ui/HUD.js
-import { materials } from '../core/materials/MaterialManager.js';
+import { materials } from '../core/MaterialManager.js';
 
 // 物品颜色配置表 - 用于UI渲染（颜色查找）
 // 在实际应用中，这些配置可能来自统一的物品管理器

@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **代码规范**:
   - 强制使用 ES6 Modules (`import`/`export`)，通过 CDN 加载 Three.js。
   - 遵循面向对象编程模式（类名大写，属性驼峰命名）。
-  - 资源必须通过 `src/core/materials/MaterialManager.js` 统一管理。
+  - 资源必须通过 `src/core/MaterialManager.js` 统一管理。
   - 方块属性（碰撞、透明度、AO等）必须通过 `src/constants/BlockData.js` 统一配置。
   - 所有新功能必须在 `specs/` 目录下创建规格文档。
 
@@ -29,6 +29,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 2. **逻辑层 (Game/Player)**:
    - `src/core/Game.js`: 驱动主循环，协调各子系统。
    - `src/entities/player/Player.js` & `src/entities/player/Physics.js`: 处理控制、重力和方块碰撞。
+   - `src/entities/weapon/Gun.js`: 处理武器模型、射击逻辑与效果。
 3. **数据/世界层 (World)**:
    - `src/world/World.js`: 管理区块的动态加载/卸载（渲染距离：3）。
    - `src/world/Chunk.js`: 核心渲染单元，使用 `THREE.InstancedMesh` 优化性能。
@@ -38,9 +39,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - `src/services/PersistenceService.js`: 使用 IndexedDB 存储世界修改。
 
 ### 关键系统
+- **资产系统**: 所有静态资源存放于 `src/assets/`。
 - **方块数据系统**: `src/constants/BlockData.js` 是所有方块属性的单一真理来源，决定了物理碰撞、面剔除和 AO 渲染行为。
-- **隐藏面剔除 (Face Culling)**: `src/core/FaceCullingSystem.js` 结合 `BlockData.js` 管理方块可见面，优化渲染性能。
-- **材质系统**: `MaterialManager.js` 负责材质注册与纹理预加载，支持程序化纹理和 AO 着色器注入。
+- **隐藏面剔除 (Face Culling)**: `src/core/FaceCullingSystem.js` 结合 `src/utils/FaceCullingUtils.js` 管理方块可见面。
+- **材质系统**: `src/core/MaterialManager.js` 负责材质注册与纹理预加载。
 
 ## 开发工作流
 
@@ -51,6 +53,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 3. **代码提交**: 遵循约定式提交 (Conventional Commits)，优先使用 `Skill("commit")`。
 
 ## 最近功能
+- **012-codebase-refactor**: 架构解耦，提取 Gun 类与物理逻辑。
+- **011-minigun-weapon**: 新增加特林机枪武器。
 - **010-block-data-refactor**: 集中化方块属性管理系统。
 - **009-player-gun**: 玩家射击系统与后坐力反馈。
 - **008-save-game**: 手动存档与导出系统。
@@ -64,8 +68,5 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **000-fps-optimization**: 渲染管线与性能监控优化。
 
 ## Active Technologies
-- JavaScript (ES6 Modules) + Three.js (via CDN), GLTFLoader (011-minigun-weapon)
-- N/A (武器状态不持久化，仅位置/修改通过 PersistenceService 存储) (011-minigun-weapon)
-
-## Recent Changes
-- 011-minigun-weapon: Added JavaScript (ES6 Modules) + Three.js (via CDN), GLTFLoader
+- JavaScript (ES6 Modules) + Three.js (via CDN), GLTFLoader (012-codebase-refactor)
+- IndexedDB (via PersistenceService.js) (012-codebase-refactor)
