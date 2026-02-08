@@ -132,7 +132,8 @@ export async function initializeAudio() {
     './src/world/assets/sound/running_water.mp3',
     './src/world/assets/sound/running_land.mp3',
     './src/world/assets/sound/bgm.mp3',
-    './src/world/assets/sound/gun_fire.mp3'
+    './src/world/assets/sound/gun_fire.mp3',
+    './src/world/assets/sound/gun_load.mp3'
   ];
   await audioManager.preloadSounds(soundUrls);
 }

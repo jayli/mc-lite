@@ -156,6 +156,11 @@ export class Player {
         this.weaponMode = (this.weaponMode + 1) % 3;
         this.drawProgress = 0; // 切换武器时重置拿起动画进度
         console.log('武器切换:', this.weaponMode);
+
+        // 切换到 Gun 或 Mag7 时播放换弹/上膛音效
+        if (this.weaponMode === WEAPON_GUN || this.weaponMode === WEAPON_MAG7) {
+          audioManager.playSound('gun_load', 0.4);
+        }
       }
     });
     window.addEventListener('keyup', e => {
