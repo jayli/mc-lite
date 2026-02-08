@@ -249,7 +249,23 @@ export class Chunk {
     const callbackKey = `${this.cx},${this.cz}`;
     // 注册 Worker 回调处理合并结果
     workerCallbacks.set(callbackKey, (data) => {
-      const { d, visibleKeys, solidBlocks } = data;
+      let { d, visibleKeys, solidBlocks } = data;
+
+      // --- 核心修复：根据主线程最新的 blockData 进行二次过滤，防止竞态导致的“幻影方块” ---
+      if (visibleKeys) {
+        visibleKeys = visibleKeys.filter(key => !!this.blockData[key]);
+      }
+      if (solidBlocks) {
+        solidBlocks = solidBlocks.filter(key => !!this.blockData[key]);
+      }
+      if (d) {
+        for (const type in d) {
+          d[type] = d[type].filter(pos => {
+            const key = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
+            return !!this.blockData[key];
+          });
+        }
+      }
 
       // 1. 同步可见性状态与碰撞状态 (完全替换，确保剔除状态同步)
       // 注意：需要保留在合并过程中新产生的动态数据
@@ -313,7 +329,7 @@ export class Chunk {
       }
 
       // 3. 构建新的渲染网格 (跳过实体，因为实体已存在)
-      this.buildMeshes(d, true);
+      this.buildMeshes(d);
 
       // --- 关键：还原宝箱状态 ---
       if (savedChestStates.size > 0) {
@@ -504,7 +520,7 @@ export class Chunk {
    * @param {Object} d - 数据收集对象，包含按类型分类的方块位置数组
    * @param {boolean} skipEntities - 是否跳过实体生成逻辑（用于合并优化）
    */
-  buildMeshes(d, skipEntities = false) {
+  buildMeshes(d) {
     // 创建一个虚拟对象用于计算每个实例的变换矩阵 (Matrix4)
     const dummy = new THREE.Object3D();
 
@@ -957,7 +973,7 @@ export class Chunk {
               const mz = Math.floor(pos.z);
 
               const isMatch = positions.some(p =>
-                Math.floor(p.x) === mx && Math.floor(p.y) === cy && Math.floor(p.z) === cz
+                Math.floor(p.x) === mx && Math.floor(p.y) === my && Math.floor(p.z) === mz
               );
 
               if (isMatch) {
