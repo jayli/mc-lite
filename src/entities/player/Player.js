@@ -769,7 +769,7 @@ export class Player {
     this.spawnTracer(this._muzzlePos, this._targetPos);
 
     // 4. 播放射击音效
-    const sound = this.weaponMode === WEAPON_MAG7 ? 'explosion' : 'gun_fire'; // 暂时用 explosion 模拟大威力声音，后续可替换
+    const sound = this.weaponMode === WEAPON_MAG7 ? 'mag7_fire' : 'gun_fire';
     const volume = this.weaponMode === WEAPON_MAG7 ? 0.2 : 0.09;
     audioManager.playSound(sound, volume);
   }
