@@ -147,6 +147,8 @@ export class Player {
 
     this.mag7Timeouts = []; // 存储 MAG7 射击相关的定时器
     this.drawProgress = 1;  // 拿起动画进度 (0-1)
+    this.minigunRotation = 0; // Minigun 枪管旋转角度
+    this.minigunSpinSpeed = 0; // Minigun 旋转速度
   }
 
   /**
@@ -531,6 +533,17 @@ export class Player {
     const actualDz = this.position.z - oldZ;
 
     this.updateArm(dt);
+
+    // 更新 Minigun 旋转逻辑
+    if (this.weaponMode === WEAPON_MINIGUN) {
+      if (this.isShooting) {
+        this.minigunSpinSpeed = THREE.MathUtils.lerp(this.minigunSpinSpeed, 25 * dt, 0.1);
+      } else {
+        this.minigunSpinSpeed = THREE.MathUtils.lerp(this.minigunSpinSpeed, 0, 0.05);
+      }
+      this.minigunRotation += this.minigunSpinSpeed;
+    }
+
     this.updateGun(dt);
     this.handleShooting(dt); // 处理连发逻辑
     this.updateCameraBob(actualDx, actualDz, dt, isCurrentlyStuck);
@@ -713,6 +726,12 @@ export class Player {
       console.log('正在切换并加载武器模型...', this.weaponMode);
       this.gun = targetModel.clone();
       this.gun.userData.sourceModel = targetModel; // 标记来源以便追踪
+
+      // 修复 Minigun 旋转死锁 (Gimbal Lock)
+      if (this.weaponMode === WEAPON_MINIGUN) {
+        this.gun.rotation.order = 'YXZ';
+      }
+
       this.camera.add(this.gun);
       this.gun.rotation.y = 0;
     }
@@ -745,10 +764,11 @@ export class Player {
         this.gun.rotation.y = - Math.PI / 2; // 纠正朝向：从之前的向左转为向前
       } else if (this.weaponMode === WEAPON_MINIGUN) {
         // Minigun 配置：修正前后和上下反转
-        this.gun.position.set(0.48, - 0.7 - drawYOffset, /*-*/ 0.6 + this.gunRecoil);
+        this.gun.position.set(0.48, - 0.56 - drawYOffset, /*-*/ /*0.6*/ 0.6 + this.gunRecoil);
         this.gun.scale.set(0.5, 0.5, 0.5);
-        this.gun.rotation.y = - Math.PI / 2;  // 修正前后：从 -PI/2 改为 PI/2
-        this.gun.rotation.x = Math.PI;      // 修正上下：旋转 180 度
+        this.gun.rotation.y = - Math.PI / 2;  // 修正前后 (Yaw)
+        this.gun.rotation.x = - Math.PI / 2 + this.minigunRotation;      // 修正上下 (Pitch)
+        this.gun.rotation.z = - Math.PI; // 应用枪管旋转 (Roll)
       }
 
       // 逐渐恢复后坐力
