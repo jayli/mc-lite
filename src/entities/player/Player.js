@@ -785,7 +785,7 @@ export class Player {
     if (this.weaponMode === WEAPON_MAG7) {
       this.gunRecoil = 0.15;
     } else if (this.weaponMode === WEAPON_MINIGUN) {
-      this.gunRecoil = 0.03;
+      this.gunRecoil = 0; // 去掉 Minigun 后坐力
     } else {
       this.gunRecoil = 0.05;
     }
