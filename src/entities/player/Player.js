@@ -463,7 +463,8 @@ export class Player {
     const py = Math.floor(this.position.y);
 
     for(let k=0; k<=4; k++) {
-      if(this.physics.isSolid(px, py - k, pz)) {
+      const blockType = this.world.getBlock(px, py - k, pz);
+      if(this.physics.isSolid(px, py - k, pz) || blockType === 'cloud') {
         gy = py - k + 1;
         break;
       }
