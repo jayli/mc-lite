@@ -22,7 +22,7 @@ export const FOG_NEAR = 30;
 // 雾的完全覆盖距离（米）
 export const FOG_FAR = 70;
 // 阴影贴图的分辨率大小（像素）
-export const SHADOW_MAP_SIZE = 712;
+export const SHADOW_MAP_SIZE = 512;
 // 阴影相机的覆盖范围大小（米）
 export const SHADOW_CAMERA_SIZE = 30;
 
@@ -54,7 +54,7 @@ export class Engine {
       powerPreference: "high-performance" // 提示浏览器使用高性能 GPU
     });
     this.renderer.shadowMap.enabled = true; // 启用阴影系统
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.resolutionScale = 0.7;        // 初始渲染分辨率缩放系数
     this.renderer.setPixelRatio(this.resolutionScale);
 
