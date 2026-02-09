@@ -347,62 +347,63 @@ export class Engine {
         varying vec3 vWorldPosition;
         varying float vDepth;
 
-        float getNoise(float x, float z, float scale) {
-          return sin((x + uSeed) * scale) * 2.0 + cos((z + uSeed) * scale) * 2.0;
-        }
-
-        float getHeight(float x, float z) {
-          float h = getNoise(x, z, 0.08) + getNoise(x, z, 0.02) * 3.0;
-          float temp = getNoise(x, z, 0.01);
-          float hum = getNoise(x + 1000.0, z + 1000.0, 0.015);
-
-          if (temp < -1.5) return h * 0.5 + 2.0;
-          if (temp > -1.5 && temp < -0.8 && hum > 0.5) return h * 0.3 - 2.0;
-          return h;
+        // 简化的地形高度函数（仅用于水面遮罩）
+        float getTerrainHeight(float x, float z) {
+          float nx = x + uSeed, nz = z + uSeed;
+          return sin(nx * 0.08) * 2.0 + cos(nz * 0.08) * 2.0 + sin(nx * 0.02) * 6.0 + cos(nz * 0.02) * 6.0;
         }
 
         void main() {
           vec2 pos = vWorldPosition.xz;
-          vec3 viewDir = normalize(cameraPosition - vWorldPosition);
-          float dist = length(vWorldPosition.xz - cameraPosition.xz);
+          float dist = length(pos - cameraPosition.xz);
 
-          if (dist < 60.0) {
-            bool nearOcean = false;
-            if (getHeight(pos.x, pos.y) < -0.8) {
-              nearOcean = true;
-            } else {
-              if (getHeight(pos.x + 4.0, pos.y) < -0.8) nearOcean = true;
-              else if (getHeight(pos.x - 4.0, pos.y) < -0.8) nearOcean = true;
-              else if (getHeight(pos.x, pos.y + 4.0) < -0.8) nearOcean = true;
-              else if (getHeight(pos.x, pos.y - 4.0) < -0.8) nearOcean = true;
-              else if (getHeight(pos.x + 3.0, pos.y + 3.0) < -0.8) nearOcean = true;
-              else if (getHeight(pos.x - 3.0, pos.y - 3.0) < -0.8) nearOcean = true;
-            }
-
+          // 水域遮罩：只在靠近海洋的地方显示水面（切入岸边约4个方块）
+          if (dist < 100.0) {
+            float h = getTerrainHeight(pos.x, pos.y);
+            // 检查中心点和周围4个方向，确保在海岸附近
+            bool nearOcean = h < -0.8;
             if (!nearOcean) {
-              discard;
+              const float offset = 3.5;
+              nearOcean = getTerrainHeight(pos.x + offset, pos.y) < -0.8 ||
+                          getTerrainHeight(pos.x - offset, pos.y) < -0.8 ||
+                          getTerrainHeight(pos.x, pos.y + offset) < -0.8 ||
+                          getTerrainHeight(pos.x, pos.y - offset) < -0.8;
             }
+            if (!nearOcean) discard;
           }
 
-          float detailMask = smoothstep(50.0, 30.0, dist);
+          // LOD：远距离减少计算
+          float detailMask = smoothstep(50.0, 25.0, dist);
+
+          // 基础波纹（始终计算）
           float waves = sin(pos.x * 1.5 + uTime * 5.5) * 0.1 + sin(pos.y * 1.3 - uTime * 3.2) * 0.1;
+
+          // 细节波纹（仅近距离计算）
           if (detailMask > 0.0) {
              waves += sin(pos.x * 2.8 + pos.y * 2.2 + uTime * 3.5) * 0.08 * detailMask;
              waves += sin(pos.x * -2.1 + pos.y * 3.7 + uTime * 2.8) * 0.06 * detailMask;
-             waves += sin((pos.x + pos.y) * 5.0 + uTime * 4.5) * 0.04 * detailMask;
           }
 
+          // 法线和视角方向
+          vec3 viewDir = normalize(cameraPosition - vWorldPosition);
           vec3 normal = normalize(vec3(waves * 2.0, 1.0, waves * 2.0));
 
+          // 太阳光镜面反射（Blinn-Phong）
           vec3 halfDir = normalize(uSunDirection + viewDir);
           float spec = pow(max(dot(normal, halfDir), 0.0), 100.0) * 8.0 * detailMask;
+
+          // 漫反射和环境散射
           float diffuse = max(dot(normal, uSunDirection), 0.0) * 0.15 * detailMask;
-          float scatter = (max(0.0, normal.y) * 0.08 + (waves * 0.05)) * detailMask;
+          float scatter = max(0.0, normal.y) * 0.08 * detailMask;
+
+          // Fresnel 边缘高光
           float fresnel = pow(1.0 - max(dot(vec3(0.0, 1.0, 0.0), viewDir), 0.0), 3.0);
 
+          // 合成颜色
           vec3 highlightColor = vec3(0.95, 0.98, 1.0);
           vec3 finalColor = uColor + highlightColor * (diffuse + scatter + spec + fresnel * 0.1);
 
+          // 雾效
           float fogFactor = smoothstep(uFogNear, uFogFar, vDepth);
           vec3 colorWithFog = mix(finalColor, uFogColor, fogFactor);
 
