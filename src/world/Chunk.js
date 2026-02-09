@@ -23,7 +23,7 @@ const CONSOLIDATION_DELAY = 1000;
 
 // --- Worker 设置 ---
 // 使用 Web Worker 处理计算密集型的地形生成，避免阻塞主线程（UI/渲染线程）
-const worldWorker = new Worker(new URL('./WorldWorker.js', import.meta.url), { type: 'module' });
+const worldWorker = new Worker(new URL('../workers/WorldWorker.js', import.meta.url), { type: 'module' });
 const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函数
 
     worldWorker.onmessage = (e) => {

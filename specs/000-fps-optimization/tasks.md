@@ -25,7 +25,7 @@
 **Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
 
 - [x] T003 Ensure `end_stone` material is correctly registered in `src/core/materials/MaterialManager.js`
-- [x] T004 [P] Identify the sea level constant (`wLvl`) in `src/world/WorldWorker.js`
+- [x] T004 [P] Identify the sea level constant (`wLvl`) in `src/workers/WorldWorker.js`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -41,7 +41,7 @@
 
 - [x] T005 [P] [US1] Implement local occupancy mapping in `Tree.generate` within `src/world/entities/Tree.js`
 - [x] T006 [US1] Implement 6-direction neighbor visibility check for leaf pruning in `src/world/entities/Tree.js`
-- [x] T007 [P] [US1] Implement seabed depth capping (max 2 layers) in `src/world/WorldWorker.js`
+- [x] T007 [P] [US1] Implement seabed depth capping (max 2 layers) in `src/workers/WorldWorker.js`
 - [x] T008 [P] [US1] 实现基于噪声的连续地底空洞（矿洞）逻辑，提高单片矿洞面积
 
 **Checkpoint**: At this point, the game should show a significant FPS improvement due to voxel count reduction.
@@ -57,7 +57,7 @@
 ### Implementation for User Story 2
 
 - [x] T009 [US2] Refine leaf pruning logic in `src/world/entities/Tree.js` to ensure "edge" leaves are never pruned (contacting `air`)
-- [x] T010 [US2] Verify that hollows in `src/world/WorldWorker.js` only start at `y < h - 1` to prevent surface holes
+- [x] T010 [US2] Verify that hollows in `src/workers/WorldWorker.js` only start at `y < h - 1` to prevent surface holes
 
 **Checkpoint**: At this point, the world should look identical to the baseline despite the internal optimizations.
 
@@ -111,8 +111,8 @@
 ```bash
 # Implement the three main optimization branches in parallel:
 Task: "Implement leaf pruning in src/world/entities/Tree.js"
-Task: "Implement seabed capping in src/world/WorldWorker.js"
-Task: "Implement inland hollows in src/world/WorldWorker.js"
+Task: "Implement seabed capping in src/workers/WorldWorker.js"
+Task: "Implement inland hollows in src/workers/WorldWorker.js"
 ```
 
 ---

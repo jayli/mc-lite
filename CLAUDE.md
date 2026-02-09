@@ -34,7 +34,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - `src/world/World.js`: 管理区块的动态加载/卸载（渲染距离：3）。
    - `src/world/Chunk.js`: 核心渲染单元，使用 `THREE.InstancedMesh` 优化性能。
    - **区块合并 (Consolidation)**: 玩家交互后的修改会异步合并到区块的主网格中。
-   - `src/world/TerrainGen.js` & `src/world/WorldWorker.js`: 地形生成与后处理逻辑，在 Web Worker 中异步执行。
+   - `src/world/TerrainGen.js` & `src/workers/WorldWorker.js`: 地形生成与后处理逻辑，在 Web Worker 中异步执行。
 4. **持久化层**:
    - `src/services/PersistenceService.js`: 使用 IndexedDB 存储世界修改。
 

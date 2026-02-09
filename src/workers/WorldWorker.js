@@ -1,9 +1,9 @@
-// src/world/WorldWorker.js
+// src/workers/WorldWorker.js
 import { setSeed } from '../utils/MathUtils.js';
-import { terrainGen } from './TerrainGen.js';
-import { Tree } from './entities/Tree.js';
-import { Cloud } from './entities/Cloud.js';
-import { Island } from './entities/Island.js';
+import { terrainGen } from '../world/TerrainGen.js';
+import { Tree } from '../world/entities/Tree.js';
+import { Cloud } from '../world/entities/Cloud.js';
+import { Island } from '../world/entities/Island.js';
 import { getBlockProperties, BLOCK_DATA } from '../constants/BlockData.js';
 
 const CHUNK_SIZE = 16;

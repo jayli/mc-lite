@@ -23,7 +23,7 @@
 
 - [x] T002 Add tracking properties (`dirtyBlocks`, `consolidationTimer`, `isConsolidating`, `dynamicMeshes`) to the `Chunk` class constructor in src/world/Chunk.js
 - [x] T003 Implement `scheduleConsolidation()` method in src/world/Chunk.js to handle debounce and threshold logic
-- [x] T004 [P] Update `WorldWorker.js` to handle snapshot-based full rebuilding without side effects in src/world/WorldWorker.js
+- [x] T004 [P] Update `WorldWorker.js` to handle snapshot-based full rebuilding without side effects in src/workers/WorldWorker.js
 - [x] T005 Update `Chunk.gen()` callback to ensure it can be reused for background consolidation in src/world/Chunk.js
 
 **Checkpoint**: Foundation ready - user story implementation can now begin.

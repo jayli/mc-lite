@@ -14,12 +14,12 @@
 ## Phase 1: Setup
 
 - [x] T001 Verify branch `003-land-caves` and workspace consistency
-- [x] T002 Identify terrestrial generation loop in `src/world/WorldWorker.js`
+- [x] T002 Identify terrestrial generation loop in `src/workers/WorldWorker.js`
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-- [x] T003 Define `ROOMS_PER_CHUNK` and `MAX_ROOM_SIZE` constants in `src/world/WorldWorker.js`
-- [x] T004 Implement random room seed generation logic in `src/world/WorldWorker.js`
+- [x] T003 Define `ROOMS_PER_CHUNK` and `MAX_ROOM_SIZE` constants in `src/workers/WorldWorker.js`
+- [x] T004 Implement random room seed generation logic in `src/workers/WorldWorker.js`
 
 ## Phase 3: User Story 1 - Large Scale Caves (Priority: P1) 🎯 MVP
 
@@ -29,9 +29,9 @@
 
 ### Implementation for User Story 1
 
-- [x] T005 [P] [US1] Implement AABB intersection helper function in `src/world/WorldWorker.js`
-- [x] T006 [US1] Integrate AABB check into terrestrial generation loop (Layer 2-10) in `src/world/WorldWorker.js`
-- [x] T007 [US1] Remove previous sparse 1D random hollow logic in `src/world/WorldWorker.js`
+- [x] T005 [P] [US1] Implement AABB intersection helper function in `src/workers/WorldWorker.js`
+- [x] T006 [US1] Integrate AABB check into terrestrial generation loop (Layer 2-10) in `src/workers/WorldWorker.js`
+- [x] T007 [US1] Remove previous sparse 1D random hollow logic in `src/workers/WorldWorker.js`
 
 **Checkpoint**: Contiguous caves are now functional.
 
@@ -43,8 +43,8 @@
 
 ### Implementation for User Story 2
 
-- [x] T008 [US2] Hardcode Layer 11 (`k=11`) to strictly solid in `src/world/WorldWorker.js`
-- [x] T009 [US2] Hardcode Layer 12 (`k=12`) to strictly `end_stone` in `src/world/WorldWorker.js`
+- [x] T008 [US2] Hardcode Layer 11 (`k=11`) to strictly solid in `src/workers/WorldWorker.js`
+- [x] T009 [US2] Hardcode Layer 12 (`k=12`) to strictly `end_stone` in `src/workers/WorldWorker.js`
 - [x] T010 [US2] Verify mining interception for `end_stone` in `src/entities/player/Player.js`
 
 **Checkpoint**: Solid foundation and indestructible bedrock are functional.

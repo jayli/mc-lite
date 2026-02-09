@@ -16,7 +16,7 @@
   - `k = 12`: Bedrock (`end_stone`).
   - `k = 11`: Solid layer (skip cave/hollow logic).
   - `2 <= k <= 10`: Potential cave layer.
-- **File**: `src/world/WorldWorker.js`.
+- **File**: `src/workers/WorldWorker.js`.
 
 ### 3. Indestructible Bedrock
 - Already implemented for `end_stone` in `Player.js`. Since `end_stone` is only used for the bottom layer on land (and seabed), this logic is sufficient.

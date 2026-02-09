@@ -105,8 +105,9 @@ src/
 ├── world/
 │   ├── Chunk.js                    # 区块管理（需要修改）
 │   ├── World.js                    # 世界管理（需要修改）
-│   ├── WorldWorker.js              # 世界生成Worker
 │   └── entities/                   # 实体定义
+├── workers/
+│   └── WorldWorker.js              # 世界生成Worker
 ├── services/
 │   └── PersistenceService.js       # 持久化服务
 ├── utils/

@@ -12,7 +12,7 @@
 - **Proposed Optimization**: Implement a visibility check. Only add leaf if at least one of its 6 neighbors is 'air' (not another leaf or log). Since we don't have a full chunk grid during tree generation, we'll use a local occupancy map for the tree structure.
 
 ### 2. Seabed Optimization
-- **Location**: `src/world/WorldWorker.js` (lines 62-73)
+- **Location**: `src/workers/WorldWorker.js` (lines 62-73)
 - **Current Logic**: If `h < wLvl` (-2), adds 4 layers of `sand` and potentially a `lilypad` or `ship`.
 - **Proposed Optimization**:
   - Layer 1 (`y=h`): `sand`.
@@ -21,7 +21,7 @@
   - `end_stone` is already defined in `MaterialManager.js` (line 340).
 
 ### 3. Inland Hollow Regions (Caves)
-- **Location**: `src/world/WorldWorker.js` (lines 82-85)
+- **Location**: `src/workers/WorldWorker.js` (lines 82-85)
 - **Current Logic**: Terrestrial loop `for (let k = 2; k <= 12; k++)` adds 11 layers of `stone` or `gold_ore`.
 - **Proposed Optimization**: Inside this loop, if `k >= 2`, apply `if (Math.random() < 0.4) continue;`.
 

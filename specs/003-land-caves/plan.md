@@ -48,7 +48,7 @@ src/
     └── WorldWorker.js          # Core cave generation logic
 ```
 
-**Structure Decision**: Single project. Focus on `src/world/WorldWorker.js` for generation and `src/entities/player/Player.js` for mining interaction.
+**Structure Decision**: Single project. Focus on `src/workers/WorldWorker.js` for generation and `src/entities/player/Player.js` for mining interaction.
 
 ## Phase 1: Design & Contracts
 
