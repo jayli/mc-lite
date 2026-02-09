@@ -24,7 +24,9 @@ const CONSOLIDATION_DELAY = 1000;
 // --- Worker 设置 ---
 // 使用 Web Worker 处理计算密集型的地形生成，避免阻塞主线程（UI/渲染线程）
 const worldWorker = new Worker(new URL('../workers/WorldWorker.js', import.meta.url), { type: 'module' });
+const faceCullingWorker = new Worker(new URL('../workers/FaceCullingWorker.js', import.meta.url), { type: 'module' });
 const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函数
+const faceCullingCallbacks = new Map(); // 用于跟踪隐藏面剔除请求的回调函数
 
     worldWorker.onmessage = (e) => {
   const { cx, cz, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot } = e.data;
@@ -32,6 +34,21 @@ const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函
   if (workerCallbacks.has(key)) {
     workerCallbacks.get(key)({ d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot });
     workerCallbacks.delete(key);
+  }
+};
+
+// 处理隐藏面剔除Worker的消息
+faceCullingWorker.onmessage = (e) => {
+  const { type, messageType, data, error, id } = e.data;
+
+  if (type === 'RESULT' && faceCullingCallbacks.has(id)) {
+    const callback = faceCullingCallbacks.get(id);
+    faceCullingCallbacks.delete(id);
+    callback(null, data);
+  } else if (type === 'ERROR' && faceCullingCallbacks.has(id)) {
+    const callback = faceCullingCallbacks.get(id);
+    faceCullingCallbacks.delete(id);
+    callback(new Error(error), null);
   }
 };
 

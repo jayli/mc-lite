@@ -319,6 +319,94 @@ onmessage = function(e) {
   });
 };
 
+// 用于隐藏面剔除的辅助函数
+const getBlockType = (x, y, z, blockMap) => {
+  const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+  const block = blockMap.get(key);
+  return block ? block.type : null;
+};
+
+const isTransparent = (type) => {
+  if (!type) return false;
+  // 根据BLOCK_DATA判断透明性
+  const props = BLOCK_DATA[type];
+  if (props) return props.isTransparent;
+  // 默认情况：'air', 'water'等为透明
+  return type === 'air' || type === 'water' || type === 'glass_block' ||
+         type === 'glass_blink' || type === 'flower' || type === 'short_grass' ||
+         type === 'allium' || type === 'vine' || type === 'lilypad';
+};
+
+/**
+ * 计算单个方块的可见面掩码
+ * @param {Object} block - 方块信息 {x, y, z, type}
+ * @param {Map} blockMap - 方块映射表
+ * @returns {number} 面掩码
+ */
+function calculateFaceVisibility(block, blockMap) {
+  if (block.type === 'chest' || block.type === 'collider') {
+    return 63; // 所有面都可见
+  }
+
+  if (isTransparent(block.type)) {
+    return 63; // 透明方块所有面可见
+  }
+
+  let mask = 0;
+  const { x, y, z } = block;
+
+  // 检查六个方向
+  if (!getBlockType(x, y + 1, z, blockMap) || isTransparent(getBlockType(x, y + 1, z, blockMap))) mask |= 1; // TOP
+  if (!getBlockType(x, y - 1, z, blockMap) || isTransparent(getBlockType(x, y - 1, z, blockMap))) mask |= 2; // BOTTOM
+  if (!getBlockType(x, y, z - 1, blockMap) || isTransparent(getBlockType(x, y, z - 1, blockMap))) mask |= 4; // NORTH
+  if (!getBlockType(x, y, z + 1, blockMap) || isTransparent(getBlockType(x, y, z + 1, blockMap))) mask |= 8; // SOUTH
+  if (!getBlockType(x - 1, y, z, blockMap) || isTransparent(getBlockType(x - 1, y, z, blockMap))) mask |= 16; // WEST
+  if (!getBlockType(x + 1, y, z, blockMap) || isTransparent(getBlockType(x + 1, y, z, blockMap))) mask |= 32; // EAST
+
+  return mask;
+}
+
+/**
+ * 批量更新方块可见面状态
+ * @param {Array} blockUpdates - 需要更新的方块列表
+ * @param {Map} blockMap - 当前方块映射表
+ * @returns {Object} 更新结果
+ */
+function batchCalculateFaceVisibility(blockUpdates, blockMap) {
+  const results = [];
+
+  // 也更新受影响的邻居方块
+  const allBlocksToCheck = new Set();
+
+  for (const update of blockUpdates) {
+    // 添加更新的方块
+    allBlocksToCheck.add(`${Math.floor(update.x)},${Math.floor(update.y)},${Math.floor(update.z)}`);
+
+    // 添加邻居方块
+    const { x, y, z } = update;
+    const neighbors = [
+      [x+1, y, z], [x-1, y, z], [x, y+1, z], [x, y-1, z], [x, y, z+1], [x, y, z-1]
+    ];
+
+    for (const [nx, ny, nz] of neighbors) {
+      allBlocksToCheck.add(`${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`);
+    }
+  }
+
+  for (const key of allBlocksToCheck) {
+    const [bx, by, bz] = key.split(',').map(Number);
+    const block = blockMap.get(key);
+    if (block) {
+      const visibility = calculateFaceVisibility(block, blockMap);
+      results.push({
+        x: bx, y: by, z: bz, type: block.type, visibility
+      });
+    }
+  }
+
+  return results;
+}
+
 // 复制结构生成逻辑
 function generateStructure(type, x, y, z, chunk, dObj, rovers = []) {
   if (type === 'house') {

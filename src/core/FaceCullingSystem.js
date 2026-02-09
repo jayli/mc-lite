@@ -202,6 +202,64 @@ export class FaceCullingSystem {
   }
 
   /**
+   * 计算多个方块的可见面位掩码（批量处理版本，适用于Worker）
+   * @param {Array} blocks - 方块数组，每个元素包含 {x, y, z, type}
+   * @param {Object} blockData - 完整的方块数据映射
+   * @returns {Array} 计算结果数组，每个元素包含 {x, y, z, type, visibility}
+   */
+  calculateMultipleFaceVisibilities(blocks, blockData) {
+    if (!this.enabled) {
+      return blocks.map(block => ({
+        x: block.x,
+        y: block.y,
+        z: block.z,
+        type: block.type,
+        visibility: faceMask.ALL
+      }));
+    }
+
+    const results = [];
+
+    for (const block of blocks) {
+      // 获取相邻方块
+      const neighbors = {
+        top: this.getBlockFromData(block.x, block.y + 1, block.z, blockData),
+        bottom: this.getBlockFromData(block.x, block.y - 1, block.z, blockData),
+        north: this.getBlockFromData(block.x, block.y, block.z - 1, blockData),
+        south: this.getBlockFromData(block.x, block.y, block.z + 1, blockData),
+        west: this.getBlockFromData(block.x - 1, block.y, block.z, blockData),
+        east: this.getBlockFromData(block.x + 1, block.y, block.z, blockData)
+      };
+
+      const visibility = this.calculateFaceVisibility(block, neighbors);
+
+      results.push({
+        x: block.x,
+        y: block.y,
+        z: block.z,
+        type: block.type,
+        visibility
+      });
+    }
+
+    return results;
+  }
+
+  /**
+   * 从方块数据中获取方块信息
+   * @param {number} x - X坐标
+   * @param {number} y - Y坐标
+   * @param {number} z - Z坐标
+   * @param {Object} blockData - 方块数据映射
+   * @returns {Object|null} 方块对象或null
+   */
+  getBlockFromData(x, y, z, blockData) {
+    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const type = blockData[key];
+    return type ? { type } : null;
+  }
+
+  /**
    * 判断是否应该显示面
    * @param {Object} currentBlock - 当前方块
    * @param {Object|null} neighborBlock - 相邻方块
@@ -749,6 +807,41 @@ export class FaceCullingSystem {
       neighborKey: neighborChunk ? `${neighborChunk.cx},${neighborChunk.cz}` : 'none',
       facesCalculated: 0
     };
+  }
+
+  /**
+   * 请求Worker计算方块可见性
+   * @param {Array} blocks - 要计算的方块列表
+   * @param {Object} blockData - 完整的方块数据
+   * @param {Function} callback - 回调函数
+   * @returns {number} 请求ID
+   */
+  requestWorkerCalculation(blocks, blockData, callback) {
+    // 检查是否支持Worker
+    if (typeof Worker !== 'undefined' && window.faceCullingWorker) {
+      const requestId = Date.now() + Math.random();
+
+      // 将回调存储起来
+      window.faceCullingCallbacks = window.faceCullingCallbacks || new Map();
+      window.faceCullingCallbacks.set(requestId, callback);
+
+      // 发送消息到Worker
+      window.faceCullingWorker.postMessage({
+        type: 'BATCH_CALCULATE_FACE_VISIBILITY',
+        id: requestId,
+        data: {
+          blockUpdates: blocks,
+          blockData: blockData
+        }
+      });
+
+      return requestId;
+    } else {
+      // 如果没有Worker支持，则在主线程计算
+      const results = this.calculateMultipleFaceVisibilities(blocks, blockData);
+      callback(null, results);
+      return null;
+    }
   }
 
   /**
