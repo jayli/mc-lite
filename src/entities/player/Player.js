@@ -654,7 +654,7 @@ export class Player {
 
   removeBlock(hit) {
     let m = hit.object;
-    while (m && !m.userData.isEntity && m.parent && !m.isInstancedMesh && m.type !== 'Scene') m = m.parent;
+    while (m && !m.userData.isEntity && !m.userData.type && m.parent && !m.isInstancedMesh && m.type !== 'Scene') m = m.parent;
     const type = m.userData.type || 'unknown';
     if (type === 'end_stone') return;
     if (m.isInstancedMesh) {
