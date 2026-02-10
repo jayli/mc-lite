@@ -32,6 +32,26 @@ export class Player {
     this.bobAmount = 0;            // 当前视角晃动强度 (步行动画)
     this.lastInputDirection = new THREE.Vector3(); // 记录最后的移动输入方向
 
+    // 初始出生点逻辑
+    let spawnFound = false;
+    for (let i = 0; i < 1000; i++) {
+      const tx = (Math.random() - 0.5) * 20000;
+      const tz = (Math.random() - 0.5) * 20000;
+
+      const biome = getBiome(tx, tz);
+      // 尝试在森林或平原生物群系出生
+      if (biome === 'FOREST' || biome === 'PLAINS') {
+        // 计算预估地形高度，确保不在水面上（海平面约 -1.5）
+        const h = Math.floor(noise(tx, tz, 0.08) + noise(tx, tz, 0.02) * 3);
+        if (h > -0.5) {
+          this.position.set(tx, 70, tz);
+          spawnFound = true;
+          break;
+        }
+      }
+    }
+    if (!spawnFound) this.position.set(0, 70, 0);
+
     // 移动与跳跃属性
     this.velocity = new THREE.Vector3(); // 玩家当前速度向量 (x, y, z)
     this.jumping = false;                // 是否处于跳跃/空中状态
