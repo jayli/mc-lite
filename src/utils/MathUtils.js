@@ -4,7 +4,7 @@ export const WORLD_CONFIG = {
 };
 
 export function setSeed(s) {
-  console.log(`[Seed] Setting global seed to: ${s}`);
+  // console.log(`[Seed] Setting global seed to: ${s}`);
   WORLD_CONFIG.SEED = s;
 }
 

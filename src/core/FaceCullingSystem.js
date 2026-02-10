@@ -1154,7 +1154,7 @@ export class FaceCullingSystem {
 
     if (warnings.length > 0) {
       const warningMessage = warnings.join('; ');
-      console.warn('性能警告:', warningMessage);
+      // console.warn('性能警告:', warningMessage);
       this.emit('performanceWarning', { warnings, snapshot });
     }
   }
