@@ -127,7 +127,7 @@ export const BLOCK_DATA = {
     isAOEnabled: false
   },
   'end_stone': {
-    isAOEnabled: false
+    isAOEnabled: true
   },
   'obsidian': {
     isAOEnabled: false
@@ -149,6 +149,7 @@ export const BLOCK_DATA = {
   'planks': { isAOEnabled: true },
   'white_planks': { isAOEnabled: true },
   'oak_planks': { isAOEnabled: true },
+  'gold_ore': { isAOEnabled: true },
   'marble': { isAOEnabled: true }
 };
 
