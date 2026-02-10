@@ -51,10 +51,22 @@ export class AudioManager {
       if (instanceSet && instanceSet.size > 0) return;
     }
 
-    const sound = new THREE.Audio(this.listener);
-    sound.setBuffer(this.sounds.get(name));
-    sound.setVolume(volume);
-    sound.setLoop(loop);
+    // 尝试从池中获取已存在的实例
+    let sound = null;
+    if (this.soundPool && this.soundPool[name] && this.soundPool[name].length > 0) {
+      sound = this.soundPool[name].pop();
+      // 重置现有实例
+      sound.setBuffer(this.sounds.get(name));
+      sound.setVolume(volume);
+      sound.setLoop(loop);
+      sound.stop(); // 确保之前的状态停止
+    } else {
+      sound = new THREE.Audio(this.listener);
+      sound.setBuffer(this.sounds.get(name));
+      sound.setVolume(volume);
+      sound.setLoop(loop);
+    }
+
     sound.play();
 
     // 初始化该音效的实例集合
@@ -64,11 +76,18 @@ export class AudioManager {
     const instanceSet = this.activeSounds.get(name);
     instanceSet.add(sound);
 
-    // 播放结束后自动从集合中移除
+    // 播放结束后自动从集合中移除并回收到池中
     const cleanup = () => {
       instanceSet.delete(sound);
       if (instanceSet.size === 0) {
         this.activeSounds.delete(name);
+      }
+
+      // 将实例放回池中以供重用
+      if (!loop) {
+        if (!this.soundPool) this.soundPool = {};
+        if (!this.soundPool[name]) this.soundPool[name] = [];
+        this.soundPool[name].push(sound);
       }
     };
 

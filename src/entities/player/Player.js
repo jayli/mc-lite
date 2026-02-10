@@ -32,6 +32,12 @@ export class Player {
     this.bobAmount = 0;            // 当前视角晃动强度 (步行动画)
     this.lastInputDirection = new THREE.Vector3(); // 记录最后的移动输入方向
 
+    // 玩家移动状态跟踪
+    this.lastPosition = new THREE.Vector3().copy(this.position); // 上一帧的位置
+    this.isMoving = false;         // 是否在移动
+    this.moveCheckInterval = 0;    // 碰撞检测间隔计数器
+    this.moveCheckFrequency = 1;   // 碰撞检测频率 (每几帧检查一次)
+
     // 初始出生点逻辑
     let spawnFound = false;
     for (let i = 0; i < 1000; i++) {
@@ -207,35 +213,56 @@ export class Player {
       this.velocity.z = 0;
     }
 
-    const isCurrentlyStuck = this.physics.checkAABB(this.position.x, this.position.y, this.position.z);
+    // 检查玩家是否移动
+    const positionDiff = this.position.distanceTo(this.lastPosition);
+    const movementThreshold = 0.01;
+    this.isMoving = positionDiff > movementThreshold || Math.abs(this.velocity.x) > 0.01 || Math.abs(this.velocity.z) > 0.01;
+
+    // 更新位置用于下一次比较
+    this.lastPosition.copy(this.position);
+
+    // 每隔一定帧数才进行一次碰撞检测（如果玩家未移动）
+    const shouldCheckCollision = this.isMoving || (this.moveCheckInterval % this.moveCheckFrequency === 0);
+    let isCurrentlyStuck = false;
+
+    if (shouldCheckCollision) {
+      isCurrentlyStuck = this.physics.checkAABB(this.position.x, this.position.y, this.position.z);
+    }
     this.isStuck = isCurrentlyStuck;
 
     if (!isCurrentlyStuck) {
       let nextX = this.position.x + this.velocity.x * dt;
       let nextZ = this.position.z + this.velocity.z * dt;
-      const hasCollisionFull = this.physics.checkAABB(nextX, this.position.y, nextZ, true);
 
-      if (hasCollisionFull) {
-        const penalty = this.physics.getCornerPenalty(this.velocity.x, this.velocity.z);
-        if (!this.physics.checkAABB(nextX, this.position.y, this.position.z, true)) {
+      if (shouldCheckCollision) {
+        const hasCollisionFull = this.physics.checkAABB(nextX, this.position.y, nextZ, true);
+
+        if (hasCollisionFull) {
+          const penalty = this.physics.getCornerPenalty(this.velocity.x, this.velocity.z);
+          if (!this.physics.checkAABB(nextX, this.position.y, this.position.z, true)) {
+            this.position.x = nextX;
+            this.velocity.x = this.physics.applyFriction(this.velocity.x);
+          } else if (!this.physics.tryStepUp(nextX, this.position.z)) {
+            this.velocity.x = 0;
+          }
+
+          if (!this.physics.checkAABB(this.position.x, this.position.y, nextZ, true)) {
+            this.position.z = nextZ;
+            this.velocity.z = this.physics.applyFriction(this.velocity.z);
+          } else if (!this.physics.tryStepUp(this.position.x, nextZ)) {
+            this.velocity.z = 0;
+          }
+
+          if (penalty < 1.0) {
+            this.position.x = oldX + (this.position.x - oldX) * penalty;
+            this.position.z = oldZ + (this.position.z - oldZ) * penalty;
+          }
+        } else {
           this.position.x = nextX;
-          this.velocity.x = this.physics.applyFriction(this.velocity.x);
-        } else if (!this.physics.tryStepUp(nextX, this.position.z)) {
-          this.velocity.x = 0;
-        }
-
-        if (!this.physics.checkAABB(this.position.x, this.position.y, nextZ, true)) {
           this.position.z = nextZ;
-          this.velocity.z = this.physics.applyFriction(this.velocity.z);
-        } else if (!this.physics.tryStepUp(this.position.x, nextZ)) {
-          this.velocity.z = 0;
-        }
-
-        if (penalty < 1.0) {
-          this.position.x = oldX + (this.position.x - oldX) * penalty;
-          this.position.z = oldZ + (this.position.z - oldZ) * penalty;
         }
       } else {
+        // 如果不需要碰撞检测，直接更新位置
         this.position.x = nextX;
         this.position.z = nextZ;
       }
@@ -244,8 +271,13 @@ export class Player {
       this.position.z += this.velocity.z * dt;
     }
 
+    // 只在移动时才应用隧道自动居中
     if (inputLen > 0) this.physics.applyTunnelCentering();
-    this.physics.applyCameraBumper();
+
+    // 只在移动时才应用相机避碰检查，除非玩家卡住
+    if (this.isMoving || this.isStuck) {
+      this.physics.applyCameraBumper();
+    }
     this.physics.checkCeilingBump();
 
     let gy = -100;
@@ -290,10 +322,16 @@ export class Player {
     const targetCamY = this.position.y + 1.65;
     this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, targetCamY, 0.2);
 
-    this.physics.applyPushOut();
+    // 只在移动时或卡住时才应用推挤修正
+    if (this.isMoving || this.isStuck) {
+      this.physics.applyPushOut();
+    }
 
     const actualDx = this.position.x - oldX;
     const actualDz = this.position.z - oldZ;
+
+    // 增加 moveCheckInterval 计数器
+    this.moveCheckInterval++;
 
     this.updateArm(dt);
     this.updateWeapon(dt);
