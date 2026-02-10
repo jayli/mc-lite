@@ -29,6 +29,8 @@ const ITEMS = {
  * 负责显示游戏中的实时信息，包括快捷栏和消息提示
  */
 export class HUD {
+  static iconCache = new Map();
+
   /**
    * 创建HUD实例
    * @param {Object} game - 游戏主对象
@@ -48,6 +50,10 @@ export class HUD {
     this.jankCount = 0;
     this.longTaskCount = 0;
     this.lastFrameTime = performance.now();
+
+    // 渲染节流控制
+    this._lastHotbarRenderTime = 0;
+    this._throttledRenderTimeout = null;
 
     // 监听主线程长任务 (Long Tasks)
     if (window.PerformanceObserver) {
@@ -133,11 +139,76 @@ export class HUD {
   }
 
   /**
+   * 生成物品图标并缓存
+   * @param {string} item - 物品名称
+   * @returns {string} - Data URL
+   */
+  static generateIcon(item) {
+    if (this.iconCache.has(item)) {
+      return this.iconCache.get(item);
+    }
+
+    const c = document.createElement('canvas');
+    c.width = 32;
+    c.height = 32;
+    const ctx = c.getContext('2d');
+    const itemDef = ITEMS[item] || { col: '#fff' };
+
+    let iconDrawn = false;
+    const mat = materials.getMaterial(item);
+    if (mat) {
+      const texture = Array.isArray(mat) ? mat[0].map : mat.map;
+      if (texture) {
+        const imgObj = texture.image || (texture.source && texture.source.data);
+        if (imgObj) {
+          ctx.drawImage(imgObj, 4, 4, 24, 24);
+          iconDrawn = true;
+        }
+      }
+    }
+
+    if (!iconDrawn) {
+      ctx.fillStyle = itemDef.col;
+      ctx.fillRect(4, 4, 24, 24);
+    }
+
+    ctx.strokeStyle = '#000';
+    ctx.strokeRect(4, 4, 24, 24);
+
+    const dataUrl = c.toDataURL();
+    this.iconCache.set(item, dataUrl);
+    return dataUrl;
+  }
+
+  /**
    * 渲染快捷栏
    * 显示玩家背包的前5个物品槽，高亮显示当前选中的物品
    */
   renderHotbar() {
     if (!this.hotbarEl) return;
+
+    // --- 渲染节流优化 ---
+    const now = performance.now();
+    const timeSinceLastRender = now - this._lastHotbarRenderTime;
+
+    if (timeSinceLastRender < 100) {
+      // 如果已经有一个等待中的渲染，就不再设置
+      if (!this._throttledRenderTimeout) {
+        this._throttledRenderTimeout = setTimeout(() => {
+          this._throttledRenderTimeout = null;
+          this.renderHotbar();
+        }, 100 - timeSinceLastRender);
+      }
+      return;
+    }
+    this._lastHotbarRenderTime = now;
+    // 如果有正在等待的延迟渲染，取消它
+    if (this._throttledRenderTimeout) {
+      clearTimeout(this._throttledRenderTimeout);
+      this._throttledRenderTimeout = null;
+    }
+    // --- 节流结束 ---
+
     const inventory = this.game.player.inventory;
     const selectedSlot = inventory.selectedSlot;
 
@@ -148,7 +219,7 @@ export class HUD {
       slots: inventory.slots.slice(0, 5).map(s => ({ item: s.item, count: s.count }))
     });
 
-    // 如果状态没有变化，直接跳过渲染，避免昂贵的 DOM 和 Canvas 操作
+    // 如果状态没有变化，直接跳过渲染，避免昂贵的 DOM 操作
     if (this._lastInventoryState === currentState) {
       return;
     }
@@ -163,39 +234,9 @@ export class HUD {
       div.className = 'slot' + (i === selectedSlot ? ' selected' : '');
 
       if (!slot.isEmpty()) {
-        // 如果物品槽非空，则渲染物品图标
-        const c = document.createElement('canvas');
-        c.width = 32;
-        c.height = 32;
-        const ctx = c.getContext('2d');
-        const itemDef = ITEMS[slot.item] || { col: '#fff' }; // 获取物品颜色配置，默认白色
-
-        // 尝试从材质管理器获取贴图
-        let iconDrawn = false;
-        const mat = materials.getMaterial(slot.item);
-        if (mat) {
-          const texture = Array.isArray(mat) ? mat[0].map : mat.map;
-          if (texture) {
-            const imgObj = texture.image || (texture.source && texture.source.data);
-            if (imgObj) {
-              ctx.drawImage(imgObj, 4, 4, 24, 24);
-              iconDrawn = true;
-            }
-          }
-        }
-
-        if (!iconDrawn) {
-          // 绘制物品图标（基于颜色配置 fallback）
-          ctx.fillStyle = itemDef.col;
-          ctx.fillRect(4, 4, 24, 24);
-        }
-
-        ctx.strokeStyle = '#000';
-        ctx.strokeRect(4, 4, 24, 24);
-
-        // 创建图像元素和数量显示
+        // 使用缓存生成的图标
         const img = document.createElement('img');
-        img.src = c.toDataURL();
+        img.src = HUD.generateIcon(slot.item);
 
         const countSpan = document.createElement('span');
         countSpan.className = 'count';

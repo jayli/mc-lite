@@ -1,30 +1,5 @@
 // src/ui/Inventory.js
-import { materials } from '../core/MaterialManager.js';
-
-/**
- * 物品颜色配置表（与HUD.js中的相同）
- * 确保UI中物品颜色的一致性
- */
-const ITEMS = {
-  'dirt': { col: '#5D4037' }, 'stone': { col: '#757575' }, 'wood': { col: '#5D4037' }, 'birch_log': { col: '#F0EAD6' },
-  'sand': { col: '#E6C288' }, 'planks': { col: '#C19A6B' }, 'oak_planks': { col: '#C19A6B' }, 'white_planks': { col: '#F0F0F0' }, 'cactus': { col: '#2E8B57' },
-  'diamond': { col: '#00FFFF' }, 'gold': { col: '#FFD700' }, 'apple': { col: '#FF0000' },
-  'flower': { col: '#FF4444' }, 'short_grass': { col: '#559944' }, 'car': { col: '#333333' },
-  'cloud': { col: '#FFFFFF' }, 'sky_stone': { col: '#DDDDDD' }, 'sky_wood': { col: '#DDA0DD' },
-  'gold_apple': { col: '#FFD700' }, 'god_sword': { col: '#9400D3' },
-  'moss': { col: '#4B6E31' }, 'azalea_log': { col: '#635338' },
-  'cobblestone': { col: '#8B8B8B' },
-  'obsidian': { col: '#2E2E2E' },
-  'marble': { col: '#F2F0E6' },
-  'glass_blink': { col: '#E0F7FA' },
-  'mossy_stone': { col: '#6B8E23' },
-  'blue_planks': { col: '#4A90E2' },
-  'end_stone': { col: '#DEE0A3' },
-  'green_planks': { col: '#4B6E31' },
-  'hay_bale': { col: '#F5DEB3' },
-  'azalea_leaves': { col: '#4A6B30' }, 'azalea_flowers': { col: '#7A9B50' },
-  'vine': { col: '#355E3B' }, 'lilypad': { col: '#228B22' }
-};
+import { HUD } from './HUD.js';
 
 function isDisplayNone(elementId) {
   const element = document.getElementById(elementId);
@@ -127,39 +102,9 @@ export class InventoryUI {
       div.className = 'slot';
       if (idx === inventory.selectedSlot) div.style.borderColor = '#FFFF00';
 
-      // 使用Canvas生成物品图标（与HUD相同）
-      const c = document.createElement('canvas');
-      c.width = 32;
-      c.height = 32;
-      const ctx = c.getContext('2d');
-      const itemDef = ITEMS[slot.item] || { col: '#fff' }; // 获取物品颜色配置，默认白色
-
-      // 尝试从材质管理器获取贴图
-      let iconDrawn = false;
-      const mat = materials.getMaterial(slot.item);
-      if (mat) {
-        const texture = Array.isArray(mat) ? mat[0].map : mat.map;
-        if (texture) {
-          const imgObj = texture.image || (texture.source && texture.source.data);
-          if (imgObj) {
-            ctx.drawImage(imgObj, 4, 4, 24, 24);
-            iconDrawn = true;
-          }
-        }
-      }
-
-      if (!iconDrawn) {
-        // 绘制物品图标（基于颜色配置 fallback）
-        ctx.fillStyle = itemDef.col;
-        ctx.fillRect(4, 4, 24, 24);
-      }
-
-      ctx.strokeStyle = '#000';
-      ctx.strokeRect(4, 4, 24, 24);
-
-      // 创建图像元素和数量显示
+      // 使用缓存生成的图标（与HUD共享）
       const img = document.createElement('img');
-      img.src = c.toDataURL();
+      img.src = HUD.generateIcon(slot.item);
 
       const countSpan = document.createElement('span');
       countSpan.className = 'count';
