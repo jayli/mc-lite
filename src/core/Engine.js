@@ -54,34 +54,34 @@ export class Engine {
       powerPreference: "high-performance" // 提示浏览器使用高性能 GPU
     });
     this.renderer.shadowMap.enabled = true; // 启用阴影系统
-    this.renderer.shadowMap.type = THREE.PCFShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap; // 设置阴影映射类型为PCF（Percentage-Closer Filtering）软阴影
     this.resolutionScale = 0.7;        // 初始渲染分辨率缩放系数
-    this.renderer.setPixelRatio(this.resolutionScale);
+    this.renderer.setPixelRatio(this.resolutionScale); // 设置渲染器的像素比例，用于控制输出分辨率
 
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.25;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping; // 应用ACES电影感色调映射，使颜色更接近真实摄影效果
+    this.renderer.toneMappingExposure = 1.25; // 设置色调映射曝光值，调整整体亮度
 
     // 灯光与天空设置
-    this.sunDirection = new THREE.Vector3(0, 0.8, 0.6).normalize();
-    this.sunColor = 0xfff7c2;
-    this.lightColor = 0xfffaf0;
-    this.zenithColor = 0x87CEEB;
-    this.horizonColor = 0xb2e0f2;
+    this.sunDirection = new THREE.Vector3(0, 0.8, 0.6).normalize(); // 设置太阳光方向向量，并归一化为单位向量
+    this.sunColor = 0xfff7c2;   // 设置太阳光的颜色（暖黄色）
+    this.lightColor = 0xfffaf0; // 设置环境光的颜色（温暖的白色）
+    this.zenithColor = 0x87CEEB;  // 设置天顶（天空上方）颜色（浅蓝色）
+    this.horizonColor = 0xb2e0f2; // 设置地平线颜色（较浅的蓝白色）
 
     const light = new THREE.DirectionalLight(this.lightColor, 3.2);
     this.scene.add(light.target);
 
-    light.castShadow = true;
-    light.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+    light.castShadow = true;  // 启用光源投射阴影
+    light.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);  // 设置阴影贴图的尺寸
 
-    light.shadow.camera.left = -SHADOW_CAMERA_SIZE;
-    light.shadow.camera.right = SHADOW_CAMERA_SIZE;
-    light.shadow.camera.top = SHADOW_CAMERA_SIZE;
-    light.shadow.camera.bottom = -SHADOW_CAMERA_SIZE;
-    light.shadow.camera.near = 0.1;
-    light.shadow.camera.far = 400;
-    light.shadow.bias = 0.0001;
-    light.shadow.normalBias = 0.078;
+    light.shadow.camera.left = -SHADOW_CAMERA_SIZE;   // 设置阴影相机左侧范围
+    light.shadow.camera.right = SHADOW_CAMERA_SIZE;   // 设置阴影相机右侧范围
+    light.shadow.camera.top = SHADOW_CAMERA_SIZE;     // 设置阴影相机顶部范围
+    light.shadow.camera.bottom = -SHADOW_CAMERA_SIZE; // 设置阴影相机底部范围
+    light.shadow.camera.near = 0.1;                   // 设置阴影相机近裁剪面
+    light.shadow.camera.far = 400;                    // 设置阴影相机远裁剪面
+    light.shadow.bias = 0.0001;                       // 设置阴影偏移，防止阴影自遮挡伪影
+    light.shadow.normalBias = 0.078;                  // 设置法线偏移，改善斜面阴影质量
 
     this.scene.add(light);
     this.scene.add(new THREE.AmbientLight(0xddeeff, 1));
@@ -100,6 +100,10 @@ export class Engine {
     this.loadModel();
   }
 
+  /**
+   * 加载游戏所需的各种3D模型资源，包括汽车、人物、武器等模型
+   * 对每个模型进行标准化处理，包括居中、缩放和材质设置
+   */
   loadModel() {
     const gltfLoader = new GLTFLoader();
     gltfLoader.load('src/assets/mod/free_car_001.gltf', (gltf) => {
@@ -270,29 +274,29 @@ export class Engine {
     canvas.height = 128;
     const context = canvas.getContext('2d');
 
-    const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 64);
+    const gradient = context.createRadialGradient(64, 64, 0, 64, 64, 64); // 创建径向渐变用于绘制太阳图像
     const sunColor = new THREE.Color(this.sunColor);
     const r = Math.floor(sunColor.r * 255);
     const g = Math.floor(sunColor.g * 255);
     const b = Math.floor(sunColor.b * 255);
 
-    gradient.addColorStop(0, `rgba(255, 205, 177, 1)`);
-    gradient.addColorStop(0.1, `rgba(255, 182, 142, 1)`);
-    gradient.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.7)`);
-    gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
+    gradient.addColorStop(0, `rgba(255, 205, 177, 1)`);      // 设置渐变起始色（中心亮黄色）
+    gradient.addColorStop(0.1, `rgba(255, 182, 142, 1)`);    // 设置渐变中间色（橙黄色）
+    gradient.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.7)`); // 设置渐变过渡色（太阳本色，半透明）
+    gradient.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);    // 设置渐变结束色（完全透明）
 
     context.fillStyle = gradient;
-    context.fillRect(0, 0, 128, 128);
+    context.fillRect(0, 0, 128, 128); // 填充渐变矩形到canvas画布
 
     const texture = new THREE.CanvasTexture(canvas);
     const sunMaterial = new THREE.SpriteMaterial({
-      map: texture,
-      transparent: true,
-      fog: false,
-      depthTest: true
+      map: texture,       // 使用上面创建的canvas纹理
+      transparent: true,  // 启用透明度混合
+      fog: false,         // 禁用雾效，保持太阳光亮
+      depthTest: true     // 启用深度测试，确保太阳在正确位置渲染
     });
 
-    this.sunSprite = new THREE.Sprite(sunMaterial);
+    this.sunSprite = new THREE.Sprite(sunMaterial); // 创建精灵对象用于渲染太阳
     this.sunSprite.visible = false;
     this.sunSprite.scale.set(20, 20, 1);
     this.scene.add(this.sunSprite);
@@ -308,19 +312,23 @@ export class Engine {
     this.scene.background = texture;
   }
 
+  /**
+   * 创建水面平面和相关的着色器材质
+   * 设置水面的几何形状、波浪效果、反射特性等
+   */
   createWaterPlane() {
     const waterGeo = new THREE.PlaneGeometry(800, 800);
 
     this.waterMaterial = new THREE.ShaderMaterial({
       uniforms: {
-        uTime: { value: 0 },
-        uColor: { value: new THREE.Color(WATER_COLOR) },
-        uSunDirection: { value: this.sunDirection },
-        uOpacity: { value: WATER_OPACITY },
-        uSeed: { value: WORLD_CONFIG.SEED },
-        uFogColor: { value: new THREE.Color(WATER_FOG_COLOR) },
-        uFogNear: { value: 20 },
-        uFogFar: { value: 70 }
+        uTime: { value: 0 },                        // 时间变量，用于波浪动画
+        uColor: { value: new THREE.Color(WATER_COLOR) }, // 水面基础颜色
+        uSunDirection: { value: this.sunDirection }, // 太阳光照方向
+        uOpacity: { value: WATER_OPACITY },          // 水面透明度
+        uSeed: { value: WORLD_CONFIG.SEED },         // 世界种子，用于噪声函数一致性
+        uFogColor: { value: new THREE.Color(WATER_FOG_COLOR) }, // 水下雾的颜色
+        uFogNear: { value: 20 },                     // 水下雾的近距范围
+        uFogFar: { value: 70 }                      // 水下雾的远距范围
       },
       vertexShader: `
         varying vec3 vWorldPosition;
@@ -420,8 +428,9 @@ export class Engine {
     this.waterPlane.position.y = WATER_LEVEL_OFFSET;
     this.scene.add(this.waterPlane);
 
+    // 初始化隐藏面剔除系统，用于优化渲染性能
     this.faceCullingSystem = new FaceCullingSystem({
-      transparentTypes: ['air', 'water']
+      transparentTypes: ['air', 'water']  // 指定透明类型的方块，用于确定面剔除规则
     });
 
     this.faceCullingSystem.enable();
@@ -461,13 +470,13 @@ export class Engine {
     }
 
     if (this.waterMaterial) {
-      this.waterMaterial.uniforms.uTime.value += 0.015;
-      this.waterMaterial.uniforms.uSeed.value = WORLD_CONFIG.SEED;
+      this.waterMaterial.uniforms.uTime.value += 0.015;    // 更新时间变量，驱动水面波浪动画
+      this.waterMaterial.uniforms.uSeed.value = WORLD_CONFIG.SEED; // 同步世界种子，确保噪声函数的一致性
     }
 
     if (this.waterPlane) {
-      this.waterPlane.position.x = this.camera.position.x;
-      this.waterPlane.position.z = this.camera.position.z;
+      this.waterPlane.position.x = this.camera.position.x;  // 将水面跟随相机在X轴移动，营造无限水面效果
+      this.waterPlane.position.z = this.camera.position.z;  // 将水面跟随相机在Z轴移动，营造无限水面效果
     }
 
     const camX = this.camera.position.x;
@@ -475,11 +484,13 @@ export class Engine {
     const camZ = this.camera.position.z;
     const waterLevel = WATER_LEVEL_OFFSET;
 
+    // 定义噪声生成函数，用于地形和水面效果计算
     const getNoise = (x, z, scale) => {
       const nx = x + WORLD_CONFIG.SEED, nz = z + WORLD_CONFIG.SEED;
       return Math.sin(nx * scale) * 2 + Math.cos(nz * scale) * 2;
     };
 
+    // 定义地形高度计算函数，用于判断当前位置是否靠近海洋
     const getHeight = (x, z) => {
       const h = getNoise(x, z, 0.08) + getNoise(x, z, 0.02) * 3;
       const temp = getNoise(x, z, 0.01);
@@ -499,17 +510,18 @@ export class Engine {
       }
     }
 
+    // 检测玩家是否在水下，并相应地更改雾效设置
     if (camY < waterLevel && isNearOcean) {
       if (!this.isUnderwater) {
-        this.scene.fog.color.set(0x103060);
-        this.scene.fog.near = 0.1;
-        this.scene.fog.far = 15;
-        this.isUnderwater = true;
+        this.scene.fog.color.set(0x103060);    // 设置水下雾的颜色为深蓝色
+        this.scene.fog.near = 0.1;             // 设置水下雾的近距范围
+        this.scene.fog.far = 15;               // 设置水下雾的远距范围，较短的距离增强水下效果
+        this.isUnderwater = true;              // 标记玩家处于水下状态
 
         if (this.waterMaterial) {
-          this.waterMaterial.uniforms.uFogColor.value.set(0x103060);
-          this.waterMaterial.uniforms.uFogNear.value = 0.1;
-          this.waterMaterial.uniforms.uFogFar.value = 15;
+          this.waterMaterial.uniforms.uFogColor.value.set(0x103060); // 更新水面材质的水下雾颜色
+          this.waterMaterial.uniforms.uFogNear.value = 0.1;          // 更新水面材质的水下雾近距范围
+          this.waterMaterial.uniforms.uFogFar.value = 15;            // 更新水面材质的水下雾远距范围
         }
       }
     } else {
@@ -530,6 +542,10 @@ export class Engine {
     this.renderer.render(this.scene, this.camera);
   }
 
+  /**
+   * 切换隐藏面剔除系统的启用/禁用状态
+   * 输出当前状态到控制台
+   */
   toggleFaceCulling() {
     if (this.faceCullingSystem.isEnabled()) {
       this.faceCullingSystem.disable('manual toggle');
@@ -540,11 +556,19 @@ export class Engine {
     }
   }
 
+  /**
+   * 切换隐藏面剔除系统的调试模式
+   * 在控制台输出当前调试模式状态
+   */
   toggleFaceCullingDebug() {
     this.faceCullingSystem.toggleDebug();
     console.log('隐藏面剔除调试模式:', this.faceCullingSystem.isDebugMode() ? '开启' : '关闭');
   }
 
+  /**
+   * 获取隐藏面剔除系统的统计信息
+   * @returns {Object} 包含系统状态和统计数据的对象
+   */
   getFaceCullingStats() {
     if (!this.faceCullingSystem) {
       return { error: '系统未初始化' };
@@ -552,6 +576,10 @@ export class Engine {
     return this.faceCullingSystem.getStats();
   }
 
+  /**
+   * 打印隐藏面剔除系统的详细状态信息
+   * 在控制台输出格式化的统计数据
+   */
   printFaceCullingStats() {
     const stats = this.getFaceCullingStats();
     console.group('隐藏面剔除系统状态');
@@ -569,6 +597,10 @@ export class Engine {
     console.groupEnd();
   }
 
+  /**
+   * 强制更新隐藏面剔除系统的状态
+   * 在控制台输出操作结果
+   */
   forceFaceCullingUpdate() {
     if (this.faceCullingSystem && this.faceCullingSystem.isEnabled()) {
       this.faceCullingSystem.forceUpdate();
@@ -576,6 +608,10 @@ export class Engine {
     }
   }
 
+  /**
+   * 启动隐藏面剔除系统的调试测试
+   * 添加预定义的测试方块到调试场景中
+   */
   testFaceCullingDebug() {
     if (!this.faceCullingSystem) return;
     this.faceCullingSystem.setDebugMode(true);
@@ -603,6 +639,10 @@ export class Engine {
     console.log('调试可视化测试已启动，添加了', testPositions.length, '个测试方块');
   }
 
+  /**
+   * 清理隐藏面剔除系统的调试对象
+   * 在控制台输出操作结果
+   */
   clearFaceCullingDebug() {
     if (this.faceCullingSystem) {
       this.faceCullingSystem.clearDebugObjects();

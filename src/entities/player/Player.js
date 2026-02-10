@@ -50,13 +50,13 @@ export class Player {
         // 计算预估地形高度，确保不在水面上（海平面约 -1.5）
         const h = Math.floor(noise(tx, tz, 0.08) + noise(tx, tz, 0.02) * 3);
         if (h > -0.5) {
-          this.position.set(tx, 70, tz);
+          this.position.set(tx, 70, tz); // 出生点海拔高度
           spawnFound = true;
           break;
         }
       }
     }
-    if (!spawnFound) this.position.set(0, 70, 0);
+    if (!spawnFound) this.position.set(0, 70, 0); // 出生点海拔高度
 
     // 移动与跳跃属性
     this.velocity = new THREE.Vector3(); // 玩家当前速度向量 (x, y, z)
@@ -107,22 +107,22 @@ export class Player {
     this.shootCooldown = 0;             // 射击冷却剩余时间
 
     // 性能优化：池与复用
-    this._tempVector = new THREE.Vector3();
-    this._direction = new THREE.Vector3();
-    this._dummyMatrix = new THREE.Matrix4();
-    this._dummyQuaternion = new THREE.Quaternion();
-    this._dummyScale = new THREE.Vector3();
-    this._zeroVector = new THREE.Vector3(0, 0, 0);
+    this._tempVector = new THREE.Vector3();              // 临时向量对象，用于避免频繁创建新向量
+    this._direction = new THREE.Vector3();               // 临时方向向量，用于存储计算中的方向
+    this._dummyMatrix = new THREE.Matrix4();             // 临时矩阵对象，用于转换操作
+    this._dummyQuaternion = new THREE.Quaternion();      // 临时四元数对象，用于旋转操作
+    this._dummyScale = new THREE.Vector3();              // 临时缩放向量，用于提取变换矩阵中的缩放分量
+    this._zeroVector = new THREE.Vector3(0, 0, 0);      // 零向量常量，用于重置变换
 
     this.tracerPool = [];
     this.tracerInfoPool = [];
 
-    this.tracerGeometry = new THREE.BoxGeometry(0.05, 0.05, 1);
-    this.tracerGeometry.translate(0, 0, 0.5);
-    this.tracerMaterial = new THREE.MeshBasicMaterial({
-      color: 0xffff00,
-      transparent: true,
-      opacity: 0.8
+    this.tracerGeometry = new THREE.BoxGeometry(0.05, 0.05, 1);  // 子弹/激光轨迹的几何体（细长的盒子形状）
+    this.tracerGeometry.translate(0, 0, 0.5);                   // 将几何体沿Z轴向前偏移0.5单位，使轨迹从前面开始延伸
+    this.tracerMaterial = new THREE.MeshBasicMaterial({         // 轨迹材质配置
+      color: 0xffff00,                                         // 黄色轨迹
+      transparent: true,                                        // 启用透明度
+      opacity: 0.8                                             // 透明度为0.8
     });
 
     this.mag7TracerMaterial = new THREE.MeshBasicMaterial({
@@ -135,6 +135,10 @@ export class Player {
     this.mag7Timeouts = [];
   }
 
+  /**
+   * 初始化玩家输入控制系统
+   * 监听键盘和鼠标事件，处理按键状态和视角控制
+   */
   setupInput() {
     window.addEventListener('keydown', e => {
       this.keys[e.code] = true;
@@ -175,6 +179,11 @@ export class Player {
     });
   }
 
+  /**
+   * 更新玩家状态
+   * 处理玩家移动、物理计算、碰撞检测和相机控制
+   * @param {number} dt - 时间步长
+   */
   update(dt = 0.016) {
     this.camera.rotation.x = this.cameraPitch;
     dt = Math.min(dt, 0.1);
@@ -340,6 +349,11 @@ export class Player {
     this.updateTracers(dt);
   }
 
+  /**
+   * 获取交互目标对象
+   * 返回当前可交互的方块和物体列表
+   * @returns {Array} 交互目标对象数组
+   */
   getInteractionTargets() {
     const targets = [];
     for (const chunk of this.world.chunks.values()) targets.push(chunk.group);
@@ -349,6 +363,11 @@ export class Player {
     return targets;
   }
 
+  /**
+   * 处理射击逻辑
+   * 根据当前武器类型和射击状态执行相应的射击操作
+   * @param {number} dt - 时间步长
+   */
   handleShooting(dt) {
     if (this.shootCooldown > 0) this.shootCooldown -= dt;
     if (this.weapon && this.isShooting && this.shootCooldown <= 0) {
@@ -359,6 +378,11 @@ export class Player {
     }
   }
 
+  /**
+   * 更新武器状态
+   * 处理武器切换、创建和更新
+   * @param {number} dt - 时间步长
+   */
   updateWeapon(dt) {
     const targetModel = this.weaponMode === WEAPON_TYPES.GUN ? gunModel :
                       (this.weaponMode === WEAPON_TYPES.MAG7 ? mag7Model :
@@ -378,6 +402,11 @@ export class Player {
     }
   }
 
+  /**
+   * 执行射击动作
+   * 发射子弹并生成轨迹效果
+   * @param {Array} targets - 交互目标对象数组
+   */
   executeShot(targets) {
     this.raycaster.far = 40;
     this.raycaster.setFromCamera(this.center, this.camera);
@@ -409,6 +438,10 @@ export class Player {
     }
   }
 
+  /**
+   * 执行散弹枪射击
+   * 特殊处理散弹枪的多重射击效果
+   */
   executeMag7Shot() {
     this.mag7Timeouts.forEach(t => clearTimeout(t));
     this.mag7Timeouts = [];
@@ -464,6 +497,13 @@ export class Player {
     this.spawnTracer(effect.start, effect.end, effect.config);
   }
 
+  /**
+   * 生成轨迹效果
+   * 创建子弹或激光的轨迹可视化效果
+   * @param {THREE.Vector3} start - 起始点
+   * @param {THREE.Vector3} end - 结束点
+   * @param {Object} config - 配置对象
+   */
   spawnTracer(start, end, config) {
     const distance = start.distanceTo(end);
     let mesh;
@@ -490,6 +530,11 @@ export class Player {
     this.tracers.push(info);
   }
 
+  /**
+   * 更新轨迹效果
+   * 更新所有活动轨迹的生命周期和外观
+   * @param {number} dt - 时间步长
+   */
   updateTracers(dt) {
     for (let i = this.tracers.length - 1; i >= 0; i--) {
       const tracer = this.tracers[i];
@@ -510,6 +555,14 @@ export class Player {
     }
   }
 
+  /**
+   * 更新相机晃动效果
+   * 实现步行时的视角摇摆效果
+   * @param {number} dx - X轴移动距离
+   * @param {number} dz - Z轴移动距离
+   * @param {number} dt - 时间步长
+   * @param {boolean} isObstructed - 是否受阻
+   */
   updateCameraBob(dx, dz, dt, isObstructed) {
     const inputSpeed = Math.sqrt(this.velocity.x ** 2 + this.velocity.z ** 2);
     const expectedDist = inputSpeed * dt;
@@ -538,6 +591,10 @@ export class Player {
     this.camera.position.y += this.bob_offset.y;
   }
 
+  /**
+   * 播放脚步声
+   * 根据当前所在方块类型播放相应的脚步声
+   */
   playFootstepSound() {
     const blockType = this.world.getBlock(Math.floor(this.position.x), Math.floor(this.position.y), Math.floor(this.position.z));
     if (blockType === 'water') {
@@ -549,6 +606,11 @@ export class Player {
     }
   }
 
+  /**
+   * 处理交互事件
+   * 处理鼠标点击事件，实现方块挖掘、放置和射击功能
+   * @param {Event} e - 鼠标事件
+   */
   interact(e) {
     if (document.pointerLockElement !== document.body) return;
     const button = e.button;
@@ -630,6 +692,13 @@ export class Player {
     }
   }
 
+  /**
+   * 打开宝箱
+   * 处理宝箱的打开动画和奖励发放
+   * @param {THREE.Mesh} mesh - 宝箱网格对象
+   * @param {number} instanceId - 实例ID
+   * @param {THREE.Vector3} pos - 宝箱位置
+   */
   openChest(mesh, instanceId, pos) {
     const info = mesh.userData.chests[instanceId];
     if (!info || info.open) return;
@@ -643,6 +712,15 @@ export class Player {
     drops.forEach(item => this.inventory.add(item, 1));
   }
 
+  /**
+   * 尝试放置方块
+   * 检查位置有效性并放置方块
+   * @param {number} x - X坐标
+   * @param {number} y - Y坐标
+   * @param {number} z - Z坐标
+   * @param {string} type - 方块类型
+   * @returns {boolean} 是否成功放置
+   */
   tryPlaceBlock(x, y, z, type) {
     if (this.physics.isSolid(x, y, z)) return false;
     if (this.position.x - 0.3 < x + 1 && this.position.x + 0.3 > x && this.position.y < y + 1 && this.position.y + 1.8 > y && this.position.z - 0.3 < z + 1 && this.position.z + 0.3 > z) return false;
@@ -652,6 +730,11 @@ export class Player {
     return true;
   }
 
+  /**
+   * 移除方块
+   * 挖掘指定位置的方块
+   * @param {Object} hit - 点击命中信息
+   */
   removeBlock(hit) {
     let m = hit.object;
     while (m && !m.userData.isEntity && !m.userData.type && m.parent && !m.isInstancedMesh && m.type !== 'Scene') m = m.parent;
@@ -690,6 +773,11 @@ export class Player {
     }
   }
 
+  /**
+   * 处理爆炸结果
+   * 处理由Worker返回的爆炸计算结果
+   * @param {Object} data - 爆炸结果数据
+   */
   handleExplosionResult(data) {
     if (data.action === 'explosionResult') {
       const { blocksToDestroy, tntToIgnite, center } = data.payload;
@@ -716,6 +804,13 @@ export class Player {
     }
   }
 
+  /**
+   * 引爆TNT
+   * 计算并执行TNT爆炸效果
+   * @param {number} x - X坐标
+   * @param {number} y - Y坐标
+   * @param {number} z - Z坐标
+   */
   explode(x, y, z) {
     const bx = Math.floor(x), by = Math.floor(y), bz = Math.floor(z);
     if (this.world.getBlock(bx, by, bz) === 'tnt') {
@@ -733,8 +828,19 @@ export class Player {
     this.explosionWorker.postMessage({ action: 'calculateExplosion', payload: { x, y, z, nearbyDeltas } });
   }
 
+  /**
+   * 生成粒子效果
+   * 在指定位置生成粒子效果
+   * @param {THREE.Vector3} pos - 位置
+   * @param {string} type - 粒子类型
+   */
   spawnParticles(pos, type) { if (this.world.spawnParticles) this.world.spawnParticles(pos, type); }
 
+  /**
+   * 执行天空放置
+   * 在视线方向上寻找合适位置放置方块
+   * @param {string} type - 方块类型
+   */
   doSkyPlace(type) {
     const origin = this.camera.position;
     this.camera.getWorldDirection(this._direction);
@@ -757,8 +863,17 @@ export class Player {
     }
   }
 
+  /**
+   * 执行挥臂动作
+   * 播放挥臂动画
+   */
   swing() { this.swingTime = 10; }
 
+  /**
+   * 更新手臂状态
+   * 控制玩家第一人称手臂的动画和位置
+   * @param {number} dt - 时间步长
+   */
   updateArm(dt) {
     if (this.weaponMode !== WEAPON_TYPES.ARM) { this.arm.visible = false; return; }
     this.arm.visible = true;

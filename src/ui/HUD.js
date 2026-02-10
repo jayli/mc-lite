@@ -37,9 +37,9 @@ export class HUD {
    */
   constructor(game) {
     this.game = game;
-    this.hotbarEl = document.getElementById('hotbar');
-    this.msgEl = document.getElementById('msg');
-    this.hudEl = document.getElementById('hud');
+    this.hotbarEl = document.getElementById('hotbar');  // 快捷栏DOM元素，用于显示和选择物品
+    this.msgEl = document.getElementById('msg');        // 消息显示DOM元素，用于显示系统提示信息
+    this.hudEl = document.getElementById('hud');        // HUD容器DOM元素，用于承载所有界面元素
 
     // FPS 相关变量
     this.lastTime = performance.now();

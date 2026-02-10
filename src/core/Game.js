@@ -165,6 +165,7 @@ export class Game {
     if (this.showDebugInfo && totalFrameTime > 25) {
       console.warn(`[Jank] 帧耗时过长: ${totalFrameTime.toFixed(2)}ms`);
       const uiStats = this.ui.hud.perfStats || { updateFPS: 0, renderHotbar: 0 };
+      const overHead = (totalFrameTime - (this.perfStats.player + this.perfStats.world + this.perfStats.ui + this.perfStats.render)).toFixed(2);
       console.table({
         'Player Update': `${this.perfStats.player.toFixed(2)}ms`,
         'World Update': `${this.perfStats.world.toFixed(2)}ms`,
@@ -172,7 +173,7 @@ export class Game {
         '  └─ HUD.updateFPS': `${uiStats.updateFPS.toFixed(2)}ms`,
         '  └─ HUD.renderHotbar': `${uiStats.renderHotbar.toFixed(2)}ms`,
         'Render (WebGL)': `${this.perfStats.render.toFixed(2)}ms`,
-        'Other (Overhead)': `${(totalFrameTime - (this.perfStats.player + this.perfStats.world + this.perfStats.ui + this.perfStats.render)).toFixed(2)}ms`
+        'Other (Overhead)': `${overHead}ms`
       });
     }
   }
@@ -242,11 +243,11 @@ export class Game {
    */
   async saveToDisk() {
     const playerSnapshot = {
-      x: this.player.position.x,
-      y: this.player.position.y,
-      z: this.player.position.z,
-      pitch: this.player.cameraPitch,
-      yaw: this.player.rotation.y
+      x: this.player.position.x,        // 玩家在X轴上的位置坐标
+      y: this.player.position.y,        // 玩家在Y轴上的位置坐标
+      z: this.player.position.z,        // 玩家在Z轴上的位置坐标
+      pitch: this.player.cameraPitch,   // 玩家相机的俯仰角度（上下视角）
+      yaw: this.player.rotation.y       // 玩家的偏航角度（左右视角/水平旋转）
     };
 
     // 序列化 persistenceService 中的所有区块增量
@@ -256,9 +257,9 @@ export class Game {
     }
 
     const snapshot = {
-      player: playerSnapshot,
-      worldDeltas: worldDeltas,
-      seed: WORLD_CONFIG.SEED
+      player: playerSnapshot,            // 玩家状态快照（位置、视角等）
+      worldDeltas: worldDeltas,         // 世界变化数据（保存所有修改过的区块）
+      seed: WORLD_CONFIG.SEED           // 世界生成种子，用于确保地形一致性
     };
 
     console.log(`[Save] Game saved with seed: ${WORLD_CONFIG.SEED}`);

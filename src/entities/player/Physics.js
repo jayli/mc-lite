@@ -3,18 +3,18 @@
  * 物理系统常量定义
  */
 export const PHYSICS_CONSTANTS = {
-  GRAVITY: -24.0,           // 调整为每秒重力 (约为 -0.4 * 60)
-  TERMINAL_VELOCITY: -50.0,
-  PLAYER_WIDTH: 0.6,
-  PLAYER_HEIGHT: 1.8,
-  HEAD_HEIGHT: 1.65,
-  MAX_STEP: 1.0,
-  MAX_JUMP_STEP: 2.0,
-  FRICTION_SLIDE: 0.9,
-  FRICTION_CORNER: 0.7,
-  JUMP_FORCE: 10.0,         // 调整为冲量速度
-  SPEED: 8.0,               // 调整为每秒速度 (约为 0.133 * 60)
-  CAMERA_WIDTH: 0.3
+  GRAVITY: -24.0,           // 重力加速度 (-24.0 单位/秒²，约为 -0.4 * 60，向下为负)
+  TERMINAL_VELOCITY: -50.0, // 终端速度，物体下落的最大速度限制
+  PLAYER_WIDTH: 0.6,        // 玩家碰撞体宽度 (0.6 单位)
+  PLAYER_HEIGHT: 1.8,       // 玩家碰撞体高度 (1.8 单位)
+  HEAD_HEIGHT: 1.65,        // 玩家头部高度 (1.65 单位，用于相机位置)
+  MAX_STEP: 1.0,            // 最大上台阶高度 (1.0 单位)
+  MAX_JUMP_STEP: 2.0,       // 跳跃时的最大上台阶高度 (2.0 单位)
+  FRICTION_SLIDE: 0.9,      // 滑动摩擦系数 (0.9，用于减速)
+  FRICTION_CORNER: 0.7,     // 转弯时的摩擦系数 (0.7，用于对角移动减速)
+  JUMP_FORCE: 10.0,         // 跳跃力度 (10.0 单位，向上冲量速度)
+  SPEED: 8.0,               // 玩家移动速度 (8.0 单位/秒)
+  CAMERA_WIDTH: 0.3         // 相机碰撞体宽度 (0.3 单位)
 };
 
 import * as THREE from 'three';
@@ -34,12 +34,12 @@ export class Physics {
     this.world = world;
 
     // 物理参数
-    this.gravity = PHYSICS_CONSTANTS.GRAVITY;
-    this.terminalVelocity = PHYSICS_CONSTANTS.TERMINAL_VELOCITY;
-    this.playerHeight = PHYSICS_CONSTANTS.PLAYER_HEIGHT;
-    this.playerWidth = PHYSICS_CONSTANTS.PLAYER_WIDTH;
-    this.jumpForce = PHYSICS_CONSTANTS.JUMP_FORCE;
-    this.speed = PHYSICS_CONSTANTS.SPEED;
+    this.gravity = PHYSICS_CONSTANTS.GRAVITY;           // 重力加速度
+    this.terminalVelocity = PHYSICS_CONSTANTS.TERMINAL_VELOCITY; // 终端速度（最大下落速度）
+    this.playerHeight = PHYSICS_CONSTANTS.PLAYER_HEIGHT; // 玩家高度
+    this.playerWidth = PHYSICS_CONSTANTS.PLAYER_WIDTH;   // 玩家宽度
+    this.jumpForce = PHYSICS_CONSTANTS.JUMP_FORCE;       // 跳跃力度
+    this.speed = PHYSICS_CONSTANTS.SPEED;               // 移动速度
   }
 
   /**

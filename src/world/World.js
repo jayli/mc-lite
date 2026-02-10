@@ -139,16 +139,16 @@ export class World {
     this.particles.spawnExplosionEffect(pos);
 
     // 2. 触发球体扩张特效 (保留在 World 中，作为底层增强)
-    const sphere = this.explosionSpheres.find(s => !s.active);
+    const sphere = this.explosionSpheres.find(s => !s.active); // 从爆炸球体池中找到一个未激活的对象
     if (sphere) {
-      sphere.active = true;
-      sphere.timer = 0;
-      sphere.maxLife = 0.3;
-      sphere.targetScale = 5.0;
-      sphere.mesh.position.copy(pos);
-      sphere.mesh.visible = true;
-      sphere.mesh.scale.setScalar(0.1);
-      sphere.mesh.material.opacity = 1.0;
+      sphere.active = true;           // 标记该爆炸球体为激活状态
+      sphere.timer = 0;               // 重置计时器为0，开始新的生命周期
+      sphere.maxLife = 0.3;           // 设置爆炸球体最大生存时间为0.3秒
+      sphere.targetScale = 5.0;       // 设置爆炸球体最终扩张的目标尺寸为5.0
+      sphere.mesh.position.copy(pos); // 将爆炸球体的位置设置为传入的位置参数
+      sphere.mesh.visible = true;     // 显示爆炸球体网格
+      sphere.mesh.scale.setScalar(0.1); // 将爆炸球体的初始缩放设为0.1（很小的初始尺寸）
+      sphere.mesh.material.opacity = 1.0; // 设置爆炸球体的不透明度为完全不透明
     }
   }
 

@@ -28,18 +28,18 @@ export class FaceCullingSystem {
 
     // 性能统计
     this.stats = {
-      enabled: this.enabled,
-      debugMode: this.debugMode,
-      totalBlocksProcessed: 0,
-      facesCulled: 0,
-      facesRendered: 0,
-      optimizationRate: 0,
-      updateTime: 0,
-      lastUpdateTime: 0,
-      errorCount: 0,
-      lastError: null,
-      isDegraded: false,
-      degradeReason: null
+      enabled: this.enabled,              // 系统是否启用
+      debugMode: this.debugMode,          // 是否处于调试模式
+      totalBlocksProcessed: 0,            // 处理的总方块数
+      facesCulled: 0,                     // 被剔除的面数
+      facesRendered: 0,                   // 被渲染的面数
+      optimizationRate: 0,                // 优化率（被剔除面数 / 总面数）
+      updateTime: 0,                      // 上次更新所用时间（毫秒）
+      lastUpdateTime: 0,                  // 上次更新的时间戳
+      errorCount: 0,                      // 错误计数
+      lastError: null,                    // 最后的错误信息
+      isDegraded: false,                  // 系统是否已降级
+      degradeReason: null                 // 降级原因
     };
 
     // 事件系统
@@ -86,10 +86,10 @@ export class FaceCullingSystem {
   enable() {
     if (this.enabled) return;
 
-    this.enabled = true;
-    this.stats.enabled = true;
-    this.stats.isDegraded = false;
-    this.stats.degradeReason = null;
+    this.enabled = true;                  // 设置系统启用状态
+    this.stats.enabled = true;            // 更新统计信息中的启用状态
+    this.stats.isDegraded = false;        // 重置降级状态
+    this.stats.degradeReason = null;      // 清除降级原因
 
     this.emit('enabled');
     console.log('FaceCullingSystem enabled');

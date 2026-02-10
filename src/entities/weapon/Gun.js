@@ -4,10 +4,10 @@ import { audioManager } from '../../core/AudioManager.js';
 
 // 武器类型常量
 export const WEAPON_TYPES = {
-  ARM: 0,
-  GUN: 1,
-  MAG7: 2,
-  MINIGUN: 3
+  ARM: 0,    // 手臂
+  GUN: 1,    // 普通枪
+  MAG7: 2,   // 散弹枪
+  MINIGUN: 3 // 机枪
 };
 
 // 武器详细配置
