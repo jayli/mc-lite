@@ -106,6 +106,11 @@ export class InventoryUI {
       const img = document.createElement('img');
       img.src = HUD.generateIcon(slot.item);
 
+      // 添加物品名称标签
+      const nameLabel = document.createElement('div');
+      nameLabel.className = 'item-name';
+      nameLabel.innerText = slot.item;
+
       const countSpan = document.createElement('span');
       countSpan.className = 'count';
       countSpan.innerText = slot.count;
@@ -116,7 +121,7 @@ export class InventoryUI {
         this.render(); // 重新渲染以更新选中状态
       };
 
-      div.append(img, countSpan);
+      div.append(nameLabel, img, countSpan);
       this.gridEl.appendChild(div);
     });
   }

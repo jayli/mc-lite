@@ -238,11 +238,23 @@ export class HUD {
         const img = document.createElement('img');
         img.src = HUD.generateIcon(slot.item);
 
+        // 添加物品名称标签（仅在调试模式下显示）
+        let nameLabel = null;
+        if (this.game.showDebugInfo) {
+          nameLabel = document.createElement('div');
+          nameLabel.className = 'item-name';
+          nameLabel.innerText = slot.item;
+        }
+
         const countSpan = document.createElement('span');
         countSpan.className = 'count';
         countSpan.innerText = slot.count;
 
-        div.append(img, countSpan);
+        if (nameLabel) {
+          div.append(nameLabel, img, countSpan);
+        } else {
+          div.append(img, countSpan);
+        }
       }
       this.hotbarEl.appendChild(div);
     }

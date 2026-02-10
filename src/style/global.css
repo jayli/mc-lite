@@ -42,9 +42,22 @@ body { margin: 0; overflow: hidden; background-color: #87CEEB; user-select: none
 .slot.selected { border: 3px solid #FFFF00; background: #a0a0a0; }
 .slot:hover { background-color: #999; }
 .slot img { width: 32px; height: 32px; image-rendering: pixelated; pointer-events: none; }
+.slot .item-name {
+  position: absolute; top: -2px; left: 0px; right: 0px;
+  color: white; font-size: 10px; text-align: center;
+  text-shadow: 1px 1px 0 #000; pointer-events: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .slot .count {
-  position: absolute; bottom: 2px; right: 2px; color: white;
-  font-family: monospace; font-size: 14px; text-shadow: 1px 1px 0 #000; pointer-events: none;
+  position: absolute; bottom: 0px; right: 2px; color: white;
+  font-family: monospace; font-size: 11px; text-shadow: 1px 1px 0 #000; pointer-events: none;
+}
+
+#hotbar .slot .item-name {
+  position: absolute; top: 2px; left: 2px; right: 2px;
+  color: yellow; font-size: 8px; text-align: center;
+  text-shadow: 1px 1px 0 #000; pointer-events: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 #msg {
