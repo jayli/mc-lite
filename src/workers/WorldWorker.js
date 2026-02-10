@@ -221,38 +221,82 @@ onmessage = function(e) {
   /**
    * 计算指定角落的 AO 值 (0-3)
    * AO = 3 - (side1 + side2 + corner)
-   * side1, side2, corner 为 1 如果该位置被遮挡，否则为 0
+   * 如果 side1 和 side2 都是空气，则忽略 corner (Minecraft 优化逻辑)
    */
   const getAOValue = (side1, side2, corner) => {
-    if (side1 && side2) return 0; // 两个侧面都遮挡，AO 为 0 (最暗)
-    return 3 - (side1 + side2 + corner);
+    const s1 = side1 ? 1 : 0;
+    const s2 = side2 ? 1 : 0;
+    const c = (side1 || side2) ? (corner ? 1 : 0) : 0; // Minecraft 逻辑：只有当侧边存在时才考虑对角
+
+    if (s1 && s2) return 0; // 两个侧面都遮挡，AO 为 0 (最暗)
+    return 3 - (s1 + s2 + c);
   };
 
   const getAO = (x, y, z, faceIdx) => {
+    // 强制坐标整数化，确保 Map 查找准确
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    const iz = Math.floor(z);
+
     // faceIdx: 0:px, 1:nx, 2:py, 3:ny, 4:pz, 5:nz
-    // 返回 4 个顶点的 AO 值
     const aos = new Uint8Array(4).fill(3);
 
-    // 根据面定义相邻方块偏移
-    if (faceIdx === 0) { // px (侧面)
-      aos[0] = getAOValue(isOccluding(x+1, y+1, z), 0, 0);
-      aos[2] = getAOValue(isOccluding(x+1, y+1, z), 0, 0);
-    } else if (faceIdx === 1) { // nx (侧面)
-      aos[0] = getAOValue(isOccluding(x-1, y+1, z), 0, 0);
-      aos[2] = getAOValue(isOccluding(x-1, y+1, z), 0, 0);
-    } else if (faceIdx === 2) { // py (顶面)
-      aos[0] = getAOValue(isOccluding(x-1, y+1, z), isOccluding(x, y+1, z-1), isOccluding(x-1, y+1, z-1));
-      aos[1] = getAOValue(isOccluding(x+1, y+1, z), isOccluding(x, y+1, z-1), isOccluding(x+1, y+1, z-1));
-      aos[2] = getAOValue(isOccluding(x-1, y+1, z), isOccluding(x, y+1, z+1), isOccluding(x-1, y+1, z+1));
-      aos[3] = getAOValue(isOccluding(x+1, y+1, z), isOccluding(x, y+1, z+1), isOccluding(x+1, y+1, z+1));
-    } else if (faceIdx === 3) { // ny (底面)
-      // Keep all at 3
-    } else if (faceIdx === 4) { // pz (侧面)
-      aos[0] = getAOValue(isOccluding(x, y+1, z+1), 0, 0);
-      aos[2] = getAOValue(isOccluding(x, y+1, z+1), 0, 0);
-    } else if (faceIdx === 5) { // nz (侧面)
-      aos[0] = getAOValue(isOccluding(x, y+1, z-1), 0, 0);
-      aos[2] = getAOValue(isOccluding(x, y+1, z-1), 0, 0);
+    if (faceIdx === 0) { // px (+X side)
+      // V0: (1, 1, 1) [Top, PZ]
+      aos[0] = getAOValue(isOccluding(ix+1, iy+1, iz), isOccluding(ix+1, iy, iz+1), isOccluding(ix+1, iy+1, iz+1));
+      // V1: (1, 1, -1) [Top, NZ]
+      aos[1] = getAOValue(isOccluding(ix+1, iy+1, iz), isOccluding(ix+1, iy, iz-1), isOccluding(ix+1, iy+1, iz-1));
+      // V2: (1, -1, 1) [Bottom, PZ]
+      aos[2] = getAOValue(isOccluding(ix+1, iy-1, iz), isOccluding(ix+1, iy, iz+1), isOccluding(ix+1, iy-1, iz+1));
+      // V3: (1, -1, -1) [Bottom, NZ]
+      aos[3] = getAOValue(isOccluding(ix+1, iy-1, iz), isOccluding(ix+1, iy, iz-1), isOccluding(ix+1, iy-1, iz-1));
+    } else if (faceIdx === 1) { // nx (-X side)
+      // V4: (-1, 1, -1) [Top, NZ]
+      aos[0] = getAOValue(isOccluding(ix-1, iy+1, iz), isOccluding(ix-1, iy, iz-1), isOccluding(ix-1, iy+1, iz-1));
+      // V5: (-1, 1, 1) [Top, PZ]
+      aos[1] = getAOValue(isOccluding(ix-1, iy+1, iz), isOccluding(ix-1, iy, iz+1), isOccluding(ix-1, iy+1, iz+1));
+      // V6: (-1, -1, -1) [Bottom, NZ]
+      aos[2] = getAOValue(isOccluding(ix-1, iy-1, iz), isOccluding(ix-1, iy, iz-1), isOccluding(ix-1, iy-1, iz-1));
+      // V7: (-1, -1, 1) [Bottom, PZ]
+      aos[3] = getAOValue(isOccluding(ix-1, iy-1, iz), isOccluding(ix-1, iy, iz+1), isOccluding(ix-1, iy-1, iz+1));
+    } else if (faceIdx === 2) { // py (+Y top)
+      // V8: (-1, 1, -1) [NX, NZ]
+      aos[0] = getAOValue(isOccluding(ix-1, iy+1, iz), isOccluding(ix, iy+1, iz-1), isOccluding(ix-1, iy+1, iz-1));
+      // V9: (1, 1, -1) [PX, NZ]
+      aos[1] = getAOValue(isOccluding(ix+1, iy+1, iz), isOccluding(ix, iy+1, iz-1), isOccluding(ix+1, iy+1, iz-1));
+      // V10: (-1, 1, 1) [NX, PZ]
+      aos[2] = getAOValue(isOccluding(ix-1, iy+1, iz), isOccluding(ix, iy+1, iz+1), isOccluding(ix-1, iy+1, iz+1));
+      // V11: (1, 1, 1) [PX, PZ]
+      aos[3] = getAOValue(ix+1, iy+1, iz+1) ? 0 : getAOValue(isOccluding(ix+1, iy+1, iz), isOccluding(ix, iy+1, iz+1), isOccluding(ix+1, iy+1, iz+1));
+      // 修正 V11 的写法统一
+      aos[3] = getAOValue(isOccluding(ix+1, iy+1, iz), isOccluding(ix, iy+1, iz+1), isOccluding(ix+1, iy+1, iz+1));
+    } else if (faceIdx === 3) { // ny (-Y bottom)
+      // V12: (-1, -1, 1) [NX, PZ]
+      aos[0] = getAOValue(isOccluding(ix-1, iy-1, iz), isOccluding(ix, iy-1, iz+1), isOccluding(ix-1, iy-1, iz+1));
+      // V13: (1, -1, 1) [PX, PZ]
+      aos[1] = getAOValue(isOccluding(ix+1, iy-1, iz), isOccluding(ix, iy-1, iz+1), isOccluding(ix+1, iy-1, iz+1));
+      // V14: (-1, -1, -1) [NX, NZ]
+      aos[2] = getAOValue(isOccluding(ix-1, iy-1, iz), isOccluding(ix, iy-1, iz-1), isOccluding(ix-1, iy-1, iz-1));
+      // V15: (1, -1, -1) [PX, NZ]
+      aos[3] = getAOValue(isOccluding(ix+1, iy-1, iz), isOccluding(ix, iy-1, iz-1), isOccluding(ix+1, iy-1, iz-1));
+    } else if (faceIdx === 4) { // pz (+Z side)
+      // V16: (-1, 1, 1) [NX, Top]
+      aos[0] = getAOValue(isOccluding(ix-1, iy, iz+1), isOccluding(ix, iy+1, iz+1), isOccluding(ix-1, iy+1, iz+1));
+      // V17: (1, 1, 1) [PX, Top]
+      aos[1] = getAOValue(isOccluding(ix+1, iy, iz+1), isOccluding(ix, iy+1, iz+1), isOccluding(ix+1, iy+1, iz+1));
+      // V18: (-1, -1, 1) [NX, Bottom]
+      aos[2] = getAOValue(isOccluding(ix-1, iy, iz+1), isOccluding(ix, iy-1, iz+1), isOccluding(ix-1, iy-1, iz+1));
+      // V19: (1, -1, 1) [PX, Bottom]
+      aos[3] = getAOValue(isOccluding(ix+1, iy, iz+1), isOccluding(ix, iy-1, iz+1), isOccluding(ix+1, iy-1, iz+1));
+    } else if (faceIdx === 5) { // nz (-Z side)
+      // V20: (1, 1, -1) [PX, Top]
+      aos[0] = getAOValue(isOccluding(ix+1, iy, iz-1), isOccluding(ix, iy+1, iz-1), isOccluding(ix+1, iy+1, iz-1));
+      // V21: (-1, 1, -1) [NX, Top]
+      aos[1] = getAOValue(isOccluding(ix-1, iy, iz-1), isOccluding(ix, iy+1, iz-1), isOccluding(ix-1, iy+1, iz-1));
+      // V22: (1, -1, -1) [PX, Bottom]
+      aos[2] = getAOValue(isOccluding(ix+1, iy, iz-1), isOccluding(ix, iy-1, iz-1), isOccluding(ix+1, iy-1, iz-1));
+      // V23: (-1, -1, -1) [NX, Bottom]
+      aos[3] = getAOValue(isOccluding(ix-1, iy, iz-1), isOccluding(ix, iy-1, iz-1), isOccluding(ix-1, iy-1, iz-1));
     }
     return aos;
   };
