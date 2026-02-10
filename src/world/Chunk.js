@@ -298,10 +298,10 @@ export class Chunk {
 
       if (solidBlocks) {
         this.solidBlocks = new Set(solidBlocks);
-        // 同理，保留合并期间新产生的碰撞体
+        // 同理，保留合并期间新产生的碰撞体，但必须确保该位置在最新的 blockData 中依然是实心的
         for (const [key, mesh] of this.dynamicMeshes.entries()) {
           const type = mesh.userData.type;
-          if (getBlockProperties(type).isSolid) {
+          if (this.blockData[key] && getBlockProperties(type).isSolid) {
             this.solidBlocks.add(key);
           }
         }
