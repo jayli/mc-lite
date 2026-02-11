@@ -481,7 +481,9 @@ export class Player {
           this.explode(this._tempVector.x, this._tempVector.y, this._tempVector.z);
         }
       } else {
-        this.removeBlock(hit);
+        if (this.game && this.game.canGunsDestroyBlocks) {
+          this.removeBlock(hit);
+        }
       }
     }
   }

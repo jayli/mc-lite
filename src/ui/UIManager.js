@@ -29,6 +29,8 @@ export class UIManager {
     const btnMid = document.getElementById('btn-mid');
     const btnQuality = document.getElementById('btn-quality');
     const btnSave = document.getElementById('btn-save-game');
+    const btnGunDestroyOn = document.getElementById('btn-gun-destroy-on');
+    const btnGunDestroyOff = document.getElementById('btn-gun-destroy-off');
 
     if (!settingsBtn || !settingsModal || !settingsClose) return;
 
@@ -69,6 +71,22 @@ export class UIManager {
       this.updateActiveButtons();
     };
 
+    // 枪械破坏设置
+    if (btnGunDestroyOn && btnGunDestroyOff) {
+      btnGunDestroyOn.onclick = (e) => {
+        e.stopPropagation();
+        this.game.canGunsDestroyBlocks = true;
+        this.hud.showMessage('已开启枪械破坏方块');
+        this.updateActiveButtons();
+      };
+      btnGunDestroyOff.onclick = (e) => {
+        e.stopPropagation();
+        this.game.canGunsDestroyBlocks = false;
+        this.hud.showMessage('已关闭枪械破坏方块');
+        this.updateActiveButtons();
+      };
+    }
+
     // 手动存档按钮处理
     if (btnSave) {
       btnSave.onclick = async (e) => {
@@ -106,12 +124,19 @@ export class UIManager {
     const btnPerf = document.getElementById('btn-perf');
     const btnMid = document.getElementById('btn-mid');
     const btnQuality = document.getElementById('btn-quality');
+    const btnGunDestroyOn = document.getElementById('btn-gun-destroy-on');
+    const btnGunDestroyOff = document.getElementById('btn-gun-destroy-off');
 
     if (!btnPerf || !btnMid || !btnQuality) return;
 
     btnPerf.classList.toggle('active', scale === 0.4);
     btnMid.classList.toggle('active', scale === 0.7);
     btnQuality.classList.toggle('active', scale === 1.0);
+
+    if (btnGunDestroyOn && btnGunDestroyOff) {
+      btnGunDestroyOn.classList.toggle('active', this.game.canGunsDestroyBlocks);
+      btnGunDestroyOff.classList.toggle('active', !this.game.canGunsDestroyBlocks);
+    }
   }
 
   /**

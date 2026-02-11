@@ -41,6 +41,8 @@ export class Game {
     this.stats.dom.style.left = 'auto'; // 确保不靠左
     document.body.appendChild(this.stats.dom);
 
+    this.canGunsDestroyBlocks = true; // 是否允许枪械破坏方块
+
     this.isRunning = false; // 游戏运行状态标志
     this.perfStats = { player: 0, world: 0, ui: 0, render: 0 }; // 性能统计数据
     this.showDebugInfo = false; // 是否显示调试信息
@@ -318,7 +320,10 @@ export class Game {
     const snapshot = {
       player: playerSnapshot,            // 玩家状态快照（位置、视角等）
       worldDeltas: worldDeltas,         // 世界变化数据（保存所有修改过的区块）
-      seed: WORLD_CONFIG.SEED           // 世界生成种子，用于确保地形一致性
+      seed: WORLD_CONFIG.SEED,           // 世界生成种子，用于确保地形一致性
+      settings: {                        // 游戏设置
+        canGunsDestroyBlocks: this.canGunsDestroyBlocks
+      }
     };
 
     console.log(`[Save] Game saved with seed: ${WORLD_CONFIG.SEED}`);
@@ -345,6 +350,11 @@ export class Game {
     // 2. 注入方块增量缓存
     if (saveData.worldDeltas && persistenceService.injectSaveData) {
       persistenceService.injectSaveData(saveData.worldDeltas);
+    }
+
+    // 3. 恢复设置
+    if (saveData.settings) {
+      this.canGunsDestroyBlocks = saveData.settings.canGunsDestroyBlocks !== undefined ? saveData.settings.canGunsDestroyBlocks : true;
     }
   }
 }
