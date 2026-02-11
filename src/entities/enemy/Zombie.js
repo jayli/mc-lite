@@ -1,3 +1,5 @@
+import * as THREE from 'three';
+
 /**
  * 丧尸实体类 - 符合我的世界原版风格的敌人
  * 尺寸：1x1x2 方块单位
@@ -77,6 +79,9 @@ export class Zombie {
         rightLeg.position.set(0.19, -0.2, 0);
         group.add(rightLeg);
 
+        // 设置userData标记这是一个丧尸，方便射线检测
+        group.userData = { type: 'zombie', isZombie: true };
+
         // 设置全局位置
         group.position.set(this.position.x, this.position.y, this.position.z);
 
@@ -146,52 +151,85 @@ export class Zombie {
 
     /**
      * 检查与世界的碰撞
-     * @param {Function} getBlockAt - 获取指定坐标的方块类型函数
+     * @param {Function} getBlockFunc - 获取指定坐标的方块类型函数
      */
-    checkCollision(getBlockAt) {
-        // 检查当前位置下方是否有方块（地面）
-        const feetY = Math.floor(this.position.y - this.height/2);
-        const headY = Math.floor(this.position.y + this.height/2);
+    checkCollision(getBlockFunc) {
         const posX = Math.floor(this.position.x);
+        const posY = Math.floor(this.position.y);
         const posZ = Math.floor(this.position.z);
 
-        // 检查脚下是否有方块
-        if (!getBlockAt(posX, feetY, posZ)) {
-            // 如果脚下没有方块，则应用重力（但丧尸不应掉落太远）
-            // 对丧尸来说，这里简化处理，只确保它不会穿过地面
-        }
+        // 检查水平移动方向的碰撞
+        const nextPosX = Math.floor(this.position.x + this.velocity.x);
+        const nextPosZ = Math.floor(this.position.z + this.velocity.z);
 
-        // 检查头部是否有障碍物
-        if (getBlockAt(posX, headY, posZ)) {
-            // 简单地将丧尸向下移动一点
-            this.position.y -= 0.1;
-            this.mesh.position.y = this.position.y;
-        }
-
-        // 检查水平方向碰撞（前方）
-        const forwardX = Math.floor(this.position.x + this.velocity.x * 2); // *2 是为了提前检测
-        const forwardZ = Math.floor(this.position.z + this.velocity.z * 2);
-
-        if (getBlockAt(forwardX, Math.floor(this.position.y), forwardZ)) {
-            // 遇到障碍物时，尝试寻找可通行路径
-            // 这里简化处理，只是停止前进
+        // 检查前方X方向是否有方块 (检查两个Y层，确保丧尸不会被卡住)
+        if (getBlockFunc(nextPosX, posY, posZ) || getBlockFunc(nextPosX, posY - 1, posZ)) {
+            // 如果前方有方块，停下X方向移动
             this.velocity.x = 0;
+        }
+
+        // 检查前方Z方向是否有方块
+        if (getBlockFunc(posX, posY, nextPosZ) || getBlockFunc(posX, posY - 1, nextPosZ)) {
+            // 如果前方有方块，停下Z方向移动
             this.velocity.z = 0;
         }
 
-        // 检查丧尸是否试图向上爬过台阶（1格高度）
-        const obstacleAtHeadLevel = getBlockAt(posX, headY, posZ);
-        const potentialStepAtHeadLevel = getBlockAt(posX, headY - 1, posZ);
+        // 查找合适的站立高度
+        let groundY = posY;
+        let foundGround = false;
 
-        // 简单的台阶检测：允许丧尸上下1格高度的台阶
-        if (!obstacleAtHeadLevel && potentialStepAtHeadLevel) {
-            // 如果前方1格高的地方是实心块，丧尸可以向上移动
-            if (Math.abs(this.velocity.x) > 0.001 || Math.abs(this.velocity.z) > 0.001) {
-                // 小幅提升丧尸高度以跨过台阶
-                this.position.y += 0.05; // 逐步升高，模拟上台阶
-                this.mesh.position.y = this.position.y;
+        // 向下搜索地面（最多向下5个方块）
+        for (let y = posY; y >= posY - 5; y--) {
+            if (getBlockFunc(posX, y, posZ)) {
+                groundY = y + 1; // 站在方块上
+                foundGround = true;
+                break;
             }
         }
+
+        // 如果找到了地面，确保丧尸站在地面之上
+        if (foundGround) {
+            const desiredY = groundY + this.height / 2; // 丧尸中心点应位于脚部上方
+
+            // 如果当前高度高于理想地面高度，则下降（实现下台阶功能）
+            if (this.position.y > desiredY) {
+                this.position.y = Math.max(desiredY, this.position.y - 0.1); // 平滑下降
+            } else {
+                // 如果当前高度低于地面高度，调整到正确位置（上台阶）
+                this.position.y = desiredY;
+            }
+        }
+
+        // 检查前方是否有台阶可以攀爬
+        if (this.velocity.x !== 0 || this.velocity.z !== 0) {
+            // 计算前方位置
+            const aheadX = Math.floor(this.position.x + this.velocity.x * 2);
+            const aheadZ = Math.floor(this.position.z + this.velocity.z * 2);
+
+            // 检查前方是否有台阶（比当前位置高最多1个方块）
+            for (let testY = posY; testY <= posY + 1; testY++) {
+                if (getBlockFunc(aheadX, testY, posZ) && !getBlockFunc(aheadX, testY + 1, posZ)) {
+                    // 前方有台阶，检查是否可以攀爬
+                    if (getBlockFunc(aheadX, testY - 1, posZ)) {
+                        // 设置丧尸在台阶上方的高度
+                        this.position.y = testY + 1 + this.height/2;
+                        break;
+                    }
+                }
+
+                if (getBlockFunc(posX, testY, aheadZ) && !getBlockFunc(posX, testY + 1, aheadZ)) {
+                    // 前方有台阶，检查是否可以攀爬
+                    if (getBlockFunc(posX, testY - 1, aheadZ)) {
+                        // 设置丧尸在台阶上方的高度
+                        this.position.y = testY + 1 + this.height/2;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // 确保Y位置正确
+        this.mesh.position.y = this.position.y;
     }
 
     /**

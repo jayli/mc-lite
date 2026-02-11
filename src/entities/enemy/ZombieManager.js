@@ -1,3 +1,5 @@
+import { Zombie } from './Zombie.js'; // 导入Zombie类
+
 /**
  * 丧尸管理器 - 管理游戏中所有的丧尸实体
  */
@@ -61,7 +63,7 @@ export class ZombieManager {
             // 更新丧尸状态
             zombie.update(
                 playerPosition,
-                this.world.getBlockAt.bind(this.world)
+                this.world.getBlock.bind(this.world)  // 修正方法名为getBlock
             );
 
             // 检查丧尸是否死亡，如果是则移除

@@ -429,15 +429,15 @@ export class Player {
 
     for (let i = 0; i < hits.length; i++) {
       const hit = hits[i];
-      if (hit.object.type === 'Group' && hit.object.children.length > 0) {
-        // 检查这个组是否是丧尸
-        if (hit.object.children.some(child => child.geometry.parameters &&
-            ((child.geometry.parameters.width === 0.5 && child.geometry.parameters.height === 0.5) ||
-             child.geometry.parameters.width === 0.75))) {
-          // 很可能是丧尸（基于其独特的方块化人体几何体）
-          zombieHit = hit;
-          break;
-        }
+      // 检查这个对象是否是丧尸
+      if (hit.object.userData && hit.object.userData.isZombie) {
+        zombieHit = hit;
+        break;
+      }
+      // 如果当前对象不是丧尸，检查父对象
+      else if (hit.object.parent && hit.object.parent.userData && hit.object.parent.userData.isZombie) {
+        zombieHit = hit;
+        break;
       }
     }
 

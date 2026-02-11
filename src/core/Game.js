@@ -10,7 +10,7 @@ import { Player } from '../entities/player/Player.js';
 import { realisticTreeManager } from '../world/entities/RealisticTreeManager.js';
 import { faceCullingSystem } from './FaceCullingSystem.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
-import { ZombieManager } from '../enemy/ZombieManager.js'; // 导入丧尸管理器
+import { ZombieManager } from '../entities/enemy/ZombieManager.js'; // 导入丧尸管理器
 import Stats from 'stats';
 
 /**
@@ -69,15 +69,48 @@ export class Game {
         }
       }
 
-      // 按 Z 键生成一个丧尸
-      if (e.code === 'KeyZ') {
+      // 按 X 键生成一个丧尸
+      if (e.code === 'KeyX') {
+        // 在玩家周围10格范围内随机选择一个位置
+        const angle = Math.random() * Math.PI * 2; // 随机角度
+        const distance = Math.random() * 8 + 2; // 距离玩家2-10格
         const spawnPos = {
-          x: this.player.position.x + (Math.random() - 0.5) * 10,
+          x: this.player.position.x + Math.cos(angle) * distance,
           y: this.player.position.y,
-          z: this.player.position.z + (Math.random() - 0.5) * 10
+          z: this.player.position.z + Math.sin(angle) * distance
         };
-        this.zombieManager.spawnZombie(spawnPos);
-        console.log('[Debug] 生成了一个丧尸');
+
+        // 尝试在稍微调整的高度上生成（确保丧尸站在地面上）
+        const spawnX = Math.floor(spawnPos.x);
+        const spawnZ = Math.floor(spawnPos.z);
+
+        // 找到合适的y位置（在地面上）
+        let spawnY = Math.floor(spawnPos.y);
+        // 向下找地面
+        for (let y = spawnY; y > spawnY - 10; y--) {
+          if (this.world.getBlock(spawnX, y, spawnZ) !== null && this.world.getBlock(spawnX, y, spawnZ) !== 'air') {
+            spawnY = y + 1; // 在方块上方生成
+            break;
+          }
+        }
+
+        const adjustedSpawnPos = {
+          x: spawnPos.x,
+          y: spawnY,
+          z: spawnPos.z
+        };
+
+        const zombie = this.zombieManager.spawnZombie(adjustedSpawnPos);
+        if (zombie) {
+          console.log(`[Debug] 生成了一个丧尸 at (${adjustedSpawnPos.x.toFixed(2)}, ${adjustedSpawnPos.y.toFixed(2)}, ${adjustedSpawnPos.z.toFixed(2)})`);
+          console.log(`[Debug] 离玩家距离: ${Math.sqrt(
+            Math.pow(adjustedSpawnPos.x - this.player.position.x, 2) +
+            Math.pow(adjustedSpawnPos.y - this.player.position.y, 2) +
+            Math.pow(adjustedSpawnPos.z - this.player.position.z, 2)
+          ).toFixed(2)} 格`);
+        } else {
+          console.log('[Debug] 未能生成丧尸（可能达到数量上限）');
+        }
       }
     });
 

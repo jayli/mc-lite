@@ -26,7 +26,7 @@
 ### Game.js
 - 添加了ZombieManager实例
 - 在主循环中调用丧尸更新方法
-- 添加了生成丧尸的快捷键（Z键）
+- 添加了生成丧尸的快捷键（X键）
 
 ### Player.js
 - 修改了getInteractionTargets()方法，将丧尸加入可交互对象
