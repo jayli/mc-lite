@@ -1,6 +1,6 @@
 # Implementation Plan: 丧尸敌人系统
 
-**Branch**: `001-zombie-enemy` | **Date**: 2026-02-11 | **Spec**: [link](./spec.md)
+**Branch**: `013-zombie-enemy` | **Date**: 2026-02-11 | **Spec**: [link](./spec.md)
 **Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
 
 **Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
@@ -38,7 +38,7 @@
 ### Documentation (this feature)
 
 ```text
-specs/001-zombie-enemy/
+specs/013-zombie-enemy/
 ├── plan.md              # This file (/speckit.plan command output)
 ├── research.md          # Phase 0 output (/speckit.plan command)
 ├── data-model.md        # Phase 1 output (/speckit.plan command)

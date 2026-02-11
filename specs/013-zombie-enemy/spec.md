@@ -1,6 +1,6 @@
 # Feature Specification: 丧尸敌人系统
 
-**Feature Branch**: `001-zombie-enemy`
+**Feature Branch**: `013-zombie-enemy`
 **Created**: 2026-02-11
 **Status**: Draft
 **Input**: User description: "我要为游戏添加丧尸，丧尸看见玩家后会移动向玩家，丧尸不会跳，只会上下一级台阶，丧尸是一个方块尺寸的长宽，两个方块高度。请按照我的世界原版游戏人物的风格和样貌，生成丧尸，丧尸的实现代码放在 src/enemy/Zombie.js 中，跟玩家一样，丧尸跟世界有碰撞效果，不能穿模，丧尸可以被枪消灭。请你尽可能内聚的实现丧尸的功能，不要对已有的其他功能做改动。"

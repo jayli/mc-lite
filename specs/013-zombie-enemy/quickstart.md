@@ -1,7 +1,7 @@
 # 快速入门：丧尸敌人系统
 
 **功能**: 丧尸敌人系统
-**分支**: 001-zombie-enemy
+**分支**: 013-zombie-enemy
 **日期**: 2026-02-11
 
 ## 概述
@@ -12,7 +12,7 @@
 
 1. 切换到功能分支：
    ```bash
-   git checkout 001-zombie-enemy
+   git checkout 013-zombie-enemy
    ```
 
 2. 确保项目依赖项已安装（Three.js通过CDN加载）
