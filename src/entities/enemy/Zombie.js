@@ -72,39 +72,39 @@ export class Zombie {
     // 头部 (1x1x1 方块)
     const headGeometry = new THREE.BoxGeometry(0.6, 0.6, 0.6);
     const head = new THREE.Mesh(headGeometry, headMaterial);
-    head.position.set(0, 2.1, 0); // 头部在身体上方 (1.5 + 0.6)
+    head.position.set(0, 1.8, 0); // 头部在身体上方 (1.5 + 0.6)
     group.add(head);
 
     // 身体 (0.75x1x0.5 方块)
-    const bodyGeometry = new THREE.BoxGeometry(0.75, 0.8, 0.5);
+    const bodyGeometry = new THREE.BoxGeometry(0.55, 0.63, 0.45);
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-    body.position.set(0, 1.33, 0); // (0.5 + 0.6)
+    body.position.set(0, 1.15, 0); // (0.5 + 0.6)
     group.add(body);
 
     // 左臂 (0.3x0.8x0.3 方块)
-    const leftArmGeometry = new THREE.BoxGeometry(0.3, 0.8, 0.3);
+    const leftArmGeometry = new THREE.BoxGeometry(0.23, 0.8, 0.23);
     const leftArm = new THREE.Mesh(leftArmGeometry, armMaterial);
-    leftArm.position.set(-0.55, 1.5, 0.3); // 稍微向前移动
+    leftArm.position.set(-0.43, 1.3, 0.3); // 稍微向前移动
     leftArm.rotation.x = -Math.PI / 2.4; // 向前抬起约60度，模拟丧尸伸臂
     group.add(leftArm);
 
     // 右臂 (0.3x0.8x0.3 方块)
-    const rightArmGeometry = new THREE.BoxGeometry(0.3, 0.8, 0.3);
+    const rightArmGeometry = new THREE.BoxGeometry(0.23, 0.8, 0.23);
     const rightArm = new THREE.Mesh(rightArmGeometry, armMaterial);
-    rightArm.position.set(0.55, 1.5, 0.3); // 稍微向前移动
+    rightArm.position.set(0.43, 1.3, 0.3); // 稍微向前移动
     rightArm.rotation.x = -Math.PI / 2.7; // 向前抬起约60度，模拟丧尸伸臂
     group.add(rightArm);
 
     // 左腿 (0.35x0.8x0.35 方块)
-    const leftLegGeometry = new THREE.BoxGeometry(0.33, 1, 0.33);
+    const leftLegGeometry = new THREE.BoxGeometry(0.26, 1, 0.26);
     const leftLeg = new THREE.Mesh(leftLegGeometry, legMaterial);
-    leftLeg.position.set(-0.17, 0.4, 0); // (-0.2 + 0.6)
+    leftLeg.position.set(-0.14, 0.4, 0); // (-0.2 + 0.6)
     group.add(leftLeg);
 
     // 右腿 (0.35x0.8x0.35 方块)
-    const rightLegGeometry = new THREE.BoxGeometry(0.33, 1, 0.33);
+    const rightLegGeometry = new THREE.BoxGeometry(0.26, 1, 0.26);
     const rightLeg = new THREE.Mesh(rightLegGeometry, legMaterial);
-    rightLeg.position.set(0.17, 0.4, 0); // (-0.2 + 0.6)
+    rightLeg.position.set(0.14, 0.4, 0); // (-0.2 + 0.6)
     group.add(rightLeg);
 
     // 设置userData标记这是一个丧尸，方便射线检测
