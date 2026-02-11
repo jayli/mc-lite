@@ -10,7 +10,7 @@ import { Player } from '../entities/player/Player.js';
 import { realisticTreeManager } from '../world/entities/RealisticTreeManager.js';
 import { faceCullingSystem } from './FaceCullingSystem.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
-import { ZombieManager } from '../entities/enemy/ZombieManager.js'; // 导入丧尸管理器
+import { EnemyManager } from './EnemyManager.js'; // 替换为新的敌人管理器
 import Stats from 'stats';
 
 /**
@@ -30,8 +30,8 @@ export class Game {
     this.player.game = this; // 将游戏实例传递给玩家对象
     this.ui = new UIManager(this); // 初始化UI管理器，传递游戏实例
 
-    // 初始化丧尸管理器
-    this.zombieManager = new ZombieManager(this.engine.scene, this.world);
+    // 初始化敌人管理器（替代原来的丧尸管理器）
+    this.enemyManager = new EnemyManager(this.engine.scene, this.world);
 
     // 初始化 Stats 监控
     this.stats = new Stats();
@@ -71,7 +71,6 @@ export class Game {
 
       // 按 X 键生成一个丧尸
       if (e.code === 'KeyX') {
-        // 在玩家周围10格范围内随机选择一个位置
         const angle = Math.random() * Math.PI * 2; // 随机角度
         const distance = Math.random() * 8 + 2; // 距离玩家2-10格
         const spawnPos = {
@@ -100,17 +99,23 @@ export class Game {
           z: spawnPos.z
         };
 
-        const zombie = this.zombieManager.spawnZombie(adjustedSpawnPos);
-        if (zombie) {
+        // 创建一个僵尸实例用于渲染
+        import('../entities/enemy/Zombie.js').then(({ Zombie }) => {
+          const zombie = new Zombie(adjustedSpawnPos);
+
+          // 将僵尸添加到场景
+          this.engine.scene.add(zombie.mesh);
+
+          // 将敌人实例添加到EnemyManager
+          this.enemyManager.addZombie(zombie);
+
           console.log(`[Debug] 生成了一个丧尸 at (${adjustedSpawnPos.x.toFixed(2)}, ${adjustedSpawnPos.y.toFixed(2)}, ${adjustedSpawnPos.z.toFixed(2)})`);
           console.log(`[Debug] 离玩家距离: ${Math.sqrt(
             Math.pow(adjustedSpawnPos.x - this.player.position.x, 2) +
             Math.pow(adjustedSpawnPos.y - this.player.position.y, 2) +
             Math.pow(adjustedSpawnPos.z - this.player.position.z, 2)
           ).toFixed(2)} 格`);
-        } else {
-          console.log('[Debug] 未能生成丧尸（可能达到数量上限）');
-        }
+        });
       }
     });
 
@@ -239,9 +244,9 @@ export class Game {
     if (this.world && this.player) this.world.update(this.player.position, dt); // 更新世界状态（区块加载等）
     const t3 = performance.now();
 
-    // 更新丧尸管理器
-    if (this.zombieManager && this.player) {
-      this.zombieManager.updateAll(this.player.position);
+    // 更新敌人管理器（替代原来的丧尸管理器）
+    if (this.enemyManager && this.player) {
+      this.enemyManager.updateAll(this.player.position, dt);
     }
 
     if (this.ui) this.ui.update(dt); // 更新UI

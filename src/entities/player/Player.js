@@ -350,6 +350,32 @@ export class Player {
   }
 
   /**
+   * 获取交互目标对象
+   * 返回当前可交互的方块和物体列表
+   * @returns {Array} 交互目标对象数组
+   */
+  getInteractionTargets() {
+    const targets = [];
+    for (const chunk of this.world.chunks.values()) targets.push(chunk.group);
+
+    // 添加丧尸作为交互目标（如果游戏有敌人管理器）
+    if (this.game && this.game.enemyManager) {
+      // 从EnemyManager获取所有敌人实例
+      const enemies = this.game.enemyManager.getAllEnemies();
+      for (const enemy of enemies) {
+        if (enemy.mesh) {
+          targets.push(enemy.mesh);
+        }
+      }
+    }
+
+    chestManager.chestAnimations.forEach(anim => {
+      if (anim.mesh) targets.push(anim.mesh);
+    });
+    return targets;
+  }
+
+  /**
    * 处理射击逻辑
    * 根据当前武器类型和射击状态执行相应的射击操作
    * @param {number} dt - 时间步长
@@ -362,31 +388,6 @@ export class Player {
         this.shootCooldown = this.weapon.config.fireRate;
       }
     }
-  }
-
-  /**
-   * 获取交互目标对象
-   * 返回当前可交互的方块和物体列表
-   * @returns {Array} 交互目标对象数组
-   */
-  getInteractionTargets() {
-    const targets = [];
-    for (const chunk of this.world.chunks.values()) targets.push(chunk.group);
-
-    // 添加丧尸作为交互目标（如果游戏有丧尸管理器）
-    if (this.game && this.game.zombieManager) {
-      const zombies = this.game.zombieManager.getAllZombies();
-      zombies.forEach(zombie => {
-        if (zombie.mesh) {
-          targets.push(zombie.mesh);
-        }
-      });
-    }
-
-    chestManager.chestAnimations.forEach(anim => {
-      if (anim.mesh) targets.push(anim.mesh);
-    });
-    return targets;
   }
 
   /**
@@ -424,47 +425,39 @@ export class Player {
     const hits = this.raycaster.intersectObjects(targets, true);
     this.raycaster.far = Infinity;
 
-    // 检查是否有击中丧尸
-    let zombieHit = null;
+    // 检查是否有击中丧尸/敌人
+    let enemyHit = null;
 
     for (let i = 0; i < hits.length; i++) {
       const hit = hits[i];
-      // 检查这个对象是否是丧尸
+      // 检查这个对象是否是丧尸/敌人
       if (hit.object.userData && hit.object.userData.isZombie) {
-        zombieHit = hit;
+        enemyHit = hit;
         break;
       }
       // 如果当前对象不是丧尸，检查父对象
       else if (hit.object.parent && hit.object.parent.userData && hit.object.parent.userData.isZombie) {
-        zombieHit = hit;
+        enemyHit = hit;
         break;
       }
     }
 
-    if (zombieHit) {
-      // 击中了丧尸，对其造成伤害
-      if (this.game && this.game.zombieManager) {
-        const zombies = this.game.zombieManager.getAllZombies();
-        // 通过位置匹配找到具体丧尸
-        for (const zombie of zombies) {
-          const distance = Math.sqrt(
-            Math.pow(zombie.position.x - zombieHit.point.x, 2) +
-            Math.pow(zombie.position.y - zombieHit.point.y, 2) +
-            Math.pow(zombie.position.z - zombieHit.point.z, 2)
-          );
+    if (enemyHit) {
+      // 击中了丧尸/敌人，对其造成伤害
+      if (this.game && this.game.enemyManager) {
+        // 通过uuid找到对应的敌人并应用伤害
+        const damage = this.weaponMode === WEAPON_TYPES.MINIGUN ? 35 : 25; // 不同武器造成不同伤害
 
-          if (distance < 2) { // 如果在丧尸附近，判定为击中该丧尸
-            const damage = this.weaponMode === WEAPON_TYPES.MINIGUN ? 35 : 25; // 不同武器造成不同伤害
-            zombie.takeDamage(damage);
-            console.log(`[Combat] 击中丧尸，造成 ${damage} 点伤害！`);
-
-            // 如果丧尸死亡，播放粒子效果
-            if (!zombie.isAlive) {
-              this.spawnParticles(zombieHit.point, 'zombie_death');
-            }
-            break;
-          }
+        // 从射线检测结果中获取正确的uuid，优先使用对象本身的uuid，
+        // 如果该对象是组的一部分，则使用其父对象的uuid
+        let enemyUuid = enemyHit.object.uuid;
+        if (!enemyHit.object.userData.isZombie && enemyHit.object.parent && enemyHit.object.parent.userData && enemyHit.object.parent.userData.isZombie) {
+          enemyUuid = enemyHit.object.parent.uuid;
         }
+
+        // 通知EnemyManager对敌人造成伤害
+        this.game.enemyManager.applyDamageToEnemy(enemyUuid, damage);
+        console.log(`[Combat] 击中丧尸，造成 ${damage} 点伤害！`);
       }
     }
 
@@ -472,7 +465,7 @@ export class Player {
     const effect = this.weapon.onFire(hit ? hit.point : null);
     this.spawnTracer(effect.start, effect.end, effect.config);
 
-    if (hit && !zombieHit) { // 如果没有击中丧尸，则按原来逻辑处理方块
+    if (hit && !enemyHit) { // 如果没有击中敌人，则按原来逻辑处理方块
       const m = hit.object;
       const type = m.userData.type || 'unknown';
       if (type === 'tnt') {
