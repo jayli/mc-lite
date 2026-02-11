@@ -48,45 +48,62 @@ export class Zombie {
   createZombieMesh() {
     const group = new THREE.Group();
 
-    // 材质 - 接近我的世界丧尸的颜色
-    const zombieMaterial = new THREE.MeshLambertMaterial({
-      color: 0x8EB87B, // 绿色调，符合丧尸外观
+    // 材质 - 不同部位使用不同的绿色调
+    const headMaterial = new THREE.MeshLambertMaterial({
+      color: 0x6B8E5E, // 头部：较深的橄榄绿
+      wireframe: false
+    });
+
+    const bodyMaterial = new THREE.MeshLambertMaterial({
+      color: 0x7A9E6B, // 身体：中等绿色
+      wireframe: false
+    });
+
+    const armMaterial = new THREE.MeshLambertMaterial({
+      color: 0x8EB87B, // 手臂：较亮的薄荷绿（双臂相同）
+      wireframe: false
+    });
+
+    const legMaterial = new THREE.MeshLambertMaterial({
+      color: 0x5C7A52, // 腿部：最深的森林绿（双腿相同）
       wireframe: false
     });
 
     // 头部 (1x1x1 方块)
     const headGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
-    const head = new THREE.Mesh(headGeometry, zombieMaterial);
+    const head = new THREE.Mesh(headGeometry, headMaterial);
     head.position.set(0, 2.1, 0); // 头部在身体上方 (1.5 + 0.6)
     group.add(head);
 
     // 身体 (0.75x1x0.5 方块)
     const bodyGeometry = new THREE.BoxGeometry(0.75, 1, 0.5);
-    const body = new THREE.Mesh(bodyGeometry, zombieMaterial);
+    const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
     body.position.set(0, 1.1, 0); // (0.5 + 0.6)
     group.add(body);
 
     // 左臂 (0.3x0.8x0.3 方块)
     const leftArmGeometry = new THREE.BoxGeometry(0.3, 0.8, 0.3);
-    const leftArm = new THREE.Mesh(leftArmGeometry, zombieMaterial);
-    leftArm.position.set(-0.55, 1.5, 0); // (0.9 + 0.6)
+    const leftArm = new THREE.Mesh(leftArmGeometry, armMaterial);
+    leftArm.position.set(-0.55, 1.5, 0.3); // 稍微向前移动
+    leftArm.rotation.x = -Math.PI / 3; // 向前抬起约60度，模拟丧尸伸臂
     group.add(leftArm);
 
     // 右臂 (0.3x0.8x0.3 方块)
     const rightArmGeometry = new THREE.BoxGeometry(0.3, 0.8, 0.3);
-    const rightArm = new THREE.Mesh(rightArmGeometry, zombieMaterial);
-    rightArm.position.set(0.55, 1.5, 0); // (0.9 + 0.6)
+    const rightArm = new THREE.Mesh(rightArmGeometry, armMaterial);
+    rightArm.position.set(0.55, 1.5, 0.3); // 稍微向前移动
+    rightArm.rotation.x = -Math.PI / 3; // 向前抬起约60度，模拟丧尸伸臂
     group.add(rightArm);
 
     // 左腿 (0.35x0.8x0.35 方块)
     const leftLegGeometry = new THREE.BoxGeometry(0.35, 0.8, 0.35);
-    const leftLeg = new THREE.Mesh(leftLegGeometry, zombieMaterial);
+    const leftLeg = new THREE.Mesh(leftLegGeometry, legMaterial);
     leftLeg.position.set(-0.19, 0.4, 0); // (-0.2 + 0.6)
     group.add(leftLeg);
 
     // 右腿 (0.35x0.8x0.35 方块)
     const rightLegGeometry = new THREE.BoxGeometry(0.35, 0.8, 0.35);
-    const rightLeg = new THREE.Mesh(rightLegGeometry, zombieMaterial);
+    const rightLeg = new THREE.Mesh(rightLegGeometry, legMaterial);
     rightLeg.position.set(0.19, 0.4, 0); // (-0.2 + 0.6)
     group.add(rightLeg);
 
