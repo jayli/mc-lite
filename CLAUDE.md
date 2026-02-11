@@ -13,7 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **代码规范**:
   - 强制使用 ES6 Modules (`import`/`export`)，通过 CDN 加载 Three.js。
   - 遵循面向对象编程模式（类名大写，属性驼峰命名）。
-  - 所有资源通过 `src/core/MaterialManager.js` 统一管理。
+  - 所有资源通过 `src/core/MaterialManager.js` 统一管理，包括颜色和材质定义。
   - 方块属性（碰撞、透明度、AO 等）必须在 `src/constants/BlockData.js` 配置。
 
 ## 项目架构
@@ -28,7 +28,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - `src/entities/weapon/Gun.js`: 处理武器模型渲染与射击逻辑。
 - **数据/世界层 (World)**:
   - `src/world/World.js`: 管理区块的动态加载/卸载（默认渲染距离：3）。
-  - `src/world/Chunk.js`: 渲染单元，使用 `THREE.InstancedMesh` 优化性能。
+  - `src/world/Chunk.js`: 渲染单元，包括部分材质的 3D 形状，使用 `THREE.InstancedMesh` 优化性能。
 
 ### 2. 异步处理与 Worker 通信
 - **地形生成与后处理**: 运行在 `src/workers/WorldWorker.js` 中。

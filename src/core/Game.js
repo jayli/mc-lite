@@ -116,6 +116,7 @@ export class Game {
     this.player.inventory.add('handrail', 1500);
     this.player.inventory.add('handrailA', 1500);
     this.player.inventory.add('handrailB', 1500);
+    this.player.inventory.add('pillr', 1500);
     // this.player.inventory.add('cloud', 1500);
 
     // 延迟执行 Face Culling 审计并同步场景

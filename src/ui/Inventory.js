@@ -111,6 +111,8 @@ export class InventoryUI {
         img.src = 'src/assets/textures/handrailA.png';
       } else if (slot.item === 'handrailB') {
         img.src = 'src/assets/textures/handrailB.png';
+      } else if (slot.item === 'pillar') {
+        img.src = 'src/assets/textures/pillar.png';
       } else {
         img.src = HUD.generateIcon(slot.item);
       }

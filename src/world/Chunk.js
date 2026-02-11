@@ -165,6 +165,15 @@ const geoHandrailB = (() => {
 })();
 
 /**
+ * 柱子几何体 - 一个竖直的长方体，粗细等同于handrailA
+ */
+const geoPillar = (() => {
+  const geoms = [];
+  geoms.push(new THREE.BoxGeometry(0.3, 1, 0.3));
+  return addVertexIdAttribute(BufferGeometryUtils.mergeGeometries(geoms));
+})();
+
+/**
  * 几何体映射表 - 将方块类型映射到对应的几何体
  */
 const geomMap = {
@@ -178,6 +187,7 @@ const geomMap = {
   'handrail': geoHandrail,
   'handrailA': geoHandrailA,
   'handrailB': geoHandrailB,
+  'pillar': geoPillar,
   'default': addVertexIdAttribute(new THREE.BoxGeometry(1, 1, 1))
 };
 
