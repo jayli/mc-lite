@@ -10,6 +10,7 @@ import { Player } from '../entities/player/Player.js';
 import { realisticTreeManager } from '../world/entities/RealisticTreeManager.js';
 import { faceCullingSystem } from './FaceCullingSystem.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
+import { ZombieManager } from '../enemy/ZombieManager.js'; // 导入丧尸管理器
 import Stats from 'stats';
 
 /**
@@ -28,6 +29,9 @@ export class Game {
     this.player = new Player(this.world, this.engine.camera);
     this.player.game = this; // 将游戏实例传递给玩家对象
     this.ui = new UIManager(this); // 初始化UI管理器，传递游戏实例
+
+    // 初始化丧尸管理器
+    this.zombieManager = new ZombieManager(this.engine.scene, this.world);
 
     // 初始化 Stats 监控
     this.stats = new Stats();
@@ -63,6 +67,17 @@ export class Game {
         if (faceCullingSystem) {
           faceCullingSystem.auditWorld(this.world, true);
         }
+      }
+
+      // 按 Z 键生成一个丧尸
+      if (e.code === 'KeyZ') {
+        const spawnPos = {
+          x: this.player.position.x + (Math.random() - 0.5) * 10,
+          y: this.player.position.y,
+          z: this.player.position.z + (Math.random() - 0.5) * 10
+        };
+        this.zombieManager.spawnZombie(spawnPos);
+        console.log('[Debug] 生成了一个丧尸');
       }
     });
 
@@ -190,6 +205,11 @@ export class Game {
 
     if (this.world && this.player) this.world.update(this.player.position, dt); // 更新世界状态（区块加载等）
     const t3 = performance.now();
+
+    // 更新丧尸管理器
+    if (this.zombieManager && this.player) {
+      this.zombieManager.updateAll(this.player.position);
+    }
 
     if (this.ui) this.ui.update(dt); // 更新UI
     const t4 = performance.now();

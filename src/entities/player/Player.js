@@ -350,20 +350,6 @@ export class Player {
   }
 
   /**
-   * 获取交互目标对象
-   * 返回当前可交互的方块和物体列表
-   * @returns {Array} 交互目标对象数组
-   */
-  getInteractionTargets() {
-    const targets = [];
-    for (const chunk of this.world.chunks.values()) targets.push(chunk.group);
-    chestManager.chestAnimations.forEach(anim => {
-      if (anim.mesh) targets.push(anim.mesh);
-    });
-    return targets;
-  }
-
-  /**
    * 处理射击逻辑
    * 根据当前武器类型和射击状态执行相应的射击操作
    * @param {number} dt - 时间步长
@@ -376,6 +362,31 @@ export class Player {
         this.shootCooldown = this.weapon.config.fireRate;
       }
     }
+  }
+
+  /**
+   * 获取交互目标对象
+   * 返回当前可交互的方块和物体列表
+   * @returns {Array} 交互目标对象数组
+   */
+  getInteractionTargets() {
+    const targets = [];
+    for (const chunk of this.world.chunks.values()) targets.push(chunk.group);
+
+    // 添加丧尸作为交互目标（如果游戏有丧尸管理器）
+    if (this.game && this.game.zombieManager) {
+      const zombies = this.game.zombieManager.getAllZombies();
+      zombies.forEach(zombie => {
+        if (zombie.mesh) {
+          targets.push(zombie.mesh);
+        }
+      });
+    }
+
+    chestManager.chestAnimations.forEach(anim => {
+      if (anim.mesh) targets.push(anim.mesh);
+    });
+    return targets;
   }
 
   /**
@@ -413,11 +424,55 @@ export class Player {
     const hits = this.raycaster.intersectObjects(targets, true);
     this.raycaster.far = Infinity;
 
+    // 检查是否有击中丧尸
+    let zombieHit = null;
+
+    for (let i = 0; i < hits.length; i++) {
+      const hit = hits[i];
+      if (hit.object.type === 'Group' && hit.object.children.length > 0) {
+        // 检查这个组是否是丧尸
+        if (hit.object.children.some(child => child.geometry.parameters &&
+            ((child.geometry.parameters.width === 0.5 && child.geometry.parameters.height === 0.5) ||
+             child.geometry.parameters.width === 0.75))) {
+          // 很可能是丧尸（基于其独特的方块化人体几何体）
+          zombieHit = hit;
+          break;
+        }
+      }
+    }
+
+    if (zombieHit) {
+      // 击中了丧尸，对其造成伤害
+      if (this.game && this.game.zombieManager) {
+        const zombies = this.game.zombieManager.getAllZombies();
+        // 通过位置匹配找到具体丧尸
+        for (const zombie of zombies) {
+          const distance = Math.sqrt(
+            Math.pow(zombie.position.x - zombieHit.point.x, 2) +
+            Math.pow(zombie.position.y - zombieHit.point.y, 2) +
+            Math.pow(zombie.position.z - zombieHit.point.z, 2)
+          );
+
+          if (distance < 2) { // 如果在丧尸附近，判定为击中该丧尸
+            const damage = this.weaponMode === WEAPON_TYPES.MINIGUN ? 35 : 25; // 不同武器造成不同伤害
+            zombie.takeDamage(damage);
+            console.log(`[Combat] 击中丧尸，造成 ${damage} 点伤害！`);
+
+            // 如果丧尸死亡，播放粒子效果
+            if (!zombie.isAlive) {
+              this.spawnParticles(zombieHit.point, 'zombie_death');
+            }
+            break;
+          }
+        }
+      }
+    }
+
     const hit = hits.length > 0 ? hits[0] : null;
     const effect = this.weapon.onFire(hit ? hit.point : null);
     this.spawnTracer(effect.start, effect.end, effect.config);
 
-    if (hit) {
+    if (hit && !zombieHit) { // 如果没有击中丧尸，则按原来逻辑处理方块
       const m = hit.object;
       const type = m.userData.type || 'unknown';
       if (type === 'tnt') {
