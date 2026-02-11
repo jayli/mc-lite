@@ -77,7 +77,7 @@ function updateEnemies(deltaTime, playerPosition) {
       const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
       // 如果敌人离玩家太远，降低更新频率或跳过
-      if (distance > 40) continue;
+      if (distance > 60) continue;
     }
 
     // AI决策：计算期望速度

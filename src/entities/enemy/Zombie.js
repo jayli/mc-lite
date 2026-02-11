@@ -27,7 +27,7 @@ export class Zombie {
     this.width = 0.6;  // 略小于1个方块，便于移动
     this.height = 1.8; // 2个方块高度
     this.speed = 0.02;
-    this.perceptionRange = 10; // 感知范围
+    this.perceptionRange = 50; // 感知范围
 
     // 状态属性
     this.health = 100;
