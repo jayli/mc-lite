@@ -50,61 +50,61 @@ export class Zombie {
 
     // 材质 - 不同部位使用不同的绿色调
     const headMaterial = new THREE.MeshLambertMaterial({
-      color: 0x6B8E5E, // 头部：较深的橄榄绿
+      color: 0x406b30, // 头部：深绿
       wireframe: false
     });
 
     const bodyMaterial = new THREE.MeshLambertMaterial({
-      color: 0x7A9E6B, // 身体：中等绿色
+      color: 0x037c7c, // 身体：蓝
       wireframe: false
     });
 
     const armMaterial = new THREE.MeshLambertMaterial({
-      color: 0x8EB87B, // 手臂：较亮的薄荷绿（双臂相同）
+      color: 0x699058, // 手臂：浅绿
       wireframe: false
     });
 
     const legMaterial = new THREE.MeshLambertMaterial({
-      color: 0x5C7A52, // 腿部：最深的森林绿（双腿相同）
+      color: 0x322b71, // 腿部：紫
       wireframe: false
     });
 
     // 头部 (1x1x1 方块)
-    const headGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+    const headGeometry = new THREE.BoxGeometry(0.6, 0.6, 0.6);
     const head = new THREE.Mesh(headGeometry, headMaterial);
     head.position.set(0, 2.1, 0); // 头部在身体上方 (1.5 + 0.6)
     group.add(head);
 
     // 身体 (0.75x1x0.5 方块)
-    const bodyGeometry = new THREE.BoxGeometry(0.75, 1, 0.5);
+    const bodyGeometry = new THREE.BoxGeometry(0.75, 0.8, 0.5);
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
-    body.position.set(0, 1.1, 0); // (0.5 + 0.6)
+    body.position.set(0, 1.33, 0); // (0.5 + 0.6)
     group.add(body);
 
     // 左臂 (0.3x0.8x0.3 方块)
     const leftArmGeometry = new THREE.BoxGeometry(0.3, 0.8, 0.3);
     const leftArm = new THREE.Mesh(leftArmGeometry, armMaterial);
     leftArm.position.set(-0.55, 1.5, 0.3); // 稍微向前移动
-    leftArm.rotation.x = -Math.PI / 3; // 向前抬起约60度，模拟丧尸伸臂
+    leftArm.rotation.x = -Math.PI / 2.4; // 向前抬起约60度，模拟丧尸伸臂
     group.add(leftArm);
 
     // 右臂 (0.3x0.8x0.3 方块)
     const rightArmGeometry = new THREE.BoxGeometry(0.3, 0.8, 0.3);
     const rightArm = new THREE.Mesh(rightArmGeometry, armMaterial);
     rightArm.position.set(0.55, 1.5, 0.3); // 稍微向前移动
-    rightArm.rotation.x = -Math.PI / 3; // 向前抬起约60度，模拟丧尸伸臂
+    rightArm.rotation.x = -Math.PI / 2.7; // 向前抬起约60度，模拟丧尸伸臂
     group.add(rightArm);
 
     // 左腿 (0.35x0.8x0.35 方块)
-    const leftLegGeometry = new THREE.BoxGeometry(0.35, 0.8, 0.35);
+    const leftLegGeometry = new THREE.BoxGeometry(0.33, 1, 0.33);
     const leftLeg = new THREE.Mesh(leftLegGeometry, legMaterial);
-    leftLeg.position.set(-0.19, 0.4, 0); // (-0.2 + 0.6)
+    leftLeg.position.set(-0.17, 0.4, 0); // (-0.2 + 0.6)
     group.add(leftLeg);
 
     // 右腿 (0.35x0.8x0.35 方块)
-    const rightLegGeometry = new THREE.BoxGeometry(0.35, 0.8, 0.35);
+    const rightLegGeometry = new THREE.BoxGeometry(0.33, 1, 0.33);
     const rightLeg = new THREE.Mesh(rightLegGeometry, legMaterial);
-    rightLeg.position.set(0.19, 0.4, 0); // (-0.2 + 0.6)
+    rightLeg.position.set(0.17, 0.4, 0); // (-0.2 + 0.6)
     group.add(rightLeg);
 
     // 设置userData标记这是一个丧尸，方便射线检测
@@ -133,16 +133,53 @@ export class Zombie {
   }
 
   /**
+    * 计算与其他丧尸的排斥力
+    * @param {Array} otherZombies - 其他丧尸的位置数组 [{x, z}, ...]
+    * @returns {{x: number, z: number}} 排斥力向量
+    */
+  calculateSeparationForce(otherZombies) {
+    let forceX = 0;
+    let forceZ = 0;
+    const minDistance = 1.2; // 最小安全距离，略大于丧尸宽度
+    const repulsionStrength = 0.05; // 排斥力强度
+
+    for (const other of otherZombies) {
+      const dx = this.position.x - other.x;
+      const dz = this.position.z - other.z;
+      const distance = Math.sqrt(dx * dx + dz * dz);
+
+      // 如果距离太近，计算排斥力
+      if (distance < minDistance && distance > 0.001) {
+        // 距离越近，排斥力越大
+        const force = (minDistance - distance) / minDistance * repulsionStrength;
+        // 归一化方向向量并乘以力度
+        forceX += (dx / distance) * force;
+        forceZ += (dz / distance) * force;
+      }
+    }
+
+    return { x: forceX, z: forceZ };
+  }
+
+  /**
     * 物理更新 - 在主线程执行，利用World数据进行碰撞检测
     * @param {Function} getBlockFunc - 获取方块的函数
     * @param {number} dt - 时间步长
+    * @param {Array} otherZombies - 其他丧尸的位置数组，用于相互排斥
     */
-  update(getBlockFunc, dt = 0.016) {
+  update(getBlockFunc, dt = 0.016, otherZombies = []) {
     if (!this.isAlive) return;
 
+    // 计算与其他丧尸的排斥力
+    const separationForce = this.calculateSeparationForce(otherZombies);
+
+    // 应用排斥力到速度
+    const velocityX = this.velocity.x + separationForce.x;
+    const velocityZ = this.velocity.z + separationForce.z;
+
     // 1. 预测下一步位置
-    let nextX = this.position.x + this.velocity.x;
-    let nextZ = this.position.z + this.velocity.z;
+    let nextX = this.position.x + velocityX;
+    let nextZ = this.position.z + velocityZ;
 
     const pX = Math.floor(this.position.x);
     const pY = Math.floor(this.position.y);
@@ -152,8 +189,8 @@ export class Zombie {
     const checkRadius = this.width / 2 + padding;
 
     // 2. 检查前方碰撞 (X方向)
-    if (Math.abs(this.velocity.x) > 0) {
-      const wallX = Math.floor(nextX + Math.sign(this.velocity.x) * checkRadius);
+    if (Math.abs(velocityX) > 0) {
+      const wallX = Math.floor(nextX + Math.sign(velocityX) * checkRadius);
 
       // 检查Z轴宽度范围内的所有可能方块，防止手臂穿模
       const zMin = Math.floor(this.position.z - checkRadius);
@@ -239,9 +276,9 @@ export class Zombie {
     }
 
     // 7. 处理跳跃（如果前方有阻挡且上方空闲）
-    if ((Math.abs(this.velocity.x) > 0 || Math.abs(this.velocity.z) > 0) && this.position.y <= groundY + 0.1) {
-      const frontX = Math.floor(this.position.x + this.velocity.x * 2);
-      const frontZ = Math.floor(this.position.z + this.velocity.z * 2);
+    if ((Math.abs(velocityX) > 0 || Math.abs(velocityZ) > 0) && this.position.y <= groundY + 0.1) {
+      const frontX = Math.floor(this.position.x + velocityX * 2);
+      const frontZ = Math.floor(this.position.z + velocityZ * 2);
 
       const blockFront = getBlockFunc(frontX, pY, frontZ);
       const blockAbove = getBlockFunc(frontX, pY + 1, frontZ);

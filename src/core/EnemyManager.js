@@ -62,13 +62,24 @@ export class EnemyManager {
 
   // 更新所有敌人
   updateAll(playerPosition, deltaTime) {
-    // 1. 收集位置更新，准备发送给Worker
+    // 1. 收集所有丧尸当前位置，用于相互排斥计算
+    const zombiePositions = [];
+    for (const [id, zombie] of this.zombies) {
+      if (zombie.isAlive) {
+        zombiePositions.push({ id, x: zombie.position.x, z: zombie.position.z });
+      }
+    }
+
+    // 2. 收集位置更新，准备发送给Worker
     const enemyUpdates = [];
 
-    // 2. 在主线程执行物理更新，并收集最新位置
+    // 3. 在主线程执行物理更新，并收集最新位置
     for (const [id, zombie] of this.zombies) {
-      // 执行物理模拟 (重力, 碰撞, 移动)
-      zombie.update(this.world.getBlock.bind(this.world), deltaTime);
+      // 准备其他丧尸的位置（排除当前丧尸自己）
+      const otherZombies = zombiePositions.filter(z => z.id !== id);
+
+      // 执行物理模拟 (重力, 碰撞, 移动, 丧尸间排斥)
+      zombie.update(this.world.getBlock.bind(this.world), deltaTime, otherZombies);
 
       // 收集新位置
       enemyUpdates.push({
