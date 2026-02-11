@@ -104,7 +104,16 @@ export class InventoryUI {
 
       // 使用缓存生成的图标（与HUD共享）
       const img = document.createElement('img');
-      img.src = HUD.generateIcon(slot.item);
+      // 特定物品使用自定义图标
+      if (slot.item === 'handrail') {
+        img.src = 'src/assets/textures/handrail.png';
+      } else if (slot.item === 'handrailA') {
+        img.src = 'src/assets/textures/handrailA.png';
+      } else if (slot.item === 'handrailB') {
+        img.src = 'src/assets/textures/handrailB.png';
+      } else {
+        img.src = HUD.generateIcon(slot.item);
+      }
 
       // 添加物品名称标签
       const nameLabel = document.createElement('div');
