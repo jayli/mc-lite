@@ -131,27 +131,52 @@ export class Zombie {
     const pY = Math.floor(this.position.y);
     const pZ = Math.floor(this.position.z);
 
+    const padding = 0.2; // 安全距离，防止穿模
+    const checkRadius = this.width / 2 + padding;
+
     // 2. 检查前方碰撞 (X方向)
     if (Math.abs(this.velocity.x) > 0) {
-      const wallX = Math.floor(nextX + Math.sign(this.velocity.x) * 0.4);
-      // 检查身体高度范围内的阻挡 (脚部和腰部)
-      if (isObstacle(getBlockFunc(wallX, pY, pZ)) || isObstacle(getBlockFunc(wallX, pY + 1, pZ))) {
-        // 如果前方有墙，且不能上台阶（头顶也是方块），则停止
-        if (isObstacle(getBlockFunc(wallX, pY + 1, pZ))) {
-          this.velocity.x = 0;
-          nextX = this.position.x;
+      const wallX = Math.floor(nextX + Math.sign(this.velocity.x) * checkRadius);
+
+      // 检查Z轴宽度范围内的所有可能方块，防止手臂穿模
+      const zMin = Math.floor(this.position.z - checkRadius);
+      const zMax = Math.floor(this.position.z + checkRadius);
+      let collision = false;
+
+      for (let z = zMin; z <= zMax; z++) {
+        // 只要头部高度有阻挡，就视为墙壁碰撞
+        if (isObstacle(getBlockFunc(wallX, pY + 1, z))) {
+          collision = true;
+          break;
         }
+      }
+
+      if (collision) {
+        this.velocity.x = 0;
+        nextX = this.position.x;
       }
     }
 
     // 3. 检查前方碰撞 (Z方向)
     if (Math.abs(this.velocity.z) > 0) {
-      const wallZ = Math.floor(nextZ + Math.sign(this.velocity.z) * 0.4);
-      if (isObstacle(getBlockFunc(pX, pY, wallZ)) || isObstacle(getBlockFunc(pX, pY + 1, wallZ))) {
-        if (isObstacle(getBlockFunc(pX, pY + 1, wallZ))) {
-          this.velocity.z = 0;
-          nextZ = this.position.z;
+      const wallZ = Math.floor(nextZ + Math.sign(this.velocity.z) * checkRadius);
+
+      // 检查X轴宽度范围内的所有可能方块，防止手臂穿模
+      const xMin = Math.floor(this.position.x - checkRadius);
+      const xMax = Math.floor(this.position.x + checkRadius);
+      let collision = false;
+
+      for (let x = xMin; x <= xMax; x++) {
+        // 只要头部高度有阻挡，就视为墙壁碰撞
+        if (isObstacle(getBlockFunc(x, pY + 1, wallZ))) {
+          collision = true;
+          break;
         }
+      }
+
+      if (collision) {
+        this.velocity.z = 0;
+        nextZ = this.position.z;
       }
     }
 
