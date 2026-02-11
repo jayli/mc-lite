@@ -1,7 +1,7 @@
 /**
  * 丧尸管理器 - 管理游戏中所有的丧尸实体
  */
-class ZombieManager {
+export class ZombieManager {
     constructor(scene, world) {
         this.scene = scene;
         this.world = world;

@@ -3,7 +3,7 @@
  * 尺寸：1x1x2 方块单位
  * 功能：追踪玩家、碰撞检测、生命值管理
  */
-class Zombie {
+export class Zombie {
     constructor(position = { x: 0, y: 0, z: 0 }) {
         // 基础属性
         this.position = { ...position };
@@ -282,9 +282,4 @@ class Zombie {
             maxZ: this.position.z + this.width / 2
         };
     }
-}
-
-// 导出Zombie类（如果在模块系统中使用）
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = Zombie;
 }
