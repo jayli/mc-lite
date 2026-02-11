@@ -586,6 +586,21 @@ export class Player {
     const hits = this.raycaster.intersectObjects(this.getInteractionTargets(), true);
     this.raycaster.far = Infinity;
 
+    // 检查是否击中丧尸 - Mag7在射程内直接消灭
+    for (const hit of hits) {
+      const obj = hit.object;
+      // 检查是否是丧尸（直接或者父级是丧尸）
+      if (obj.userData?.isZombie || obj.parent?.userData?.isZombie) {
+        if (this.game?.enemyManager) {
+          const enemyUuid = obj.userData?.isZombie ? obj.uuid : obj.parent.uuid;
+          // Mag7直接消灭丧尸
+          this.game.enemyManager.applyDamageToEnemy(enemyUuid, 999);
+          console.log(`[Combat] Mag7 击中丧尸，直接消灭！`);
+        }
+        break; // 击中一个丧尸后停止
+      }
+    }
+
     const hit = hits.length > 0 ? hits[0] : null;
     const effect = this.weapon.onFire(hit ? hit.point : null);
     this.spawnTracer(effect.start, effect.end, effect.config);
