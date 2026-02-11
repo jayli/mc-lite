@@ -133,57 +133,23 @@ export class Zombie {
   }
 
   /**
-    * 计算与其他丧尸的排斥力
-    * @param {Array} otherZombies - 其他丧尸的位置数组 [{x, z}, ...]
-    * @returns {{x: number, z: number}} 排斥力向量
-    */
-  calculateSeparationForce(otherZombies) {
-    let forceX = 0;
-    let forceZ = 0;
-    const minDistance = 1.2; // 最小安全距离，略大于丧尸宽度
-    const repulsionStrength = 0.05; // 排斥力强度
-
-    for (const other of otherZombies) {
-      const dx = this.position.x - other.x;
-      const dz = this.position.z - other.z;
-      const distance = Math.sqrt(dx * dx + dz * dz);
-
-      // 如果距离太近，计算排斥力
-      if (distance < minDistance && distance > 0.001) {
-        // 距离越近，排斥力越大
-        const force = (minDistance - distance) / minDistance * repulsionStrength;
-        // 归一化方向向量并乘以力度
-        forceX += (dx / distance) * force;
-        forceZ += (dz / distance) * force;
-      }
-    }
-
-    return { x: forceX, z: forceZ };
-  }
-
-  /**
     * 物理更新 - 在主线程执行，利用World数据进行碰撞检测
+    * 注意：排斥力和AI速度计算已在Worker中完成，这里直接使用this.velocity
     * @param {Function} getBlockFunc - 获取方块的函数
     * @param {number} dt - 时间步长
-    * @param {Array} otherZombies - 其他丧尸的位置数组，用于相互排斥
     */
-  update(getBlockFunc, dt = 0.016, otherZombies = []) {
+  update(getBlockFunc, dt = 0.016) {
     if (!this.isAlive) return;
 
-    // 计算与其他丧尸的排斥力
-    const separationForce = this.calculateSeparationForce(otherZombies);
-
-    // 应用排斥力到速度
-    const velocityX = this.velocity.x + separationForce.x;
-    const velocityZ = this.velocity.z + separationForce.z;
+    // Worker已经计算了AI速度+排斥力，直接使用this.velocity
+    const velocityX = this.velocity.x;
+    const velocityZ = this.velocity.z;
 
     // 1. 预测下一步位置
     let nextX = this.position.x + velocityX;
     let nextZ = this.position.z + velocityZ;
 
-    const pX = Math.floor(this.position.x);
     const pY = Math.floor(this.position.y);
-    const pZ = Math.floor(this.position.z);
 
     const padding = 0.2; // 安全距离，防止穿模
     const checkRadius = this.width / 2 + padding;
@@ -279,9 +245,10 @@ export class Zombie {
     if ((Math.abs(velocityX) > 0 || Math.abs(velocityZ) > 0) && this.position.y <= groundY + 0.1) {
       const frontX = Math.floor(this.position.x + velocityX * 2);
       const frontZ = Math.floor(this.position.z + velocityZ * 2);
+      const eyeY = Math.floor(this.position.y) + 1; // 眼睛高度
 
-      const blockFront = getBlockFunc(frontX, pY, frontZ);
-      const blockAbove = getBlockFunc(frontX, pY + 1, frontZ);
+      const blockFront = getBlockFunc(frontX, eyeY, frontZ);
+      const blockAbove = getBlockFunc(frontX, eyeY + 1, frontZ);
 
       if (isObstacle(blockFront) && !isObstacle(blockAbove)) {
         // 尝试跳上台阶

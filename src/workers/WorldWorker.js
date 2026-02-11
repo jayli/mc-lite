@@ -126,7 +126,7 @@ onmessage = function(e) {
               }
             }
             if (inRoom) continue;
-            const blockType = Math.random() < 0.05 ? 'gold_ore' : 'stone';
+            const blockType = Math.random() < 0.01 ? 'gold_ore' : 'stone';
             fakeChunk.add(wx, h - k, wz, blockType, dPlaceholder);
           }
 

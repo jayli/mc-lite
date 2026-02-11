@@ -62,24 +62,15 @@ export class EnemyManager {
 
   // 更新所有敌人
   updateAll(playerPosition, deltaTime) {
-    // 1. 收集所有丧尸当前位置，用于相互排斥计算
-    const zombiePositions = [];
-    for (const [id, zombie] of this.zombies) {
-      if (zombie.isAlive) {
-        zombiePositions.push({ id, x: zombie.position.x, z: zombie.position.z });
-      }
-    }
-
-    // 2. 收集位置更新，准备发送给Worker
+    // 1. 收集位置更新，准备发送给Worker
     const enemyUpdates = [];
 
-    // 3. 在主线程执行物理更新，并收集最新位置
+    // 2. 在主线程执行物理更新（碰撞检测 + 重力 + 位置步进）
+    // 注意：排斥力和AI速度已在Worker中计算，通过setDesiredVelocity应用
     for (const [id, zombie] of this.zombies) {
-      // 准备其他丧尸的位置（排除当前丧尸自己）
-      const otherZombies = zombiePositions.filter(z => z.id !== id);
-
-      // 执行物理模拟 (重力, 碰撞, 移动, 丧尸间排斥)
-      zombie.update(this.world.getBlock.bind(this.world), deltaTime, otherZombies);
+      // 执行物理模拟 (重力, 碰撞, 移动)
+      // 排斥力已不再需要传入，因为Worker已经将其包含在desiredVelocity中
+      zombie.update(this.world.getBlock.bind(this.world), deltaTime);
 
       // 收集新位置
       enemyUpdates.push({
@@ -90,7 +81,7 @@ export class EnemyManager {
       });
     }
 
-    // 3. 发送给Worker进行AI计算
+    // 3. 发送给Worker进行AI计算（包含排斥力计算）
     this.worker.postMessage({
       action: 'update',
       payload: {
