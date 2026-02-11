@@ -10,6 +10,7 @@ import { getBiome, noise } from '../../utils/MathUtils.js';
 import { chestManager } from '../../world/entities/Chest.js';
 import { gunModel, mag7Model, minigunModel } from '../../core/Engine.js';
 import { Gun, WEAPON_TYPES } from '../weapon/Gun.js';
+import { getBlockProperties } from '../../constants/BlockData.js';
 
 export class Player {
   /**
@@ -425,6 +426,31 @@ export class Player {
     const hits = this.raycaster.intersectObjects(targets, true);
     this.raycaster.far = Infinity;
 
+    // 当枪械不能破坏方块时，实心方块可以阻挡子弹
+    const canGunsDestroyBlocks = this.game?.canGunsDestroyBlocks !== false;
+
+    // 辅助函数：检查射线路径上是否有实心方块阻挡
+    const checkSolidBlockBetween = (start, end, maxDistance) => {
+      const direction = new THREE.Vector3().subVectors(end, start).normalize();
+      const distance = start.distanceTo(end);
+      const step = 0.5; // 步进距离
+
+      for (let d = 0; d < Math.min(distance, maxDistance); d += step) {
+        const point = new THREE.Vector3().copy(start).add(direction.clone().multiplyScalar(d));
+        const bx = Math.floor(point.x);
+        const by = Math.floor(point.y);
+        const bz = Math.floor(point.z);
+        const block = this.world.getBlock(bx, by, bz);
+        if (block && block !== 'air') {
+          const props = getBlockProperties(block);
+          if (props.isSolid) {
+            return true; // 有实心方块阻挡
+          }
+        }
+      }
+      return false;
+    };
+
     // 检查是否有击中丧尸/敌人
     let enemyHit = null;
 
@@ -443,21 +469,37 @@ export class Player {
     }
 
     if (enemyHit) {
-      // 击中了丧尸/敌人，对其造成伤害
-      if (this.game && this.game.enemyManager) {
-        // 通过uuid找到对应的敌人并应用伤害
-        const damage = this.weaponMode === WEAPON_TYPES.MINIGUN ? 35 : 25; // 不同武器造成不同伤害
+      // 当枪械不能破坏方块时，检查实心方块是否阻挡子弹
+      let isBlocked = false;
+      if (!canGunsDestroyBlocks) {
+        const enemyPos = new THREE.Vector3(
+          enemyHit.object.parent?.userData?.isZombie ? enemyHit.object.parent.position.x : enemyHit.object.position.x,
+          (enemyHit.object.parent?.userData?.isZombie ? enemyHit.object.parent.position.y : enemyHit.object.position.y) + 0.9,
+          enemyHit.object.parent?.userData?.isZombie ? enemyHit.object.parent.position.z : enemyHit.object.position.z
+        );
+        const rayStartWorld = new THREE.Vector3().copy(this.camera.position);
+        rayStartWorld.y -= 0.35; // 枪口高度
+        const distance = rayStartWorld.distanceTo(enemyPos);
+        isBlocked = checkSolidBlockBetween(rayStartWorld, enemyPos, distance);
+      }
 
-        // 从射线检测结果中获取正确的uuid，优先使用对象本身的uuid，
-        // 如果该对象是组的一部分，则使用其父对象的uuid
-        let enemyUuid = enemyHit.object.uuid;
-        if (!enemyHit.object.userData.isZombie && enemyHit.object.parent && enemyHit.object.parent.userData && enemyHit.object.parent.userData.isZombie) {
-          enemyUuid = enemyHit.object.parent.uuid;
+      if (!isBlocked) {
+        // 击中了丧尸/敌人，对其造成伤害
+        if (this.game && this.game.enemyManager) {
+          // 通过uuid找到对应的敌人并应用伤害
+          const damage = this.weaponMode === WEAPON_TYPES.MINIGUN ? 35 : 25; // 不同武器造成不同伤害
+
+          // 从射线检测结果中获取正确的uuid，优先使用对象本身的uuid，
+          // 如果该对象是组的一部分，则使用其父对象的uuid
+          let enemyUuid = enemyHit.object.uuid;
+          if (!enemyHit.object.userData.isZombie && enemyHit.object.parent && enemyHit.object.parent.userData && enemyHit.object.parent.userData.isZombie) {
+            enemyUuid = enemyHit.object.parent.uuid;
+          }
+
+          // 通知EnemyManager对敌人造成伤害
+          this.game.enemyManager.applyDamageToEnemy(enemyUuid, damage);
+          console.log(`[Combat] 击中丧尸，造成 ${damage} 点伤害！`);
         }
-
-        // 通知EnemyManager对敌人造成伤害
-        this.game.enemyManager.applyDamageToEnemy(enemyUuid, damage);
-        console.log(`[Combat] 击中丧尸，造成 ${damage} 点伤害！`);
       }
     }
 
@@ -495,6 +537,8 @@ export class Player {
   executeMag7Shot() {
     this.mag7Timeouts.forEach(t => clearTimeout(t));
     this.mag7Timeouts = [];
+
+    // Mag7 散弹枪设计初衷是破坏一切，不受 canGunsDestroyBlocks 限制
 
     const right = new THREE.Vector3(), up = new THREE.Vector3(), dir = new THREE.Vector3();
     this.camera.matrixWorld.extractBasis(right, up, dir);
