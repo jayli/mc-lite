@@ -1,4 +1,15 @@
 import * as THREE from 'three';
+import { getBlockProperties } from '../../constants/BlockData.js';
+
+/**
+ * 辅助函数：判断方块是否为障碍物
+ * @param {string} blockType - 方块类型
+ * @returns {boolean} 是否为障碍物
+ */
+function isObstacle(blockType) {
+  if (!blockType) return false;
+  return getBlockProperties(blockType).isSolid;
+}
 
 /**
  * 丧尸实体类 - 符合我的世界原版风格的敌人
@@ -124,9 +135,9 @@ export class Zombie {
     if (Math.abs(this.velocity.x) > 0) {
       const wallX = Math.floor(nextX + Math.sign(this.velocity.x) * 0.4);
       // 检查身体高度范围内的阻挡 (脚部和腰部)
-      if (getBlockFunc(wallX, pY, pZ) || getBlockFunc(wallX, pY + 1, pZ)) {
+      if (isObstacle(getBlockFunc(wallX, pY, pZ)) || isObstacle(getBlockFunc(wallX, pY + 1, pZ))) {
         // 如果前方有墙，且不能上台阶（头顶也是方块），则停止
-        if (getBlockFunc(wallX, pY + 1, pZ)) {
+        if (isObstacle(getBlockFunc(wallX, pY + 1, pZ))) {
           this.velocity.x = 0;
           nextX = this.position.x;
         }
@@ -136,8 +147,8 @@ export class Zombie {
     // 3. 检查前方碰撞 (Z方向)
     if (Math.abs(this.velocity.z) > 0) {
       const wallZ = Math.floor(nextZ + Math.sign(this.velocity.z) * 0.4);
-      if (getBlockFunc(pX, pY, wallZ) || getBlockFunc(pX, pY + 1, wallZ)) {
-        if (getBlockFunc(pX, pY + 1, wallZ)) {
+      if (isObstacle(getBlockFunc(pX, pY, wallZ)) || isObstacle(getBlockFunc(pX, pY + 1, wallZ))) {
+        if (isObstacle(getBlockFunc(pX, pY + 1, wallZ))) {
           this.velocity.z = 0;
           nextZ = this.position.z;
         }
@@ -152,7 +163,7 @@ export class Zombie {
     let groundY = -100;
     // 向下探测地面
     for (let y = Math.ceil(this.position.y); y >= Math.floor(this.position.y) - 4; y--) {
-      if (getBlockFunc(Math.floor(this.position.x), y, Math.floor(this.position.z))) {
+      if (isObstacle(getBlockFunc(Math.floor(this.position.x), y, Math.floor(this.position.z)))) {
         groundY = y + 1; // 地面高度（方块顶面）
         break;
       }
@@ -161,9 +172,9 @@ export class Zombie {
     // 6. 自动跳跃/上台阶
     // 如果脚下有方块（比如因为水平移动撞进了台阶内部），自动抬升
     const currentBlockY = Math.floor(this.position.y);
-    if (getBlockFunc(Math.floor(this.position.x), currentBlockY, Math.floor(this.position.z))) {
+    if (isObstacle(getBlockFunc(Math.floor(this.position.x), currentBlockY, Math.floor(this.position.z)))) {
       // 如果我们陷在方块里，且上方没有阻挡，抬升到方块上方
-      if (!getBlockFunc(Math.floor(this.position.x), currentBlockY + 1, Math.floor(this.position.z))) {
+      if (!isObstacle(getBlockFunc(Math.floor(this.position.x), currentBlockY + 1, Math.floor(this.position.z)))) {
         groundY = currentBlockY + 1;
       }
     }
@@ -193,7 +204,7 @@ export class Zombie {
       const blockFront = getBlockFunc(frontX, pY, frontZ);
       const blockAbove = getBlockFunc(frontX, pY + 1, frontZ);
 
-      if (blockFront && !blockAbove) {
+      if (isObstacle(blockFront) && !isObstacle(blockAbove)) {
         // 尝试跳上台阶
         this.velocity.y = 0.4;
         this.position.y += 0.1; // 稍微抬起一点以触发重力循环
