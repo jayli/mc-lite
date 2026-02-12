@@ -444,126 +444,103 @@ export class Player {
     // 当枪械不能破坏方块时，实心方块可以阻挡子弹
     const canGunsDestroyBlocks = this.game?.canGunsDestroyBlocks !== false;
 
-    // 辅助函数：检查射线路径上是否有实心方块阻挡
-    const checkSolidBlockBetween = (start, end, maxDistance) => {
-      const direction = new THREE.Vector3().subVectors(end, start).normalize();
-      const distance = start.distanceTo(end);
-      const step = 0.5; // 步进距离
+    let finalHit = null; // The actual hit point for tracer
+    let hasHitSolid = false;
 
-      for (let d = 0; d < Math.min(distance, maxDistance); d += step) {
-        const point = new THREE.Vector3().copy(start).add(direction.clone().multiplyScalar(d));
-        const bx = Math.floor(point.x);
-        const by = Math.floor(point.y);
-        const bz = Math.floor(point.z);
-        const block = this.world.getBlock(bx, by, bz);
-        if (block && block !== 'air') {
-          const props = getBlockProperties(block);
-          if (props.isSolid) {
-            return true; // 有实心方块阻挡
-          }
-        }
-      }
-      return false;
-    };
-
-    // 检查是否有击中丧尸/敌人
-    let enemyHit = null;
-
+    // Iterate through hits to find the first solid object (Zombie or Block)
     for (let i = 0; i < hits.length; i++) {
       const hit = hits[i];
-      // 检查是否是实例化渲染的丧尸部分
-      if (hit.object.userData && hit.object.userData.renderer) {
-        enemyHit = hit;
-        break;
-      }
-      // 检查这个对象是否是丧尸/敌人
-      else if (hit.object.userData && hit.object.userData.isZombie) {
-        enemyHit = hit;
-        break;
-      }
-      // 如果当前对象不是丧尸，检查父对象
-      else if (hit.object.parent && hit.object.parent.userData && hit.object.parent.userData.isZombie) {
-        enemyHit = hit;
-        break;
-      }
-    }
+      const obj = hit.object;
 
-    if (enemyHit) {
-      // 当枪械不能破坏方块时，检查实心方块是否阻挡子弹
-      let isBlocked = false;
-      if (!canGunsDestroyBlocks) {
-        // 获取敌人位置
-        let enemyPos;
-        if (enemyHit.object.userData.renderer) {
-           const zombie = enemyHit.object.userData.renderer.getZombieAt(enemyHit.instanceId);
-           enemyPos = new THREE.Vector3(zombie.position.x, zombie.position.y + 0.9, zombie.position.z);
-        } else {
-           enemyPos = new THREE.Vector3(
-            enemyHit.object.parent?.userData?.isZombie ? enemyHit.object.parent.position.x : enemyHit.object.position.x,
-            (enemyHit.object.parent?.userData?.isZombie ? enemyHit.object.parent.position.y : enemyHit.object.position.y) + 0.9,
-            enemyHit.object.parent?.userData?.isZombie ? enemyHit.object.parent.position.z : enemyHit.object.position.z
-          );
-        }
-
-        const rayStartWorld = new THREE.Vector3().copy(this.camera.position);
-        rayStartWorld.y -= 0.35; // 枪口高度
-        const distance = rayStartWorld.distanceTo(enemyPos);
-        isBlocked = checkSolidBlockBetween(rayStartWorld, enemyPos, distance);
+      // 1. Check if Zombie
+      let isZombie = false;
+      if (obj.userData?.renderer || obj.userData?.isZombie || obj.parent?.userData?.isZombie) {
+        isZombie = true;
       }
 
-      if (!isBlocked) {
-        // 击中了丧尸/敌人，对其造成伤害
+      if (isZombie) {
+        // Hit a zombie!
+        finalHit = hit;
+        hasHitSolid = true;
+
         if (this.game && this.game.enemyManager) {
-          // 通过uuid找到对应的敌人并应用伤害
-          const damage = this.weaponMode === WEAPON_TYPES.MINIGUN ? 35 : 25; // 不同武器造成不同伤害
-
-          // 从射线检测结果中获取正确的uuid
+          const damage = this.weaponMode === WEAPON_TYPES.MINIGUN ? 35 : 25;
           let enemyUuid;
-          if (enemyHit.object.userData.renderer) {
-             const zombie = enemyHit.object.userData.renderer.getZombieAt(enemyHit.instanceId);
-             enemyUuid = zombie.id;
+
+          if (obj.userData?.renderer) {
+             const zombie = obj.userData.renderer.getZombieAt(hit.instanceId);
+             if (zombie) enemyUuid = zombie.id;
           } else {
-             enemyUuid = enemyHit.object.uuid;
-             if (!enemyHit.object.userData.isZombie && enemyHit.object.parent && enemyHit.object.parent.userData && enemyHit.object.parent.userData.isZombie) {
-               enemyUuid = enemyHit.object.parent.uuid;
+             enemyUuid = obj.uuid;
+             if (!obj.userData?.isZombie && obj.parent?.userData?.isZombie) {
+               enemyUuid = obj.parent.uuid;
              }
-             // 兼容 zombieId
-             if (enemyHit.object.parent?.userData?.zombieId) enemyUuid = enemyHit.object.parent.userData.zombieId;
-             if (enemyHit.object.userData?.zombieId) enemyUuid = enemyHit.object.userData.zombieId;
+             if (obj.parent?.userData?.zombieId) enemyUuid = obj.parent.userData.zombieId;
+             if (obj.userData?.zombieId) enemyUuid = obj.userData.zombieId;
           }
 
-          // 通知EnemyManager对敌人造成伤害
-          this.game.enemyManager.applyDamageToEnemy(enemyUuid, damage);
-          console.log(`[Combat] 击中丧尸，造成 ${damage} 点伤害！`);
+          if (enemyUuid) {
+            this.game.enemyManager.applyDamageToEnemy(enemyUuid, damage);
+            console.log(`[Combat] 击中丧尸，造成 ${damage} 点伤害！`);
+          }
         }
+        break; // Bullet stops at zombie
       }
-    }
 
-    const hit = hits.length > 0 ? hits[0] : null;
-    const effect = this.weapon.onFire(hit ? hit.point : null);
-    this.spawnTracer(effect.start, effect.end, effect.config);
+      // 2. Check if Block (Terrain/Other)
+      // Determine if it's a solid block
+      // Calculate block coordinate slightly inside the hit face
+      const p = hit.point.clone().addScaledVector(hit.face.normal, -0.01);
+      const bx = Math.floor(p.x);
+      const by = Math.floor(p.y);
+      const bz = Math.floor(p.z);
+      const blockType = this.world.getBlock(bx, by, bz);
 
-    if (hit && !enemyHit) { // 如果没有击中敌人，则按原来逻辑处理方块
-      const m = hit.object;
-      const type = m.userData.type || 'unknown';
-      if (type === 'tnt') {
-        if (m.isInstancedMesh) {
-          m.getMatrixAt(hit.instanceId, this._dummyMatrix);
-          this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
-        } else {
-          this._tempVector.copy(m.position);
+      if (blockType && blockType !== 'air') {
+        const props = getBlockProperties(blockType);
+        if (props.isSolid) {
+          // Hit a solid block
+          finalHit = hit;
+          hasHitSolid = true;
+
+          if (canGunsDestroyBlocks) {
+            this.removeBlock(hit);
+          }
+          // If not canGunsDestroyBlocks, we just stop here (blocked)
+          break;
         }
-        const key = `${Math.floor(this._tempVector.x)},${Math.floor(this._tempVector.y)},${Math.floor(this._tempVector.z)}`;
-        if (!this.ignitingTNTs.has(key)) {
-          this.ignitingTNTs.add(key);
-          this.explode(this._tempVector.x, this._tempVector.y, this._tempVector.z);
-        }
+        // If not solid (e.g. grass, water), continue ray to find what's behind
       } else {
-        if (this.game && this.game.canGunsDestroyBlocks) {
-          this.removeBlock(hit);
+        // Hit something else (chest, TNT, etc.)?
+        // TNT and Chests are meshes but usually handled via removeBlock logic or specialized logic
+        // If it's a mesh entity, we treat it as solid for now
+        const type = obj.userData.type || 'unknown';
+        if (type === 'tnt' || type === 'chest') {
+           finalHit = hit;
+           hasHitSolid = true;
+           if (type === 'tnt') {
+              // Ignite TNT logic (copied from original)
+              if (obj.isInstancedMesh) {
+                obj.getMatrixAt(hit.instanceId, this._dummyMatrix);
+                this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
+              } else {
+                this._tempVector.copy(obj.position);
+              }
+              const key = `${Math.floor(this._tempVector.x)},${Math.floor(this._tempVector.y)},${Math.floor(this._tempVector.z)}`;
+              if (!this.ignitingTNTs.has(key)) {
+                this.ignitingTNTs.add(key);
+                this.explode(this._tempVector.x, this._tempVector.y, this._tempVector.z);
+              }
+           } else if (canGunsDestroyBlocks) {
+              this.removeBlock(hit);
+           }
+           break;
         }
       }
     }
+
+    const effect = this.weapon.onFire(finalHit ? finalHit.point : null);
+    this.spawnTracer(effect.start, effect.end, effect.config);
   }
 
   /**
