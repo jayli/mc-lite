@@ -1,12 +1,17 @@
 // src/core/EnemyManager.js
 // 敌人管理器，用于与EnemyWorker通信并在主线程管理丧尸实体
 
+import { ZombieInstancedRenderer } from '../entities/enemy/ZombieInstancedRenderer.js';
+
 export class EnemyManager {
   constructor(scene, world) {
     this.scene = scene;
     this.world = world;
     // 存储丧尸实例 Map<uuid, Zombie>
     this.zombies = new Map();
+
+    // 实例化渲染器
+    this.renderer = new ZombieInstancedRenderer(scene, 200);
 
     // 启动敌人Worker
     this.worker = new Worker(new URL('../workers/EnemyWorker.js', import.meta.url));
@@ -33,7 +38,10 @@ export class EnemyManager {
    * @param {Zombie} zombie - 丧尸实例
    */
   addZombie(zombie) {
-    const id = zombie.mesh.uuid;
+    // 优先使用 id，如果没有则使用 mesh.uuid
+    const id = zombie.id || (zombie.mesh ? zombie.mesh.uuid : THREE.MathUtils.generateUUID());
+    zombie.id = id; // Ensure zombie has an ID
+
     this.zombies.set(id, zombie);
 
     // 将敌人数据发送到worker进行AI初始化
@@ -81,6 +89,9 @@ export class EnemyManager {
       });
     }
 
+    // 更新实例化渲染器
+    this.renderer.update(this.zombies);
+
     // 3. 发送给Worker进行AI计算（包含排斥力计算）
     this.worker.postMessage({
       action: 'update',
@@ -125,7 +136,8 @@ export class EnemyManager {
     const zombie = this.zombies.get(id);
 
     if (zombie) {
-      // 视觉移除
+      // 视觉移除已经由 renderer.update() 自动处理（下一帧不再渲染）
+      // 如果使用了原始mesh且在场景中，需要移除
       if (zombie.mesh && zombie.mesh.parent) {
         zombie.mesh.parent.remove(zombie.mesh);
       }
@@ -162,6 +174,14 @@ export class EnemyManager {
   // 获取所有敌人
   getAllEnemies() {
     return Array.from(this.zombies.values());
+  }
+
+  // 获取渲染网格（用于射线检测）
+  getRenderMeshes() {
+    if (this.renderer && this.renderer.meshes) {
+      return Object.values(this.renderer.meshes);
+    }
+    return [];
   }
 
   // 销毁管理器

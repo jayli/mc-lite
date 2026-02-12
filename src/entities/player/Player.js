@@ -361,6 +361,12 @@ export class Player {
 
     // 添加丧尸作为交互目标（如果游戏有敌人管理器）
     if (this.game && this.game.enemyManager) {
+      // 从EnemyManager获取渲染网格（InstancedMesh）
+      if (typeof this.game.enemyManager.getRenderMeshes === 'function') {
+        const renderMeshes = this.game.enemyManager.getRenderMeshes();
+        targets.push(...renderMeshes);
+      }
+
       // 从EnemyManager获取所有敌人实例
       const enemies = this.game.enemyManager.getAllEnemies();
       for (const enemy of enemies) {
@@ -456,8 +462,13 @@ export class Player {
 
     for (let i = 0; i < hits.length; i++) {
       const hit = hits[i];
+      // 检查是否是实例化渲染的丧尸部分
+      if (hit.object.userData && hit.object.userData.renderer) {
+        enemyHit = hit;
+        break;
+      }
       // 检查这个对象是否是丧尸/敌人
-      if (hit.object.userData && hit.object.userData.isZombie) {
+      else if (hit.object.userData && hit.object.userData.isZombie) {
         enemyHit = hit;
         break;
       }
@@ -472,11 +483,19 @@ export class Player {
       // 当枪械不能破坏方块时，检查实心方块是否阻挡子弹
       let isBlocked = false;
       if (!canGunsDestroyBlocks) {
-        const enemyPos = new THREE.Vector3(
-          enemyHit.object.parent?.userData?.isZombie ? enemyHit.object.parent.position.x : enemyHit.object.position.x,
-          (enemyHit.object.parent?.userData?.isZombie ? enemyHit.object.parent.position.y : enemyHit.object.position.y) + 0.9,
-          enemyHit.object.parent?.userData?.isZombie ? enemyHit.object.parent.position.z : enemyHit.object.position.z
-        );
+        // 获取敌人位置
+        let enemyPos;
+        if (enemyHit.object.userData.renderer) {
+           const zombie = enemyHit.object.userData.renderer.getZombieAt(enemyHit.instanceId);
+           enemyPos = new THREE.Vector3(zombie.position.x, zombie.position.y + 0.9, zombie.position.z);
+        } else {
+           enemyPos = new THREE.Vector3(
+            enemyHit.object.parent?.userData?.isZombie ? enemyHit.object.parent.position.x : enemyHit.object.position.x,
+            (enemyHit.object.parent?.userData?.isZombie ? enemyHit.object.parent.position.y : enemyHit.object.position.y) + 0.9,
+            enemyHit.object.parent?.userData?.isZombie ? enemyHit.object.parent.position.z : enemyHit.object.position.z
+          );
+        }
+
         const rayStartWorld = new THREE.Vector3().copy(this.camera.position);
         rayStartWorld.y -= 0.35; // 枪口高度
         const distance = rayStartWorld.distanceTo(enemyPos);
@@ -489,11 +508,19 @@ export class Player {
           // 通过uuid找到对应的敌人并应用伤害
           const damage = this.weaponMode === WEAPON_TYPES.MINIGUN ? 35 : 25; // 不同武器造成不同伤害
 
-          // 从射线检测结果中获取正确的uuid，优先使用对象本身的uuid，
-          // 如果该对象是组的一部分，则使用其父对象的uuid
-          let enemyUuid = enemyHit.object.uuid;
-          if (!enemyHit.object.userData.isZombie && enemyHit.object.parent && enemyHit.object.parent.userData && enemyHit.object.parent.userData.isZombie) {
-            enemyUuid = enemyHit.object.parent.uuid;
+          // 从射线检测结果中获取正确的uuid
+          let enemyUuid;
+          if (enemyHit.object.userData.renderer) {
+             const zombie = enemyHit.object.userData.renderer.getZombieAt(enemyHit.instanceId);
+             enemyUuid = zombie.id;
+          } else {
+             enemyUuid = enemyHit.object.uuid;
+             if (!enemyHit.object.userData.isZombie && enemyHit.object.parent && enemyHit.object.parent.userData && enemyHit.object.parent.userData.isZombie) {
+               enemyUuid = enemyHit.object.parent.uuid;
+             }
+             // 兼容 zombieId
+             if (enemyHit.object.parent?.userData?.zombieId) enemyUuid = enemyHit.object.parent.userData.zombieId;
+             if (enemyHit.object.userData?.zombieId) enemyUuid = enemyHit.object.userData.zombieId;
           }
 
           // 通知EnemyManager对敌人造成伤害
@@ -589,10 +616,29 @@ export class Player {
     // 检查是否击中丧尸 - Mag7在射程内直接消灭
     for (const hit of hits) {
       const obj = hit.object;
-      // 检查是否是丧尸（直接或者父级是丧尸）
-      if (obj.userData?.isZombie || obj.parent?.userData?.isZombie) {
+
+      // Check for InstancedMesh zombie
+      if (obj.userData?.renderer) {
         if (this.game?.enemyManager) {
-          const enemyUuid = obj.userData?.isZombie ? obj.uuid : obj.parent.uuid;
+          const zombie = obj.userData.renderer.getZombieAt(hit.instanceId);
+          if (zombie) {
+            this.game.enemyManager.applyDamageToEnemy(zombie.id, 999);
+            console.log(`[Combat] Mag7 击中丧尸，直接消灭！`);
+            break;
+          }
+        }
+      }
+
+      // 检查是否是丧尸（直接或者父级是丧尸）
+      else if (obj.userData?.isZombie || obj.parent?.userData?.isZombie) {
+        if (this.game?.enemyManager) {
+          let enemyUuid = obj.uuid;
+          if (obj.userData?.isZombie) enemyUuid = obj.uuid;
+          else if (obj.parent?.userData?.isZombie) enemyUuid = obj.parent.uuid;
+
+          if (obj.userData?.zombieId) enemyUuid = obj.userData.zombieId;
+          if (obj.parent?.userData?.zombieId) enemyUuid = obj.parent.userData.zombieId;
+
           // Mag7直接消灭丧尸
           this.game.enemyManager.applyDamageToEnemy(enemyUuid, 999);
           console.log(`[Combat] Mag7 击中丧尸，直接消灭！`);
