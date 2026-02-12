@@ -56,7 +56,8 @@ function saveSnapshot(payload) {
       timestamp: Date.now(),
       player: payload.player,
       worldDeltas: payload.worldDeltas,
-      seed: payload.seed
+      seed: payload.seed,
+      settings: payload.settings
     });
 
     request.onsuccess = () => resolve();

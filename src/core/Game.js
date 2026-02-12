@@ -355,6 +355,8 @@ export class Game {
     // 3. 恢复设置
     if (saveData.settings) {
       this.canGunsDestroyBlocks = saveData.settings.canGunsDestroyBlocks !== undefined ? saveData.settings.canGunsDestroyBlocks : true;
+      // 更新UI按钮状态
+      this.ui.updateActiveButtons();
     }
   }
 }
