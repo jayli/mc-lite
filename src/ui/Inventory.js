@@ -127,7 +127,9 @@ export class InventoryUI {
       countSpan.innerText = slot.count;
 
       // 点击物品槽选择该物品
-      div.onclick = () => {
+      div.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         inventory.selectedSlot = idx;
         this.render(); // 重新渲染以更新选中状态
       };

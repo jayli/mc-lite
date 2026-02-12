@@ -172,7 +172,14 @@ export class Player {
 
     this.bgmStarted = false;
     document.body.addEventListener('click', () => {
-      if (document.pointerLockElement !== document.body) document.body.requestPointerLock();
+      // 检查背包是否打开，如果打开则不请求指针锁定
+      const inventoryModal = document.getElementById('inventory-modal');
+      const isInventoryOpen = inventoryModal && inventoryModal.style.display !== 'none';
+
+      if (!isInventoryOpen && document.pointerLockElement !== document.body) {
+        document.body.requestPointerLock();
+      }
+
       if (!this.bgmStarted) {
         audioManager.playBGM('bgm', 0.15);
         this.bgmStarted = true;
