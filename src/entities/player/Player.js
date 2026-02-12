@@ -524,8 +524,8 @@ export class Player {
         }
 
         const props = getBlockProperties(blockType);
-        if (props.isSolid) {
-          // Hit a solid block (not TNT)
+        if (props.isSolid || blockType === 'cloud') {
+          // Hit a solid block or cloud block (not TNT)
           finalHit = hit;
           hasHitSolid = true;
 
@@ -535,7 +535,7 @@ export class Player {
           // If not canGunsDestroyBlocks, we just stop here (blocked)
           break;
         }
-        // If not solid (e.g. grass, water), continue ray to find what's behind
+        // If not solid and not cloud (e.g. grass, water), continue ray to find what's behind
       } else {
         // Hit something else (chest, TNT, etc.)?
         // TNT and Chests are meshes but usually handled via removeBlock logic or specialized logic
