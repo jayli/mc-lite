@@ -958,6 +958,25 @@ export class Player {
           this.explode(tnt.x, tnt.y, tnt.z);
         }, tnt.delay);
       });
+
+      // 新增：TNT爆炸伤害范围内的丧尸
+      if (this.game && this.game.enemyManager) {
+        const explosionCenter = new THREE.Vector3(center.x + 0.5, center.y + 0.5, center.z + 0.5);
+        const explosionRadius = 4; // 爆炸伤害范围（方块单位）
+        const explosionDamage = 80; // 爆炸伤害值，足够高以确保一击必杀
+
+        const allZombies = this.game.enemyManager.getAllEnemies();
+        for (const zombie of allZombies) {
+          const zombiePos = new THREE.Vector3(zombie.position.x, zombie.position.y + zombie.height / 2, zombie.position.z);
+          const distance = explosionCenter.distanceTo(zombiePos);
+
+          if (distance <= explosionRadius) {
+            zombie.takeDamage(explosionDamage);
+            console.log(`[Explosion] 丧尸在爆炸范围内，造成 ${explosionDamage} 点伤害！`);
+          }
+        }
+      }
+
       this._tempVector.set(center.x + 0.5, center.y + 0.5, center.z + 0.5);
       if (this.world.spawnExplosionParticles) this.world.spawnExplosionParticles(this._tempVector);
       audioManager.playSound('explosion', 0.4);
