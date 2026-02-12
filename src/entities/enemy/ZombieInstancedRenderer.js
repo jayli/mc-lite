@@ -20,13 +20,13 @@ export class ZombieInstancedRenderer {
   }
 
   initResources() {
-    // 1. Head Texture & Material
-    const headTexture = this.createMosaicTexture('head');
+    // 1. Head Texture & Material - 创建两个纹理：有眼睛（正面）和无眼睛（其他面）
+    const headTextureWithEyes = this.createMosaicTexture('head', true);
+    const headTextureWithoutEyes = this.createMosaicTexture('head', false);
     this.headMaterial = new THREE.MeshLambertMaterial({
-      map: headTexture,
       color: 0xffffff,
     });
-    this.headGeometry = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+    this.headGeometry = this.createHeadGeometry(); // 创建带材质组的头部几何体
 
     // 2. Body Material
     this.bodyMaterial = new THREE.MeshLambertMaterial({
@@ -54,6 +54,38 @@ export class ZombieInstancedRenderer {
       leg: new THREE.Color(0x322b71),
       flash: new THREE.Color(0xff0000)
     };
+
+    // 存储头部纹理
+    this.headTextures = {
+      withEyes: headTextureWithEyes,
+      withoutEyes: headTextureWithoutEyes
+    };
+  }
+
+  createHeadGeometry() {
+    // 创建带材质组的头部几何体
+    // BoxGeometry 的组成：每个面有 2 个三角形，每个三角形有 3 个顶点
+    // 总共有 6 个面，12 个三角形，36 个顶点
+    // 面顺序：[右,左,上,下,前,后]，每个面有6个顶点（2个三角形）
+    const geometry = new THREE.BoxGeometry(0.6, 0.6, 0.6);
+
+    // 重新分配面的材质索引
+    geometry.clearGroups();
+
+    // 面 0：右侧（x+）- 2个三角形，6个顶点
+    geometry.addGroup(0, 6, 0);
+    // 面 1：左侧（x-）- 2个三角形，6个顶点
+    geometry.addGroup(6, 6, 0);
+    // 面 2：顶部（y+）- 2个三角形，6个顶点
+    geometry.addGroup(12, 6, 0);
+    // 面 3：底部（y-）- 2个三角形，6个顶点
+    geometry.addGroup(18, 6, 0);
+    // 面 4：正面（z+）- 2个三角形，6个顶点（我们希望这面显示眼睛）
+    geometry.addGroup(24, 6, 1);
+    // 面 5：背面（z-）- 2个三角形，6个顶点
+    geometry.addGroup(30, 6, 0);
+
+    return geometry;
   }
 
   initInstancedMeshes() {
@@ -85,8 +117,20 @@ export class ZombieInstancedRenderer {
       return mesh;
     };
 
+    // 头部需要使用材质数组，其他部分使用单一材质
+    const headMaterials = [
+      new THREE.MeshLambertMaterial({
+        map: this.headTextures.withoutEyes,
+        color: 0xffffff
+      }),
+      new THREE.MeshLambertMaterial({
+        map: this.headTextures.withEyes,
+        color: 0xffffff
+      })
+    ];
+
     this.meshes = {
-      head: createMesh(this.headGeometry, this.headMaterial),
+      head: createMesh(this.headGeometry, headMaterials),
       body: createMesh(this.bodyGeometry, this.bodyMaterial),
       leftArm: createMesh(this.armGeometry, this.armMaterial),
       rightArm: createMesh(this.armGeometry, this.armMaterial),
@@ -190,7 +234,7 @@ export class ZombieInstancedRenderer {
   }
 
   // Copied from Zombie.js
-  createMosaicTexture(type = 'head') {
+  createMosaicTexture(type = 'head', addEyes = true) {
     const size = 64;
     const canvas = document.createElement('canvas');
     canvas.width = size;
@@ -223,6 +267,32 @@ export class ZombieInstancedRenderer {
         ctx.fillStyle = `rgb(${Math.floor(color[0])}, ${Math.floor(color[1])}, ${Math.floor(color[2])})`;
         ctx.fillRect(x, y, mosaicSize, mosaicSize);
       }
+    }
+
+    // 添加眼睛（黑色马赛克方块）
+    if (type === 'head' && addEyes) {
+      const eyeSize = 8; // 眼睛大小（马赛克方块数量）
+      const eyeXOffset = 10; // X 轴偏移
+      const eyeYOffset = 6; // Y 轴偏移
+      const eyeSpacing = 6; // 眼睛间距
+
+      // 左眼
+      ctx.fillStyle = 'rgb(0, 0, 0)';
+      ctx.fillRect(
+        size / 2 - eyeXOffset - eyeSize,
+        size / 2 - eyeYOffset,
+        eyeSize,
+        eyeSize
+      );
+
+      // 右眼
+      ctx.fillStyle = 'rgb(0, 0, 0)';
+      ctx.fillRect(
+        size / 2 + eyeXOffset,
+        size / 2 - eyeYOffset,
+        eyeSize,
+        eyeSize
+      );
     }
 
     const texture = new THREE.CanvasTexture(canvas);
