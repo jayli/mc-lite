@@ -9,6 +9,7 @@ export class EnemyManager {
     this.world = world;
     // 存储丧尸实例 Map<uuid, Zombie>
     this.zombies = new Map();
+    this.maxActiveZombies = 10; // 最大活跃丧尸数
 
     // 实例化渲染器
     this.renderer = new ZombieInstancedRenderer(scene, 200);
@@ -36,8 +37,15 @@ export class EnemyManager {
   /**
    * 添加丧尸实例到管理器
    * @param {Zombie} zombie - 丧尸实例
+   * @returns {boolean} 添加是否成功
    */
   addZombie(zombie) {
+    // 检查是否已达到最大活跃丧尸数
+    if (this.zombies.size >= this.maxActiveZombies) {
+      console.warn('已达到最大活跃丧尸数量限制');
+      return false;
+    }
+
     // 优先使用 id，如果没有则使用 mesh.uuid
     const id = zombie.id || (zombie.mesh ? zombie.mesh.uuid : THREE.MathUtils.generateUUID());
     zombie.id = id; // Ensure zombie has an ID
@@ -58,6 +66,8 @@ export class EnemyManager {
         }
       }
     });
+
+    return true;
   }
 
   // 兼容旧接口（如果Game.js还没改完），但在我们的计划中会被addZombie替代

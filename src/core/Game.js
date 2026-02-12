@@ -105,18 +105,18 @@ export class Game {
         import('../entities/enemy/Zombie.js').then(({ Zombie }) => {
           const zombie = new Zombie(adjustedSpawnPos);
 
-          // 将僵尸添加到场景
-          this.engine.scene.add(zombie.mesh);
+          // 检查是否可以添加更多丧尸
+          if (this.enemyManager.addZombie(zombie)) {
+            // 将僵尸添加到场景
+            this.engine.scene.add(zombie.mesh);
 
-          // 将敌人实例添加到EnemyManager
-          this.enemyManager.addZombie(zombie);
-
-          console.log(`[Debug] 生成了一个丧尸 at (${adjustedSpawnPos.x.toFixed(2)}, ${adjustedSpawnPos.y.toFixed(2)}, ${adjustedSpawnPos.z.toFixed(2)})`);
-          console.log(`[Debug] 离玩家距离: ${Math.sqrt(
-            Math.pow(adjustedSpawnPos.x - this.player.position.x, 2) +
-            Math.pow(adjustedSpawnPos.y - this.player.position.y, 2) +
-            Math.pow(adjustedSpawnPos.z - this.player.position.z, 2)
-          ).toFixed(2)} 格`);
+            console.log(`[Debug] 生成了一个丧尸 at (${adjustedSpawnPos.x.toFixed(2)}, ${adjustedSpawnPos.y.toFixed(2)}, ${adjustedSpawnPos.z.toFixed(2)})`);
+            console.log(`[Debug] 离玩家距离: ${Math.sqrt(
+              Math.pow(adjustedSpawnPos.x - this.player.position.x, 2) +
+              Math.pow(adjustedSpawnPos.y - this.player.position.y, 2) +
+              Math.pow(adjustedSpawnPos.z - this.player.position.z, 2)
+            ).toFixed(2)} 格`);
+          }
         });
       }
     });

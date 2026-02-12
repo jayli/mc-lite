@@ -8,7 +8,7 @@ export class ZombieManager {
     this.scene = scene;
     this.world = world;
     this.zombies = [];
-    this.maxActiveZombies = 20; // 最大活跃丧尸数
+    this.maxActiveZombies = 10; // 最大活跃丧尸数
 
     // 性能优化：批量更新
     this.updateQueue = [];
