@@ -53,6 +53,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
    - 在 `src/core/EnemyManager.js` 注册新类型。
 3. **调试物理**: 物理步进逻辑位于 `src/entities/player/Physics.js`（玩家）和实体类的 `update` 方法（敌人）。
 4. **优化渲染**: 隐藏面剔除逻辑位于 `src/core/FaceCullingSystem.js` 与 `src/utils/FaceCullingUtils.js`。
+5. **运行环境**: 运行环境是用户通过启动本地服务`npm run start`后由用户在浏览器中运行，命令行没有日志输出，所以 claude 最后无须启动`npm run start`来验证，提示用户启动服务并打开浏览器即可。
 
 ## 最近功能记录
 - **013-zombie-enemy**: 新增丧尸敌人，采用主线程物理+Worker AI的分离架构。
