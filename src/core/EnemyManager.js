@@ -75,9 +75,15 @@ export class EnemyManager {
 
     // 2. 在主线程执行物理更新（碰撞检测 + 重力 + 位置步进）
     // 注意：排斥力和AI速度已在Worker中计算，通过setDesiredVelocity应用
+    const zombiesToRemove = [];
     for (const [id, zombie] of this.zombies) {
+      // 检查是否已死亡
+      if (!zombie.isAlive) {
+        zombiesToRemove.push(id);
+        continue;
+      }
+
       // 执行物理模拟 (重力, 碰撞, 移动)
-      // 排斥力已不再需要传入，因为Worker已经将其包含在desiredVelocity中
       zombie.update(this.world.getBlock.bind(this.world), deltaTime);
 
       // 收集新位置
@@ -87,6 +93,11 @@ export class EnemyManager {
         y: zombie.position.y,
         z: zombie.position.z
       });
+    }
+
+    // 移除死亡的丧尸
+    for (const id of zombiesToRemove) {
+      this.removeEnemy(id);
     }
 
     // 更新实例化渲染器

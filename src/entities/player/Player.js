@@ -171,10 +171,10 @@ export class Player {
     });
 
     this.bgmStarted = false;
-    document.body.addEventListener('click', () => {
+    document.addEventListener('click', () => {
       // 检查背包是否打开，如果打开则不请求指针锁定
       const inventoryModal = document.getElementById('inventory-modal');
-      const isInventoryOpen = inventoryModal && inventoryModal.style.display !== 'none';
+      const isInventoryOpen = inventoryModal && window.getComputedStyle(inventoryModal).display !== 'none';
 
       if (!isInventoryOpen && document.pointerLockElement !== document.body) {
         document.body.requestPointerLock();
