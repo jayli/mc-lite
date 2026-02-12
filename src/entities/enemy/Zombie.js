@@ -49,8 +49,12 @@ export class Zombie {
     const group = new THREE.Group();
 
     // 材质 - 不同部位使用不同的绿色调
+
+    // 为头部创建带马赛克噪点的纹理
+    const headTexture = this.createMosaicTexture();
     const headMaterial = new THREE.MeshLambertMaterial({
-      color: 0x406b30, // 头部：深绿
+      map: headTexture, // 使用带噪点的纹理
+      color: 0xffffff,  // 白色基色让纹理颜色正常显示
       wireframe: false
     });
 
@@ -114,6 +118,64 @@ export class Zombie {
     group.position.set(this.position.x, this.position.y, this.position.z);
 
     return group;
+  }
+
+  /**
+    * 创建马赛克噪点纹理 - 在基色基础上混入深浅不一的噪点
+    * @param {string} type - 纹理类型 ('head' | 'body' | 'arm' | 'leg')
+    * @returns {THREE.CanvasTexture} 生成的纹理
+    */
+  createMosaicTexture(type = 'head') {
+    const size = 64; // 纹理大小
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // 定义不同部位的基色和噪点范围
+    const palettes = {
+      head: { base: [64, 107, 48], noise: [[48, 80, 36], [80, 134, 60], [96, 160, 72]] },
+      body: { base: [3, 124, 124], noise: [[2, 93, 93], [4, 155, 155], [5, 186, 186]] },
+      arm: { base: [105, 144, 88], noise: [[79, 108, 66], [131, 180, 110], [157, 216, 132]] },
+      leg: { base: [50, 43, 113], noise: [[38, 32, 85], [62, 54, 141], [75, 65, 169]] }
+    };
+
+    const palette = palettes[type] || palettes.head;
+    const mosaicSize = 4; // 每个马赛克块的大小（像素）
+
+    // 绘制马赛克块
+    for (let y = 0; y < size; y += mosaicSize) {
+      for (let x = 0; x < size; x += mosaicSize) {
+        // 随机决定使用基色还是噪点色
+        const useNoise = Math.random() > 0.3; // 70% 概率使用噪点色
+
+        let color;
+        if (useNoise) {
+          // 从噪点数组中随机选择一种颜色
+          const noiseIndex = Math.floor(Math.random() * palette.noise.length);
+          color = palette.noise[noiseIndex];
+        } else {
+          // 使用基色（稍微加一点随机扰动）
+          const variation = 10;
+          color = [
+            Math.max(0, Math.min(255, palette.base[0] + (Math.random() - 0.5) * variation)),
+            Math.max(0, Math.min(255, palette.base[1] + (Math.random() - 0.5) * variation)),
+            Math.max(0, Math.min(255, palette.base[2] + (Math.random() - 0.5) * variation))
+          ];
+        }
+
+        ctx.fillStyle = `rgb(${Math.floor(color[0])}, ${Math.floor(color[1])}, ${Math.floor(color[2])})`;
+        ctx.fillRect(x, y, mosaicSize, mosaicSize);
+      }
+    }
+
+    // 创建纹理并设置参数
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.magFilter = THREE.NearestFilter; // 像素化效果
+    texture.minFilter = THREE.NearestFilter;
+    texture.colorSpace = THREE.SRGBColorSpace;
+
+    return texture;
   }
 
   /**
