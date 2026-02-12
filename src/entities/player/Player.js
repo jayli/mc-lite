@@ -432,6 +432,15 @@ export class Player {
     const hits = this.raycaster.intersectObjects(targets, true);
     this.raycaster.far = Infinity;
 
+    // Debug logging for raycasting
+    if (this.game && this.game.showDebugInfo) {
+      console.log(`[Raycast] targets: ${targets.length}, hits: ${hits.length}`);
+      if (hits.length > 0) {
+        const hit = hits[0];
+        console.log(`[Raycast] Hit[0]:`, hit.object.userData, hit.object.isInstancedMesh, hit.instanceId);
+      }
+    }
+
     // 当枪械不能破坏方块时，实心方块可以阻挡子弹
     const canGunsDestroyBlocks = this.game?.canGunsDestroyBlocks !== false;
 

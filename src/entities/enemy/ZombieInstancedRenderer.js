@@ -64,6 +64,14 @@ export class ZombieInstancedRenderer {
       mesh.userData = { isZombiePart: true, renderer: this };
       mesh.frustumCulled = false; // Disable frustum culling to prevent zombies from disappearing
 
+      // Initialize bounding sphere to infinity to prevent Raycaster culling
+      // We set both geometry and mesh bounding spheres to infinity to be safe across Three.js versions
+      if (!mesh.geometry.boundingSphere) {
+        mesh.geometry.computeBoundingSphere();
+      }
+      mesh.geometry.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Infinity);
+      mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Infinity);
+
       // Initialize instanceColor to ensure it exists and has correct size
       // We use maxCount, not current count, to allocate buffer
       if (mesh.setColorAt) {
