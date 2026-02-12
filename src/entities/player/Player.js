@@ -970,7 +970,7 @@ export class Player {
       if (this.game && this.game.enemyManager) {
         const explosionCenter = new THREE.Vector3(center.x + 0.5, center.y + 0.5, center.z + 0.5);
         const explosionRadius = 4; // 爆炸伤害范围（方块单位）
-        const explosionDamage = 50; // 爆炸伤害值，两下可以消灭丧尸
+        const explosionDamage = 80; // 爆炸伤害值
 
         const allZombies = this.game.enemyManager.getAllEnemies();
         for (const zombie of allZombies) {
