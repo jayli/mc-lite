@@ -42,6 +42,7 @@ export class Game {
     document.body.appendChild(this.stats.dom);
 
     this.canGunsDestroyBlocks = true; // 是否允许枪械破坏方块
+    this.maxActiveZombies = 20; // 最大活跃丧尸数
 
     this.isRunning = false; // 游戏运行状态标志
     this.perfStats = { player: 0, world: 0, ui: 0, render: 0 }; // 性能统计数据
@@ -322,7 +323,8 @@ export class Game {
       worldDeltas: worldDeltas,         // 世界变化数据（保存所有修改过的区块）
       seed: WORLD_CONFIG.SEED,           // 世界生成种子，用于确保地形一致性
       settings: {                        // 游戏设置
-        canGunsDestroyBlocks: this.canGunsDestroyBlocks
+        canGunsDestroyBlocks: this.canGunsDestroyBlocks,
+        maxActiveZombies: this.maxActiveZombies
       }
     };
 
@@ -355,6 +357,8 @@ export class Game {
     // 3. 恢复设置
     if (saveData.settings) {
       this.canGunsDestroyBlocks = saveData.settings.canGunsDestroyBlocks !== undefined ? saveData.settings.canGunsDestroyBlocks : true;
+      this.maxActiveZombies = saveData.settings.maxActiveZombies !== undefined ? saveData.settings.maxActiveZombies : 10;
+      this.enemyManager.maxActiveZombies = this.maxActiveZombies; // 同步到敌人管理器
       // 更新UI按钮状态
       this.ui.updateActiveButtons();
     }

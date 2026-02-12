@@ -9,7 +9,7 @@ export class EnemyManager {
     this.world = world;
     // 存储丧尸实例 Map<uuid, Zombie>
     this.zombies = new Map();
-    this.maxActiveZombies = 10; // 最大活跃丧尸数
+    this.maxActiveZombies = 20; // 最大活跃丧尸数（默认值）
 
     // 实例化渲染器
     this.renderer = new ZombieInstancedRenderer(scene, 200);

@@ -31,6 +31,9 @@ export class UIManager {
     const btnSave = document.getElementById('btn-save-game');
     const btnGunDestroyOn = document.getElementById('btn-gun-destroy-on');
     const btnGunDestroyOff = document.getElementById('btn-gun-destroy-off');
+    const btnZombie20 = document.getElementById('btn-zombie-20');
+    const btnZombie30 = document.getElementById('btn-zombie-30');
+    const btnZombie50 = document.getElementById('btn-zombie-50');
 
     if (!settingsBtn || !settingsModal || !settingsClose) return;
 
@@ -87,6 +90,31 @@ export class UIManager {
       };
     }
 
+    // 丧尸数量设置
+    if (btnZombie20 && btnZombie30 && btnZombie50) {
+      btnZombie20.onclick = (e) => {
+        e.stopPropagation();
+        this.game.maxActiveZombies = 20;
+        this.game.enemyManager.maxActiveZombies = 20;
+        this.hud.showMessage('已设置丧尸数量上限为 20 个');
+        this.updateActiveButtons();
+      };
+      btnZombie30.onclick = (e) => {
+        e.stopPropagation();
+        this.game.maxActiveZombies = 30;
+        this.game.enemyManager.maxActiveZombies = 30;
+        this.hud.showMessage('已设置丧尸数量上限为 30 个');
+        this.updateActiveButtons();
+      };
+      btnZombie50.onclick = (e) => {
+        e.stopPropagation();
+        this.game.maxActiveZombies = 50;
+        this.game.enemyManager.maxActiveZombies = 50;
+        this.hud.showMessage('已设置丧尸数量上限为 50 个');
+        this.updateActiveButtons();
+      };
+    }
+
     // 手动存档按钮处理
     if (btnSave) {
       btnSave.onclick = async (e) => {
@@ -126,6 +154,9 @@ export class UIManager {
     const btnQuality = document.getElementById('btn-quality');
     const btnGunDestroyOn = document.getElementById('btn-gun-destroy-on');
     const btnGunDestroyOff = document.getElementById('btn-gun-destroy-off');
+    const btnZombie20 = document.getElementById('btn-zombie-20');
+    const btnZombie30 = document.getElementById('btn-zombie-30');
+    const btnZombie50 = document.getElementById('btn-zombie-50');
 
     if (!btnPerf || !btnMid || !btnQuality) return;
 
@@ -136,6 +167,12 @@ export class UIManager {
     if (btnGunDestroyOn && btnGunDestroyOff) {
       btnGunDestroyOn.classList.toggle('active', this.game.canGunsDestroyBlocks);
       btnGunDestroyOff.classList.toggle('active', !this.game.canGunsDestroyBlocks);
+    }
+
+    if (btnZombie20 && btnZombie30 && btnZombie50) {
+      btnZombie20.classList.toggle('active', this.game.maxActiveZombies === 20);
+      btnZombie30.classList.toggle('active', this.game.maxActiveZombies === 30);
+      btnZombie50.classList.toggle('active', this.game.maxActiveZombies === 50);
     }
   }
 
