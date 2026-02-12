@@ -497,9 +497,28 @@ export class Player {
       const blockType = this.world.getBlock(bx, by, bz);
 
       if (blockType && blockType !== 'air') {
+        // 优先检查是否是 TNT 方块，无论是否是实心都触发爆炸
+        if (blockType === 'tnt') {
+          finalHit = hit;
+          hasHitSolid = true;
+          // Ignite TNT logic
+          if (obj.isInstancedMesh) {
+            obj.getMatrixAt(hit.instanceId, this._dummyMatrix);
+            this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
+          } else {
+            this._tempVector.copy(obj.position);
+          }
+          const key = `${Math.floor(this._tempVector.x)},${Math.floor(this._tempVector.y)},${Math.floor(this._tempVector.z)}`;
+          if (!this.ignitingTNTs.has(key)) {
+            this.ignitingTNTs.add(key);
+            this.explode(this._tempVector.x, this._tempVector.y, this._tempVector.z);
+          }
+          break;
+        }
+
         const props = getBlockProperties(blockType);
         if (props.isSolid) {
-          // Hit a solid block
+          // Hit a solid block (not TNT)
           finalHit = hit;
           hasHitSolid = true;
 
