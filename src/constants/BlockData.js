@@ -133,6 +133,12 @@ export const BLOCK_DATA = {
   'end_stone': {
     isAOEnabled: true
   },
+  'iron': {
+    isAOEnabled: true
+  },
+  'diamond': {
+    isAOEnabled: true
+  },
   'obsidian': {
     isAOEnabled: false
   },
