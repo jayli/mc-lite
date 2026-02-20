@@ -170,8 +170,9 @@ export class ZombieInstancedRenderer {
   /**
    * 更新所有丧尸的实例化渲染
    * @param {Map|Array} zombies - 丧尸对象集合（Map 或 Array）
+   * @param {number} deltaTime - 时间增量（秒）
    */
-  update(zombies) {
+  update(zombies, deltaTime = 0.016) {
     let count = 0;
     this.instanceMap = [];
 
@@ -199,6 +200,29 @@ export class ZombieInstancedRenderer {
       // 确定颜色（受伤时闪红）
       const isFlashing = zombie.isFlashing;
 
+      // 计算行走动画
+      const isMoving = Math.abs(zombie.velocity.x) > 0.001 || Math.abs(zombie.velocity.z) > 0.001;
+
+      // 更新动画时间
+      if (isMoving) {
+        zombie._walkTime = (zombie._walkTime || 0) + deltaTime;
+      } else {
+        zombie._walkTime = 0; // 停止时重置
+      }
+
+      // 行走动画参数
+      const walkSpeed = 10; // 动画播放速度
+      const legSwingAngle = Math.PI / 8; // 腿部摆动幅度（22.5 度）
+      const armSwingAngle = Math.PI / 12; // 手臂摆动幅度（15 度）
+
+      let legSwing = 0;
+      let armSwing = 0;
+
+      if (isMoving) {
+        legSwing = Math.sin(zombie._walkTime * walkSpeed) * legSwingAngle;
+        armSwing = Math.sin(zombie._walkTime * walkSpeed) * armSwingAngle;
+      }
+
       // --- 头部 ---
       // 本地坐标: (0, 1.8, 0)
       this.updatePart(this.meshes.head, i, px, py, pz, ry, 0, 1.8, 0, 0, 0, 0, isFlashing, 'head');
@@ -207,21 +231,21 @@ export class ZombieInstancedRenderer {
       // 本地坐标: (0, 1.15, 0)
       this.updatePart(this.meshes.body, i, px, py, pz, ry, 0, 1.15, 0, 0, 0, 0, isFlashing, 'body');
 
-      // --- 左臂 ---
+      // --- 左臂 ---（与左腿同向摆动）
       // 本地坐标: (-0.43, 1.3, 0.3), X轴旋转 = -PI/2.4
-      this.updatePart(this.meshes.leftArm, i, px, py, pz, ry, -0.43, 1.3, 0.3, -Math.PI / 2.4, 0, 0, isFlashing, 'arm');
+      this.updatePart(this.meshes.leftArm, i, px, py, pz, ry, -0.43, 1.3, 0.3, -Math.PI / 2.4 + armSwing, 0, 0, isFlashing, 'arm');
 
-      // --- 右臂 ---
+      // --- 右臂 ---（与右腿同向摆动）
       // 本地坐标: (0.43, 1.3, 0.3), X轴旋转 = -PI/2.7
-      this.updatePart(this.meshes.rightArm, i, px, py, pz, ry, 0.43, 1.3, 0.3, -Math.PI / 2.7, 0, 0, isFlashing, 'arm');
+      this.updatePart(this.meshes.rightArm, i, px, py, pz, ry, 0.43, 1.3, 0.3, -Math.PI / 2.7 - armSwing, 0, 0, isFlashing, 'arm');
 
-      // --- 左腿 ---
+      // --- 左腿 ---（前后摆动）
       // 本地坐标: (-0.14, 0.4, 0)
-      this.updatePart(this.meshes.leftLeg, i, px, py, pz, ry, -0.14, 0.4, 0, 0, 0, 0, isFlashing, 'leg');
+      this.updatePart(this.meshes.leftLeg, i, px, py, pz, ry, -0.14, 0.4, 0, legSwing, 0, 0, isFlashing, 'leg');
 
-      // --- 右腿 ---
+      // --- 右腿 ---（与左腿反向摆动）
       // 本地坐标: (0.14, 0.4, 0)
-      this.updatePart(this.meshes.rightLeg, i, px, py, pz, ry, 0.14, 0.4, 0, 0, 0, 0, isFlashing, 'leg');
+      this.updatePart(this.meshes.rightLeg, i, px, py, pz, ry, 0.14, 0.4, 0, -legSwing, 0, 0, isFlashing, 'leg');
 
       count++;
     }

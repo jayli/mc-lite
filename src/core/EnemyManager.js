@@ -111,7 +111,7 @@ export class EnemyManager {
     }
 
     // 更新实例化渲染器
-    this.renderer.update(this.zombies);
+    this.renderer.update(this.zombies, deltaTime);
 
     // 3. 发送给Worker进行AI计算（包含排斥力计算）
     this.worker.postMessage({
