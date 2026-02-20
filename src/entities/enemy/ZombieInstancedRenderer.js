@@ -282,7 +282,9 @@ export class ZombieInstancedRenderer {
    * @returns {THREE.CanvasTexture} 生成的纹理
    */
   createMosaicTexture(type = 'head', addEyes = true) {
-    const size = 64;
+    const mosaicCount = 8; // 每个面 8x8 个马赛克
+    const mosaicSize = 8; // 每个马赛克方块 8 像素
+    const size = mosaicCount * mosaicSize; // 64x64
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
@@ -293,17 +295,16 @@ export class ZombieInstancedRenderer {
     };
 
     const palette = palettes[type] || palettes.head;
-    const mosaicSize = 4;
 
     for (let y = 0; y < size; y += mosaicSize) {
       for (let x = 0; x < size; x += mosaicSize) {
-        const useNoise = Math.random() > 0.3;
+        const useNoise = Math.random() > 0.7; // 降低噪音使用概率至 30%
         let color;
         if (useNoise) {
           const noiseIndex = Math.floor(Math.random() * palette.noise.length);
           color = palette.noise[noiseIndex];
         } else {
-          const variation = 10;
+          const variation = 5; // 降低基础颜色波动幅度
           color = [
             Math.max(0, Math.min(255, palette.base[0] + (Math.random() - 0.5) * variation)),
             Math.max(0, Math.min(255, palette.base[1] + (Math.random() - 0.5) * variation)),
@@ -317,28 +318,21 @@ export class ZombieInstancedRenderer {
 
     // 添加眼睛（黑色马赛克方块）
     if (type === 'head' && addEyes) {
-      const eyeSize = 8; // 眼睛大小（马赛克方块数量）
-      const eyeXOffset = 10; // X 轴偏移
-      const eyeYOffset = 6; // Y 轴偏移
-      const eyeSpacing = 6; // 眼睛间距
+      // 每只眼睛大小为 1 个马赛克颗粒
+      const eyeSize = mosaicSize; // 8 像素
+
+      // 8x8 网格中，眼睛位置：垂直居中（第 3-4 行），水平对称分布（第 2 列和第 6 列）
+      const leftEyeX = 2 * mosaicSize; // 第 3 列起始位置
+      const rightEyeX = 5 * mosaicSize; // 第 6 列起始位置
+      const eyeY = 3 * mosaicSize; // 第 4 行起始位置（垂直居中）
 
       // 左眼
       ctx.fillStyle = 'rgb(0, 0, 0)';
-      ctx.fillRect(
-        size / 2 - eyeXOffset - eyeSize,
-        size / 2 - eyeYOffset,
-        eyeSize,
-        eyeSize
-      );
+      ctx.fillRect(leftEyeX, eyeY, eyeSize, eyeSize);
 
       // 右眼
       ctx.fillStyle = 'rgb(0, 0, 0)';
-      ctx.fillRect(
-        size / 2 + eyeXOffset,
-        size / 2 - eyeYOffset,
-        eyeSize,
-        eyeSize
-      );
+      ctx.fillRect(rightEyeX, eyeY, eyeSize, eyeSize);
     }
 
     const texture = new THREE.CanvasTexture(canvas);
