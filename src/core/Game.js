@@ -41,7 +41,7 @@ export class Game {
     this.stats.dom.style.left = 'auto'; // 确保不靠左
     document.body.appendChild(this.stats.dom);
 
-    this.canGunsDestroyBlocks = true; // 是否允许枪械破坏方块
+    this.canGunsDestroyBlocks = false; // 是否允许枪械破坏方块
     this.maxActiveZombies = 20; // 最大活跃丧尸数
 
     this.isRunning = false; // 游戏运行状态标志
