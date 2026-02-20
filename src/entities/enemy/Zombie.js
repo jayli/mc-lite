@@ -26,7 +26,7 @@ export class Zombie {
     // 物理属性
     this.width = 0.6;  // 略小于1个方块，便于移动
     this.height = 1.8; // 2个方块高度
-    this.speed = 0.04; // 丧尸移动速度
+    this.speed = 0.02; // 丧尸移动速度
     this.perceptionRange = 50; // 感知范围
 
     // 状态属性
