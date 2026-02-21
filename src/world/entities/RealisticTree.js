@@ -29,12 +29,13 @@ export class RealisticTree {
       const templateIndex = realisticTreeManager.getRandomTemplateIndex();
       realisticTreeManager.addTreeToChunk(cx, cz, x, y, z, templateIndex);
 
-      // 立即添加碰撞体（不等待实例化渲染）
+      // 立即添加碰撞体和 blockData（不等待实例化渲染）
       const template = realisticTreeManager.templates[templateIndex];
       if (template) {
         for (let i = 0; i < Math.ceil(template.trunkHeight); i++) {
           const key = `${Math.floor(x)},${Math.floor(y + i)},${Math.floor(z)}`;
           chunk.solidBlocks.add(key);
+          chunk.blockData[key] = 'realistic_trunk';
         }
       }
     } else {

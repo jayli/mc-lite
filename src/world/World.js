@@ -286,4 +286,17 @@ export class World {
       chunk.removeCollisionKey(x, y, z);
     }
   }
+
+  /**
+   * 根据世界坐标获取区块
+   * @param {number} x - 世界坐标 X
+   * @param {number} z - 世界坐标 Z
+   * @returns {Chunk|null} 区块对象
+   */
+  getChunkAt(x, z) {
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cz = Math.floor(z / CHUNK_SIZE);
+    const key = `${cx},${cz}`;
+    return this.chunks.get(key) || null;
+  }
 }
