@@ -12,6 +12,7 @@ import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
 import { carModel, gunManModel } from '../core/Engine.js';
 import { getBlockProperties } from '../constants/BlockData.js';
+import { getRotationAngle, parseBlockEntry, serializeBlockEntry } from '../utils/OrientationUtils.js';
 
 /** 区块尺寸 - 每个区块在 X 和 Z 方向上的方块数量 (16x16 是 Voxel 游戏的标准区块大小) */
 const CHUNK_SIZE = 16;
@@ -605,7 +606,10 @@ export class Chunk {
     d[type].forEach((pos, i) => {
       // 核心偏移：将模型中心对齐到方块中心 (增加 0.5 偏移)
       dummy.position.set(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
-      dummy.updateMatrix();                     // 根据位置生成变换矩阵
+      // 应用朝向旋转（如果有）
+      const orientation = pos.orientation || 0;
+      dummy.rotation.set(0, getRotationAngle(orientation), 0);
+      dummy.updateMatrix();                     // 根据位置和旋转生成变换矩阵
       mesh.setMatrixAt(i, dummy.matrix);        // 将矩阵写入实例化缓冲区
 
       const posKey = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
@@ -677,21 +681,31 @@ export class Chunk {
    * @param {number} x - 世界坐标X
    * @param {number} y - 世界坐标Y
    * @param {number} z - 世界坐标Z
-   * @param {string} type - 方块类型
+   * @param {string|object} typeOrEntry - 方块类型或完整条目对象 { type, orientation }
+   * @param {number} [orientation=0] - 朝向 (0-3)，当 typeOrEntry 为字符串时使用
    */
-  addBlockDynamic(x, y, z, type) {
+  addBlockDynamic(x, y, z, typeOrEntry, orientation = 0) {
+    // 解析输入参数，支持新旧两种调用方式
+    const entry = typeof typeOrEntry === 'string'
+      ? { type: typeOrEntry, orientation }
+      : parseBlockEntry(typeOrEntry);
+    const { type } = entry;
+    const blockOrientation = entry.orientation || 0;
+
     const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-    const oldType = this.blockData[key];
+    const oldEntry = this.blockData[key];
+    const oldParsed = parseBlockEntry(oldEntry);
+    const oldType = oldParsed.type;
 
     // 更新内存中的快照数据
-    persistenceService.recordChange(x, y, z, type);
+    persistenceService.recordChange(x, y, z, entry);
 
     // 更新数据和可见性状态
     if (type === 'air') {
       delete this.blockData[key];
       this.visibleKeys.delete(key);
     } else {
-      this.blockData[key] = type;
+      this.blockData[key] = entry;
       this.visibleKeys.add(key);
     }
 
@@ -705,8 +719,10 @@ export class Chunk {
       let chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(`${cx},${cz}`);
       if (!chunk || !chunk.isReady) return null;
       const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-      const t = chunk.blockData[key];
-      return t ? { type: t } : null;
+      const entry = chunk.blockData[key];
+      if (!entry) return null;
+      const parsed = parseBlockEntry(entry);
+      return { type: parsed.type, orientation: parsed.orientation };
     };
 
     const getNeighborsOf = (nx, ny, nz) => ({
@@ -911,7 +927,9 @@ export class Chunk {
       // 创建单个网格
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.set(Math.floor(x) + 0.5, Math.floor(y) + 0.5, Math.floor(z) + 0.5); // 增加 0.5 偏移
-      mesh.userData = { type: type };
+      // 应用朝向旋转
+      mesh.rotation.set(0, getRotationAngle(blockOrientation), 0);
+      mesh.userData = { type: type, orientation: blockOrientation };
       mesh.frustumCulled = false; // 防止视锥剔除误判
 
       // --- 为动态方块设置空的 AO 属性，防止报错 ---
@@ -970,6 +988,35 @@ export class Chunk {
         this._triggerFaceCullingUpdate(x, y, z, this.blockData[key]);
       }
     }
+  }
+
+  /**
+   * 获取指定位置方块的朝向
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @returns {number} 朝向值 (0-3)，方块不存在时返回 0
+   */
+  getBlockOrientation(x, y, z) {
+    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const entry = this.blockData[key];
+    if (!entry) return 0;
+    const parsed = parseBlockEntry(entry);
+    return parsed.orientation || 0;
+  }
+
+  /**
+   * 获取指定位置方块的类型
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @returns {{ type: string, orientation: number }|null} 方块信息
+   */
+  getBlockEntry(x, y, z) {
+    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const entry = this.blockData[key];
+    if (!entry) return null;
+    return parseBlockEntry(entry);
   }
 
   /**

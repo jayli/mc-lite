@@ -11,6 +11,7 @@ import { chestManager } from '../../world/entities/Chest.js';
 import { gunModel, mag7Model, minigunModel } from '../../core/Engine.js';
 import { Gun, WEAPON_TYPES } from '../weapon/Gun.js';
 import { getBlockProperties } from '../../constants/BlockData.js';
+import { nextOrientation } from '../../utils/OrientationUtils.js';
 
 export class Player {
   /**
@@ -99,6 +100,9 @@ export class Player {
 
     // 追踪引燃中的 TNT
     this.ignitingTNTs = new Set();
+
+    // 放置记忆 - 存储每种方块类型上次移除时的朝向，用于计算下次放置时的朝向
+    this.placementMemory = new Map();
 
     // 持枪系统 (Refactored)
     this.weaponMode = WEAPON_TYPES.ARM; // 当前选择的武器模式 (0: 手臂, 1: 手枪, 2: MAG7, 3: 加特林)
@@ -897,10 +901,36 @@ export class Player {
   tryPlaceBlock(x, y, z, type) {
     if (this.physics.isSolid(x, y, z)) return false;
     if (this.position.x - 0.3 < x + 1 && this.position.x + 0.3 > x && this.position.y < y + 1 && this.position.y + 1.8 > y && this.position.z - 0.3 < z + 1 && this.position.z + 0.3 > z) return false;
-    this.world.setBlock(x, y, z, type);
+    // 获取下次放置的朝向（基于放置记忆）
+    const orientation = this.getNextPlacementOrientation(type);
+    this.world.setBlock(x, y, z, type, orientation);
     this.inventory.remove(type, 1);
     audioManager.playSound('put', 0.3);
     return true;
+  }
+
+  /**
+   * 记录方块移除时的朝向到放置记忆
+   * @param {string} type - 方块类型
+   * @param {number} orientation - 朝向 (0-3)
+   */
+  recordPlacementMemory(type, orientation) {
+    if (type && type !== 'air' && type !== 'water' && type !== 'cloud') {
+      this.placementMemory.set(type, orientation);
+    }
+  }
+
+  /**
+   * 获取下次放置该类型方块的朝向（顺时针旋转90度）
+   * @param {string} type - 方块类型
+   * @returns {number} 下次放置的朝向 (0-3)
+   */
+  getNextPlacementOrientation(type) {
+    const lastOrientation = this.placementMemory.get(type);
+    if (lastOrientation === undefined) {
+      return 0; // 默认朝东
+    }
+    return nextOrientation(lastOrientation);
   }
 
   /**
@@ -917,6 +947,12 @@ export class Player {
     if (m.isInstancedMesh) {
       m.getMatrixAt(hit.instanceId, this._dummyMatrix);
       this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
+      // 记录方块朝向到放置记忆
+      const bx = Math.floor(this._tempVector.x), by = Math.floor(this._tempVector.y), bz = Math.floor(this._tempVector.z);
+      const entry = this.world.getBlockEntry(bx, by, bz);
+      if (entry) {
+        this.recordPlacementMemory(entry.type, entry.orientation);
+      }
       this._dummyMatrix.scale(this._zeroVector);
       m.setMatrixAt(hit.instanceId, this._dummyMatrix);
       m.instanceMatrix.needsUpdate = true;
@@ -926,7 +962,7 @@ export class Player {
       } else {
         this.spawnParticles(this._tempVector, type);
       }
-      this.world.removeBlock(Math.floor(this._tempVector.x), Math.floor(this._tempVector.y), Math.floor(this._tempVector.z));
+      this.world.removeBlock(bx, by, bz);
       audioManager.playSound('delete_get', 0.3);
       if (type !== 'water' && type !== 'cloud') this.inventory.add(type === 'grass' ? 'dirt' : type, 1);
     } else {
@@ -946,6 +982,11 @@ export class Player {
         }
       } else {
         const bx = Math.floor(m.position.x), by = Math.floor(m.position.y), bz = Math.floor(m.position.z);
+        // 记录方块朝向到放置记忆
+        const entry = this.world.getBlockEntry(bx, by, bz);
+        if (entry) {
+          this.recordPlacementMemory(entry.type, entry.orientation);
+        }
         this.world.removeBlock(bx, by, bz);
         audioManager.playSound('delete_get', 0.3);
         // 徒手破坏时使用新的破碎特效，否则使用原有粒子特效

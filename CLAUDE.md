@@ -41,3 +41,10 @@
 ## 代码提交
 - 你的任何修改都不能自动提交代码，必须等待我的明确指令才提交代码，再次强调，你的任何修改都不能自动在未经我允许的情况下提交代码，必须等我的明确指令才能提交代码
 - 提交作者包含：`noreply@anthropic.com`、`lijing00333@163.com`
+
+## Active Technologies
+- JavaScript (ES6 Modules) + Three.js (WebGL 3D 引擎) (001-block-orientation)
+- IndexedDB (通过 PersistenceService) (001-block-orientation)
+
+## Recent Changes
+- 001-block-orientation: Added JavaScript (ES6 Modules) + Three.js (WebGL 3D 引擎)

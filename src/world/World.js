@@ -7,6 +7,7 @@ import { chestManager } from './entities/Chest.js';
 import { persistenceService } from '../services/PersistenceService.js';
 import { noise } from '../utils/MathUtils.js';
 import { ParticleSystem } from './effects/ParticleSystem.js';
+import { parseBlockEntry } from '../utils/OrientationUtils.js';
 
 // --- 全局世界常量 ---
 /** 每个区块在 X 和 Z 方向上的大小 (16x16) */
@@ -228,7 +229,31 @@ export class World {
     if (!chunk) return null;
 
     const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-    return chunk.blockData[blockKey] || null;
+    const entry = chunk.blockData[blockKey];
+    if (!entry) return null;
+    // 兼容新旧格式：返回类型字符串
+    const parsed = parseBlockEntry(entry);
+    return parsed.type;
+  }
+
+  /**
+   * 获取指定世界坐标的方块完整信息（包含朝向）
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @returns {{ type: string, orientation: number }|null} 方块信息，如果区块未加载则返回 null
+   */
+  getBlockEntry(x, y, z) {
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cz = Math.floor(z / CHUNK_SIZE);
+    const key = `${cx},${cz}`;
+    const chunk = this.chunks.get(key);
+    if (!chunk) return null;
+
+    const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const entry = chunk.blockData[blockKey];
+    if (!entry) return null;
+    return parseBlockEntry(entry);
   }
 
   /**
@@ -236,9 +261,10 @@ export class World {
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y
    * @param {number} z - 世界坐标 Z
-   * @param {string} type - 方块类型名称
+   * @param {string|object} typeOrEntry - 方块类型名称或完整条目对象 { type, orientation }
+   * @param {number} [orientation=0] - 朝向 (0-3)，当 typeOrEntry 为字符串时使用
    */
-  setBlock(x, y, z, type) {
+  setBlock(x, y, z, typeOrEntry, orientation = 0) {
     const cx = Math.floor(x / CHUNK_SIZE);
     const cz = Math.floor(z / CHUNK_SIZE);
     const key = `${cx},${cz}`;
@@ -250,9 +276,7 @@ export class World {
     }
 
     // 逻辑委托：调用区块的动态添加方法，处理网格生成和邻居面更新
-    chunk.addBlockDynamic(x, y, z, type);
-    // 持久化：通知持久化服务记录这一变更
-    persistenceService.recordChange(x, y, z, type);
+    chunk.addBlockDynamic(x, y, z, typeOrEntry, orientation);
   }
 
   /**

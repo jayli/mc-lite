@@ -4,6 +4,7 @@
  * 使用 Worker 线程处理 IndexedDB 操作，避免阻塞主线程
  */
 import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
+import { serializeBlockEntry } from '../utils/OrientationUtils.js';
 
 export class PersistenceService {
   constructor() {
@@ -79,9 +80,10 @@ export class PersistenceService {
    * @param {number} x - 世界坐标X
    * @param {number} y - 世界坐标Y
    * @param {number} z - 世界坐标Z
-   * @param {string} type - 方块类型 ('air' 表示删除)
+   * @param {string|object} typeOrEntry - 方块类型 ('air' 表示删除) 或完整条目对象 { type, orientation }
+   * @param {number} [orientation] - 朝向（当第一个参数为字符串时使用）
    */
-  recordChange(x, y, z, type) {
+  recordChange(x, y, z, typeOrEntry, orientation) {
     const cx = Math.floor(x / PERSISTENCE_CONFIG.CHUNK_SIZE);
     const cz = Math.floor(z / PERSISTENCE_CONFIG.CHUNK_SIZE);
     const chunkKey = `${cx},${cz}`;
@@ -89,12 +91,24 @@ export class PersistenceService {
 
     const chunkData = this.cache.get(chunkKey);
     if (chunkData && chunkData.blocks) {
-      // chunkData.blocks[blockKey] = type;
-      if (type === 'air') {
-        delete chunkData.blocks[blockKey];
+      // 解析输入参数
+      let entry;
+      if (typeof typeOrEntry === 'string') {
+        if (typeOrEntry === 'air') {
+          delete chunkData.blocks[blockKey];
+          return;
+        }
+        entry = serializeBlockEntry(typeOrEntry, orientation);
+      } else if (typeof typeOrEntry === 'object' && typeOrEntry !== null) {
+        if (typeOrEntry.type === 'air') {
+          delete chunkData.blocks[blockKey];
+          return;
+        }
+        entry = typeOrEntry;
       } else {
-        chunkData.blocks[blockKey] = type;
+        return;
       }
+      chunkData.blocks[blockKey] = entry;
     }
   }
 

@@ -6,6 +6,24 @@ import { Cloud } from '../world/entities/Cloud.js';
 import { Island } from '../world/entities/Island.js';
 import { getBlockProperties, BLOCK_DATA } from '../constants/BlockData.js';
 
+/**
+ * 解析方块数据条目，兼容新旧格式
+ * @param {string|object} value - 存储值
+ * @returns {{ type: string, orientation: number }} 标准化条目
+ */
+function parseBlockEntry(value) {
+  if (typeof value === 'string') {
+    return { type: value, orientation: 0 };
+  }
+  if (typeof value === 'object' && value !== null) {
+    return {
+      type: value.type || 'air',
+      orientation: value.orientation ?? 0
+    };
+  }
+  return { type: 'air', orientation: 0 };
+}
+
 const CHUNK_SIZE = 16;
 const ROOMS_PER_CHUNK = 2;
 const MAX_ROOM_SIZE = 5;
@@ -27,7 +45,7 @@ onmessage = function(e) {
   const fakeChunk = {
     add: (x, y, z, type, dObj, solid = true) => {
       const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-      blockMap.set(key, { x, y, z, type, solid });
+      blockMap.set(key, { x, y, z, type, solid, orientation: 0 });
     }
   };
 
@@ -35,11 +53,11 @@ onmessage = function(e) {
     // 如果存在快照，直接恢复数据
     if (snapshot.blocks) {
       for (const key in snapshot.blocks) {
-        const type = snapshot.blocks[key];
+        const entry = parseBlockEntry(snapshot.blocks[key]);
         const [bx, by, bz] = key.split(',').map(Number);
         // 从全局配置获取实心属性
-        const solid = getBlockProperties(type).isSolid;
-        blockMap.set(key, { x: bx, y: by, z: bz, type, solid });
+        const solid = getBlockProperties(entry.type).isSolid;
+        blockMap.set(key, { x: bx, y: by, z: bz, type: entry.type, solid, orientation: entry.orientation });
       }
     }
     if (snapshot.entities) {
@@ -200,7 +218,8 @@ onmessage = function(e) {
   // 统一后处理：AO 计算、隐藏面剔除，并返回渲染数据
   const blocksForSnapshot = {};
   for (const [key, b] of blockMap) {
-    blocksForSnapshot[key] = b.type;
+    // 保存新格式（包含朝向）
+    blocksForSnapshot[key] = { type: b.type, orientation: b.orientation || 0 };
   }
 
   // 将 blockMap 转换为 d 和 solidBlocks
@@ -347,10 +366,10 @@ onmessage = function(e) {
           }
         }
       }
-      d[block.type].push({x: block.x, y: block.y, z: block.z, aoLow, aoHigh});
+      d[block.type].push({x: block.x, y: block.y, z: block.z, aoLow, aoHigh, orientation: block.orientation || 0});
       visibleKeys.push(key);
     }
-    allBlockTypes[key] = block.type;
+    allBlockTypes[key] = { type: block.type, orientation: block.orientation || 0 };
   }
 
   // 返回数据
