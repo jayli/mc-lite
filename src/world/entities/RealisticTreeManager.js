@@ -12,6 +12,8 @@ import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 class RealisticTreeManager {
   constructor() {
     this.templates = [];
+    // 实例化渲染支持：按区块存储待合并的树木数据
+    this.chunkTreeData = new Map(); // key: "cx,cz" -> [{x, y, z, templateIndex}]
   }
 
   /**
@@ -36,6 +38,138 @@ class RealisticTreeManager {
       return null;
     }
     return this.templates[Math.floor(Math.random() * this.templates.length)];
+  }
+
+  /**
+   * 获取模板索引（用于实例化时引用特定模板）
+   * @returns {number} 模板索引
+   */
+  getRandomTemplateIndex() {
+    if (this.templates.length === 0) {
+      return -1;
+    }
+    return Math.floor(Math.random() * this.templates.length);
+  }
+
+  /**
+   * 记录树木到区块数据（用于后续实例化合并）
+   * @param {number} cx - 区块 X 坐标
+   * @param {number} cz - 区块 Z 坐标
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @param {number} templateIndex - 模板索引
+   */
+  addTreeToChunk(cx, cz, x, y, z, templateIndex) {
+    const chunkKey = `${cx},${cz}`;
+    if (!this.chunkTreeData.has(chunkKey)) {
+      this.chunkTreeData.set(chunkKey, []);
+    }
+    this.chunkTreeData.get(chunkKey).push({ x, y, z, templateIndex });
+  }
+
+  /**
+   * 获取区块的树木数据
+   * @param {number} cx - 区块 X 坐标
+   * @param {number} cz - 区块 Z 坐标
+   * @returns {Array|null} 树木数据数组
+   */
+  getChunkTreeData(cx, cz) {
+    const chunkKey = `${cx},${cz}`;
+    return this.chunkTreeData.get(chunkKey) || null;
+  }
+
+  /**
+   * 清除区块的树木数据（合并后调用）
+   * @param {number} cx - 区块 X 坐标
+   * @param {number} cz - 区块 Z 坐标
+   */
+  clearChunkTreeData(cx, cz) {
+    const chunkKey = `${cx},${cz}`;
+    this.chunkTreeData.delete(chunkKey);
+  }
+
+  /**
+   * 为指定区块创建实例化树木网格
+   * @param {number} cx - 区块 X 坐标
+   * @param {number} cz - 区块 Z 坐标
+   * @param {THREE.Group} chunkGroup - 区块组对象
+   * @param {Set} chunkSolidBlocks - 区块碰撞集合
+   * @returns {Object|null} 包含树干和树叶 InstancedMesh 的对象
+   */
+  createInstancedTreesForChunk(cx, cz, chunkGroup, chunkSolidBlocks = null) {
+    const treeData = this.getChunkTreeData(cx, cz);
+    if (!treeData || treeData.length === 0) {
+      return null;
+    }
+
+    const trunkMat = materials.getMaterial('realistic_trunk_procedural');
+    const leavesMat = materials.getMaterial('realistic_oak_leaves');
+    const dummy = new THREE.Object3D();
+
+    // 为每个模板创建实例化网格
+    for (let tIdx = 0; tIdx < this.templates.length; tIdx++) {
+      const treesForTemplate = treeData.filter(t => t.templateIndex === tIdx);
+      if (treesForTemplate.length === 0) continue;
+
+      const template = this.templates[tIdx];
+
+      // --- 创建树干 InstancedMesh ---
+      const trunkGeo = template.trunk.geometry;
+      const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, treesForTemplate.length);
+      trunkMesh.castShadow = true;
+      trunkMesh.receiveShadow = true;
+      trunkMesh.userData = { type: 'realistic_trunk', isTreePart: true };
+
+      treesForTemplate.forEach((tree, i) => {
+        dummy.position.set(
+          tree.x + 0.5,
+          tree.y + template.trunkHeight / 2 - 0.5,
+          tree.z + 0.5
+        );
+        dummy.rotation.set(template.trunk.rotation.x, template.trunk.rotation.y, template.trunk.rotation.z);
+        dummy.scale.copy(template.trunk.scale);
+        dummy.updateMatrix();
+        trunkMesh.setMatrixAt(i, dummy.matrix);
+      });
+      trunkMesh.instanceMatrix.needsUpdate = true;
+      chunkGroup.add(trunkMesh);
+
+      // --- 创建树叶 InstancedMesh ---
+      const leavesGeo = template.leaves.geometry;
+      const leavesMesh = new THREE.InstancedMesh(leavesGeo, leavesMat, treesForTemplate.length);
+      leavesMesh.castShadow = true;
+      leavesMesh.userData = { type: 'realistic_leaves', isTreePart: true };
+
+      treesForTemplate.forEach((tree, i) => {
+        dummy.position.set(
+          tree.x + 0.5,
+          tree.y,
+          tree.z + 0.5
+        );
+        dummy.rotation.set(0, 0, 0); // 树叶使用世界旋转
+        dummy.scale.copy(template.leaves.scale);
+        dummy.updateMatrix();
+        leavesMesh.setMatrixAt(i, dummy.matrix);
+      });
+      leavesMesh.instanceMatrix.needsUpdate = true;
+      chunkGroup.add(leavesMesh);
+
+      // 添加碰撞数据
+      if (chunkSolidBlocks) {
+        treesForTemplate.forEach(tree => {
+          for (let i = 0; i < Math.ceil(template.trunkHeight); i++) {
+            const key = `${Math.floor(tree.x)},${Math.floor(tree.y + i)},${Math.floor(tree.z)}`;
+            chunkSolidBlocks.add(key);
+          }
+        });
+      }
+    }
+
+    // 清除已处理的数据
+    this.clearChunkTreeData(cx, cz);
+
+    return { trunkCount: treeData.length };
   }
 
   /**

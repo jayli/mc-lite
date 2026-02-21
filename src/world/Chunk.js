@@ -436,9 +436,16 @@ export class Chunk {
         this.buildMeshes(d);
 
         // 3. 处理真实感树木 (在主线程生成，因为涉及复杂 Mesh 克隆)
+        // 使用实例化渲染优化：记录树木数据，后续批量创建 InstancedMesh
         realisticTrees.forEach(pos => {
-          RealisticTree.generate(pos.x, pos.y, pos.z, this, null);
+          RealisticTree.generate(pos.x, pos.y, pos.z, this, null, true);
         });
+
+        // 3.0 创建实例化树木网格（替换克隆的 Mesh）
+        const instancedResult = RealisticTree.createInstancedForChunk(this);
+        if (instancedResult) {
+          console.log(`Chunk ${this.cx},${this.cz}: Created ${instancedResult.trunkCount} instanced trees`);
+        }
 
         // 3.1 处理模型人 (gun_man.glb)
         if (modGunMan && modGunMan.length > 0 && gunManModel) {
