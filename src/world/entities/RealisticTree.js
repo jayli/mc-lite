@@ -29,12 +29,14 @@ export class RealisticTree {
       const templateIndex = realisticTreeManager.getRandomTemplateIndex();
       realisticTreeManager.addTreeToChunk(cx, cz, x, y, z, templateIndex);
 
-      // 立即添加碰撞体（不等待实例化渲染）
+      // 立即添加碰撞体和数据（不等待实例化渲染）
       const template = realisticTreeManager.templates[templateIndex];
       if (template) {
         for (let i = 0; i < Math.ceil(template.trunkHeight); i++) {
           const key = `${Math.floor(x)},${Math.floor(y + i)},${Math.floor(z)}`;
           chunk.solidBlocks.add(key);
+          // 添加到 blockData，使 removeBlock 能够正确处理
+          chunk.blockData[key] = 'realistic_trunk_collider';
         }
       }
     } else {
@@ -92,7 +94,8 @@ export class RealisticTree {
       chunk.cx,
       chunk.cz,
       chunk.group,
-      null // 碰撞体已在 generate() 中添加，这里不需要重复添加
+      null, // 碰撞体已在 generate() 中添加，这里不需要重复添加
+      chunk.instanceIndexMap // 传递实例索引映射，用于移除方块时查找
     );
   }
 }

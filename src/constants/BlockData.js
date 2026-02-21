@@ -150,6 +150,12 @@ export const BLOCK_DATA = {
     isTransparent: true,
     isAOEnabled: false
   },
+  'realistic_trunk_collider': {
+    isSolid: true,
+    isTransparent: true,
+    isRendered: false,
+    isShadowEnabled: false
+  },
   // AO 启用的方块 (严格匹配原 aoAllowedTypes 列表)
   'sand': { isAOEnabled: true },
   'stone': { isAOEnabled: true },

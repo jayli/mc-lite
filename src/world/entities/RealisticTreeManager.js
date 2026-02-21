@@ -95,9 +95,10 @@ class RealisticTreeManager {
    * @param {number} cz - 区块 Z 坐标
    * @param {THREE.Group} chunkGroup - 区块组对象
    * @param {Set} chunkSolidBlocks - 区块碰撞集合
+   * @param {Map} instanceIndexMap - 实例索引映射（用于移除方块时查找）
    * @returns {Object|null} 包含树干和树叶 InstancedMesh 的对象
    */
-  createInstancedTreesForChunk(cx, cz, chunkGroup, chunkSolidBlocks = null) {
+  createInstancedTreesForChunk(cx, cz, chunkGroup, chunkSolidBlocks = null, instanceIndexMap = null) {
     const treeData = this.getChunkTreeData(cx, cz);
     if (!treeData || treeData.length === 0) {
       return null;
@@ -106,6 +107,12 @@ class RealisticTreeManager {
     const trunkMat = materials.getMaterial('realistic_trunk_procedural');
     const leavesMat = materials.getMaterial('realistic_oak_leaves');
     const dummy = new THREE.Object3D();
+
+    // 初始化实例索引映射
+    if (instanceIndexMap) {
+      instanceIndexMap['realistic_trunk'] = new Map();
+      instanceIndexMap['realistic_leaves'] = new Map();
+    }
 
     // 为每个模板创建实例化网格
     for (let tIdx = 0; tIdx < this.templates.length; tIdx++) {
@@ -131,6 +138,12 @@ class RealisticTreeManager {
         dummy.scale.copy(template.trunk.scale);
         dummy.updateMatrix();
         trunkMesh.setMatrixAt(i, dummy.matrix);
+
+        // 记录树干底部位置到索引映射（用于移除时查找）
+        if (instanceIndexMap && instanceIndexMap['realistic_trunk']) {
+          const posKey = `${Math.floor(tree.x)},${Math.floor(tree.y)},${Math.floor(tree.z)}`;
+          instanceIndexMap['realistic_trunk'].set(posKey, i);
+        }
       });
       trunkMesh.instanceMatrix.needsUpdate = true;
       chunkGroup.add(trunkMesh);
@@ -151,6 +164,12 @@ class RealisticTreeManager {
         dummy.scale.copy(template.leaves.scale);
         dummy.updateMatrix();
         leavesMesh.setMatrixAt(i, dummy.matrix);
+
+        // 记录树叶位置到索引映射（用于移除时查找）
+        if (instanceIndexMap && instanceIndexMap['realistic_leaves']) {
+          const posKey = `${Math.floor(tree.x)},${Math.floor(tree.y)},${Math.floor(tree.z)}`;
+          instanceIndexMap['realistic_leaves'].set(posKey, i);
+        }
       });
       leavesMesh.instanceMatrix.needsUpdate = true;
       chunkGroup.add(leavesMesh);

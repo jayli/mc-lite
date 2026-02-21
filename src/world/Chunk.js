@@ -345,10 +345,14 @@ export class Chunk {
         }
       });
 
-      // 移除旧的 InstancedMesh (保留实体)
+      // 移除旧的 InstancedMesh (保留实体和树木)
       for (let i = this.group.children.length - 1; i >= 0; i--) {
         const child = this.group.children[i];
         if (child.isInstancedMesh) {
+          // 保留树木的 InstancedMesh
+          if (child.userData.type === 'realistic_trunk' || child.userData.type === 'realistic_leaves') {
+            continue; // 跳过树木
+          }
           // 这里不 dispose 材质，因为材质是共享的，只清理几何体（如果是克隆的）
           if (child.geometry && child.geometry !== geomMap[child.userData.type] && child.geometry !== geomMap['default']) {
              child.geometry.dispose();
@@ -357,7 +361,7 @@ export class Chunk {
         }
       }
 
-      // 3. 构建新的渲染网格 (跳过实体，因为实体已存在)
+      // 3. 构建新的渲染网格 (跳过实体和树木，因为已存在)
       this.buildMeshes(d);
 
       // --- 关键：还原宝箱状态 ---
@@ -594,7 +598,10 @@ export class Chunk {
       }
 
     // 为每个实例设置位置矩阵
-    this.instanceIndexMap[type] = new Map();
+    // 跳过树木类型，因为树木的 instanceIndexMap 已经在 createInstancedTreesForChunk 中设置
+    if (type !== 'realistic_trunk' && type !== 'realistic_leaves') {
+      this.instanceIndexMap[type] = new Map();
+    }
     d[type].forEach((pos, i) => {
       // 核心偏移：将模型中心对齐到方块中心 (增加 0.5 偏移)
       dummy.position.set(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
@@ -784,6 +791,35 @@ export class Chunk {
             }
           });
           continue;
+        }
+      }
+
+      // --- 处理 RealisticTree 实例化树木移除逻辑 ---
+      // 当移除 realistic_trunk_collider 时，需要隐藏对应的 InstancedMesh 实例
+      if (type === 'air' && oldType === 'realistic_trunk_collider') {
+        // 查找 realistic_trunk InstancedMesh
+        const trunkMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'realistic_trunk');
+        if (trunkMesh && this.instanceIndexMap['realistic_trunk']) {
+          const posKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+          const idx = this.instanceIndexMap['realistic_trunk'].get(posKey);
+          if (idx !== undefined) {
+            const dummy = new THREE.Matrix4();
+            dummy.makeScale(0, 0, 0);
+            trunkMesh.setMatrixAt(idx, dummy);
+            trunkMesh.instanceMatrix.needsUpdate = true;
+          }
+        }
+        // 同时查找并隐藏树叶实例
+        const leavesMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'realistic_leaves');
+        if (leavesMesh && this.instanceIndexMap['realistic_leaves']) {
+          const posKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+          const idx = this.instanceIndexMap['realistic_leaves'].get(posKey);
+          if (idx !== undefined) {
+            const dummy = new THREE.Matrix4();
+            dummy.makeScale(0, 0, 0);
+            leavesMesh.setMatrixAt(idx, dummy);
+            leavesMesh.instanceMatrix.needsUpdate = true;
+          }
         }
       }
 
