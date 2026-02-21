@@ -155,9 +155,9 @@ export class ParticleSystem {
   }
 
   /**
-   * 触发挖掘粒子
+   * 触发击中特效（机枪击中方块时）
    */
-  spawnDigEffect(pos) {
+  spawnHitEffect(pos) {
     const item = this.digBillboards.find(b => !b.active);
     if (item) {
       item.active = true;

@@ -123,11 +123,11 @@ export class World {
   }
 
   /**
-   * 生成挖掘粒子效果 (转发至 ParticleSystem)
+   * 生成击中粒子效果 (转发至 ParticleSystem)
    * @param {THREE.Vector3} pos - 粒子生成位置
    */
   spawnParticles(pos) {
-    this.particles.spawnDigEffect(pos);
+    this.particles.spawnHitEffect(pos);
   }
 
   /**
