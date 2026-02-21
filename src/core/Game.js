@@ -171,7 +171,7 @@ export class Game {
     this.player.inventory.add('chest', 1500);
     this.player.inventory.add('handrail', 1500);
     this.player.inventory.add('handrailA', 1500);
-    this.player.inventory.add('handrailB', 1500);
+    // this.player.inventory.add('handrailB', 1500); // 增加了方块旋转，handrailB 就不需要了
     this.player.inventory.add('pillar', 1500);
     // this.player.inventory.add('cloud', 1500);
 
