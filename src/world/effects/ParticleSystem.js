@@ -53,7 +53,17 @@ export class ParticleSystem {
    * 初始化特效对象池
    */
   initEffectPool(path, tilesX, tilesY, maxLife, count, pool, useAdditive) {
-    const texture = this.textureLoader.load(path);
+    const texture = this.textureLoader.load(path, () => {
+      // 纹理加载完成后计算单帧的宽高比
+      const imageAspect = texture.image.width / texture.image.height;
+      const frameAspect = (imageAspect * tilesY) / tilesX; // 单帧的宽高比
+      // 更新池中所有对象的 Sprite 缩放
+      pool.forEach(item => {
+        item.sprite.scale.set(frameAspect, 1, 1);
+        item.sprite.userData.baseScaleX = frameAspect;
+        item.sprite.userData.baseScaleY = 1;
+      });
+    });
     texture.magFilter = THREE.NearestFilter;
     texture.minFilter = THREE.NearestFilter;
     texture.repeat.set(1 / tilesX, 1 / tilesY);
@@ -72,6 +82,8 @@ export class ParticleSystem {
 
       const sprite = new THREE.Sprite(material);
       sprite.visible = false;
+      sprite.userData.baseScaleX = 1; // 占位，等待纹理加载完成更新
+      sprite.userData.baseScaleY = 1;
       this.scene.add(sprite);
 
       pool.push({
@@ -93,24 +105,24 @@ export class ParticleSystem {
   update(dt) {
     this._updatePool(this.digBillboards, dt, (progress, sprite) => {
       // 挖掘特效特有动画：爆开并缩小
-      const scale = 1.0 + progress * 2.0;
-      sprite.scale.set(scale, scale, 1);
+      const scale = sprite.userData.baseScaleX * (1.0 + progress * 2.0);
+      sprite.scale.set(scale, sprite.userData.baseScaleY * scale / sprite.userData.baseScaleX, 1);
       sprite.material.opacity = 1.0 - progress;
     });
 
     this._updatePool(this.explosionBillboards, dt, (progress, sprite) => {
       // 爆炸特效特有动画：快速扩张并淡出
-      const scale = 3.0 + progress * 5.0;
-      sprite.scale.set(scale, scale, 1);
+      const scale = sprite.userData.baseScaleX * (3.0 + progress * 5.0);
+      sprite.scale.set(scale, sprite.userData.baseScaleY * scale / sprite.userData.baseScaleX, 1);
       // 前 80% 保持亮，最后 20% 消失
       sprite.material.opacity = progress < 0.8 ? 1.0 : 1.0 - (progress - 0.8) / 0.2;
     });
 
     this._updatePool(this.blockCrashBillboards, dt, (progress, sprite) => {
-      // 破坏方块特效特有动画：扩张并淡出
-      const scale = 1.5 + progress * 1.5;
-      sprite.scale.set(scale, scale, 1);
-      sprite.material.opacity = 1.0 - progress;
+      // 破坏方块特效特有动画：扩张并淡出（放大 1.5 倍）
+      const scale = sprite.userData.baseScaleX * 1.5 * (1.0 + progress * 0.5);
+      sprite.scale.set(scale, sprite.userData.baseScaleY * scale / sprite.userData.baseScaleX, 1);
+      sprite.material.opacity = 1.0; // 保持不透明
     });
   }
 
@@ -134,7 +146,7 @@ export class ParticleSystem {
 
         const tex = item.sprite.material.map;
         tex.offset.x = col / item.tilesX;
-        tex.offset.y = 1.0 - (1.0 / item.tilesY) - (row / item.tilesY);
+        tex.offset.y = 1.0 - ((row + 1) / item.tilesY);
 
         // 自定义动画
         animCallback(progress, item.sprite);
@@ -152,7 +164,7 @@ export class ParticleSystem {
       item.timer = 0;
       item.sprite.position.copy(pos);
       item.sprite.visible = true;
-      item.sprite.scale.set(1, 1, 1);
+      item.sprite.scale.set(item.sprite.userData.baseScaleX, item.sprite.userData.baseScaleY, 1);
       item.sprite.material.opacity = 1;
     }
   }
@@ -167,7 +179,7 @@ export class ParticleSystem {
       item.timer = 0;
       item.sprite.position.copy(pos);
       item.sprite.visible = true;
-      item.sprite.scale.set(3, 3, 1);
+      item.sprite.scale.set(3 * item.sprite.userData.baseScaleX, 3 * item.sprite.userData.baseScaleY, 1);
       item.sprite.material.opacity = 1;
       item.sprite.material.rotation = Math.random() * Math.PI;
     }
@@ -183,8 +195,9 @@ export class ParticleSystem {
       item.timer = 0;
       item.sprite.position.copy(pos);
       item.sprite.visible = true;
-      item.sprite.scale.set(1, 1, 1);
-      item.sprite.material.opacity = 1;
+      // 放大到原来的 1.5 倍
+      item.sprite.scale.set(item.sprite.userData.baseScaleX * 1.5, item.sprite.userData.baseScaleY * 1.5, 1);
+      item.sprite.material.opacity = 1; // 不透明
       item.sprite.material.rotation = Math.random() * Math.PI * 0.5 - Math.PI * 0.25; // 随机小角度旋转
     }
   }
