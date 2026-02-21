@@ -200,7 +200,7 @@ export class ParticleSystem {
       // 放大到原来的 1.5 倍
       item.sprite.scale.set(item.sprite.userData.baseScaleX * 1.5, item.sprite.userData.baseScaleY * 1.5, 1);
       item.sprite.material.opacity = 1; // 不透明
-      item.sprite.material.rotation = Math.random() * Math.PI * 0.5 - Math.PI * 0.25; // 随机小角度旋转
+      // item.sprite.material.rotation = Math.random() * Math.PI * 0.5 - Math.PI * 0.25; // 随机小角度旋转
     }
   }
 }
