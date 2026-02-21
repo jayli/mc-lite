@@ -1,6 +1,6 @@
 # Feature Specification: Block Orientation System
 
-**Feature Branch**: `001-block-orientation`
+**Feature Branch**: `014-block-orientation`
 **Created**: 2026-02-22
 **Status**: Draft
 **Input**: User description: "给每个方块增加水平面的朝向的方向，即前后左后的属性，当消除一个方块（比如handrailA）的时候，下次再放置同样的方块（即handrailA）时，方向顺时针旋转90度，也就是说，假设消除一个面朝东的方块时，再次放置这个方块，则这个方块面朝南，当消除这个面朝南的方块时，再放置这个方块时则面朝西，当消除这个面朝西的方块时，再放置这个方块时则面朝北，依次类推。所有可被放置的方块都支持这个东南西北朝向的属性。请注意，这只是一个功能性的新增，方块的朝向不应当影响性能，包括不影响 face calling 和 instancedMesh 以及 后台合并等操作，这些性能相关的动作跟新增的朝向不应当互相影响，而要很好的兼容。需要澄清的是，新的实现需要对旧的indexedDB的存档做兼容，要能读取旧的存档。"

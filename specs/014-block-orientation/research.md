@@ -1,7 +1,7 @@
 # Research: Block Orientation System
 
 **Date**: 2026-02-22
-**Feature**: 001-block-orientation
+**Feature**: 014-block-orientation
 
 ## 1. 现有数据结构分析
 

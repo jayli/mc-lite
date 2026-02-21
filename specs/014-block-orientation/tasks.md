@@ -1,6 +1,6 @@
 # Tasks: Block Orientation System
 
-**Input**: Design documents from `/specs/001-block-orientation/`
+**Input**: Design documents from `/specs/014-block-orientation/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/
 
 **Tests**: 未明确要求测试，本任务列表不包含测试任务。

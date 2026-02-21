@@ -1,7 +1,7 @@
 # Data Model: Block Orientation System
 
 **Date**: 2026-02-22
-**Feature**: 001-block-orientation
+**Feature**: 014-block-orientation
 
 ## 1. 枚举定义
 

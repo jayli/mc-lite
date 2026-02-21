@@ -1,7 +1,7 @@
 # Implementation Plan: Block Orientation System
 
-**Branch**: `001-block-orientation` | **Date**: 2026-02-22 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `/specs/001-block-orientation/spec.md`
+**Branch**: `014-block-orientation` | **Date**: 2026-02-22 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/014-block-orientation/spec.md`
 
 ## Summary
 
@@ -39,7 +39,7 @@
 ### Documentation (this feature)
 
 ```text
-specs/001-block-orientation/
+specs/014-block-orientation/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output
 ├── data-model.md        # Phase 1 output

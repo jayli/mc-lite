@@ -1,6 +1,6 @@
 # Quickstart: Block Orientation System
 
-**Feature**: 001-block-orientation
+**Feature**: 014-block-orientation
 **Date**: 2026-02-22
 
 ## 概述
