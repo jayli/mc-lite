@@ -851,7 +851,7 @@ export class Player {
             return;
           }
         }
-        this.removeBlock(hit);
+        this.removeBlock(hit, true);
         this.swing();
       } else {
         this.swing();
@@ -901,8 +901,9 @@ export class Player {
    * 移除方块
    * 挖掘指定位置的方块
    * @param {Object} hit - 点击命中信息
+   * @param {boolean} isHandBreak - 是否是徒手破坏（用于播放不同特效）
    */
-  removeBlock(hit) {
+  removeBlock(hit, isHandBreak = false) {
     let m = hit.object;
     while (m && !m.userData.isEntity && !m.userData.type && m.parent && !m.isInstancedMesh && m.type !== 'Scene') m = m.parent;
     const type = m.userData.type || 'unknown';
@@ -913,7 +914,12 @@ export class Player {
       this._dummyMatrix.scale(this._zeroVector);
       m.setMatrixAt(hit.instanceId, this._dummyMatrix);
       m.instanceMatrix.needsUpdate = true;
-      this.spawnParticles(this._tempVector, type);
+      // 徒手破坏时使用新的破碎特效，否则使用原有粒子特效
+      if (isHandBreak) {
+        this.world.spawnBlockCrashParticles(this._tempVector);
+      } else {
+        this.spawnParticles(this._tempVector, type);
+      }
       this.world.removeBlock(Math.floor(this._tempVector.x), Math.floor(this._tempVector.y), Math.floor(this._tempVector.z));
       audioManager.playSound('delete_get', 0.3);
       if (type !== 'water' && type !== 'cloud') this.inventory.add(type === 'grass' ? 'dirt' : type, 1);
@@ -921,7 +927,12 @@ export class Player {
       if (m.userData.isEntity) {
         if (m.userData.collisionBlocks) m.userData.collisionBlocks.forEach(p => this.world.removeBlockCollider(p.x, p.y, p.z));
         if (m.parent) m.parent.remove(m);
-        this.spawnParticles(m.position, type || 'stone');
+        // 徒手破坏时使用新的破碎特效，否则使用原有粒子特效
+        if (isHandBreak) {
+          this.world.spawnBlockCrashParticles(m.position);
+        } else {
+          this.spawnParticles(m.position, type || 'stone');
+        }
         if (type === 'chest') {
           this.world.removeBlock(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z));
           this.inventory.add('chest', 1);
@@ -931,7 +942,12 @@ export class Player {
         const bx = Math.floor(m.position.x), by = Math.floor(m.position.y), bz = Math.floor(m.position.z);
         this.world.removeBlock(bx, by, bz);
         audioManager.playSound('delete_get', 0.3);
-        this.spawnParticles(m.position, type);
+        // 徒手破坏时使用新的破碎特效，否则使用原有粒子特效
+        if (isHandBreak) {
+          this.world.spawnBlockCrashParticles(m.position);
+        } else {
+          this.spawnParticles(m.position, type);
+        }
         if (m.parent) m.parent.remove(m);
         if (type === 'realistic_trunk') this.inventory.add('wood', 1);
         else if (type === 'realistic_leaves') { if (Math.random() < 0.8) this.inventory.add('leaves', 1); }

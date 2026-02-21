@@ -35,6 +35,18 @@ export class ParticleSystem {
       this.explosionBillboards,
       true  // 使用 AdditiveBlending 增强发光感
     );
+
+    // --- 破坏方块特效配置 (Block Crash) ---
+    this.MAX_BLOCK_CRASH_BILLBOARDS = 15;
+    this.blockCrashBillboards = [];
+    this.initEffectPool(
+      'src/assets/gif/block_crash.png',
+      5, 3, // 5x3 布局，一行 5 张图，一共 3 行
+      0.5,   // 持续 0.5s
+      this.MAX_BLOCK_CRASH_BILLBOARDS,
+      this.blockCrashBillboards,
+      false // 不使用 AdditiveBlending
+    );
   }
 
   /**
@@ -92,6 +104,13 @@ export class ParticleSystem {
       sprite.scale.set(scale, scale, 1);
       // 前 80% 保持亮，最后 20% 消失
       sprite.material.opacity = progress < 0.8 ? 1.0 : 1.0 - (progress - 0.8) / 0.2;
+    });
+
+    this._updatePool(this.blockCrashBillboards, dt, (progress, sprite) => {
+      // 破坏方块特效特有动画：扩张并淡出
+      const scale = 1.5 + progress * 1.5;
+      sprite.scale.set(scale, scale, 1);
+      sprite.material.opacity = 1.0 - progress;
     });
   }
 
@@ -151,6 +170,22 @@ export class ParticleSystem {
       item.sprite.scale.set(3, 3, 1);
       item.sprite.material.opacity = 1;
       item.sprite.material.rotation = Math.random() * Math.PI;
+    }
+  }
+
+  /**
+   * 触发破坏方块效果（徒手破坏专用）
+   */
+  spawnBlockCrashEffect(pos) {
+    const item = this.blockCrashBillboards.find(b => !b.active);
+    if (item) {
+      item.active = true;
+      item.timer = 0;
+      item.sprite.position.copy(pos);
+      item.sprite.visible = true;
+      item.sprite.scale.set(1, 1, 1);
+      item.sprite.material.opacity = 1;
+      item.sprite.material.rotation = Math.random() * Math.PI * 0.5 - Math.PI * 0.25; // 随机小角度旋转
     }
   }
 }

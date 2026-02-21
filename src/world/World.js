@@ -153,6 +153,14 @@ export class World {
   }
 
   /**
+   * 生成破坏方块粒子效果（徒手破坏专用，转发至 ParticleSystem）
+   * @param {THREE.Vector3} pos - 粒子生成位置
+   */
+  spawnBlockCrashParticles(pos) {
+    this.particles.spawnBlockCrashEffect(pos);
+  }
+
+  /**
    * 批量移除指定位置的方块（用于爆炸或大规模编辑）
    * @param {Array<{x:number, y:number, z:number}>} positions - 待移除方块的世界坐标列表
    */
