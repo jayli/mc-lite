@@ -320,6 +320,35 @@ function mkMat(col, op=1) {
 }
 
 /**
+ * 创建带有程序化斑点纹理的材质定义辅助函数
+ * @param {string} baseColor - 材质基础颜色（CSS 颜色字符串）
+ * @param {string} spotColor - 斑点颜色（CSS 颜色字符串）
+ * @param {number} spotSize - 斑点大小（像素，默认 2）
+ * @returns {Object} 材质定义对象
+ */
+function mkProceduralMat(baseColor, spotColor, spotSize=2) {
+  return {
+    color: baseColor,
+    textureGenerator: (ctx) => {
+      // 填充基础色背景
+      ctx.fillStyle = baseColor;
+      ctx.fillRect(0, 0, 64, 64);
+      // 添加随机斑点
+      const spotCount = Math.floor(100 / spotSize); // 斑点数量与大小成反比
+      for(let i = 0; i < spotCount; i++) {
+        ctx.fillStyle = spotColor;
+        ctx.fillRect(
+          Math.random() * 64,
+          Math.random() * 64,
+          spotSize,
+          spotSize
+        );
+      }
+    }
+  };
+}
+
+/**
  * 创建带有细节绘图的材质定义辅助函数
  * @param {string} baseCol - 基础背景颜色（CSS颜色字符串）
  * @param {string} detailCol - 细节绘图颜色（CSS颜色字符串）
@@ -605,16 +634,7 @@ materials.registerMaterial('lilypad', mkDetailMat(null, '#228B22', true, (ctx) =
   ctx.beginPath(); ctx.arc(32,32,28,0.3, Math.PI*1.8); ctx.fill(); // 圆心(32,32)，半径28，起始弧度0.3，结束弧度1.8π（制造缺口效果）
 }));
 
-materials.registerMaterial('realistic_trunk_procedural', {
-  color: '#5D4037', // 深棕色
-  textureGenerator: (ctx) => {
-    // 添加深绿色斑点
-    ctx.fillStyle = '#006400'; // 深绿色
-    for(let i = 0; i < 150; i++) {
-      ctx.fillRect(Math.random() * 64, Math.random() * 64, 2, 2);
-    }
-  }
-});
+materials.registerMaterial('realistic_trunk_procedural', mkProceduralMat('#5D4037', '#006400', 2)); // 深棕色树干带深绿色斑点
 
 // 新树木材质（使用预加载纹理）
 materials.registerMaterial('realistic_oak_leaves', {
@@ -645,9 +665,12 @@ materials.registerMaterial('allium', {
 });
 
 materials.registerMaterial('chimney', mkMat('#7f5b37')); // 深棕色烟囱
-materials.registerMaterial('handrail', mkMat('#b98e5b')); // 栏杆
-materials.registerMaterial('handrailA', mkMat('#b98e5b')); // 栏杆 A
-materials.registerMaterial('handrailB', mkMat('#b98e5b')); // 栏杆 B
+var handrailBaseColor = "#b98e5b";
+var handrailPotColor = "#8e6148";
+var handrailPotSize = 10;
+materials.registerMaterial('handrail', mkProceduralMat(handrailBaseColor, handrailPotColor, 4)); // 栏杆（带深灰色斑点）
+materials.registerMaterial('handrailA', mkProceduralMat(handrailBaseColor, handrailPotColor, handrailPotSize)); // 栏杆 A（带深灰色斑点）
+materials.registerMaterial('handrailB', mkProceduralMat(handrailBaseColor, handrailPotColor, handrailPotSize)); // 栏杆 B（带深灰色斑点）
 materials.registerMaterial('pillar', mkMat('#b98e5b')); // 柱子
 materials.registerMaterial('collider', { transparent: true, opacity: 0 }); // 碰撞体材质
 
