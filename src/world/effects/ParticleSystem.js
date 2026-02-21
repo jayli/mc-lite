@@ -156,8 +156,10 @@ export class ParticleSystem {
 
   /**
    * 触发击中特效（机枪击中方块时）
+   * @param {THREE.Vector3} pos - 粒子生成位置
+   * @param {string} type - 方块类型（可选）
    */
-  spawnHitEffect(pos) {
+  spawnHitEffect(pos, type) {
     const item = this.digBillboards.find(b => !b.active);
     if (item) {
       item.active = true;

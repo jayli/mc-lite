@@ -524,6 +524,9 @@ export class Player {
         }
 
         const props = getBlockProperties(blockType);
+        // 花和草可以被枪械摧毁
+        const isDestructiblePlant = blockType === 'flower' || blockType === 'short_grass' || blockType === 'allium';
+
         if (props.isSolid || blockType === 'cloud') {
           // Hit a solid block or cloud block (not TNT)
           finalHit = hit;
@@ -534,8 +537,11 @@ export class Player {
           }
           // If not canGunsDestroyBlocks, we just stop here (blocked)
           break;
+        } else if (isDestructiblePlant && canGunsDestroyBlocks) {
+          // 花和草可以被枪械摧毁，但射线继续穿透
+          this.removeBlock(hit);
         }
-        // If not solid and not cloud (e.g. grass, water), continue ray to find what's behind
+        // If not solid and not cloud and not destructible plant (e.g. water), continue ray to find what's behind
       } else {
         // Hit something else (chest, TNT, etc.)?
         // TNT and Chests are meshes but usually handled via removeBlock logic or specialized logic

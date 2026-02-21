@@ -125,9 +125,10 @@ export class World {
   /**
    * 生成击中粒子效果 (转发至 ParticleSystem)
    * @param {THREE.Vector3} pos - 粒子生成位置
+   * @param {string} type - 方块类型
    */
-  spawnParticles(pos) {
-    this.particles.spawnHitEffect(pos);
+  spawnParticles(pos, type) {
+    this.particles.spawnHitEffect(pos, type);
   }
 
   /**
