@@ -917,18 +917,6 @@ export class Player {
     if (m.isInstancedMesh) {
       m.getMatrixAt(hit.instanceId, this._dummyMatrix);
       this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
-      const treePos = new THREE.Vector3(
-        Math.floor(this._tempVector.x),
-        Math.floor(this._tempVector.y),
-        Math.floor(this._tempVector.z)
-      );
-
-      // 如果是树木，需要同时删除树干和树叶
-      if (type === 'realistic_trunk' || type === 'realistic_leaves') {
-        this._removeTree(treePos, isHandBreak);
-        return;
-      }
-
       this._dummyMatrix.scale(this._zeroVector);
       m.setMatrixAt(hit.instanceId, this._dummyMatrix);
       m.instanceMatrix.needsUpdate = true;
@@ -972,77 +960,6 @@ export class Player {
         else this.inventory.add(type, 1);
       }
     }
-  }
-
-  /**
-   * 移除整棵树（树干和树叶）
-   * @param {THREE.Vector3} treePos - 树的位置
-   * @param {boolean} isHandBreak - 是否是徒手破坏
-   */
-  _removeTree(treePos, isHandBreak) {
-    const chunk = this.world.getChunkAt(treePos.x, treePos.z);
-    if (!chunk) return;
-
-    // 查找树对应的 InstancedMesh 实例
-    const trunkMesh = chunk.group.children.find(c => c.isInstancedMesh && c.userData.type === 'realistic_trunk');
-    const leavesMesh = chunk.group.children.find(c => c.isInstancedMesh && c.userData.type === 'realistic_leaves');
-
-    if (!trunkMesh || !leavesMesh) return;
-
-    // 找到树干实例的索引
-    const dummy = new THREE.Matrix4();
-    const treeWorldPos = new THREE.Vector3();
-    let trunkIndex = -1;
-
-    for (let i = 0; i < trunkMesh.count; i++) {
-      trunkMesh.getMatrixAt(i, dummy);
-      dummy.decompose(treeWorldPos, this._dummyQuaternion, this._dummyScale);
-      if (Math.floor(treeWorldPos.x) === treePos.x &&
-          Math.floor(treeWorldPos.y) === treePos.y &&
-          Math.floor(treeWorldPos.z) === treePos.z) {
-        trunkIndex = i;
-        break;
-      }
-    }
-
-    if (trunkIndex === -1) return;
-
-    // 获取树干位置用于特效和掉落物
-    trunkMesh.getMatrixAt(trunkIndex, dummy);
-    dummy.decompose(treeWorldPos, this._dummyQuaternion, this._dummyScale);
-
-    // 隐藏树干实例
-    this._zeroVector.set(0, 0, 0);
-    dummy.makeScale(this._zeroVector.x, this._zeroVector.y, this._zeroVector.z);
-    trunkMesh.setMatrixAt(trunkIndex, dummy);
-    trunkMesh.instanceMatrix.needsUpdate = true;
-
-    // 隐藏对应的树叶实例
-    leavesMesh.getMatrixAt(trunkIndex, dummy);
-    dummy.decompose(treeWorldPos, this._dummyQuaternion, this._dummyScale);
-    dummy.makeScale(this._zeroVector.x, this._zeroVector.y, this._zeroVector.z);
-    leavesMesh.setMatrixAt(trunkIndex, dummy);
-    leavesMesh.instanceMatrix.needsUpdate = true;
-
-    // 播放特效
-    if (isHandBreak) {
-      this.world.spawnBlockCrashParticles(treeWorldPos);
-    } else {
-      this.spawnParticles(treeWorldPos, 'realistic_trunk');
-    }
-
-    // 从 blockData 和 solidBlocks 中移除
-    for (let i = 0; i < 10; i++) {
-      const key = `${treePos.x},${treePos.y + i},${treePos.z}`;
-      delete chunk.blockData[key];
-      chunk.solidBlocks.delete(key);
-    }
-
-    // 添加掉落物
-    this.inventory.add('wood', 1);
-    if (Math.random() < 0.8) this.inventory.add('leaves', 1);
-
-    audioManager.playSound('delete_get', 0.3);
   }
 
   /**
