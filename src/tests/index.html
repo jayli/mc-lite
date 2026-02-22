@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MC Lite - 游戏测试套件</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background-color: #1a1a2e;
+      color: #eee;
+      padding: 20px;
+      line-height: 1.6;
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #00d9ff;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 14px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    button.primary {
+      background-color: #00d9ff;
+      color: #1a1a2e;
+    }
+
+    button.primary:hover {
+      background-color: #00b8e6;
+    }
+
+    button.secondary {
+      background-color: #4a4a6a;
+      color: #eee;
+    }
+
+    button.secondary:hover {
+      background-color: #5a5a7a;
+    }
+
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .status-bar {
+      background-color: #2a2a4a;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: flex;
+      justify-content: space-around;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .status-item {
+      text-align: center;
+    }
+
+    .status-label {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .status-value {
+      font-size: 24px;
+      font-weight: bold;
+      margin-top: 5px;
+    }
+
+    .status-value.passed {
+      color: #22c55e;
+    }
+
+    .status-value.failed {
+      color: #ef4444;
+    }
+
+    #test-results {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .report-header {
+      margin-bottom: 20px;
+    }
+
+    .report-header h2 {
+      text-align: center;
+      margin-bottom: 15px;
+    }
+
+    .summary {
+      display: flex;
+      justify-content: space-around;
+      padding: 15px;
+      border-radius: 8px;
+      color: white;
+      font-weight: bold;
+    }
+
+    .test-suite {
+      background-color: #2a2a4a;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      overflow: hidden;
+    }
+
+    .suite-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 15px;
+      background-color: #3a3a5a;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .suite-header:hover {
+      background-color: #4a4a6a;
+    }
+
+    .suite-name {
+      font-weight: bold;
+      font-size: 16px;
+    }
+
+    .suite-stats {
+      font-size: 12px;
+      color: #888;
+    }
+
+    .test-list {
+      list-style: none;
+      padding: 0;
+    }
+
+    .test-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 15px;
+      border-bottom: 1px solid #3a3a5a;
+      gap: 10px;
+    }
+
+    .test-item:last-child {
+      border-bottom: none;
+    }
+
+    .test-item.test-passed {
+      background-color: rgba(34, 197, 94, 0.1);
+    }
+
+    .test-item.test-failed {
+      background-color: rgba(239, 68, 68, 0.1);
+    }
+
+    .status-icon {
+      font-size: 18px;
+      font-weight: bold;
+      width: 24px;
+      text-align: center;
+    }
+
+    .test-passed .status-icon {
+      color: #22c55e;
+    }
+
+    .test-failed .status-icon {
+      color: #ef4444;
+    }
+
+    .test-name {
+      flex: 1;
+      font-size: 14px;
+    }
+
+    .test-duration {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .test-error {
+      width: 100%;
+      margin-top: 8px;
+      padding: 8px;
+      background-color: rgba(0, 0, 0, 0.3);
+      border-radius: 4px;
+      font-size: 12px;
+      color: #fca5a5;
+      font-family: 'Courier New', monospace;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    .collapsible {
+      max-height: 500px;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+
+    .collapsible.collapsed {
+      max-height: 0;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 40px;
+      color: #888;
+    }
+
+    .loading::after {
+      content: '...';
+      animation: dots 1.5s infinite;
+    }
+
+    @keyframes dots {
+      0%, 20% { content: '.'; }
+      40% { content: '..'; }
+      60%, 100% { content: '...'; }
+    }
+
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 14px;
+    }
+
+    .checkbox-group input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+    }
+  </style>
+</head>
+<body>
+  <h1>MC Lite - 游戏测试套件</h1>
+
+  <div class="controls">
+    <button id="run-all-btn" class="primary" onclick="runAllTests()">运行所有测试</button>
+    <button id="clear-btn" class="secondary" onclick="clearResults()">清除结果</button>
+    <div class="checkbox-group">
+      <input type="checkbox" id="auto-scroll" checked>
+      <label for="auto-scroll">自动滚动到失败测试</label>
+    </div>
+  </div>
+
+  <div class="status-bar" id="status-bar" style="display: none;">
+    <div class="status-item">
+      <div class="status-label">总测试数</div>
+      <div class="status-value" id="total-count">0</div>
+    </div>
+    <div class="status-item">
+      <div class="status-label">通过</div>
+      <div class="status-value passed" id="passed-count">0</div>
+    </div>
+    <div class="status-item">
+      <div class="status-label">失败</div>
+      <div class="status-value failed" id="failed-count">0</div>
+    </div>
+    <div class="status-item">
+      <div class="status-label">通过率</div>
+      <div class="status-value" id="pass-rate">0%</div>
+    </div>
+    <div class="status-item">
+      <div class="status-label">耗时</div>
+      <div class="status-value" id="duration">0ms</div>
+    </div>
+  </div>
+
+  <div id="test-results">
+    <div class="loading">点击"运行所有测试"开始</div>
+  </div>
+
+  <script type="module">
+    import { runAllTests, displayResults, resetTestResults, getSuiteCount } from './runner.js';
+    import './test-orientation.js';
+    import './test-block-data.js';
+    import './test-face-culling.js';
+    import './test-persistence.js';
+    import './test-chunk.js';
+    import './test-world.js';
+
+    // 暴露函数到全局 scope
+    window.runAllTests = async function() {
+      const btn = document.getElementById('run-all-btn');
+      const statusBar = document.getElementById('status-bar');
+
+      btn.disabled = true;
+      btn.textContent = '运行中...';
+      statusBar.style.display = 'none';
+
+      // 重置结果
+      resetTestResults();
+
+      // 运行测试
+      const results = await runAllTests();
+
+      // 显示结果
+      displayResults(results);
+
+      // 更新状态栏
+      statusBar.style.display = 'flex';
+      document.getElementById('total-count').textContent = results.total;
+      document.getElementById('passed-count').textContent = results.passed;
+      document.getElementById('failed-count').textContent = results.failed;
+      document.getElementById('pass-rate').textContent = `${results.passRate}%`;
+      document.getElementById('duration').textContent = `${results.duration.toFixed(2)}ms`;
+
+      // 滚动到失败测试
+      const autoScroll = document.getElementById('auto-scroll').checked;
+      if (autoScroll && results.failed > 0) {
+        setTimeout(() => {
+          const firstFailed = document.querySelector('.test-failed');
+          if (firstFailed) {
+            firstFailed.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 100);
+      }
+
+      btn.disabled = false;
+      btn.textContent = '运行所有测试';
+    };
+
+    window.clearResults = function() {
+      resetTestResults();
+      document.getElementById('test-results').innerHTML = '<div class="loading">点击"运行所有测试"开始</div>';
+      document.getElementById('status-bar').style.display = 'none';
+    };
+  </script>
+</body>
+</html>
