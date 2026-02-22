@@ -101,8 +101,8 @@ export class Player {
     // 追踪引燃中的 TNT
     this.ignitingTNTs = new Set();
 
-    // 放置记忆 - 存储每种方块类型上次移除时的朝向，用于计算下次放置时的朝向
-    this.placementMemory = new Map();
+    // 放置记忆 - 存储上次移除方块的位置和朝向，用于判断是否在同一位置放置相同方块
+    this.lastRemovedBlock = null; // { x, y, z, type, orientation }
 
     // 持枪系统 (Refactored)
     this.weaponMode = WEAPON_TYPES.ARM; // 当前选择的武器模式 (0: 手臂, 1: 手枪, 2: MAG7, 3: 加特林)
@@ -901,8 +901,10 @@ export class Player {
   tryPlaceBlock(x, y, z, type) {
     if (this.physics.isSolid(x, y, z)) return false;
     if (this.position.x - 0.3 < x + 1 && this.position.x + 0.3 > x && this.position.y < y + 1 && this.position.y + 1.8 > y && this.position.z - 0.3 < z + 1 && this.position.z + 0.3 > z) return false;
-    // 获取下次放置的朝向（基于放置记忆）
-    const orientation = this.getNextPlacementOrientation(type);
+    // 获取放置朝向（只有在同一位置移除并放置相同方块时才旋转）
+    const orientation = this.getPlacementOrientation(x, y, z, type);
+    // 放置后清除移除记忆
+    this.clearRemovedBlock();
     this.world.setBlock(x, y, z, type, orientation);
     this.inventory.remove(type, 1);
     audioManager.playSound('put', 0.3);
@@ -910,27 +912,49 @@ export class Player {
   }
 
   /**
-   * 记录方块移除时的朝向到放置记忆
+   * 记录方块移除时的位置和朝向
+   * @param {number} x - 方块 X 坐标
+   * @param {number} y - 方块 Y 坐标
+   * @param {number} z - 方块 Z 坐标
    * @param {string} type - 方块类型
    * @param {number} orientation - 朝向 (0-3)
    */
-  recordPlacementMemory(type, orientation) {
-    if (type && type !== 'air' && type !== 'water' && type !== 'cloud') {
-      this.placementMemory.set(type, orientation);
-    }
+  recordRemovedBlock(x, y, z, type, orientation) {
+    this.lastRemovedBlock = { x, y, z, type, orientation };
   }
 
   /**
-   * 获取下次放置该类型方块的朝向（顺时针旋转90度）
-   * @param {string} type - 方块类型
-   * @returns {number} 下次放置的朝向 (0-3)
+   * 清除移除方块的记忆（在放置方块后或非同一位置放置时调用）
    */
-  getNextPlacementOrientation(type) {
-    const lastOrientation = this.placementMemory.get(type);
-    if (lastOrientation === undefined) {
+  clearRemovedBlock() {
+    this.lastRemovedBlock = null;
+  }
+
+  /**
+   * 获取放置方块的朝向
+   * 只有在同一位置移除方块后紧接着放置相同类型方块时，才顺时针旋转 90 度
+   * @param {number} x - 放置位置 X
+   * @param {number} y - 放置位置 Y
+   * @param {number} z - 放置位置 Z
+   * @param {string} type - 方块类型
+   * @returns {number} 放置的朝向 (0-3)
+   */
+  getPlacementOrientation(x, y, z, type) {
+    if (!this.lastRemovedBlock) {
       return 0; // 默认朝东
     }
-    return nextOrientation(lastOrientation);
+
+    // 检查是否在同一位置放置相同类型的方块
+    if (this.lastRemovedBlock.x === x &&
+        this.lastRemovedBlock.y === y &&
+        this.lastRemovedBlock.z === z &&
+        this.lastRemovedBlock.type === type) {
+      // 同一位置、相同类型，顺时针旋转 90 度
+      return nextOrientation(this.lastRemovedBlock.orientation);
+    }
+
+    // 其他情况：默认朝东
+    return 0;
   }
 
   /**
@@ -947,11 +971,11 @@ export class Player {
     if (m.isInstancedMesh) {
       m.getMatrixAt(hit.instanceId, this._dummyMatrix);
       this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
-      // 记录方块朝向到放置记忆
+      // 记录方块位置和朝向到放置记忆
       const bx = Math.floor(this._tempVector.x), by = Math.floor(this._tempVector.y), bz = Math.floor(this._tempVector.z);
       const entry = this.world.getBlockEntry(bx, by, bz);
       if (entry) {
-        this.recordPlacementMemory(entry.type, entry.orientation);
+        this.recordRemovedBlock(bx, by, bz, entry.type, entry.orientation);
       }
       this._dummyMatrix.scale(this._zeroVector);
       m.setMatrixAt(hit.instanceId, this._dummyMatrix);
@@ -982,10 +1006,10 @@ export class Player {
         }
       } else {
         const bx = Math.floor(m.position.x), by = Math.floor(m.position.y), bz = Math.floor(m.position.z);
-        // 记录方块朝向到放置记忆
+        // 记录方块位置和朝向到放置记忆
         const entry = this.world.getBlockEntry(bx, by, bz);
         if (entry) {
-          this.recordPlacementMemory(entry.type, entry.orientation);
+          this.recordRemovedBlock(bx, by, bz, entry.type, entry.orientation);
         }
         this.world.removeBlock(bx, by, bz);
         audioManager.playSound('delete_get', 0.3);
