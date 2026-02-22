@@ -42,6 +42,6 @@
 - 你的任何修改都不能自动提交代码，必须等待我的明确指令才提交代码，再次强调，你的任何修改都不能自动在未经我允许的情况下提交代码，必须等我的明确指令才能提交代码
 - 提交作者包含：`noreply@anthropic.com`、`lijing00333@163.com`
 
-## 代码验证
-
-- 仅给出提示访问http://localhost:8080/src/tests/index.html进行用例测试，点击`#run-all-btn`执行测试。注意，仅给出提示即可，不要主动执行验证的动作。
+## 测试用例
+- 测试用例目录`src/tests/`，用例执行入口`src/tests/index.html`
+- 完成代码修改后，仅给出提示访问 <http://localhost:8080/src/tests/index.html> 进行用例测试，点击`#run-all-btn`执行测试。注意，仅给出提示即可，不要主动执行验证的动作。
