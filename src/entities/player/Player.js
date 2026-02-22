@@ -104,6 +104,10 @@ export class Player {
     // 放置记忆 - 存储上次移除方块的位置和朝向，用于判断是否在同一位置放置相同方块
     this.lastRemovedBlock = null; // { x, y, z, type, orientation }
 
+    // 全局朝向记忆 - 按物品类型存储上次使用的朝向
+    // 当放置方块方向改变后，后续同类型方块都沿用该朝向
+    this.placementOrientationMemory = new Map(); // { 'handrail': 1, 'pillar': 2, ... }
+
     // 持枪系统 (Refactored)
     this.weaponMode = WEAPON_TYPES.ARM; // 当前选择的武器模式 (0: 手臂, 1: 手枪, 2: MAG7, 3: 加特林)
     this.weapon = null;                 // 当前处于激活状态的 Gun 实例
@@ -932,7 +936,8 @@ export class Player {
 
   /**
    * 获取放置方块的朝向
-   * 只有在同一位置移除方块后紧接着放置相同类型方块时，才顺时针旋转 90 度
+   * 使用全局朝向记忆：每种物品类型都记住上次使用的朝向
+   * 当在同一位置移除并重新放置相同方块时，顺时针旋转 90 度并更新记忆
    * @param {number} x - 放置位置 X
    * @param {number} y - 放置位置 Y
    * @param {number} z - 放置位置 Z
@@ -940,21 +945,32 @@ export class Player {
    * @returns {number} 放置的朝向 (0-3)
    */
   getPlacementOrientation(x, y, z, type) {
-    if (!this.lastRemovedBlock) {
-      return 0; // 默认朝东
-    }
-
-    // 检查是否在同一位置放置相同类型的方块
-    if (this.lastRemovedBlock.x === x &&
+    // 检查是否在同一位置放置相同类型的方块（用于旋转）
+    const isRebuildingSameBlock = this.lastRemovedBlock &&
+        this.lastRemovedBlock.x === x &&
         this.lastRemovedBlock.y === y &&
         this.lastRemovedBlock.z === z &&
-        this.lastRemovedBlock.type === type) {
+        this.lastRemovedBlock.type === type;
+
+    // 获取该物品类型上次记住的朝向
+    const lastOrientation = this.placementOrientationMemory.get(type);
+
+    let newOrientation;
+
+    if (isRebuildingSameBlock) {
       // 同一位置、相同类型，顺时针旋转 90 度
-      return nextOrientation(this.lastRemovedBlock.orientation);
+      newOrientation = nextOrientation(this.lastRemovedBlock.orientation);
+      // 更新记忆
+      this.placementOrientationMemory.set(type, newOrientation);
+    } else if (lastOrientation !== undefined) {
+      // 有记忆，沿用记忆的朝向
+      newOrientation = lastOrientation;
+    } else {
+      // 没有记忆，使用默认朝东
+      newOrientation = 0;
     }
 
-    // 其他情况：默认朝东
-    return 0;
+    return newOrientation;
   }
 
   /**
