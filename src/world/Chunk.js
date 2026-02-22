@@ -124,20 +124,20 @@ const geoCactus = (() => {
 const geoChimney = addVertexIdAttribute(new THREE.CylinderGeometry(0.15, 0.15, 2, 8));
 
 /**
- * 栏杆几何体 - 由中心柱子和四个方向的把手组成
+ * 栏杆几何体 - L 形状，由中心柱子和东/北方向的把手组成
  */
 const geoHandrail = (() => {
   const geoms = [];
-  // 中心柱子：宽0.5，高1.0
+  // 中心柱子：宽 0.5，高 1.0
   geoms.push(new THREE.BoxGeometry(0.5, 1, 0.5));
-  // 水平交叉把手 (X轴)
-  const barX = new THREE.BoxGeometry(1, 0.15, 0.15);
-  barX.translate(0, 0.35, 0); // 靠近顶部
-  geoms.push(barX);
-  // 水平交叉把手 (Z轴)
-  const barZ = new THREE.BoxGeometry(0.15, 0.15, 1);
-  barZ.translate(0, 0.35, 0); // 靠近顶部
-  geoms.push(barZ);
+  // 东方把手 (正 X 方向)：从中心向东延伸 0.5 单位
+  const barEast = new THREE.BoxGeometry(0.5, 0.15, 0.15);
+  barEast.translate(0.375, 0.35, 0); // 中心在 x=0.375 (0.25+0.125)
+  geoms.push(barEast);
+  // 北方把手 (正 Z 方向)：从中心向北延伸 0.5 单位
+  const barNorth = new THREE.BoxGeometry(0.15, 0.15, 0.5);
+  barNorth.translate(0, 0.35, 0.375); // 中心在 z=0.375 (0.25+0.125)
+  geoms.push(barNorth);
   return addVertexIdAttribute(BufferGeometryUtils.mergeGeometries(geoms));
 })();
 
