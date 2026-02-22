@@ -45,3 +45,32 @@
 ## 测试用例
 - 测试用例目录`src/tests/`，用例执行入口`src/tests/index.html`
 - 完成代码修改后，仅给出提示访问 <http://localhost:8080/src/tests/index.html> 进行用例测试，点击`#run-all-btn`执行测试。注意，仅给出提示即可，不要主动执行验证的动作。
+## 文件操作最佳实践
+
+### 读取文件
+- 使用 `Read` 工具读取文件内容
+- 如果读取失败或内容异常，先检查文件是否存在，再尝试重新读取
+
+### 修改文件
+1. **优先使用 `Edit` 工具** 进行小幅度修改
+2. **`Edit` 工具匹配失败时**：
+   - 不要重试相同的 `old_string`（会继续失败）
+   - 不要使用 `Write` 工具直接覆盖（会丢失文件内容）
+   - 使用 `Bash` + `node` 脚本或 `sed` 命令修改文件
+   - 示例：
+     ```bash
+     node << 'SCRIPT'
+     const fs = require('fs');
+     const path = 'path/to/file';
+     let content = fs.readFileSync(path, 'utf8');
+     content = content.replace('old_string', 'new_string');
+     fs.writeFileSync(path, content);
+     SCRIPT
+     ```
+3. **如果不慎清空文件**：立即使用 `git checkout HEAD -- <file>` 恢复
+
+### 新建文件
+- 使用 `Write` 工具创建新文件
+
+### 删除文件
+- 使用 `Bash` 命令 `rm <file>` 删除文件
