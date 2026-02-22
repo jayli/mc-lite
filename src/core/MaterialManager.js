@@ -508,6 +508,7 @@ materials.registerMaterial('birch_log', {
 }); // 桦木树干
 
 materials.registerMaterial('planks', { textureUrl: './src/assets/textures/planks_birch.png' }); // 木板
+materials.registerMaterial('planks_step', { textureUrl: './src/assets/textures/planks_birch.png' }); // 木台阶
 materials.registerMaterial('oak_planks', { textureUrl: './src/assets/textures/Oak_Planks.png' }); // 大橡木木板
 materials.registerMaterial('white_planks', { textureUrl: './src/assets/textures/White_Wood_Planks.png' }); // 白色木板
 materials.registerMaterial('glass_block', {

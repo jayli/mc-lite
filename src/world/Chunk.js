@@ -175,6 +175,23 @@ const geoPillar = (() => {
 })();
 
 /**
+ * 木台阶几何体 - 一个缺了右上角四分之一的立方体
+ * 从侧面看是一个 L 形，占据左下、右下、左上三个象限
+ */
+const geoPlanksStep = (() => {
+  const geoms = [];
+  // 底部整体：x: [-0.5, 0.5], y: [-0.5, 0], z: [-0.5, 0.5]
+  const bottom = new THREE.BoxGeometry(1, 0.5, 1);
+  bottom.translate(0, -0.25, 0);
+  geoms.push(bottom);
+  // 左上部分：x: [-0.5, 0], y: [0, 0.5], z: [-0.5, 0.5]
+  const topLeft = new THREE.BoxGeometry(0.5, 0.5, 1);
+  topLeft.translate(-0.25, 0.25, 0);
+  geoms.push(topLeft);
+  return addVertexIdAttribute(BufferGeometryUtils.mergeGeometries(geoms));
+})();
+
+/**
  * 几何体映射表 - 将方块类型映射到对应的几何体
  */
 const geomMap = {
@@ -189,6 +206,7 @@ const geomMap = {
   'handrailA': geoHandrailA,
   'handrailB': geoHandrailB,
   'pillar': geoPillar,
+  'planks_step': geoPlanksStep,
   'default': addVertexIdAttribute(new THREE.BoxGeometry(1, 1, 1))
 };
 

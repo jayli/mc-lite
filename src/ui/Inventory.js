@@ -113,6 +113,8 @@ export class InventoryUI {
         img.src = 'src/assets/textures/handrailB.png';
       } else if (slot.item === 'pillar') {
         img.src = 'src/assets/textures/pillar.png';
+      } else if (slot.item === 'planks_step') {
+        img.src = 'src/assets/textures/Oak_Planks_step.png';
       } else {
         img.src = HUD.generateIcon(slot.item);
       }

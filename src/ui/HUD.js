@@ -234,9 +234,22 @@ export class HUD {
       div.className = 'slot' + (i === selectedSlot ? ' selected' : '');
 
       if (!slot.isEmpty()) {
-        // 使用缓存生成的图标
+        // 使用缓存生成的图标（与 Inventory.js 共享逻辑）
         const img = document.createElement('img');
-        img.src = HUD.generateIcon(slot.item);
+        // 特定物品使用自定义图标
+        if (slot.item === 'handrail') {
+          img.src = 'src/assets/textures/handrail.png';
+        } else if (slot.item === 'handrailA') {
+          img.src = 'src/assets/textures/handrailA.png';
+        } else if (slot.item === 'handrailB') {
+          img.src = 'src/assets/textures/handrailB.png';
+        } else if (slot.item === 'pillar') {
+          img.src = 'src/assets/textures/pillar.png';
+        } else if (slot.item === 'planks_step') {
+          img.src = 'src/assets/textures/Oak_Planks_step.png';
+        } else {
+          img.src = HUD.generateIcon(slot.item);
+        }
 
         // 添加物品名称标签（仅在调试模式下显示）
         let nameLabel = null;
