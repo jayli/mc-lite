@@ -169,6 +169,12 @@ export const BLOCK_DATA = {
     isAOEnabled: false,
     geometryType: 'planks_step'
   },
+  'cobblestone_step': {
+    isSolid: true,
+    isTransparent: true,  // 不参与 face culling，相邻面都显示
+    isAOEnabled: false,
+    geometryType: 'cobblestone_step'
+  },
   'white_planks': { isAOEnabled: true },
   'oak_planks': { isAOEnabled: true },
   'gold_ore': { isAOEnabled: true },

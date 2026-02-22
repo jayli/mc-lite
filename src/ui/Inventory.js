@@ -1,12 +1,12 @@
 // src/ui/Inventory.js
 import { HUD } from './HUD.js';
+import { createItemIcon } from './ItemIconUtils.js';
 
 function isDisplayNone(elementId) {
   const element = document.getElementById(elementId);
   if (!element) {
-    return null; // 或者抛出错误
+    return null;
   }
-  // 获取计算后的样式
   const computedStyle = window.getComputedStyle(element);
   return computedStyle.display === 'none';
 }
@@ -31,8 +31,8 @@ export class InventoryUI {
 
   /**
    * 设置键盘事件监听
-   * - Z键：切换背包打开/关闭
-   * - 数字键1-5：选择快捷栏物品
+   * - Z 键：切换背包打开/关闭
+   * - 数字键 1-5：选择快捷栏物品
    */
   setupEvents() {
     window.addEventListener('keydown', (e) => {
@@ -57,7 +57,7 @@ export class InventoryUI {
         return;
       }
       if (e.code === 'KeyZ' || (e.code === 'Escape' && this.isOpen)) this.toggle();
-      // 快捷栏选择键（数字键1-5）
+      // 快捷栏选择键（数字键 1-5）
       if (['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'].includes(e.code)) {
         if (this.game.player) {
           this.game.player.inventory.selectedSlot = parseInt(e.code.replace('Digit', '')) - 1;
@@ -75,12 +75,12 @@ export class InventoryUI {
   toggle() {
     this.isOpen = !this.isOpen;
     if (this.isOpen) {
-      document.exitPointerLock(); // 解除指针锁定，允许鼠标操作UI
+      document.exitPointerLock();
       if (this.modalEl) this.modalEl.style.display = 'flex';
-      this.render(); // 渲染背包内容
+      this.render();
     } else {
       if (this.modalEl) this.modalEl.style.display = 'none';
-      document.body.requestPointerLock(); // 重新锁定指针，恢复游戏控制
+      document.body.requestPointerLock();
     }
   }
 
@@ -89,37 +89,21 @@ export class InventoryUI {
    * 显示所有非空的物品槽，允许点击选择物品
    */
   render() {
-    if (!this.isOpen || !this.gridEl || !this.game.player) return; // 检查背包是否打开且元素存在
+    if (!this.isOpen || !this.gridEl || !this.game.player) return;
 
     const inventory = this.game.player.inventory;
     this.gridEl.innerHTML = '';
 
     inventory.slots.forEach((slot, idx) => {
-      // 只渲染非空的物品槽
       if (slot.isEmpty()) return;
 
       const div = document.createElement('div');
       div.className = 'slot';
       if (idx === inventory.selectedSlot) div.style.borderColor = '#FFFF00';
 
-      // 使用缓存生成的图标（与HUD共享）
       const img = document.createElement('img');
-      // 特定物品使用自定义图标
-      if (slot.item === 'handrail') {
-        img.src = 'src/assets/textures/handrail.png';
-      } else if (slot.item === 'handrailA') {
-        img.src = 'src/assets/textures/handrailA.png';
-      } else if (slot.item === 'handrailB') {
-        img.src = 'src/assets/textures/handrailB.png';
-      } else if (slot.item === 'pillar') {
-        img.src = 'src/assets/textures/pillar.png';
-      } else if (slot.item === 'planks_step') {
-        img.src = 'src/assets/textures/Oak_Planks_step.png';
-      } else {
-        img.src = HUD.generateIcon(slot.item);
-      }
+      createItemIcon(img, slot.item, HUD.generateIcon.bind(HUD));
 
-      // 添加物品名称标签
       const nameLabel = document.createElement('div');
       nameLabel.className = 'item-name';
       nameLabel.innerText = slot.item;
@@ -128,11 +112,10 @@ export class InventoryUI {
       countSpan.className = 'count';
       countSpan.innerText = slot.count;
 
-      // 点击物品槽选择该物品
       div.onclick = (e) => {
         e.preventDefault();
         inventory.selectedSlot = idx;
-        this.render(); // 重新渲染以更新选中状态
+        this.render();
       };
 
       div.append(nameLabel, img, countSpan);

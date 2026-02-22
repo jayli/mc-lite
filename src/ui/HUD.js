@@ -1,5 +1,6 @@
 // src/ui/HUD.js
 import { materials } from '../core/MaterialManager.js';
+import { createItemIcon } from './ItemIconUtils.js';
 
 // 物品颜色配置表 - 用于UI渲染（颜色查找）
 // 在实际应用中，这些配置可能来自统一的物品管理器
@@ -236,20 +237,7 @@ export class HUD {
       if (!slot.isEmpty()) {
         // 使用缓存生成的图标（与 Inventory.js 共享逻辑）
         const img = document.createElement('img');
-        // 特定物品使用自定义图标
-        if (slot.item === 'handrail') {
-          img.src = 'src/assets/textures/handrail.png';
-        } else if (slot.item === 'handrailA') {
-          img.src = 'src/assets/textures/handrailA.png';
-        } else if (slot.item === 'handrailB') {
-          img.src = 'src/assets/textures/handrailB.png';
-        } else if (slot.item === 'pillar') {
-          img.src = 'src/assets/textures/pillar.png';
-        } else if (slot.item === 'planks_step') {
-          img.src = 'src/assets/textures/Oak_Planks_step.png';
-        } else {
-          img.src = HUD.generateIcon(slot.item);
-        }
+        createItemIcon(img, slot.item, HUD.generateIcon.bind(HUD));
 
         // 添加物品名称标签（仅在调试模式下显示）
         let nameLabel = null;

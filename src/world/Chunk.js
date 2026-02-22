@@ -192,6 +192,11 @@ const geoPlanksStep = (() => {
 })();
 
 /**
+ * 鹅卵石台阶几何体 - 与木台阶形状相同
+ */
+const geoCobblestoneStep = geoPlanksStep;
+
+/**
  * 几何体映射表 - 将方块类型映射到对应的几何体
  */
 const geomMap = {
@@ -207,6 +212,7 @@ const geomMap = {
   'handrailB': geoHandrailB,
   'pillar': geoPillar,
   'planks_step': geoPlanksStep,
+  'cobblestone_step': geoCobblestoneStep,
   'default': addVertexIdAttribute(new THREE.BoxGeometry(1, 1, 1))
 };
 
