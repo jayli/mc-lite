@@ -1,6 +1,6 @@
 # Feature Specification: 模型创造台 (Model Creator)
 
-**Feature Branch**: `001-model-creator`
+**Feature Branch**: `015-model-creator`
 **Created**: 2026-02-23
 **Status**: Ready for Planning
 **Input**: 新需求编号 015，将游戏中创造的模型（各种方块的组合）导出为 JSON 文件，作为原始模型参与世界地图构建

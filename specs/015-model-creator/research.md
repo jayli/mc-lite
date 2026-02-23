@@ -2,7 +2,7 @@
 
 **Feature**: 模型创造台 (Model Creator)
 **Date**: 2026-02-23
-**Branch**: `001-model-creator`
+**Branch**: `015-model-creator`
 
 ---
 

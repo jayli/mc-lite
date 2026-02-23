@@ -1,6 +1,6 @@
 # Implementation Plan: 模型创造台 (Model Creator)
 
-**Branch**: `001-model-creator` | **Date**: 2026-02-23 | **Spec**: [spec.md](./spec.md)
+**Branch**: `015-model-creator` | **Date**: 2026-02-23 | **Spec**: [spec.md](./spec.md)
 **Input**: 新需求编号 015 - 将游戏中创造的模型导出为 JSON 文件，作为原始模型参与世界地图构建
 
 ## Summary
@@ -37,7 +37,7 @@
 ### Documentation (this feature)
 
 ```text
-specs/001-model-creator/
+specs/015-model-creator/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output
 ├── data-model.md        # Phase 1 output

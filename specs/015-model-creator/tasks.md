@@ -1,6 +1,6 @@
 # Tasks: 模型创造台 (Model Creator)
 
-**Input**: Design documents from `/specs/001-model-creator/`
+**Input**: Design documents from `/specs/015-model-creator/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/
 
 **Tests**: Not included - manual testing per project convention (访问 localhost:8080/src/tests/index.html)

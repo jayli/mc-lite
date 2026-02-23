@@ -59,7 +59,7 @@ npm run start
 ## 文件位置
 
 ```
-specs/001-model-creator/
+specs/015-model-creator/
 ├── spec.md              # 功能规格说明书
 ├── plan.md              # 实现计划
 ├── research.md          # 技术调研
