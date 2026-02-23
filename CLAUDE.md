@@ -31,12 +31,15 @@
 - **爆炸效果**: `src/workers/ExplosionWorker.js`
 - **树木生成**: `src/world/entities/RealisticTreeManager.js`
 - **UI**: `src/ui/UIManager.js`、`src/ui/HUD.js`、`src/ui/Inventory.js`
+- **图标生成工具函数**: `src/utils/ItemIconUtils.js`
+- **方块面剔除工具函数**: `src/utils/FaceCullingUtils.js`
+- **方块方向工具函数**: `src/utils/OrientationUtils.js`
 
 ## 开发工作流
 1. **添加方块**: `BlockData.js` → `MaterialManager.js` → `Chunk.js`
 2. **添加敌人**: 实体类 → `EnemyWorker.js` → `EnemyManager.js`
 3. **调试物理**: 玩家 `Physics.js` / 敌人实体 `update()` 方法
-4. **性能监控**: 按 `P` 键显示/隐藏调试信息
+4. **性能监控**: 按 `P` 键显示/隐藏调试信息，`I` 键显示/隐藏提示信息。
 
 ## 代码提交
 - 任何情况你都不能自动提交代码，必须等待我的明确指令才提交代码，再次强调，你的任何修改都不能自动在未经我允许的情况下提交代码，必须等我的明确指令才能提交代码

@@ -1,6 +1,6 @@
 // src/ui/HUD.js
 import { materials } from '../core/MaterialManager.js';
-import { createItemIcon } from './ItemIconUtils.js';
+import { createItemIcon } from '../utils/ItemIconUtils.js';
 
 // 物品颜色配置表 - 用于UI渲染（颜色查找）
 // 在实际应用中，这些配置可能来自统一的物品管理器

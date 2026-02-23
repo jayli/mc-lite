@@ -1,6 +1,6 @@
 // src/ui/Inventory.js
 import { HUD } from './HUD.js';
-import { createItemIcon } from './ItemIconUtils.js';
+import { createItemIcon } from '../utils/ItemIconUtils.js';
 
 function isDisplayNone(elementId) {
   const element = document.getElementById(elementId);
