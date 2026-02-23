@@ -1061,10 +1061,12 @@ export class Chunk {
       const py = Math.floor(p.y);
       const pz = Math.floor(p.z);
       const key = `${px},${py},${pz}`;
-      const oldType = this.blockData[key];
+      const oldEntry = this.blockData[key];
 
-      if (oldType) {
-        affectedTypes.add(oldType);
+      if (oldEntry) {
+        // 解析方块类型，兼容新旧格式
+        const oldParsed = typeof oldEntry === 'string' ? { type: oldEntry, orientation: 0 } : parseBlockEntry(oldEntry);
+        affectedTypes.add(oldParsed.type); // 存储类型字符串，而不是完整对象
         // this.blockData[key] = 'air';
         delete this.blockData[key];
         this.visibleKeys.delete(key);
