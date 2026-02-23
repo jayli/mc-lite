@@ -70,19 +70,45 @@ export class PlaygroundService {
   }
 
   /**
-   * 查找指定位置的地表高度
+   * 查找指定位置的地表高度，确保上方有足够净空
    * @param {number} x - X 坐标
    * @param {number} z - Z 坐标
+   * @param {number} minClearance - 最小净空要求（默认 12 格，包含平台到上方 10 格）
    * @returns {number|null} 地表 Y 坐标或 null
    */
-  findGroundLevel(x, z) {
-    // 从高空向下射线检测，找到第一个实心方块
+  findGroundLevel(x, z, minClearance = 12) {
+    // 从高空向下射线检测，找到第一个实心方块，且上方有足够净空
     for (let y = 100; y >= 0; y--) {
       if (this.world && this.world.isSolid(x, y, z)) {
-        return y + 1; // 返回方块上方的空位
+        const groundY = y + 1; // 地面高度（方块上方）
+        // 检查上方是否有足够净空
+        if (this.hasClearanceAbove(x, groundY, z, minClearance)) {
+          return groundY;
+        }
       }
     }
     return null;
+  }
+
+  /**
+   * 检查指定位置上方是否有足够的净空高度
+   * @param {number} x - X 坐标（创造台中心）
+   * @param {number} y - Y 坐标（创造台平台高度）
+   * @param {number} z - Z 坐标（创造台中心）
+   * @param {number} requiredHeight - 需要的净空高度
+   * @returns {boolean} 是否有足够净空
+   */
+  hasClearanceAbove(x, y, z, requiredHeight = 12) {
+    if (!this.world) return false;
+
+    // 检查平台上方 requiredHeight 个方块高度内是否有障碍物
+    // 从 y+1 开始检查到 y+requiredHeight
+    for (let checkY = y + 1; checkY <= y + requiredHeight; checkY++) {
+      if (this.world.isSolid(x, checkY, z)) {
+        return false;
+      }
+    }
+    return true;
   }
 
   /**
@@ -105,16 +131,23 @@ export class PlaygroundService {
     const playerY = Math.floor(playerPos.y);
     const playerZ = Math.floor(playerPos.z);
 
+    // 需要的净空高度：平台上方 10 格 + 平台本身 1 格 = 11 格，额外增加 2 格余量
+    const requiredClearance = 12;
+
     // 尝试东侧（+X 方向）
     let originX = playerX + distance;
     let originZ = playerZ - this.playgroundSize / 2;
-    let originY = this.findGroundLevel(originX + this.playgroundSize / 2, originZ + this.playgroundSize / 2);
+    const centerX = originX + this.playgroundSize / 2;
+    const centerZ = originZ + this.playgroundSize / 2;
+    let originY = this.findGroundLevel(centerX, centerZ, requiredClearance);
 
     // 如果东侧找不到地面，尝试西侧（-X 方向）
     if (originY === null) {
       originX = playerX - distance;
       originZ = playerZ - this.playgroundSize / 2;
-      originY = this.findGroundLevel(originX + this.playgroundSize / 2, originZ + this.playgroundSize / 2);
+      const centerX = originX + this.playgroundSize / 2;
+      const centerZ = originZ + this.playgroundSize / 2;
+      originY = this.findGroundLevel(centerX, centerZ, requiredClearance);
     }
 
     // 如果还是找不到地面，使用玩家 Y 坐标向下搜索
