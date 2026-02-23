@@ -138,7 +138,8 @@ export class Physics {
       [this.player.position.x + halfW - 0.05, this.player.position.z + halfW - 0.05]
     ];
     for (const [cx, cz] of checkCoords) {
-      if (this.isSolid(cx, feetY, cz)) {
+      const blockType = this.world.getBlock(cx, feetY, cz);
+      if (this.isSolid(cx, feetY, cz) || blockType === 'cloud') {
         isSupported = true;
         break;
       }
