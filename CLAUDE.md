@@ -74,9 +74,3 @@
 ### 删除文件
 - 使用 `Bash` 命令 `rm <file>` 删除文件
 
-## Active Technologies
-- JavaScript (ES6 Modules) + Three.js (3D 渲染) (001-model-creator)
-- 浏览器下载 (Blob/URL 下载) (001-model-creator)
-
-## Recent Changes
-- 001-model-creator: Added JavaScript (ES6 Modules) + Three.js (3D 渲染)
