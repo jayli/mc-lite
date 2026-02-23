@@ -51,6 +51,345 @@ const BIRCH_TREE_DATA = {
   ]
 };
 
+// 坦克 JSON 数据（从 src/world/blockmods/tank.json 加载）
+const TANK_DATA = {
+  "blocks": [
+    { "x": -10, "y": 7, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -10, "y": 7, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -9, "y": 7, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -9, "y": 7, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -8, "y": 7, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -8, "y": 7, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -7, "y": 3, "z": -2, "type": "iron", "direction": 0 },
+    { "x": -7, "y": 4, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": -7, "y": 3, "z": -1, "type": "iron", "direction": 0 },
+    { "x": -7, "y": 4, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": -7, "y": 3, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -7, "y": 4, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -7, "y": 7, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -7, "y": 3, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -7, "y": 4, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -7, "y": 7, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -7, "y": 3, "z": 2, "type": "iron", "direction": 0 },
+    { "x": -7, "y": 4, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": -7, "y": 3, "z": 3, "type": "iron", "direction": 0 },
+    { "x": -7, "y": 4, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": -6, "y": 2, "z": -2, "type": "iron", "direction": 0 },
+    { "x": -6, "y": 4, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": -6, "y": 2, "z": -1, "type": "iron", "direction": 0 },
+    { "x": -6, "y": 4, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": -6, "y": 2, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -6, "y": 3, "z": 0, "type": "iron", "direction": 0 },
+    { "x": -6, "y": 4, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -6, "y": 7, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -6, "y": 2, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -6, "y": 3, "z": 1, "type": "iron", "direction": 0 },
+    { "x": -6, "y": 4, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -6, "y": 7, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -6, "y": 2, "z": 2, "type": "iron", "direction": 0 },
+    { "x": -6, "y": 4, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": -6, "y": 2, "z": 3, "type": "iron", "direction": 0 },
+    { "x": -6, "y": 4, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": -5, "y": 1, "z": -2, "type": "iron", "direction": 0 },
+    { "x": -5, "y": 3, "z": -2, "type": "cobblestone", "direction": 0 },
+    { "x": -5, "y": 4, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": -5, "y": 1, "z": -1, "type": "iron", "direction": 0 },
+    { "x": -5, "y": 3, "z": -1, "type": "cobblestone", "direction": 0 },
+    { "x": -5, "y": 4, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": -5, "y": 1, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -5, "y": 2, "z": 0, "type": "iron", "direction": 0 },
+    { "x": -5, "y": 3, "z": 0, "type": "iron", "direction": 0 },
+    { "x": -5, "y": 4, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -5, "y": 7, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -5, "y": 1, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -5, "y": 2, "z": 1, "type": "iron", "direction": 0 },
+    { "x": -5, "y": 3, "z": 1, "type": "iron", "direction": 0 },
+    { "x": -5, "y": 4, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -5, "y": 7, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -5, "y": 1, "z": 2, "type": "iron", "direction": 0 },
+    { "x": -5, "y": 3, "z": 2, "type": "cobblestone", "direction": 0 },
+    { "x": -5, "y": 4, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": -5, "y": 1, "z": 3, "type": "iron", "direction": 0 },
+    { "x": -5, "y": 3, "z": 3, "type": "cobblestone", "direction": 0 },
+    { "x": -5, "y": 4, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": -4, "y": 1, "z": -2, "type": "iron", "direction": 0 },
+    { "x": -4, "y": 2, "z": -2, "type": "cobblestone", "direction": 0 },
+    { "x": -4, "y": 4, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": -4, "y": 1, "z": -1, "type": "iron", "direction": 0 },
+    { "x": -4, "y": 2, "z": -1, "type": "cobblestone", "direction": 0 },
+    { "x": -4, "y": 4, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": -4, "y": 1, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -4, "y": 2, "z": 0, "type": "iron", "direction": 0 },
+    { "x": -4, "y": 3, "z": 0, "type": "iron", "direction": 0 },
+    { "x": -4, "y": 4, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -4, "y": 7, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -4, "y": 1, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -4, "y": 2, "z": 1, "type": "iron", "direction": 0 },
+    { "x": -4, "y": 3, "z": 1, "type": "iron", "direction": 0 },
+    { "x": -4, "y": 4, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -4, "y": 7, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -4, "y": 1, "z": 2, "type": "iron", "direction": 0 },
+    { "x": -4, "y": 2, "z": 2, "type": "cobblestone", "direction": 0 },
+    { "x": -4, "y": 4, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": -4, "y": 1, "z": 3, "type": "iron", "direction": 0 },
+    { "x": -4, "y": 2, "z": 3, "type": "cobblestone", "direction": 0 },
+    { "x": -4, "y": 4, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": -3, "y": 1, "z": -2, "type": "iron", "direction": 0 },
+    { "x": -3, "y": 3, "z": -2, "type": "cobblestone", "direction": 0 },
+    { "x": -3, "y": 4, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": -3, "y": 1, "z": -1, "type": "iron", "direction": 0 },
+    { "x": -3, "y": 3, "z": -1, "type": "cobblestone", "direction": 0 },
+    { "x": -3, "y": 4, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": -3, "y": 1, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -3, "y": 2, "z": 0, "type": "iron", "direction": 0 },
+    { "x": -3, "y": 3, "z": 0, "type": "iron", "direction": 0 },
+    { "x": -3, "y": 4, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -3, "y": 7, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -3, "y": 1, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -3, "y": 2, "z": 1, "type": "iron", "direction": 0 },
+    { "x": -3, "y": 3, "z": 1, "type": "iron", "direction": 0 },
+    { "x": -3, "y": 4, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -3, "y": 7, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -3, "y": 1, "z": 2, "type": "iron", "direction": 0 },
+    { "x": -3, "y": 3, "z": 2, "type": "cobblestone", "direction": 0 },
+    { "x": -3, "y": 4, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": -3, "y": 1, "z": 3, "type": "iron", "direction": 0 },
+    { "x": -3, "y": 3, "z": 3, "type": "cobblestone", "direction": 0 },
+    { "x": -3, "y": 4, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": -2, "y": 1, "z": -2, "type": "iron", "direction": 0 },
+    { "x": -2, "y": 2, "z": -2, "type": "cobblestone", "direction": 0 },
+    { "x": -2, "y": 4, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": -2, "y": 1, "z": -1, "type": "iron", "direction": 0 },
+    { "x": -2, "y": 2, "z": -1, "type": "cobblestone", "direction": 0 },
+    { "x": -2, "y": 4, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": -2, "y": 1, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -2, "y": 2, "z": 0, "type": "iron", "direction": 0 },
+    { "x": -2, "y": 3, "z": 0, "type": "iron", "direction": 0 },
+    { "x": -2, "y": 4, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -2, "y": 7, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -2, "y": 1, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -2, "y": 2, "z": 1, "type": "iron", "direction": 0 },
+    { "x": -2, "y": 3, "z": 1, "type": "iron", "direction": 0 },
+    { "x": -2, "y": 4, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -2, "y": 7, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -2, "y": 1, "z": 2, "type": "iron", "direction": 0 },
+    { "x": -2, "y": 2, "z": 2, "type": "cobblestone", "direction": 0 },
+    { "x": -2, "y": 4, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": -2, "y": 1, "z": 3, "type": "iron", "direction": 0 },
+    { "x": -2, "y": 2, "z": 3, "type": "cobblestone", "direction": 0 },
+    { "x": -2, "y": 4, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 1, "z": -2, "type": "iron", "direction": 0 },
+    { "x": -1, "y": 3, "z": -2, "type": "cobblestone", "direction": 0 },
+    { "x": -1, "y": 4, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 7, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 1, "z": -1, "type": "iron", "direction": 0 },
+    { "x": -1, "y": 3, "z": -1, "type": "cobblestone", "direction": 0 },
+    { "x": -1, "y": 4, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 6, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 7, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 8, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 1, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 2, "z": 0, "type": "iron", "direction": 0 },
+    { "x": -1, "y": 3, "z": 0, "type": "iron", "direction": 0 },
+    { "x": -1, "y": 4, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 6, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 7, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 8, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 1, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 2, "z": 1, "type": "iron", "direction": 0 },
+    { "x": -1, "y": 3, "z": 1, "type": "iron", "direction": 0 },
+    { "x": -1, "y": 4, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 6, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 7, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 8, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 1, "z": 2, "type": "iron", "direction": 0 },
+    { "x": -1, "y": 3, "z": 2, "type": "cobblestone", "direction": 0 },
+    { "x": -1, "y": 4, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 6, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 7, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 8, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": -1, "y": 1, "z": 3, "type": "iron", "direction": 0 },
+    { "x": -1, "y": 3, "z": 3, "type": "cobblestone", "direction": 0 },
+    { "x": -1, "y": 4, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 1, "z": -2, "type": "iron", "direction": 0 },
+    { "x": 0, "y": 2, "z": -2, "type": "cobblestone", "direction": 0 },
+    { "x": 0, "y": 4, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 6, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 7, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 8, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 1, "z": -1, "type": "iron", "direction": 0 },
+    { "x": 0, "y": 2, "z": -1, "type": "cobblestone", "direction": 0 },
+    { "x": 0, "y": 4, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 5, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 9, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 1, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 2, "z": 0, "type": "iron", "direction": 0 },
+    { "x": 0, "y": 3, "z": 0, "type": "iron", "direction": 0 },
+    { "x": 0, "y": 4, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 5, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 9, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 1, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 2, "z": 1, "type": "iron", "direction": 0 },
+    { "x": 0, "y": 3, "z": 1, "type": "iron", "direction": 0 },
+    { "x": 0, "y": 4, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 5, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 9, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 1, "z": 2, "type": "iron", "direction": 0 },
+    { "x": 0, "y": 2, "z": 2, "type": "cobblestone", "direction": 0 },
+    { "x": 0, "y": 4, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 5, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 9, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 1, "z": 3, "type": "iron", "direction": 0 },
+    { "x": 0, "y": 2, "z": 3, "type": "cobblestone", "direction": 0 },
+    { "x": 0, "y": 4, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 6, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 7, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 0, "y": 8, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 1, "z": -2, "type": "iron", "direction": 0 },
+    { "x": 1, "y": 3, "z": -2, "type": "cobblestone", "direction": 0 },
+    { "x": 1, "y": 4, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 6, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 7, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 8, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 1, "z": -1, "type": "iron", "direction": 0 },
+    { "x": 1, "y": 3, "z": -1, "type": "cobblestone", "direction": 0 },
+    { "x": 1, "y": 4, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 5, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 9, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 1, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 2, "z": 0, "type": "iron", "direction": 0 },
+    { "x": 1, "y": 3, "z": 0, "type": "iron", "direction": 0 },
+    { "x": 1, "y": 4, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 5, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 9, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 1, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 2, "z": 1, "type": "iron", "direction": 0 },
+    { "x": 1, "y": 3, "z": 1, "type": "iron", "direction": 0 },
+    { "x": 1, "y": 4, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 5, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 9, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 1, "z": 2, "type": "iron", "direction": 0 },
+    { "x": 1, "y": 3, "z": 2, "type": "cobblestone", "direction": 0 },
+    { "x": 1, "y": 4, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 5, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 9, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 1, "z": 3, "type": "iron", "direction": 0 },
+    { "x": 1, "y": 3, "z": 3, "type": "cobblestone", "direction": 0 },
+    { "x": 1, "y": 4, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 6, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 7, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 1, "y": 8, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 1, "z": -2, "type": "iron", "direction": 0 },
+    { "x": 2, "y": 2, "z": -2, "type": "cobblestone", "direction": 0 },
+    { "x": 2, "y": 4, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 6, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 7, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 8, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 1, "z": -1, "type": "iron", "direction": 0 },
+    { "x": 2, "y": 2, "z": -1, "type": "cobblestone", "direction": 0 },
+    { "x": 2, "y": 4, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 5, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 9, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 1, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 2, "z": 0, "type": "iron", "direction": 0 },
+    { "x": 2, "y": 3, "z": 0, "type": "iron", "direction": 0 },
+    { "x": 2, "y": 4, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 5, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 9, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 1, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 2, "z": 1, "type": "iron", "direction": 0 },
+    { "x": 2, "y": 3, "z": 1, "type": "iron", "direction": 0 },
+    { "x": 2, "y": 4, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 5, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 9, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 1, "z": 2, "type": "iron", "direction": 0 },
+    { "x": 2, "y": 2, "z": 2, "type": "cobblestone", "direction": 0 },
+    { "x": 2, "y": 4, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 5, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 9, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 1, "z": 3, "type": "iron", "direction": 0 },
+    { "x": 2, "y": 2, "z": 3, "type": "cobblestone", "direction": 0 },
+    { "x": 2, "y": 4, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 6, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 7, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 2, "y": 8, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 1, "z": -2, "type": "iron", "direction": 0 },
+    { "x": 3, "y": 3, "z": -2, "type": "cobblestone", "direction": 0 },
+    { "x": 3, "y": 4, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 6, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 7, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 8, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 1, "z": -1, "type": "iron", "direction": 0 },
+    { "x": 3, "y": 3, "z": -1, "type": "cobblestone", "direction": 0 },
+    { "x": 3, "y": 4, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 5, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 9, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 1, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 2, "z": 0, "type": "iron", "direction": 0 },
+    { "x": 3, "y": 3, "z": 0, "type": "iron", "direction": 0 },
+    { "x": 3, "y": 4, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 5, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 9, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 1, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 2, "z": 1, "type": "iron", "direction": 0 },
+    { "x": 3, "y": 3, "z": 1, "type": "iron", "direction": 0 },
+    { "x": 3, "y": 4, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 5, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 9, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 1, "z": 2, "type": "iron", "direction": 0 },
+    { "x": 3, "y": 3, "z": 2, "type": "cobblestone", "direction": 1 },
+    { "x": 3, "y": 4, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 5, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 9, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 1, "z": 3, "type": "iron", "direction": 0 },
+    { "x": 3, "y": 3, "z": 3, "type": "cobblestone", "direction": 2 },
+    { "x": 3, "y": 4, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 6, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 7, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 3, "y": 8, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 2, "z": -2, "type": "iron", "direction": 0 },
+    { "x": 4, "y": 4, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 7, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 2, "z": -1, "type": "iron", "direction": 0 },
+    { "x": 4, "y": 4, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 6, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 7, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 8, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 2, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 3, "z": 0, "type": "iron", "direction": 0 },
+    { "x": 4, "y": 4, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 6, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 7, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 8, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 2, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 3, "z": 1, "type": "iron", "direction": 0 },
+    { "x": 4, "y": 4, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 6, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 7, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 8, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 2, "z": 2, "type": "iron", "direction": 0 },
+    { "x": 4, "y": 4, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 6, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 7, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 8, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 2, "z": 3, "type": "iron", "direction": 0 },
+    { "x": 4, "y": 4, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 4, "y": 7, "z": 3, "type": "green_planks", "direction": 0 },
+    { "x": 5, "y": 3, "z": -2, "type": "iron", "direction": 0 },
+    { "x": 5, "y": 4, "z": -2, "type": "green_planks", "direction": 0 },
+    { "x": 5, "y": 3, "z": -1, "type": "iron", "direction": 0 },
+    { "x": 5, "y": 4, "z": -1, "type": "green_planks", "direction": 0 },
+    { "x": 5, "y": 3, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 5, "y": 4, "z": 0, "type": "green_planks", "direction": 0 },
+    { "x": 5, "y": 3, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 5, "y": 4, "z": 1, "type": "green_planks", "direction": 0 },
+    { "x": 5, "y": 3, "z": 2, "type": "iron", "direction": 0 },
+    { "x": 5, "y": 4, "z": 2, "type": "green_planks", "direction": 0 },
+    { "x": 5, "y": 3, "z": 3, "type": "iron", "direction": 0 },
+    { "x": 5, "y": 4, "z": 3, "type": "green_planks", "direction": 0 }
+  ]
+};
+
 /**
  * 解析方块数据条目，兼容新旧格式
  * @param {string|object} value - 存储值
@@ -63,7 +402,7 @@ function parseBlockEntry(value) {
   if (typeof value === 'object' && value !== null) {
     return {
       type: value.type || 'air',
-      orientation: value.orientation ?? 0
+      orientation: value.orientation ?? value.direction ?? 0
     };
   }
   return { type: 'air', orientation: 0 };
@@ -88,9 +427,9 @@ onmessage = function(e) {
 
   // 模拟 Chunk 类的 add 方法 - 改为写入 blockMap
   const fakeChunk = {
-    add: (x, y, z, type, dObj, solid = true) => {
+    add: (x, y, z, type, dObj, solid = true, orientation = 0) => {
       const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-      blockMap.set(key, { x, y, z, type, solid, orientation: 0 });
+      blockMap.set(key, { x, y, z, type, solid, orientation });
     }
   };
 
@@ -241,6 +580,11 @@ onmessage = function(e) {
             }
             if (Math.random() < 0.001 && safeForStructure) {
               structureQueue.push(() => generateStructure('house', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
+            }
+            // 在草地上生成坦克（低概率，确保不与其他物体重叠）
+            if (surf === 'grass' && !occupied && Math.random() < 0.0003 && safeForStructure) {
+              generateTank(wx, h + 1, wz, fakeChunk, dPlaceholder);
+              occupied = true;
             }
           }
         }
@@ -607,6 +951,83 @@ function generateBirchTree(x, y, z, chunk, dObj) {
 
   // 使用优化方法添加到区块
   addBirchTreeOptimized(chunk, blocks, dObj);
+}
+
+/**
+ * 计算坦克的最低点 Y 值（用于确定放置高度）
+ * @returns {number} 坦克底部 Y 偏移
+ */
+function getTankBottomY() {
+  let minY = Infinity;
+  for (const block of TANK_DATA.blocks) {
+    if (block.y < minY) minY = block.y;
+  }
+  return minY; // 返回坦克模型的最低点 Y 值（相对于坦克中心点）
+}
+
+/**
+ * 生成坦克（从 JSON 数据）
+ * @param {number} x - X 坐标（坦克中心点）
+ * @param {number} y - Y 坐标（地面高度）
+ * @param {number} z - Z 坐标（坦克中心点）
+ * @param {Object} chunk - 区块对象
+ * @param {Object} dObj - 数据收集对象
+ */
+function generateTank(x, y, z, chunk, dObj) {
+  const blocks = [];
+  const tankBottomY = getTankBottomY(); // 获取坦克最低点 Y 值
+
+  // 遍历 JSON 中的所有方块
+  for (const block of TANK_DATA.blocks) {
+    const worldX = x + block.x;
+    // 调整 Y 坐标，使坦克底部接触地面
+    // 坦克模型最低点为 tankBottomY，需要将其放置在地面 y 上
+    const worldY = y + (block.y - tankBottomY);
+    const worldZ = z + block.z;
+
+    blocks.push({
+      x: worldX,
+      y: worldY,
+      z: worldZ,
+      type: block.type,
+      solid: block.solid !== false,
+      orientation: block.direction ?? 0
+    });
+  }
+
+  // 添加到区块
+  addTankOptimized(chunk, blocks, dObj);
+}
+
+/**
+ * 收集并添加坦克方块
+ * @private
+ */
+function addTankOptimized(chunk, blocks, dObj) {
+  const blockMap = new Set();
+  blocks.forEach(b => blockMap.add(`${Math.floor(b.x)},${Math.floor(b.y)},${Math.floor(b.z)}`));
+
+  blocks.forEach(b => {
+    const props = getBlockProperties(b.type);
+    // 如果是透明方块（如某些特殊方块），进行遮挡剔除优化
+    if (props.isTransparent && b.type !== 'vine') {
+      // 检查 6 个相邻位置是否都在 blockMap 中
+      const neighbors = [
+        [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]
+      ];
+      const isSurrounded = neighbors.every(([dx, dy, dz]) =>
+        blockMap.has(`${Math.floor(b.x + dx)},${Math.floor(b.y + dy)},${Math.floor(b.z + dz)}`)
+      );
+
+      // 如果被完全包围，则认为不接触空气，跳过生成
+      if (!isSurrounded) {
+        chunk.add(b.x, b.y, b.z, b.type, dObj, b.solid !== false, b.orientation ?? 0);
+      }
+    } else {
+      // 非透明方块直接添加
+      chunk.add(b.x, b.y, b.z, b.type, dObj, b.solid !== false, b.orientation ?? 0);
+    }
+  });
 }
 
 /**
