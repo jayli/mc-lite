@@ -70,70 +70,132 @@ export class PlaygroundService {
   }
 
   /**
-   * 查找指定位置的地表高度
+   * 查找指定位置的地表高度，确保上方有足够净空
    * @param {number} x - X 坐标
    * @param {number} z - Z 坐标
+   * @param {number} minClearance - 最小净空要求（默认 12 格，包含平台到上方 10 格）
    * @returns {number|null} 地表 Y 坐标或 null
    */
-  findGroundLevel(x, z) {
-    // 从高空向下射线检测，找到第一个实心方块
+  findGroundLevel(x, z, minClearance = 12) {
+    // 从高空向下射线检测，找到第一个实心方块，且上方有足够净空
     for (let y = 100; y >= 0; y--) {
       if (this.world && this.world.isSolid(x, y, z)) {
-        return y + 1; // 返回方块上方的空位
+        const groundY = y + 1; // 地面高度（方块上方）
+        // 检查上方是否有足够净空
+        if (this.hasClearanceAbove(x, groundY, z, minClearance)) {
+          return groundY;
+        }
       }
     }
     return null;
   }
 
   /**
-   * 检查创造台上方指定高度内是否有干扰方块
-   * @param {number} originX - 创造台起始 X 坐标
-   * @param {number} originY - 创造台 Y 坐标
-   * @param {number} originZ - 创造台起始 Z 坐标
-   * @param {number} size - 创造台尺寸
-   * @param {number} checkHeight - 检查高度（默认 10 格）
-   * @returns {boolean} 是否有干扰方块
+   * 检查指定位置上方是否有足够的净空高度
+   * @param {number} x - X 坐标
+   * @param {number} y - Y 坐标
+   * @param {number} z - Z 坐标
+   * @param {number} requiredHeight - 需要的净空高度
+   * @returns {boolean} 是否有足够净空
    */
-  hasObstructionsAbove(originX, originY, originZ, size, checkHeight = 10) {
-    // 检查创造台区域内每个位置的上方空间
+  hasClearanceAbove(x, y, z, requiredHeight = 12) {
+    if (!this.world) return false;
+
+    // 检查平台上方 requiredHeight 个方块高度内是否有障碍物
+    for (let checkY = y + 1; checkY <= y + requiredHeight; checkY++) {
+      if (this.world.isSolid(x, checkY, z)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * 为创造台查找合适的地面高度，确保整个 40x40 区域上方有足够净空
+   * @param {number} originX - 创造台左下角 X 坐标
+   * @param {number} originZ - 创造台左下角 Z 坐标
+   * @param {number} size - 创造台尺寸
+   * @param {number} minClearance - 最小净空要求
+   * @returns {number|null} 地表 Y 坐标或 null
+   */
+  findGroundLevelForPlayground(originX, originZ, size, minClearance = 10) {
+    if (!this.world) return null;
+
+    // 从高空向下检测，找到适合整个 40x40 区域的地面高度
+    for (let y = 100; y >= 0; y--) {
+      // 检查整个区域是否都是实心方块（地面）
+      let isAllGround = true;
+      for (let dx = 0; dx < size && isAllGround; dx++) {
+        for (let dz = 0; dz < size && isAllGround; dz++) {
+          const x = Math.floor(originX + dx);
+          const z = Math.floor(originZ + dz);
+          if (!this.world.isSolid(x, y, z)) {
+            isAllGround = false;
+          }
+        }
+      }
+
+      if (isAllGround) {
+        const groundY = y + 1;
+        // 检查整个区域上方是否有足够净空
+        if (this.hasClearanceInArea(originX, groundY, originZ, size, minClearance)) {
+          return groundY;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * 检查 40x40 创造台区域上方是否有足够的净空
+   * @param {number} originX - 创造台左下角 X 坐标
+   * @param {number} originY - 创造台平台 Y 坐标
+   * @param {number} originZ - 创造台左下角 Z 坐标
+   * @param {number} size - 创造台尺寸
+   * @param {number} requiredHeight - 需要的净空高度
+   * @returns {boolean} 是否有足够净空
+   */
+  hasClearanceInArea(originX, originY, originZ, size, requiredHeight = 12) {
+    if (!this.world) return false;
+
+    // 检查整个 40x40 区域内每个点的上方净空
     for (let dx = 0; dx < size; dx++) {
       for (let dz = 0; dz < size; dz++) {
         const x = Math.floor(originX + dx);
         const z = Math.floor(originZ + dz);
+        if (!this.hasClearanceAbove(x, originY, z, requiredHeight)) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
 
-        // 检查从 platformY+1 到 platformY+checkHeight 的范围
-        for (let dy = 1; dy <= checkHeight; dy++) {
-          const y = Math.floor(originY) + dy;
-          if (this.world && this.world.isSolid(x, y, z)) {
-            return true; // 发现干扰方块
+  /**
+   * 清理创造台区域上方的障碍物
+   * @param {number} originX - 创造台左下角 X 坐标
+   * @param {number} originY - 创造台平台 Y 坐标
+   * @param {number} originZ - 创造台左下角 Z 坐标
+   * @param {number} size - 创造台尺寸
+   * @param {number} clearHeight - 清理高度（从平台向上）
+   */
+  clearAreaAbove(originX, originY, originZ, size, clearHeight = 12) {
+    if (!this.world) return;
+
+    // 清理整个 40x40 区域内每个点上方的方块
+    for (let dx = 0; dx < size; dx++) {
+      for (let dz = 0; dz < size; dz++) {
+        const x = Math.floor(originX + dx);
+        const z = Math.floor(originZ + dz);
+        // 从平台上方开始清理到指定高度
+        for (let y = originY + 1; y <= originY + clearHeight; y++) {
+          const blockType = this.world.getBlock(x, y, z);
+          if (blockType && blockType !== 'air') {
+            this.world.setBlock(x, y, z, 'air');
           }
         }
       }
     }
-    return false; // 没有干扰
-  }
-
-  /**
-   * 查找安全的创造台高度（上方无干扰方块）
-   * @param {number} baseX - 基础 X 坐标
-   * @param {number} baseY - 基础 Y 坐标
-   * @param {number} baseZ - 基础 Z 坐标
-   * @param {number} size - 创造台尺寸
-   * @param {number} checkHeight - 检查高度
-   * @returns {number} 安全的 Y 坐标
-   */
-  findSafePlaygroundHeight(baseX, baseY, baseZ, size, checkHeight = 10) {
-    let safeY = baseY;
-
-    // 循环检查，直到找到安全高度或达到上限
-    while (safeY < 256 - checkHeight) {
-      if (!this.hasObstructionsAbove(baseX, safeY, baseZ, size, checkHeight)) {
-        return safeY; // 找到安全高度
-      }
-      safeY++; // 高度 +1，继续检查
-    }
-
-    return safeY; // 返回当前高度（即使有干扰也使用）
   }
 
   /**
@@ -156,16 +218,19 @@ export class PlaygroundService {
     const playerY = Math.floor(playerPos.y);
     const playerZ = Math.floor(playerPos.z);
 
+    // 需要的净空高度：平台上方 10 格
+    const requiredClearance = 10;
+
     // 尝试东侧（+X 方向）
     let originX = playerX + distance;
     let originZ = playerZ - this.playgroundSize / 2;
-    let originY = this.findGroundLevel(originX + this.playgroundSize / 2, originZ + this.playgroundSize / 2);
+    let originY = this.findGroundLevelForPlayground(originX, originZ, this.playgroundSize, requiredClearance);
 
     // 如果东侧找不到地面，尝试西侧（-X 方向）
     if (originY === null) {
       originX = playerX - distance;
       originZ = playerZ - this.playgroundSize / 2;
-      originY = this.findGroundLevel(originX + this.playgroundSize / 2, originZ + this.playgroundSize / 2);
+      originY = this.findGroundLevelForPlayground(originX, originZ, this.playgroundSize, requiredClearance);
     }
 
     // 如果还是找不到地面，使用玩家 Y 坐标向下搜索
@@ -178,16 +243,10 @@ export class PlaygroundService {
       originY = playerY - 5;
     }
 
-    // 检查并调整创造台高度，确保上方 10 格内无干扰方块
-    const clearanceHeight = 10; // 创造台上方需要 10 格净空
-    const safeY = this.findSafePlaygroundHeight(originX, originY, originZ, this.playgroundSize, clearanceHeight);
-
-    if (safeY !== originY) {
-      console.log(`Adjusting playground height from ${originY} to ${safeY} to avoid obstructions above`);
-    }
-    originY = safeY;
-
     this.playgroundOrigin = { x: originX, y: originY, z: originZ };
+
+    // 清理创造台区域上方的所有障碍物（确保平台上方 10 格内无方块）
+    this.clearAreaAbove(originX, originY, originZ, this.playgroundSize, requiredClearance);
 
     // 生成 40x40 平台
     let placed = 0;
@@ -217,22 +276,6 @@ export class PlaygroundService {
     console.log(`Playground created: ${placed} blocks at (${originX}, ${originY}, ${originZ})`);
 
     return { success: true, origin: this.playgroundOrigin };
-  }
-
-  /**
-   * 从指定高度向下搜索地面
-   * @param {number} x - X 坐标
-   * @param {number} startY - 起始 Y 坐标
-   * @param {number} z - Z 坐标
-   * @returns {number|null} 地面 Y 坐标
-   */
-  findGroundLevelFromBelow(x, startY, z) {
-    for (let y = startY; y >= 0; y--) {
-      if (this.world && this.world.isSolid(x, y, z)) {
-        return y + 1;
-      }
-    }
-    return null;
   }
 
   /**
