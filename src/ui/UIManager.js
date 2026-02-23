@@ -1,6 +1,7 @@
 // src/ui/UIManager.js
 import { HUD } from './HUD.js';
 import { InventoryUI } from './Inventory.js';
+import { playgroundService } from '../services/PlaygroundService.js';
 
 /**
  * UI管理器 - 负责协调所有UI组件的初始化和更新
@@ -34,12 +35,25 @@ export class UIManager {
     const btnZombie20 = document.getElementById('btn-zombie-20');
     const btnZombie30 = document.getElementById('btn-zombie-30');
     const btnZombie50 = document.getElementById('btn-zombie-50');
+    const btnCreatePlayground = document.getElementById('btn-create-playground');
+    const btnExportModel = document.getElementById('btn-export-model');
 
     if (!settingsBtn || !settingsModal || !settingsClose) return;
+
+    // 初始化创造台服务（延迟到 world 可用时）
+    if (this.game && this.game.world) {
+      playgroundService.initialize(this.game.world);
+    }
 
     // 打开设置
     settingsBtn.onclick = (e) => {
       e.stopPropagation(); // 阻止冒泡，防止触发 body 的 requestPointerLock
+
+      // 确保创造台服务已初始化
+      if (!playgroundService.world && this.game && this.game.world) {
+        playgroundService.initialize(this.game.world);
+      }
+
       settingsModal.style.display = 'flex';
       this.updateActiveButtons(); // 确保打开时显示正确状态
       if (document.pointerLockElement) {
@@ -135,6 +149,53 @@ export class UIManager {
       };
     }
 
+    // 创造台功能按钮处理
+    if (btnCreatePlayground) {
+      btnCreatePlayground.onclick = (e) => {
+        e.stopPropagation();
+
+        // 确保创造台服务已初始化
+        if (!playgroundService.world && this.game && this.game.world) {
+          playgroundService.initialize(this.game.world);
+        }
+
+        // 使用玩家位置，如果玩家不存在则使用相机位置
+        const playerPos = this.game.player?.position || this.game.engine.camera.position;
+        const result = playgroundService.createPlayground(playerPos);
+        if (result.success) {
+          this.hud.showMessage('创造台已创建');
+          // 禁用打开创造台按钮
+          btnCreatePlayground.disabled = true;
+          btnCreatePlayground.style.background = '#666';
+          btnCreatePlayground.innerText = '创造台已打开';
+          // 显示导出模型按钮
+          if (btnExportModel) {
+            btnExportModel.style.display = 'block';
+          }
+        } else {
+          if (result.error === 'PLAYGROUND_EXISTS') {
+            this.hud.showMessage('创造台已存在');
+          } else if (result.error === 'NO_SPACE') {
+            this.hud.showMessage('无法找到合适的空间，请移动位置');
+          } else {
+            this.hud.showMessage('创建失败：' + result.error);
+          }
+        }
+      };
+    }
+
+    if (btnExportModel) {
+      btnExportModel.onclick = (e) => {
+        e.stopPropagation();
+        const result = playgroundService.exportModel();
+        if (result.success) {
+          this.hud.showMessage('模型导出成功');
+        } else {
+          this.hud.showMessage('导出失败：' + result.error);
+        }
+      };
+    }
+
     // 点击背景关闭
     settingsModal.onclick = (e) => {
       if (e.target === settingsModal) {
@@ -173,6 +234,14 @@ export class UIManager {
       btnZombie20.classList.toggle('active', this.game.maxActiveZombies === 20);
       btnZombie30.classList.toggle('active', this.game.maxActiveZombies === 30);
       btnZombie50.classList.toggle('active', this.game.maxActiveZombies === 50);
+    }
+
+    // 更新创造台按钮状态（仅在服务已初始化时）
+    const btnCreatePlayground = document.getElementById('btn-create-playground');
+    if (btnCreatePlayground && playgroundService.world && playgroundService.isPlaygroundActive) {
+      btnCreatePlayground.disabled = true;
+      btnCreatePlayground.style.background = '#666';
+      btnCreatePlayground.innerText = '创造台已打开';
     }
   }
 

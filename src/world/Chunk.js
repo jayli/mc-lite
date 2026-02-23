@@ -1243,6 +1243,22 @@ export class Chunk {
    * @param {number} z - 世界坐标Z
    */
   removeBlock(x, y, z) {
+    // 检查方块是否为不可破坏类型
+    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const currentType = this.blockData[key];
+    if (currentType) {
+      // 兼容新旧格式：当前类型可能是字符串或对象
+      const blockType = typeof currentType === 'string' ? currentType : currentType.type;
+      if (blockType) {
+        const props = getBlockProperties(blockType);
+        if (props.isIndestructible) {
+          // 不可破坏方块，忽略移除请求
+          console.log(`Block at ${x},${y},${z} is indestructible (${blockType})`);
+          return;
+        }
+      }
+    }
+
     // 记录持久化变更
     persistenceService.recordChange(x, y, z, 'air');
     // 使用 addBlockDynamic 统一处理逻辑状态更新、内存缓存同步和隐藏面剔除

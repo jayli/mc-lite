@@ -156,6 +156,22 @@ export const BLOCK_DATA = {
     isRendered: false,
     isShadowEnabled: false
   },
+  'playground_block': {
+    isSolid: true,
+    isTransparent: false,
+    isRendered: true,
+    isShadowEnabled: false,
+    isAOEnabled: false,
+    isIndestructible: true  // 不可被 TNT、机枪或玩家破坏
+  },
+  'playground_center_block': {
+    isSolid: true,
+    isTransparent: false,
+    isRendered: true,
+    isAOEnabled: false,
+    isShadowEnabled: false,
+    isIndestructible: true  // 不可被 TNT、机枪或玩家破坏
+  },
   // AO 启用的方块 (严格匹配原 aoAllowedTypes 列表)
   'sand': { isAOEnabled: true },
   'stone': { isAOEnabled: true },
@@ -183,26 +199,34 @@ export const BLOCK_DATA = {
 
 /**
  * 获取方块属性的辅助函数
- * @param {string} type - 方块类型
+ * @param {string|object} type - 方块类型字符串或对象
  * @returns {Object} 方块属性对象
  */
 export function getBlockProperties(type) {
   if (!type) return { ...DEFAULT_PROPERTIES };
 
+  // 如果 type 是对象，提取 type 属性
+  let typeStr = type;
+  if (typeof type !== 'string') {
+    typeStr = type.type || '';
+  }
+
+  if (!typeStr) return { ...DEFAULT_PROPERTIES };
+
   // 处理动态生成的或带前缀的方块类型（如 'realistic_oak_leaves_1'）
   // 如果完全匹配则直接返回
-  if (BLOCK_DATA[type]) {
-    return { ...DEFAULT_PROPERTIES, ...BLOCK_DATA[type] };
+  if (BLOCK_DATA[typeStr]) {
+    return { ...DEFAULT_PROPERTIES, ...BLOCK_DATA[typeStr] };
   }
 
   // 模糊匹配特殊类型
-  if (type.includes('leaves')) {
+  if (typeStr.includes('leaves')) {
     return { ...DEFAULT_PROPERTIES, ...BLOCK_DATA['leaves'] };
   }
-  if (type.includes('glass')) {
+  if (typeStr.includes('glass')) {
     return { ...DEFAULT_PROPERTIES, ...BLOCK_DATA['glass_block'] };
   }
-  if (type.includes('water')) {
+  if (typeStr.includes('water')) {
     return { ...DEFAULT_PROPERTIES, ...BLOCK_DATA['water'] };
   }
 

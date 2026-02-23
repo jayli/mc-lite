@@ -983,7 +983,10 @@ export class Player {
     let m = hit.object;
     while (m && !m.userData.isEntity && !m.userData.type && m.parent && !m.isInstancedMesh && m.type !== 'Scene') m = m.parent;
     const type = m.userData.type || 'unknown';
-    if (type === 'end_stone') return;
+
+    // 检查是否为不可破坏方块
+    if (type === 'end_stone' || type === 'playground_block' || type === 'playground_center_block') return;
+
     if (m.isInstancedMesh) {
       m.getMatrixAt(hit.instanceId, this._dummyMatrix);
       this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);

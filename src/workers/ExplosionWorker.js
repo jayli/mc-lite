@@ -4,6 +4,9 @@
  * 负责计算连锁反应和破坏范围，减轻主线程负担
  */
 
+// 不可破坏方块列表
+const INDESTRUCTIBLE_BLOCKS = ['playground_block', 'playground_center_block', 'bedrock', 'barrier'];
+
 self.onmessage = function(e) {
   const { action, payload } = e.data;
 
@@ -18,7 +21,14 @@ self.onmessage = function(e) {
     for (let dx = -1; dx <= 1; dx++) {
       for (let dy = -1; dy <= 1; dy++) {
         for (let dz = -1; dz <= 1; dz++) {
-          blocksToDestroy.push({ x: bx + dx, y: by + dy, z: bz + dz });
+          const blockX = bx + dx;
+          const blockY = by + dy;
+          const blockZ = bz + dz;
+          // 检查是否为不可破坏方块
+          const blockType = nearbyDeltas[`${blockX},${blockY},${blockZ}`];
+          if (!blockType || !INDESTRUCTIBLE_BLOCKS.includes(blockType)) {
+            blocksToDestroy.push({ x: blockX, y: blockY, z: blockZ });
+          }
         }
       }
     }
