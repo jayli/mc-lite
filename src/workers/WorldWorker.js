@@ -6,6 +6,51 @@ import { Cloud } from '../world/entities/Cloud.js';
 import { Island } from '../world/entities/Island.js';
 import { getBlockProperties, BLOCK_DATA } from '../constants/BlockData.js';
 
+// 白桦树 JSON 数据（从 src/world/blockmods/brich_tree.json 加载）
+const BIRCH_TREE_DATA = {
+  "blocks": [
+    { "x": -2, "y": 5, "z": -2, "type": "leaves" },
+    { "x": -2, "y": 5, "z": -1, "type": "leaves" },
+    { "x": -2, "y": 5, "z": 0, "type": "leaves" },
+    { "x": -2, "y": 5, "z": 1, "type": "leaves" },
+    { "x": -2, "y": 5, "z": 2, "type": "leaves" },
+    { "x": -1, "y": 5, "z": -2, "type": "leaves" },
+    { "x": -1, "y": 5, "z": -1, "type": "leaves" },
+    { "x": -1, "y": 6, "z": -1, "type": "leaves" },
+    { "x": -1, "y": 5, "z": 0, "type": "leaves" },
+    { "x": -1, "y": 6, "z": 0, "type": "leaves" },
+    { "x": -1, "y": 5, "z": 1, "type": "leaves" },
+    { "x": -1, "y": 6, "z": 1, "type": "leaves" },
+    { "x": -1, "y": 5, "z": 2, "type": "leaves" },
+    { "x": 0, "y": 5, "z": -2, "type": "leaves" },
+    { "x": 0, "y": 5, "z": -1, "type": "leaves" },
+    { "x": 0, "y": 6, "z": -1, "type": "leaves" },
+    { "x": 0, "y": 1, "z": 0, "type": "birch_log" },
+    { "x": 0, "y": 2, "z": 0, "type": "birch_log" },
+    { "x": 0, "y": 3, "z": 0, "type": "birch_log" },
+    { "x": 0, "y": 4, "z": 0, "type": "birch_log" },
+    { "x": 0, "y": 5, "z": 0, "type": "birch_log" },
+    { "x": 0, "y": 6, "z": 0, "type": "leaves" },
+    { "x": 0, "y": 7, "z": 0, "type": "leaves" },
+    { "x": 0, "y": 5, "z": 1, "type": "leaves" },
+    { "x": 0, "y": 6, "z": 1, "type": "leaves" },
+    { "x": 0, "y": 5, "z": 2, "type": "leaves" },
+    { "x": 1, "y": 5, "z": -2, "type": "leaves" },
+    { "x": 1, "y": 5, "z": -1, "type": "leaves" },
+    { "x": 1, "y": 6, "z": -1, "type": "leaves" },
+    { "x": 1, "y": 5, "z": 0, "type": "leaves" },
+    { "x": 1, "y": 6, "z": 0, "type": "leaves" },
+    { "x": 1, "y": 5, "z": 1, "type": "leaves" },
+    { "x": 1, "y": 6, "z": 1, "type": "leaves" },
+    { "x": 1, "y": 5, "z": 2, "type": "leaves" },
+    { "x": 2, "y": 5, "z": -2, "type": "leaves" },
+    { "x": 2, "y": 5, "z": -1, "type": "leaves" },
+    { "x": 2, "y": 5, "z": 0, "type": "leaves" },
+    { "x": 2, "y": 5, "z": 1, "type": "leaves" },
+    { "x": 2, "y": 5, "z": 2, "type": "leaves" }
+  ]
+};
+
 /**
  * 解析方块数据条目，兼容新旧格式
  * @param {string|object} value - 存储值
@@ -153,11 +198,16 @@ onmessage = function(e) {
               if (Math.random() < 0.15) {
                 realisticTrees.push({ x: wx, y: h + 1, z: wz });
               } else {
-                const isYellow = Math.random() < 0.1;
-                const leafType = isYellow ? 'yellow_leaves' : null;
-                const isBirch = Math.random() < 0.1;
-                const logType = isBirch ? 'birch_log' : null;
-                Tree.generate(wx, h + 1, wz, fakeChunk, 'big', dPlaceholder, logType, leafType);
+                // 10% 概率生成白桦树，90% 概率生成普通大树
+                if (Math.random() < 0.1) {
+                  generateBirchTree(wx, h + 1, wz, fakeChunk, dPlaceholder);
+                } else {
+                  const isYellow = Math.random() < 0.1;
+                  const leafType = isYellow ? 'yellow_leaves' : null;
+                  const isBirch = Math.random() < 0.1;
+                  const logType = isBirch ? 'birch_log' : null;
+                  Tree.generate(wx, h + 1, wz, fakeChunk, 'big', dPlaceholder, logType, leafType);
+                }
               }
             }
           } else if (centerBiome === 'AZALEA') {
@@ -527,4 +577,65 @@ function generateStructure(type, x, y, z, chunk, dObj, rovers = []) {
     for (let i = 0; i < 5; i++) chunk.add(x, y + i, z, 'wood', dObj);
     chunk.add(x, y + 1, z + 2, 'chest', dObj);
   }
+}
+
+/**
+ * 生成白桦树（从 JSON 数据）
+ * @param {number} x - X 坐标
+ * @param {number} y - Y 坐标
+ * @param {number} z - Z 坐标
+ * @param {Object} chunk - 区块对象
+ * @param {Object} dObj - 数据收集对象
+ */
+function generateBirchTree(x, y, z, chunk, dObj) {
+  const blocks = [];
+
+  // 遍历 JSON 中的所有方块
+  for (const block of BIRCH_TREE_DATA.blocks) {
+    const worldX = x + block.x;
+    const worldY = y + block.y - 1; // 整体降低 1 个方块高度，使树干底部接触地面
+    const worldZ = z + block.z;
+
+    blocks.push({
+      x: worldX,
+      y: worldY,
+      z: worldZ,
+      type: block.type,
+      solid: block.solid !== false
+    });
+  }
+
+  // 使用优化方法添加到区块
+  addBirchTreeOptimized(chunk, blocks, dObj);
+}
+
+/**
+ * 收集并裁剪树木方块，仅保留接触空气的树叶方块
+ * @private
+ */
+function addBirchTreeOptimized(chunk, blocks, dObj) {
+  const blockMap = new Set();
+  blocks.forEach(b => blockMap.add(`${Math.floor(b.x)},${Math.floor(b.y)},${Math.floor(b.z)}`));
+
+  blocks.forEach(b => {
+    const props = getBlockProperties(b.type);
+    // 如果是透明方块（如树叶），进行遮挡剔除优化
+    if (props.isTransparent && b.type !== 'vine') {
+      // 检查 6 个相邻位置是否都在 blockMap 中
+      const neighbors = [
+        [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]
+      ];
+      const isSurrounded = neighbors.every(([dx, dy, dz]) =>
+        blockMap.has(`${Math.floor(b.x + dx)},${Math.floor(b.y + dy)},${Math.floor(b.z + dz)}`)
+      );
+
+      // 如果被完全包围，则认为不接触空气，跳过生成
+      if (!isSurrounded) {
+        chunk.add(b.x, b.y, b.z, b.type, dObj, b.solid !== false);
+      }
+    } else {
+      // 非透明方块直接添加
+      chunk.add(b.x, b.y, b.z, b.type, dObj, b.solid !== false);
+    }
+  });
 }

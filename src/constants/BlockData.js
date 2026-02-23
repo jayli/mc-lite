@@ -53,6 +53,26 @@ export const BLOCK_DATA = {
   'leaves': {
     isTransparent: true
   },
+  'birch_log': {
+    isSolid: true,
+    isTransparent: false,
+    isAOEnabled: false
+  },
+  'wood': {
+    isSolid: true,
+    isTransparent: false,
+    isAOEnabled: false
+  },
+  'sky_wood': {
+    isSolid: true,
+    isTransparent: false,
+    isAOEnabled: false
+  },
+  'azalea_log': {
+    isSolid: true,
+    isTransparent: false,
+    isAOEnabled: false
+  },
   'azalea_leaves': {
     isTransparent: true
   },
