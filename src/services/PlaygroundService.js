@@ -86,6 +86,57 @@ export class PlaygroundService {
   }
 
   /**
+   * 检查创造台上方指定高度内是否有干扰方块
+   * @param {number} originX - 创造台起始 X 坐标
+   * @param {number} originY - 创造台 Y 坐标
+   * @param {number} originZ - 创造台起始 Z 坐标
+   * @param {number} size - 创造台尺寸
+   * @param {number} checkHeight - 检查高度（默认 10 格）
+   * @returns {boolean} 是否有干扰方块
+   */
+  hasObstructionsAbove(originX, originY, originZ, size, checkHeight = 10) {
+    // 检查创造台区域内每个位置的上方空间
+    for (let dx = 0; dx < size; dx++) {
+      for (let dz = 0; dz < size; dz++) {
+        const x = Math.floor(originX + dx);
+        const z = Math.floor(originZ + dz);
+
+        // 检查从 platformY+1 到 platformY+checkHeight 的范围
+        for (let dy = 1; dy <= checkHeight; dy++) {
+          const y = Math.floor(originY) + dy;
+          if (this.world && this.world.isSolid(x, y, z)) {
+            return true; // 发现干扰方块
+          }
+        }
+      }
+    }
+    return false; // 没有干扰
+  }
+
+  /**
+   * 查找安全的创造台高度（上方无干扰方块）
+   * @param {number} baseX - 基础 X 坐标
+   * @param {number} baseY - 基础 Y 坐标
+   * @param {number} baseZ - 基础 Z 坐标
+   * @param {number} size - 创造台尺寸
+   * @param {number} checkHeight - 检查高度
+   * @returns {number} 安全的 Y 坐标
+   */
+  findSafePlaygroundHeight(baseX, baseY, baseZ, size, checkHeight = 10) {
+    let safeY = baseY;
+
+    // 循环检查，直到找到安全高度或达到上限
+    while (safeY < 256 - checkHeight) {
+      if (!this.hasObstructionsAbove(baseX, safeY, baseZ, size, checkHeight)) {
+        return safeY; // 找到安全高度
+      }
+      safeY++; // 高度 +1，继续检查
+    }
+
+    return safeY; // 返回当前高度（即使有干扰也使用）
+  }
+
+  /**
    * 在玩家附近创建创造台
    * @param {THREE.Vector3} playerPos - 玩家位置
    * @returns {{ success: boolean, error?: string }}
@@ -126,6 +177,15 @@ export class PlaygroundService {
       // 最后手段：在玩家脚下 5 格处生成
       originY = playerY - 5;
     }
+
+    // 检查并调整创造台高度，确保上方 10 格内无干扰方块
+    const clearanceHeight = 10; // 创造台上方需要 10 格净空
+    const safeY = this.findSafePlaygroundHeight(originX, originY, originZ, this.playgroundSize, clearanceHeight);
+
+    if (safeY !== originY) {
+      console.log(`Adjusting playground height from ${originY} to ${safeY} to avoid obstructions above`);
+    }
+    originY = safeY;
 
     this.playgroundOrigin = { x: originX, y: originY, z: originZ };
 

@@ -582,7 +582,7 @@ onmessage = function(e) {
               structureQueue.push(() => generateStructure('house', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
             }
             // 在草地上生成坦克（低概率，确保不与其他物体重叠）
-            if (surf === 'grass' && !occupied && Math.random() < 0.0003 && safeForStructure) {
+            if (surf === 'grass' && !occupied && Math.random() < 0.0001 && safeForStructure) {
               generateTank(wx, h + 1, wz, fakeChunk, dPlaceholder);
               occupied = true;
             }
