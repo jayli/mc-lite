@@ -16,7 +16,8 @@ export function getCustomIconPath(item) {
     'handrailB': 'src/assets/textures/handrailB.png',
     'pillar': 'src/assets/textures/pillar.png',
     'planks_step': 'src/assets/textures/Oak_Planks_step.png',
-    'cobblestone_step': 'src/assets/textures/Cobblestone_step.png'
+    'cobblestone_step': 'src/assets/textures/Cobblestone_step.png',
+    'stone_diorite_step': 'src/assets/textures/stone_diorite_step.png'
   };
 
   return customIcons[item] || null;

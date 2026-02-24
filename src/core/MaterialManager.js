@@ -514,6 +514,7 @@ materials.registerMaterial('birch_log', {
 materials.registerMaterial('planks', { textureUrl: './src/assets/textures/planks_birch.png' }); // 木板
 materials.registerMaterial('planks_step', { textureUrl: './src/assets/textures/planks_birch.png' }); // 木台阶
 materials.registerMaterial('cobblestone_step', { textureUrl: './src/assets/textures/Cobblestone.png' }); // 鹅卵石台阶
+materials.registerMaterial('stone_diorite_step', { textureUrl: './src/assets/textures/stone_diorite.png' }); // 闪长岩台阶
 materials.registerMaterial('oak_planks', { textureUrl: './src/assets/textures/Oak_Planks.png' }); // 大橡木木板
 materials.registerMaterial('white_planks', { textureUrl: './src/assets/textures/White_Wood_Planks.png' }); // 白色木板
 materials.registerMaterial('glass_block', {

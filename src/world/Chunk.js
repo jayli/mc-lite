@@ -213,6 +213,7 @@ const geomMap = {
   'pillar': geoPillar,
   'planks_step': geoPlanksStep,
   'cobblestone_step': geoCobblestoneStep,
+  'stone_diorite_step': geoCobblestoneStep,
   'default': addVertexIdAttribute(new THREE.BoxGeometry(1, 1, 1))
 };
 
