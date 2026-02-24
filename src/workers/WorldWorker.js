@@ -198,7 +198,7 @@ onmessage = function(e) {
             }
             // 在沙漠地形中生成丑陋小屋（概率 0.00008，确保底面紧贴地表）
             if (!occupied && Math.random() < 0.00008 && safeForStructure) {
-              generateUglyHouse(wx, h, wz, fakeChunk, dPlaceholder);
+              generateUglyHouse(wx, h + 1, wz, fakeChunk, dPlaceholder);
               occupied = true;
             }
           } else {
