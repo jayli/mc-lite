@@ -195,6 +195,7 @@ export const BLOCK_DATA = {
   // AO 启用的方块 (严格匹配原 aoAllowedTypes 列表)
   'sand': { isAOEnabled: true },
   'stone': { isAOEnabled: true },
+  'stone_diorite': { isAOEnabled: true },
   'mossy_stone': { isAOEnabled: true },
   'cobblestone': { isAOEnabled: true },
   'bricks': { isAOEnabled: true },

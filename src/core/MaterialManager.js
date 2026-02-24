@@ -248,6 +248,7 @@ export async function initializeMaterials() {
     './src/assets/textures/dark_planks.png',
     './src/assets/textures/stone_andesite.png',
     './src/assets/textures/stone.png',
+    './src/assets/textures/stone_diorite.png',
     './src/assets/textures/sand.png',
     './src/assets/textures/sand_side.png',
     './src/assets/textures/dirt.png',
@@ -416,6 +417,10 @@ materials.registerMaterial('stone', {
     5: stoneSide1       // 北面：石头侧面（普通石头）
   }
 }); // 石头
+
+materials.registerMaterial('stone_diorite', {
+  textureUrl: './src/assets/textures/stone_diorite.png'
+}); // 闪长岩
 
 materials.registerMaterial('gold_ore', {
   textureUrl: './src/assets/textures/Deepslate_Gold.png'

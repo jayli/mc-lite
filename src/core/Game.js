@@ -127,6 +127,7 @@ export class Game {
 
     // 初始化玩家背包，添加默认物品
     this.player.inventory.add('stone', 1500);
+    this.player.inventory.add('stone_diorite', 1500);
     this.player.inventory.add('dirt', 1500);
     this.player.inventory.add('planks', 1500);
     this.player.inventory.add('planks_step', 1500);
