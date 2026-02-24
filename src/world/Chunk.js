@@ -55,6 +55,13 @@ faceCullingWorker.onmessage = (e) => {
 
 worldWorker.onerror = (e) => {
   console.error('WorldWorker Error:', e);
+  console.error('Error details:', {
+    message: e.message,
+    filename: e.filename,
+    lineno: e.lineno,
+    colno: e.colno,
+    error: e.error
+  });
 };
 
 // 共享几何体定义 - 用于优化渲染性能，避免在每个区块中重复创建相同的几何体，减少 GPU 内存占用

@@ -6,6 +6,64 @@ import { Cloud } from '../world/entities/Cloud.js';
 import { Island } from '../world/entities/Island.js';
 import { getBlockProperties, BLOCK_DATA } from '../constants/BlockData.js';
 
+console.log('WorldWorker.js loaded');
+
+// 全局错误处理
+self.onerror = (e) => {
+  console.error('WorldWorker internal error:', e.message, 'at', e.filename, ':', e.lineno);
+};
+
+// 丑陋小屋 JSON 数据（从 src/world/blockmods/ugly_house.json 加载）
+let UGLY_HOUSE_DATA = null;
+let uglyHouseDataLoading = null;
+
+// 异步加载丑陋小屋 JSON 数据
+async function loadUglyHouseData() {
+  if (UGLY_HOUSE_DATA) return UGLY_HOUSE_DATA;
+  if (uglyHouseDataLoading) return uglyHouseDataLoading;
+
+  uglyHouseDataLoading = (async () => {
+    try {
+      // 相对路径：从 src/workers/ 到 src/world/blockmods/
+      const response = await fetch('../world/blockmods/ugly_house.json');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log('ugly_house.json loaded, block count:', data.blocks.length);
+
+      // 找出最低 Y 值
+      let minY = Infinity;
+      data.blocks.forEach(b => { if (b.y < minY) minY = b.y; });
+      console.log('ugly_house minY:', minY);
+
+      // 将 Y 坐标归一化，使最低点 Y=1
+      UGLY_HOUSE_DATA = {
+        blocks: data.blocks.map(b => ({
+          x: b.x,
+          y: b.y - minY + 1,
+          z: b.z,
+          type: b.type,
+          direction: b.direction !== undefined ? b.direction : 0
+        }))
+      };
+      console.log('UGLY_HOUSE_DATA ready, blocks:', UGLY_HOUSE_DATA.blocks.length);
+      return UGLY_HOUSE_DATA;
+    } catch (err) {
+      console.error('Failed to load ugly_house.json:', err);
+      UGLY_HOUSE_DATA = { blocks: [] }; // 使用空数据避免后续错误
+      return UGLY_HOUSE_DATA;
+    }
+  })();
+
+  return uglyHouseDataLoading;
+}
+
+// 同步获取丑陋小屋数据（仅在数据已加载后使用）
+function getUglyHouseData() {
+  return UGLY_HOUSE_DATA;
+}
+
 // 白桦树 JSON 数据（从 src/world/blockmods/brich_tree.json 加载）
 const BIRCH_TREE_DATA = {
   "blocks": [
@@ -418,6 +476,9 @@ onmessage = function(e) {
   // 同步种子
   setSeed(seed);
 
+  // 预加载丑陋小屋数据（不阻塞主逻辑）
+  loadUglyHouseData().catch(err => console.error('Failed to load ugly house data:', err));
+
   // 使用 Map 暂存方块，确保同一位置后生成的方块覆盖旧方块
   const blockMap = new Map();
   let realisticTrees = []; // 记录真实 tree 的位置
@@ -554,9 +615,15 @@ onmessage = function(e) {
           } else if (centerBiome === 'SWAMP') {
             if (Math.random() < 0.03) Tree.generate(wx, h + 1, wz, fakeChunk, 'swamp', dPlaceholder);
           } else if (centerBiome === 'DESERT') {
+            let occupied = false;
             if (Math.random() < 0.01) fakeChunk.add(wx, h + 1, wz, 'cactus', dPlaceholder);
             if (Math.random() < 0.0005 && safeForStructure) {
               structureQueue.push(() => generateStructure('rover', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
+            }
+            // 在沙漠地形中生成丑陋小屋（概率 0.00008，确保底面紧贴地表）
+            if (!occupied && Math.random() < 0.00008 && safeForStructure) {
+              generateUglyHouse(wx, h, wz, fakeChunk, dPlaceholder);
+              occupied = true;
             }
           } else {
             let occupied = false;
@@ -1004,6 +1071,86 @@ function generateTank(x, y, z, chunk, dObj) {
  * @private
  */
 function addTankOptimized(chunk, blocks, dObj) {
+  const blockMap = new Set();
+  blocks.forEach(b => blockMap.add(`${Math.floor(b.x)},${Math.floor(b.y)},${Math.floor(b.z)}`));
+
+  blocks.forEach(b => {
+    const props = getBlockProperties(b.type);
+    // 如果是透明方块（如某些特殊方块），进行遮挡剔除优化
+    if (props.isTransparent && b.type !== 'vine') {
+      // 检查 6 个相邻位置是否都在 blockMap 中
+      const neighbors = [
+        [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]
+      ];
+      const isSurrounded = neighbors.every(([dx, dy, dz]) =>
+        blockMap.has(`${Math.floor(b.x + dx)},${Math.floor(b.y + dy)},${Math.floor(b.z + dz)}`)
+      );
+
+      // 如果被完全包围，则认为不接触空气，跳过生成
+      if (!isSurrounded) {
+        chunk.add(b.x, b.y, b.z, b.type, dObj, b.solid !== false, b.orientation ?? 0);
+      }
+    } else {
+      // 非透明方块直接添加
+      chunk.add(b.x, b.y, b.z, b.type, dObj, b.solid !== false, b.orientation ?? 0);
+    }
+  });
+}
+
+/**
+ * 计算丑陋小屋的最低点 Y 值（用于确定放置高度）
+ * @returns {number} 小屋底部 Y 偏移
+ */
+function getUglyHouseBottomY() {
+  if (!UGLY_HOUSE_DATA) return 1; // 默认值
+  let minY = Infinity;
+  for (const block of UGLY_HOUSE_DATA.blocks) {
+    if (block.y < minY) minY = block.y;
+  }
+  return minY; // 返回小屋模型的最低点 Y 值（相对于小屋中心点）
+}
+
+/**
+ * 生成丑陋小屋（从 JSON 数据）
+ * @param {number} x - X 坐标（小屋中心点）
+ * @param {number} y - Y 坐标（地面高度）
+ * @param {number} z - Z 坐标（小屋中心点）
+ * @param {Object} chunk - 区块对象
+ * @param {Object} dObj - 数据收集对象
+ */
+function generateUglyHouse(x, y, z, chunk, dObj) {
+  if (!UGLY_HOUSE_DATA) return; // 数据未加载，跳过
+
+  const blocks = [];
+  const houseBottomY = getUglyHouseBottomY(); // 获取小屋最低点 Y 值
+
+  // 遍历 JSON 中的所有方块
+  for (const block of UGLY_HOUSE_DATA.blocks) {
+    const worldX = x + block.x;
+    // 调整 Y 坐标，使小屋底部接触地面
+    // 小屋模型最低点为 houseBottomY，需要将其放置在地面 y 上
+    const worldY = y + (block.y - houseBottomY);
+    const worldZ = z + block.z;
+
+    blocks.push({
+      x: worldX,
+      y: worldY,
+      z: worldZ,
+      type: block.type,
+      solid: block.solid !== false,
+      orientation: block.direction ?? 0
+    });
+  }
+
+  // 添加到区块
+  addUglyHouseOptimized(chunk, blocks, dObj);
+}
+
+/**
+ * 收集并添加丑陋小屋方块
+ * @private
+ */
+function addUglyHouseOptimized(chunk, blocks, dObj) {
   const blockMap = new Set();
   blocks.forEach(b => blockMap.add(`${Math.floor(b.x)},${Math.floor(b.y)},${Math.floor(b.z)}`));
 

@@ -1,0 +1,8538 @@
+{
+  "blocks": [
+    {
+      "x": -20,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -20,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -19,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -19,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -19,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -18,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -18,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -18,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -18,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -17,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -17,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -17,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -17,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -17,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -16,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -16,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -16,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -16,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -16,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -16,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": -3,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": -2,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": -1,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": 0,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": 1,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": 2,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": 3,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": 4,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": 5,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": 6,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": 7,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -4,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -4,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": -4,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": -4,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": -4,
+      "type": "planks_step",
+      "direction": 1
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -3,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -3,
+      "type": "azalea_leaves",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": -3,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": -3,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": -3,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -2,
+      "type": "azalea_leaves",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": -2,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": -2,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": -1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": -1,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": -1,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 0,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 0,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": 0,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": 0,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": 0,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": 0,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": 0,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": 1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": 1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": 1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": 1,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": 1,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 2,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 2,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": 2,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": 2,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": 2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": 2,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": 2,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": 3,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": 3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": 3,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": 3,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": 3,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 4,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": 4,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": 4,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": 4,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": 4,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": 4,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 5,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 5,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": 5,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": 5,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": 5,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": 5,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": 5,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 6,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": 6,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": 6,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": 6,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": 6,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": 6,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": 7,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": 7,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": 7,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 8,
+      "type": "azalea_leaves",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 9,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 9,
+      "type": "azalea_leaves",
+      "direction": 2
+    },
+    {
+      "x": -4,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -4,
+      "type": "planks_step",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": -4,
+      "type": "planks_step",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -3,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": -3,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 6,
+      "z": -3,
+      "type": "planks",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 7,
+      "z": -3,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 8,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": -3,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -4,
+      "y": 10,
+      "z": -3,
+      "type": "azalea_leaves",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 11,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 8,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": -2,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -4,
+      "y": 10,
+      "z": -2,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 4,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": -1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 8,
+      "z": -1,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": -1,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -4,
+      "y": 10,
+      "z": -1,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 0,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": 0,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 8,
+      "z": 0,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": 0,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -4,
+      "y": 10,
+      "z": 0,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": 1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 8,
+      "z": 1,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": 1,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -4,
+      "y": 10,
+      "z": 1,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 2,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": 2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 8,
+      "z": 2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": 2,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -4,
+      "y": 10,
+      "z": 2,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 3,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": 3,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 8,
+      "z": 3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": 3,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -4,
+      "y": 10,
+      "z": 3,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 4,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": 4,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 8,
+      "z": 4,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": 4,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -4,
+      "y": 10,
+      "z": 4,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 5,
+      "type": "white_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": 5,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 8,
+      "z": 5,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": 5,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -4,
+      "y": 10,
+      "z": 5,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 6,
+      "type": "white_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": 6,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 8,
+      "z": 6,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": 6,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -4,
+      "y": 10,
+      "z": 6,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 7,
+      "type": "stone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": 7,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 4,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": 7,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 6,
+      "z": 7,
+      "type": "planks",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 7,
+      "z": 7,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 8,
+      "z": 7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": 7,
+      "type": "cobblestone_step",
+      "direction": 2
+    },
+    {
+      "x": -4,
+      "y": 10,
+      "z": 7,
+      "type": "handrail",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 6,
+      "z": 8,
+      "type": "stone_diorite_step",
+      "direction": 3
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 9,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": 9,
+      "type": "azalea_leaves",
+      "direction": 2
+    },
+    {
+      "x": -3,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -4,
+      "type": "planks_step",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": -4,
+      "type": "planks_step",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -3,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": -3,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 6,
+      "z": -3,
+      "type": "planks",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 7,
+      "z": -3,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 9,
+      "z": -3,
+      "type": "azalea_leaves",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": -3,
+      "type": "azalea_leaves",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": -1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": -1,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 0,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": 0,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": 0,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": 1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": 1,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 2,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": 2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": 2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 3,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": 3,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": 3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 4,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": 4,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": 4,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 5,
+      "type": "white_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": 5,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": 5,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 6,
+      "type": "white_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": 6,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": 6,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 7,
+      "type": "stone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 3,
+      "z": 7,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": 7,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 6,
+      "z": 7,
+      "type": "planks",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 7,
+      "z": 7,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": 7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 9,
+      "z": 7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": 7,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": 8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 6,
+      "z": 8,
+      "type": "stone_diorite_step",
+      "direction": 3
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 9,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": 9,
+      "type": "azalea_leaves",
+      "direction": 2
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": 9,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": 10,
+      "type": "stone_diorite_step",
+      "direction": 3
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -4,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": -4,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": -4,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": -4,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": -4,
+      "type": "planks_step",
+      "direction": 1
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -3,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": -3,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 6,
+      "z": -3,
+      "type": "planks",
+      "direction": 1
+    },
+    {
+      "x": -2,
+      "y": 7,
+      "z": -3,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": -3,
+      "type": "azalea_leaves",
+      "direction": 1
+    },
+    {
+      "x": -2,
+      "y": 11,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": -1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": -1,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 0,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 0,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": 0,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": 1,
+      "type": "cobblestone",
+      "direction": 1
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 2,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": 2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 3,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 3,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": 3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 4,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 4,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": 4,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 5,
+      "type": "white_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 5,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": 5,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 6,
+      "type": "white_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 6,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": 6,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 7,
+      "type": "stone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 7,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 6,
+      "z": 7,
+      "type": "planks",
+      "direction": 1
+    },
+    {
+      "x": -2,
+      "y": 7,
+      "z": 7,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": 7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": 7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 10,
+      "z": 7,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 6,
+      "z": 8,
+      "type": "stone_diorite_step",
+      "direction": 3
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 9,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 9,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 9,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": 9,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 9,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 10,
+      "type": "stone_diorite_step",
+      "direction": 3
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -4,
+      "type": "azalea_leaves",
+      "direction": 1
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -4,
+      "type": "azalea_leaves",
+      "direction": 2
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": -4,
+      "type": "planks_step",
+      "direction": 1
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -3,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": -3,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 6,
+      "z": -3,
+      "type": "planks",
+      "direction": 1
+    },
+    {
+      "x": -1,
+      "y": 7,
+      "z": -3,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": -3,
+      "type": "azalea_leaves",
+      "direction": 1
+    },
+    {
+      "x": -1,
+      "y": 11,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": -1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": -1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": -1,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 0,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 0,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": 0,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": 1,
+      "type": "cobblestone",
+      "direction": 1
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 2,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": 2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 3,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 3,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": 3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 4,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 4,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": 4,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 5,
+      "type": "white_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 5,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": 5,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 6,
+      "type": "white_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 6,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": 6,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 7,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 7,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 6,
+      "z": 7,
+      "type": "planks",
+      "direction": 1
+    },
+    {
+      "x": -1,
+      "y": 7,
+      "z": 7,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": 7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": 7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 10,
+      "z": 7,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 6,
+      "z": 8,
+      "type": "stone_diorite_step",
+      "direction": 3
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 9,
+      "type": "stone_diorite_step",
+      "direction": 3
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 9,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 10,
+      "type": "stone_diorite_step",
+      "direction": 3
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -4,
+      "type": "azalea_leaves",
+      "direction": 1
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -4,
+      "type": "azalea_leaves",
+      "direction": 2
+    },
+    {
+      "x": 0,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -3,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": -3,
+      "type": "azalea_leaves",
+      "direction": 1
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "z": -3,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": -2,
+      "type": "planks",
+      "direction": 1
+    },
+    {
+      "x": 0,
+      "y": 7,
+      "z": -2,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": -1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": -1,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 0,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 0,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": 0,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": 1,
+      "type": "cobblestone_step",
+      "direction": 3
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 2,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 7,
+      "z": 2,
+      "type": "cobblestone_step",
+      "direction": 3
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 3,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 3,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": 3,
+      "type": "cobblestone_step",
+      "direction": 3
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 4,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 5,
+      "type": "white_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 5,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": 5,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 6,
+      "type": "white_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 6,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": 6,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 7,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": 7,
+      "type": "planks",
+      "direction": 1
+    },
+    {
+      "x": 0,
+      "y": 7,
+      "z": 7,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": 7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": 7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "z": 7,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": 8,
+      "type": "stone_diorite_step",
+      "direction": 3
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 9,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 9,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 9,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 9,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 9,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 10,
+      "type": "stone_diorite_step",
+      "direction": 3
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -4,
+      "type": "azalea_leaves",
+      "direction": 2
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -4,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -3,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": -3,
+      "type": "azalea_leaves",
+      "direction": 1
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": -2,
+      "type": "planks",
+      "direction": 1
+    },
+    {
+      "x": 1,
+      "y": 7,
+      "z": -2,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": -1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": -1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": -1,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 0,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 0,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 0,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 1,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 2,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 3,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 3,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 4,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 4,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 5,
+      "type": "white_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 5,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 5,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 6,
+      "type": "white_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 6,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 6,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 7,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 7,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 7,
+      "type": "planks",
+      "direction": 1
+    },
+    {
+      "x": 1,
+      "y": 7,
+      "z": 7,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": 7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": 7,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 8,
+      "type": "stone_diorite_step",
+      "direction": 3
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 9,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 9,
+      "type": "azalea_leaves",
+      "direction": 2
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 9,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 10,
+      "type": "stone_diorite_step",
+      "direction": 3
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -4,
+      "type": "azalea_leaves",
+      "direction": 1
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": -4,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -3,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "z": -3,
+      "type": "azalea_leaves",
+      "direction": 1
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": -3,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "z": -2,
+      "type": "planks",
+      "direction": 1
+    },
+    {
+      "x": 2,
+      "y": 7,
+      "z": -2,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": -1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": -1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": -1,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 0,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 0,
+      "type": "cobblestone_step",
+      "direction": 3
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": 0,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": 1,
+      "type": "cobblestone_step",
+      "direction": 3
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": 1,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 2,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 2,
+      "type": "cobblestone_step",
+      "direction": 3
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": 2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 3,
+      "type": "stone_diorite",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 3,
+      "type": "cobblestone_step",
+      "direction": 3
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": 3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 4,
+      "type": "planks",
+      "direction": 1
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": 4,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 5,
+      "type": "white_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 5,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": 5,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 6,
+      "type": "white_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 6,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": 6,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 7,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 7,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "z": 7,
+      "type": "planks",
+      "direction": 1
+    },
+    {
+      "x": 2,
+      "y": 7,
+      "z": 7,
+      "type": "pillar",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": 7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "z": 7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": 7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "z": 8,
+      "type": "stone_diorite_step",
+      "direction": 3
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 9,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 9,
+      "type": "azalea_leaves",
+      "direction": 2
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": -4,
+      "type": "azalea_leaves",
+      "direction": 1
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": -4,
+      "type": "handrail",
+      "direction": 3
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": -3,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": -3,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": -3,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": -2,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": -2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": -2,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": -2,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": -1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": -1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": -1,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": -1,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": -1,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 0,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 0,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 0,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": 0,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 0,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 0,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": 0,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": 0,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": 0,
+      "type": "short_grass",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": 1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 1,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 1,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": 1,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": 1,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": 1,
+      "type": "short_grass",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 2,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 2,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 2,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": 2,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 2,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 2,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": 2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": 2,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": 2,
+      "type": "short_grass",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 3,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": 3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 3,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 3,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": 3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": 3,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": 3,
+      "type": "short_grass",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 4,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 4,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": 4,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 4,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 4,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": 4,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": 4,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": 4,
+      "type": "short_grass",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 5,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 5,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 5,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": 5,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 5,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 5,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": 5,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": 5,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": 5,
+      "type": "short_grass",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 6,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 6,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": 6,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 6,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 6,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": 6,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": 6,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": 6,
+      "type": "short_grass",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": 7,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 7,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 7,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": 7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": 7,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 8,
+      "type": "azalea_leaves",
+      "direction": 2
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 9,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 9,
+      "type": "azalea_leaves",
+      "direction": 2
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": -3,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": -2,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": -1,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": -1,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 0,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": 0,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 1,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": 1,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 2,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": 2,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 3,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": 3,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 4,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": 4,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 5,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": 5,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 6,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": 6,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 7,
+      "type": "planks_step",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": 7,
+      "type": "cobblestone_step",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 43,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 43,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 43,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 9,
+      "y": 43,
+      "z": 0,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 10,
+      "y": 43,
+      "z": 0,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 11,
+      "y": 43,
+      "z": 0,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 12,
+      "y": 43,
+      "z": 0,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 13,
+      "y": 43,
+      "z": 0,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": 0,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 43,
+      "z": 1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": 0,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 15,
+      "y": 43,
+      "z": 1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": 0,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 16,
+      "y": 43,
+      "z": 1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": 0,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 43,
+      "z": 1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": 0,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 43,
+      "z": 1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -18,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": 0,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 43,
+      "z": 1,
+      "type": "cloud",
+      "direction": 0
+    }
+  ],
+  "metadata": {
+    "created": "2026-02-24T07:40:39.957Z",
+    "dimensions": {
+      "width": 40,
+      "height": 43,
+      "depth": 31
+    }
+  }
+}
