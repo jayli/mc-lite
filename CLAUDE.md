@@ -31,6 +31,7 @@
 - **爆炸效果**: `src/workers/ExplosionWorker.js`
 - **树木生成**: `src/world/entities/RealisticTreeManager.js`
 - **UI**: `src/ui/UIManager.js`、`src/ui/HUD.js`、`src/ui/Inventory.js`
+- **结构数据加载**: `src/workers/StructureLoader.js` (统一的 JSON 结构加载器)
 - **图标生成工具函数**: `src/utils/ItemIconUtils.js`
 - **方块面剔除工具函数**: `src/utils/FaceCullingUtils.js`
 - **方块方向工具函数**: `src/utils/OrientationUtils.js`
@@ -38,8 +39,10 @@
 ## 开发工作流
 1. **添加方块**: `BlockData.js` → `MaterialManager.js` → `Chunk.js`
 2. **添加敌人**: 实体类 → `EnemyWorker.js` → `EnemyManager.js`
-3. **调试物理**: 玩家 `Physics.js` / 敌人实体 `update()` 方法
-4. **性能监控**: 按 `P` 键显示/隐藏调试信息，`I` 键显示/隐藏提示信息。
+3. **添加结构数据**: 在 `src/world/blockmods/` 添加 JSON 文件 → 在 `StructureLoader.js` 中注册
+4. **调试物理**: 玩家 `Physics.js` / 敌人实体 `update()` 方法
+5. **性能监控**: 按 `P` 键显示/隐藏调试信息，`I` 键显示/隐藏提示信息。
+6. **控制台调试**: 浏览器 DevTools Console 中可访问 `window.game` 获取游戏实例
 
 ## 代码提交
 - 任何情况你都不能自动提交代码，必须等待我的明确指令才提交代码，再次强调，你的任何修改都不能自动在未经我允许的情况下提交代码，必须等我的明确指令才能提交代码
@@ -56,20 +59,16 @@
 
 ### 修改文件
 1. **优先使用 `Edit` 工具** 进行小幅度修改
-2. **`Edit` 工具匹配失败时**：
-   - 不要重试相同的 `old_string`（会继续失败）
-   - 不要使用 `Write` 工具直接覆盖（会丢失文件内容）
-   - 使用 `Bash` + `node` 脚本或 `sed` 命令修改文件
-   - 示例：
-     ```bash
-     node << 'SCRIPT'
-     const fs = require('fs');
-     const path = 'path/to/file';
-     let content = fs.readFileSync(path, 'utf8');
-     content = content.replace('old_string', 'new_string');
-     fs.writeFileSync(path, content);
-     SCRIPT
-     ```
+2. **`Edit` 工具匹配失败时**：使用 `Bash` + `node` 脚本或 `sed` 命令修改文件
+   ```bash
+   node << 'SCRIPT'
+   const fs = require('fs');
+   const path = 'path/to/file';
+   let content = fs.readFileSync(path, 'utf8');
+   content = content.replace('old_string', 'new_string');
+   fs.writeFileSync(path, content);
+   SCRIPT
+   ```
 3. **如果不慎清空文件**：立即使用 `git checkout HEAD -- <file>` 恢复
 
 ### 新建文件

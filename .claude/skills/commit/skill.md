@@ -25,7 +25,7 @@ Use this skill when the user runs `/commit` or asks to commit changes.
     - **Description**: Concise summary in imperative mood (e.g., "add support for...", not "added").
 
 4.  **Execute Commit**:
-    - Run `git commit -m "generated_message"`.
+    - Run `git commit -m "generated_message" --author="Claude <noreply@anthropic.com>"`.
     - If the message has a body, use multiple `-m` flags or a heredoc.
 
 5.  **Report**:
