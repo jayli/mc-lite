@@ -813,13 +813,9 @@ export class Player {
           }
         }
         if (heldItem && this.inventory.has(heldItem)) {
-          if (m.isInstancedMesh) {
-            m.getMatrixAt(instanceId, this._dummyMatrix);
-            this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
-          } else {
-            this._tempVector.copy(m.position);
-          }
-          if (this.tryPlaceBlock(Math.floor(this._tempVector.x + hit.face.normal.x), Math.floor(this._tempVector.y + hit.face.normal.y), Math.floor(this._tempVector.z + hit.face.normal.z), heldItem)) this.swing();
+          // 统一使用 hit.point 计算点击的面，确保旋转方块的正确性
+          const blockPos = this._getBlockPositionFromHit(hit);
+          if (this.tryPlaceBlock(blockPos.x, blockPos.y, blockPos.z, heldItem)) this.swing();
         }
       } else if (heldItem && this.inventory.has(heldItem)) {
         this.doSkyPlace(heldItem);
@@ -880,6 +876,52 @@ export class Player {
    * @param {number} instanceId - 实例ID
    * @param {THREE.Vector3} pos - 宝箱位置
    */
+
+  /**
+   * 从射线检测击中信息计算放置位置
+   * 使用 hit.point 计算点击的面，确保旋转方块的正确性
+   * @param {Object} hit - 射线检测击中信息
+   * @returns {{ x: number, y: number, z: number }} 放置位置
+   */
+  _getBlockPositionFromHit(hit) {
+    const m = hit.object;
+    // 获取方块的世界空间位置
+    let blockWorldPos;
+    if (m.isInstancedMesh) {
+      m.getMatrixAt(hit.instanceId, this._dummyMatrix);
+      this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
+      blockWorldPos = this._tempVector;
+    } else {
+      blockWorldPos = m.position;
+    }
+
+    const blockX = Math.floor(blockWorldPos.x);
+    const blockY = Math.floor(blockWorldPos.y);
+    const blockZ = Math.floor(blockWorldPos.z);
+
+    // 计算击中点相对于方块中心 (块中心 +0.5) 的偏移
+    const dx = hit.point.x - (blockX + 0.5);
+    const dy = hit.point.y - (blockY + 0.5);
+    const dz = hit.point.z - (blockZ + 0.5);
+
+    // 找到绝对值最大的轴，确定点击的面
+    const absX = Math.abs(dx), absY = Math.abs(dy), absZ = Math.abs(dz);
+    let nx = 0, ny = 0, nz = 0;
+    if (absX >= absY && absX >= absZ) {
+      nx = dx > 0 ? 1 : -1;
+    } else if (absY >= absX && absY >= absZ) {
+      ny = dy > 0 ? 1 : -1;
+    } else {
+      nz = dz > 0 ? 1 : -1;
+    }
+
+    return {
+      x: Math.floor(blockWorldPos.x + nx),
+      y: Math.floor(blockWorldPos.y + ny),
+      z: Math.floor(blockWorldPos.z + nz)
+    };
+  }
+
   openChest(mesh, instanceId, pos) {
     const info = mesh.userData.chests[instanceId];
     if (!info || info.open) return;
