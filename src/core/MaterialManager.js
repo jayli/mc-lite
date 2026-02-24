@@ -405,12 +405,11 @@ materials.registerMaterial('dirt', {
 }); // 土
 
 const stoneSide1 = { textureUrl: './src/assets/textures/stone.png' };
-const stoneSide = { textureUrl: './src/assets/textures/stone_diorite.png' };
 const stoneTopBottom = { textureUrl: './src/assets/textures/stone_andesite.png' };
 materials.registerMaterial('stone', {
   faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
-    0: stoneSide,       // 东面：石头侧面（闪长岩）
-    1: stoneSide,       // 西面：石头侧面（闪长岩）
+    0: stoneSide1,       // 东面：石头侧面（闪长岩）
+    1: stoneSide1,       // 西面：石头侧面（闪长岩）
     2: stoneTopBottom,  // 上面：石头顶部（安山岩）
     3: stoneTopBottom,  // 下面：石头底部（安山岩）
     4: stoneSide1,      // 南面：石头侧面（普通石头）
