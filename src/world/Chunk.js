@@ -313,7 +313,7 @@ export class Chunk {
     workerCallbacks.set(callbackKey, (data) => {
       let { d, visibleKeys, solidBlocks } = data;
 
-      // --- 核心修复：根据主线程最新的 blockData 进行二次过滤，防止竞态导致的“幻影方块” ---
+      // --- 核心修复：根据主线程最新的 blockData 进行二次过滤，防止竞态导致的”幻影方块” ---
       if (visibleKeys) {
         visibleKeys = visibleKeys.filter(key => !!this.blockData[key]);
       }
@@ -322,9 +322,15 @@ export class Chunk {
       }
       if (d) {
         for (const type in d) {
+          // 修复：过滤掉位置不在最新 blockData 中的方块，或者 blockData 中的类型与 d[type] 不匹配的方块
+          // 这可以防止”方块消除后又重新出现”的 bug，因为旧类型的方块数据可能仍然存在于 Worker 返回的结果中
           d[type] = d[type].filter(pos => {
             const key = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
-            return !!this.blockData[key];
+            const currentEntry = this.blockData[key];
+            if (!currentEntry) return false; // 位置已空，过滤掉
+            // 检查类型是否匹配，防止旧类型的方块被重新渲染
+            const currentType = typeof currentEntry === 'string' ? currentEntry : currentEntry.type;
+            return currentType === type;
           });
         }
       }
@@ -874,9 +880,14 @@ export class Chunk {
       if (child.userData.isEntity) continue;
 
       // 处理动态网格 (玩家放置的单体 Mesh)
-      if (Math.floor(child.position.x) === Math.floor(x) &&
-          Math.floor(child.position.y) === Math.floor(y) &&
-          Math.floor(child.position.z) === Math.floor(z)) {
+      // 核心修复：移除该位置的所有动态 mesh，防止"方块消除后又重新出现"的 bug
+      const matchX = Math.floor(x);
+      const matchY = Math.floor(y);
+      const matchZ = Math.floor(z);
+
+      if (Math.floor(child.position.x) === matchX &&
+          Math.floor(child.position.y) === matchY &&
+          Math.floor(child.position.z) === matchZ) {
 
         // 从追踪映射中移除
         this.dynamicMeshes.delete(key);
@@ -887,6 +898,7 @@ export class Chunk {
           else child.material.dispose();
         }
         this.group.remove(child);
+        // 注意：这里不 continue，继续检查是否有其他 mesh 在同一位置（修复叠加方块问题）
       }
     }
 
@@ -1164,6 +1176,8 @@ export class Chunk {
           }
         }
       } else {
+        // 处理动态网格 (玩家放置的单体 Mesh)
+        // 核心修复：移除该位置的所有动态 mesh，防止"方块消除后又重新出现"的 bug
         const cx = Math.floor(child.position.x);
         const cy = Math.floor(child.position.y);
         const cz = Math.floor(child.position.z);
@@ -1172,8 +1186,15 @@ export class Chunk {
         );
 
         if (isMatch) {
+          const key = `${cx},${cy},${cz}`;
+          this.dynamicMeshes.delete(key);
           if (child.geometry) child.geometry.dispose();
+          if (child.material) {
+            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+            else child.material.dispose();
+          }
           this.group.remove(child);
+          // 注意：这里不 break，继续检查是否有其他 mesh 在同一位置
         }
       }
     }
