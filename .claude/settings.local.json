@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nrefactor\\(test\\): 改进面剔除测试页面的代码质量\n\n- 将 onclick 属性改为 addEventListener 事件绑定\n- 添加透明方块类型初始化，确保测试完整性\n- 移除全局函数导出，改为直接绑定按钮事件\n- 提高代码的可维护性和健壮性\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git commit:*)",
+      "Bash(git reset --hard:*)",
+      "Bash(git checkout:*)",
+      "Bash(gh pr create:*)",
+      "Bash(git merge:*)",
+      "Bash(git push:*)",
+      "Bash(git fetch:*)",
+      "Bash(.specify/scripts/bash/create-new-feature.sh:*)",
+      "Bash(.specify/scripts/bash/check-prerequisites.sh:*)",
+      "Bash(.specify/scripts/bash/setup-plan.sh:*)",
+      "Bash(.specify/scripts/bash/update-agent-context.sh:*)",
+      "Bash(git config:*)",
+      "Bash(npm run build)",
+      "Bash(npm run)",
+      "Bash(node:*)",
+      "Bash(npm run start)",
+      "Bash(npx eslint:*)",
+      "Bash(sleep 5:*)",
+      "Bash(lsof:*)",
+      "Bash(ls:*)",
+      "Bash(curl:*)",
+      "Bash(echo 端口 8080 未使用:*)",
+      "Bash(true:*)",
+      "Bash(open:*)",
+      "Bash(bash:*)",
+      "Bash(git branch:*)",
+      "Bash(echo $file OK:*)"
+    ]
+  },
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "teammateMode": "in-process"
+}
