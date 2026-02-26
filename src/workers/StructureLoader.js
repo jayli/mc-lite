@@ -124,37 +124,11 @@ export class StructureLoader {
    * @param {boolean} optimizeTransparent - 是否对透明方块进行遮挡优化
    */
   addToChunk(chunk, blocks, dObj, optimizeTransparent = true) {
-    if (!optimizeTransparent) {
-      // 不进行优化，直接添加
-      blocks.forEach(b => {
-        chunk.add(b.x, b.y, b.z, b.type, dObj, b.solid !== false, b.orientation ?? 0);
-      });
-      return;
-    }
-
-    const blockMap = new Set();
-    blocks.forEach(b => blockMap.add(`${Math.floor(b.x)},${Math.floor(b.y)},${Math.floor(b.z)}`));
-
+    // 不进行优化，直接添加所有方块
+    // 修复：跨区块结构（如 uglyHouse）的遮挡判断需要考虑相邻区块的方块
+    // 简单方案：跳过遮挡优化，让主线程的 FaceCullingSystem 处理
     blocks.forEach(b => {
-      const props = getBlockProperties(b.type);
-      // 如果是透明方块（如某些特殊方块），进行遮挡剔除优化
-      if (props.isTransparent && b.type !== 'vine') {
-        // 检查 6 个相邻位置是否都在 blockMap 中
-        const neighbors = [
-          [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]
-        ];
-        const isSurrounded = neighbors.every(([dx, dy, dz]) =>
-          blockMap.has(`${Math.floor(b.x + dx)},${Math.floor(b.y + dy)},${Math.floor(b.z + dz)}`)
-        );
-
-        // 如果被完全包围，则认为不接触空气，跳过生成
-        if (!isSurrounded) {
-          chunk.add(b.x, b.y, b.z, b.type, dObj, b.solid !== false, b.orientation ?? 0);
-        }
-      } else {
-        // 非透明方块直接添加
-        chunk.add(b.x, b.y, b.z, b.type, dObj, b.solid !== false, b.orientation ?? 0);
-      }
+      chunk.add(b.x, b.y, b.z, b.type, dObj, b.solid !== false, b.orientation ?? 0);
     });
   }
 
