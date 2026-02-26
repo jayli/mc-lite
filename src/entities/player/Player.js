@@ -671,6 +671,22 @@ export class Player {
         }
         break; // 击中一个丧尸后停止
       }
+
+      // 检查是否击中小汽车 (rover)
+      else if (obj.userData?.type === 'rover' || obj.parent?.userData?.type === 'rover') {
+        const car = obj.userData?.type === 'rover' ? obj : obj.parent;
+        if (car && car.userData.collisionBlocks) {
+          // 移除碰撞方块
+          this.world.removeBlocksBatch(car.userData.collisionBlocks);
+          console.log(`[Combat] Mag7 击中小汽车，移除 ${car.userData.collisionBlocks.length} 个碰撞方块`);
+        }
+        // 移除小汽车模型
+        if (car && car.parent) {
+          car.parent.remove(car);
+          console.log(`[Combat] Mag7 击中小汽车，模型已移除`);
+        }
+        break; // 击中一个后停止
+      }
     }
 
     const hit = hits.length > 0 ? hits[0] : null;
