@@ -575,15 +575,16 @@ export class Chunk {
     * @param {string} type - 方块类型（如 'dirt', 'stone', 'wood' 等）
     * @param {Object} dObj - 数据收集对象（用于批量构建网格），如果为null则不收集
     * @param {boolean} solid - 是否为实心方块（影响碰撞检测）
+    * @param {number} orientation - 方块朝向（0-3），默认为 0
     */
-  add(x, y, z, type, dObj = null, solid = true) {
+  add(x, y, z, type, dObj = null, solid = true, orientation = 0) {
     // 生成方块的唯一键（用于碰撞检测和持久化覆盖检查）
     const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
 
     // 如果提供了数据收集对象，将方块位置按类型分类存储
     if (dObj) {
       if (!dObj[type]) dObj[type] = [];
-      dObj[type].push({ x, y, z });
+      dObj[type].push({ x, y, z, orientation: orientation || 0 });
     }
     // 如果是实心方块，添加到实心方块集合中
     if (solid) {

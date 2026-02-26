@@ -99,9 +99,9 @@ export class StructureLoader {
     const bottomY = groundY !== null ? this.getBottomY() : 0;
 
     for (const block of this.data.blocks) {
-      const worldX = x + block.x;
-      const worldY = groundY !== null ? y + (block.y - bottomY) : y + block.y - 1;
-      const worldZ = z + block.z;
+      const worldX = Math.floor(x + block.x);
+      const worldY = groundY !== null ? Math.floor(y + (block.y - bottomY)) : Math.floor(y + block.y - 1);
+      const worldZ = Math.floor(z + block.z);
 
       blocks.push({
         x: worldX,
