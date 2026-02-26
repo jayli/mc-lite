@@ -176,20 +176,28 @@ onmessage = function(e) {
               } else {
                 // 10% 概率生成白桦树，90% 概率生成普通大树
                 if (Math.random() < 0.1) {
-                  generateBirchTree(wx, h + 1, wz, fakeChunk, dPlaceholder);
+                  // 放入队列，确保在地形生成完成后执行，避免方块重叠
+                  structureQueue.push(() => generateBirchTree(wx, h + 1, wz, fakeChunk, dPlaceholder));
                 } else {
                   const isYellow = Math.random() < 0.1;
                   const leafType = isYellow ? 'yellow_leaves' : null;
                   const isBirch = Math.random() < 0.1;
                   const logType = isBirch ? 'birch_log' : null;
-                  Tree.generate(wx, h + 1, wz, fakeChunk, 'big', dPlaceholder, logType, leafType);
+                  // 放入队列，确保在地形生成完成后执行，避免方块重叠
+                  structureQueue.push(() => Tree.generate(wx, h + 1, wz, fakeChunk, 'big', dPlaceholder, logType, leafType));
                 }
               }
             }
           } else if (centerBiome === 'AZALEA') {
-            if (Math.random() < 0.045) Tree.generate(wx, h + 1, wz, fakeChunk, 'azalea', dPlaceholder);
+            if (Math.random() < 0.045) {
+              // 放入队列，确保在地形生成完成后执行，避免方块重叠
+              structureQueue.push(() => Tree.generate(wx, h + 1, wz, fakeChunk, 'azalea', dPlaceholder));
+            }
           } else if (centerBiome === 'SWAMP') {
-            if (Math.random() < 0.03) Tree.generate(wx, h + 1, wz, fakeChunk, 'swamp', dPlaceholder);
+            if (Math.random() < 0.03) {
+              // 放入队列，确保在地形生成完成后执行，避免方块重叠
+              structureQueue.push(() => Tree.generate(wx, h + 1, wz, fakeChunk, 'swamp', dPlaceholder));
+            }
           } else if (centerBiome === 'DESERT') {
             let occupied = false;
             if (Math.random() < 0.01) fakeChunk.add(wx, h + 1, wz, 'cactus', dPlaceholder);
@@ -197,8 +205,9 @@ onmessage = function(e) {
               structureQueue.push(() => generateStructure('rover', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
             }
             // 在沙漠地形中生成丑陋小屋（概率 0.00008，确保底面紧贴地表）
+            // 放入队列，确保在地形生成完成后执行，避免方块重叠
             if (!occupied && Math.random() < 0.00008 && safeForStructure) {
-              generateUglyHouse(wx, h + 1, wz, fakeChunk, dPlaceholder);
+              structureQueue.push(() => generateUglyHouse(wx, h + 1, wz, fakeChunk, dPlaceholder));
               occupied = true;
             }
           } else {
@@ -209,7 +218,8 @@ onmessage = function(e) {
               occupied = true;
             }
             if (!occupied && Math.random() < 0.005) {
-              Tree.generate(wx, h + 1, wz, fakeChunk, 'default', dPlaceholder);
+              // 放入队列，确保在地形生成完成后执行，避免方块重叠
+              structureQueue.push(() => Tree.generate(wx, h + 1, wz, fakeChunk, 'default', dPlaceholder));
               occupied = true;
             }
             if (!occupied) {
@@ -225,8 +235,9 @@ onmessage = function(e) {
               structureQueue.push(() => generateStructure('house', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
             }
             // 在草地上生成坦克（低概率，确保不与其他物体重叠）
+            // 放入队列，确保在地形生成完成后执行，避免方块重叠
             if (surf === 'grass' && !occupied && Math.random() < 0.0001 && safeForStructure) {
-              generateTank(wx, h + 1, wz, fakeChunk, dPlaceholder);
+              structureQueue.push(() => generateTank(wx, h + 1, wz, fakeChunk, dPlaceholder));
               occupied = true;
             }
           }
