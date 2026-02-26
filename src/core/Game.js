@@ -380,29 +380,20 @@ export class Game {
   }
 
   /**
-   * 设置玩家出生点在金字塔旁边
+   * 设置玩家出生点在金字塔旁边（高空坠落）
    */
   setPlayerSpawnAtPyramid() {
     // 金字塔中心点附近出生（距离金字塔边缘 5 格）
     const spawnX = this.pyramidCenterX + 25; // 金字塔半径 20 + 5 格距离
     const spawnZ = this.pyramidCenterZ + 25;
-
-    // 查找地面高度
-    let spawnY = 20; // 从空中开始向下查找
-    for (let y = spawnY; y > -10; y--) {
-      const block = this.world.getBlock(spawnX, y, spawnZ);
-      if (block !== null && block !== 'air') {
-        spawnY = y + 1; // 在方块上方生成
-        break;
-      }
-    }
+    const spawnY = 120; // 高空坠落
 
     // 设置玩家位置
     this.player.position.set(spawnX, spawnY, spawnZ);
     this.player.camera.position.copy(this.player.position);
     this.player.camera.position.y += 1.65;
 
-    console.log(`[Spawn] 玩家出生在金字塔附近：(${spawnX}, ${spawnY}, ${spawnZ})`);
+    console.log(`[Spawn] 玩家出生在金字塔附近高空：(${spawnX}, ${spawnY}, ${spawnZ})`);
     console.log(`[Spawn] 金字塔中心点：(${this.pyramidCenterX}, ${this.pyramidCenterZ})`);
   }
 

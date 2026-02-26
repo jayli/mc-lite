@@ -158,11 +158,9 @@ onmessage = function(e) {
           // 最底层 end_stone
           fakeChunk.add(wx, h - 12, wz, 'end_stone', dPlaceholder);
 
-          // 金字塔区域不生成其他结构（树、房屋等）
-          continue;
-        }
-
-        if (h < wLvl) {
+          // 金字塔区域不生成其他结构（树、房屋等），但云需要正常生成
+          // 跳过后续的地表装饰生成，继续执行云生成逻辑
+        } else if (h < wLvl) {
           fakeChunk.add(wx, h, wz, 'sand', dPlaceholder);
           fakeChunk.add(wx, h - 1, wz, 'end_stone', dPlaceholder);
           if (centerBiome === 'SWAMP' && Math.random() < 0.08) {
