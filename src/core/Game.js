@@ -33,6 +33,12 @@ export class Game {
     // 初始化敌人管理器（替代原来的丧尸管理器）
     this.enemyManager = new EnemyManager(this.engine.scene, this.world);
 
+    // 计算金字塔中心点（与 WorldWorker.js 中的逻辑一致）
+    const randX = Math.abs(Math.sin(WORLD_CONFIG.SEED * 1.5));
+    const randZ = Math.abs(Math.sin(WORLD_CONFIG.SEED * 2.5));
+    this.pyramidCenterX = Math.floor(randX * 150) + 50;
+    this.pyramidCenterZ = Math.floor(randZ * 150) + 50;
+
     // 初始化 Stats 监控
     this.stats = new Stats();
     this.stats.dom.style.position = 'absolute';
@@ -185,6 +191,11 @@ export class Game {
         faceCullingSystem.auditWorld(this.world, true);
       }
     }, 5000);
+
+    // 设置玩家出生点在金字塔旁边（等待世界加载完成后）
+    setTimeout(() => {
+      this.setPlayerSpawnAtPyramid();
+    }, 500);
   }
 
   /**
@@ -367,4 +378,32 @@ export class Game {
       this.ui.updateActiveButtons();
     }
   }
+
+  /**
+   * 设置玩家出生点在金字塔旁边
+   */
+  setPlayerSpawnAtPyramid() {
+    // 金字塔中心点附近出生（距离金字塔边缘 5 格）
+    const spawnX = this.pyramidCenterX + 25; // 金字塔半径 20 + 5 格距离
+    const spawnZ = this.pyramidCenterZ + 25;
+
+    // 查找地面高度
+    let spawnY = 20; // 从空中开始向下查找
+    for (let y = spawnY; y > -10; y--) {
+      const block = this.world.getBlock(spawnX, y, spawnZ);
+      if (block !== null && block !== 'air') {
+        spawnY = y + 1; // 在方块上方生成
+        break;
+      }
+    }
+
+    // 设置玩家位置
+    this.player.position.set(spawnX, spawnY, spawnZ);
+    this.player.camera.position.copy(this.player.position);
+    this.player.camera.position.y += 1.65;
+
+    console.log(`[Spawn] 玩家出生在金字塔附近：(${spawnX}, ${spawnY}, ${spawnZ})`);
+    console.log(`[Spawn] 金字塔中心点：(${this.pyramidCenterX}, ${this.pyramidCenterZ})`);
+  }
+
 }

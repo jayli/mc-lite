@@ -130,6 +130,38 @@ onmessage = function(e) {
         const wLvl = -2;
         const safeForStructure = x >= 3 && x <= 12 && z >= 3 && z <= 12;
 
+        // 检查当前坐标是否在金字塔范围内
+        const pyInfo = getPyramidInfo(wx, wz, seed);
+        const inPyramid = pyInfo !== null;
+
+        if (inPyramid) {
+          // 金字塔区域：生成沙子金字塔和岩石基础
+          const pyramidSurfaceY = h + pyInfo.layerHeight;
+
+          // 生成金字塔主体（沙子）
+          for (let y = h; y <= pyramidSurfaceY; y++) {
+            fakeChunk.add(wx, y, wz, 'sand', dPlaceholder);
+          }
+
+          // 生成岩石基础层（1-11 层，无矿洞）
+          for (let k = 1; k <= 11; k++) {
+            const rockY = h - k;
+            if (k === 11) {
+              fakeChunk.add(wx, rockY, wz, 'end_stone', dPlaceholder);
+            } else if (k === 10) {
+              fakeChunk.add(wx, rockY, wz, 'stone', dPlaceholder);
+            } else {
+              const rockType = Math.random() < 0.3 ? 'cobblestone' : 'stone';
+              fakeChunk.add(wx, rockY, wz, rockType, dPlaceholder);
+            }
+          }
+          // 最底层 end_stone
+          fakeChunk.add(wx, h - 12, wz, 'end_stone', dPlaceholder);
+
+          // 金字塔区域不生成其他结构（树、房屋等）
+          continue;
+        }
+
         if (h < wLvl) {
           fakeChunk.add(wx, h, wz, 'sand', dPlaceholder);
           fakeChunk.add(wx, h - 1, wz, 'end_stone', dPlaceholder);
@@ -611,4 +643,43 @@ function generateTank(x, y, z, chunk, dObj) {
  */
 function generateUglyHouse(x, y, z, chunk, dObj) {
   uglyHouse.generate(x, y, z, chunk, dObj, true);
+}
+
+/**
+ * 检查坐标是否在金字塔范围内，并返回金字塔相关信息
+ */
+function getPyramidInfo(wx, wz, seed) {
+  const pyramidSize = 40;
+  const halfSize = pyramidSize / 2;
+
+  // 使用确定性随机找到金字塔中心点（基于种子）
+  const randX = Math.abs(Math.sin(seed * 1.5));
+  const randZ = Math.abs(Math.sin(seed * 2.5));
+  const pyramidCx = Math.floor(randX * 150) + 50;
+  const pyramidCz = Math.floor(randZ * 150) + 50;
+
+  const pyramidMinX = pyramidCx - halfSize;
+  const pyramidMaxX = pyramidCx + halfSize;
+  const pyramidMinZ = pyramidCz - halfSize;
+  const pyramidMaxZ = pyramidCz + halfSize;
+
+  // 检查是否在金字塔范围内
+  if (wx < pyramidMinX || wx > pyramidMaxX || wz < pyramidMinZ || wz > pyramidMaxZ) {
+    return null;
+  }
+
+  // 计算相对于金字塔中心的距离
+  const dx = Math.abs(wx - pyramidCx);
+  const dz = Math.abs(wz - pyramidCz);
+  const distFromCenter = Math.max(dx, dz);
+
+  // 金字塔坡度：每 2 个单位水平距离，高度下降 1 个单位
+  const pyramidLayerHeight = Math.floor((halfSize - distFromCenter) / 2);
+
+  return {
+    centerX: pyramidCx,
+    centerZ: pyramidCz,
+    layerHeight: Math.max(0, pyramidLayerHeight),
+    isBaseLayer: pyramidLayerHeight === 0
+  };
 }
