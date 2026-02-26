@@ -2,6 +2,10 @@
 
 Use this skill when the user runs `/commit` or asks to commit changes.
 
+## Configuration
+
+- **Model**: Prioritize using the model configured in environment variable `ANTHROPIC_DEFAULT_HAIKU_MODEL`. If this environment variable is not available, use the default model.
+
 ## Instructions
 
 1.  **Analyze Context**:
