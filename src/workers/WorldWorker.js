@@ -234,8 +234,9 @@ onmessage = function(e) {
             if (Math.random() < 0.0005 && safeForStructure) {
               structureQueue.push(() => generateStructure('rover', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
             }
-            // 在沙漠地形中生成丑陋小屋（概率 0.00008，确保底面紧贴地表）
+            // 在沙漠地形中生成丑陋小屋（概率 0.00008）
             // 放入队列，确保在地形生成完成后执行，避免方块重叠
+            // 使用 h+1 与 Tank 保持一致
             if (!occupied && Math.random() < 0.00008 && safeForStructure) {
               structureQueue.push(() => generateUglyHouse(wx, h + 1, wz, fakeChunk, dPlaceholder));
               occupied = true;
