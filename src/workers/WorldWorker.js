@@ -645,16 +645,25 @@ function generateUglyHouse(x, y, z, chunk, dObj) {
 
 /**
  * 检查坐标是否在金字塔范围内，并返回金字塔相关信息
+ * 每 500x500 的区域生成一个金字塔
  */
 function getPyramidInfo(wx, wz, seed) {
-  const pyramidSize = 40;
-  const halfSize = pyramidSize / 2;
+  const pyramidSize = 40;  // 金字塔边长 40 格
+  const halfSize = Math.floor(pyramidSize / 2);
+  const regionSize = 400;  // 每 400x400 区域生成一个金字塔
 
-  // 使用确定性随机找到金字塔中心点（基于种子）
-  const randX = Math.abs(Math.sin(seed * 1.5));
-  const randZ = Math.abs(Math.sin(seed * 2.5));
-  const pyramidCx = Math.floor(randX * 150) + 50;
-  const pyramidCz = Math.floor(randZ * 150) + 50;
+  // 计算当前坐标所在的区域
+  const regionX = Math.floor(wx / regionSize);
+  const regionZ = Math.floor(wz / regionSize);
+
+  // 每个区域的金字塔中心点，使用种子添加固定偏移
+  const randX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
+  const randZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
+  const offsetX = Math.floor(randX * 300) + 100;  // 区域内偏移 100-400
+  const offsetZ = Math.floor(randZ * 300) + 100;
+
+  const pyramidCx = regionX * regionSize + offsetX;
+  const pyramidCz = regionZ * regionSize + offsetZ;
 
   const pyramidMinX = pyramidCx - halfSize;
   const pyramidMaxX = pyramidCx + halfSize;
