@@ -269,7 +269,7 @@
   </script>
 
   <div class="controls">
-    <button id="run-all-btn" class="primary">运行所有测试</button>
+    <button id="run-all-btn" class="primary" disabled title="等待脚本加载完成...">运行所有测试</button>
     <button id="clear-btn" class="secondary">清除结果</button>
     <div class="checkbox-group">
       <input type="checkbox" id="auto-scroll" checked>
@@ -314,8 +314,14 @@
     import './test-world.js';
     import './test-entity-system.js';
 
+    // 所有脚本加载完成，启用运行按钮
+    const runAllBtn = document.getElementById('run-all-btn');
+    runAllBtn.disabled = false;
+    runAllBtn.removeAttribute('title');
+    runAllBtn.title = '点击运行所有测试用例';
+
     // 绑定按钮事件
-    document.getElementById('run-all-btn').addEventListener('click', async function() {
+    runAllBtn.addEventListener('click', async function() {
       const btn = this;
       const statusBar = document.getElementById('status-bar');
 
