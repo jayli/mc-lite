@@ -58,6 +58,7 @@ onmessage = function(e) {
   let modGunMan = []; // 记录模型人 (gun_man.glb) 的位置
   let rovers = []; // 记录火星车的位置
   const structureQueue = []; // 结构生成队列，确保结构覆盖地形
+  const structureCenters = []; // 结构中心点列表，用于跨 Chunk 渲染
 
   // 模拟 Chunk 类的 add 方法 - 改为写入 blockMap
   const fakeChunk = {
@@ -207,38 +208,50 @@ onmessage = function(e) {
                 // 10% 概率生成白桦树，90% 概率生成普通大树
                 if (Math.random() < 0.1) {
                   // 放入队列，确保在地形生成完成后执行，避免方块重叠
-                  structureQueue.push(() => generateBirchTree(wx, h + 1, wz, fakeChunk, dPlaceholder));
+                  const task = () => generateBirchTree(wx, h + 1, wz, fakeChunk, dPlaceholder);
+                  task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'tree';
+                  structureQueue.push(task);
                 } else {
                   const isYellow = Math.random() < 0.1;
                   const leafType = isYellow ? 'yellow_leaves' : null;
                   const isBirch = Math.random() < 0.1;
                   const logType = isBirch ? 'birch_log' : null;
                   // 放入队列，确保在地形生成完成后执行，避免方块重叠
-                  structureQueue.push(() => Tree.generate(wx, h + 1, wz, fakeChunk, 'big', dPlaceholder, logType, leafType));
+                  const task = () => Tree.generate(wx, h + 1, wz, fakeChunk, 'big', dPlaceholder, logType, leafType);
+                  task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'tree';
+                  structureQueue.push(task);
                 }
               }
             }
           } else if (centerBiome === 'AZALEA') {
             if (Math.random() < 0.045) {
               // 放入队列，确保在地形生成完成后执行，避免方块重叠
-              structureQueue.push(() => Tree.generate(wx, h + 1, wz, fakeChunk, 'azalea', dPlaceholder));
+              const task = () => Tree.generate(wx, h + 1, wz, fakeChunk, 'azalea', dPlaceholder);
+              task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'tree';
+              structureQueue.push(task);
             }
           } else if (centerBiome === 'SWAMP') {
             if (Math.random() < 0.03) {
               // 放入队列，确保在地形生成完成后执行，避免方块重叠
-              structureQueue.push(() => Tree.generate(wx, h + 1, wz, fakeChunk, 'swamp', dPlaceholder));
+              const task = () => Tree.generate(wx, h + 1, wz, fakeChunk, 'swamp', dPlaceholder);
+              task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'tree';
+              structureQueue.push(task);
             }
           } else if (centerBiome === 'DESERT') {
             let occupied = false;
             if (Math.random() < 0.01) fakeChunk.add(wx, h + 1, wz, 'cactus', dPlaceholder);
             if (Math.random() < 0.0005 && safeForStructure) {
-              structureQueue.push(() => generateStructure('rover', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
+              const task = () => generateStructure('rover', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers);
+              task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'rover';
+              structureQueue.push(task);
             }
             // 在沙漠地形中生成丑陋小屋（概率 0.00008）
             // 放入队列，确保在地形生成完成后执行，避免方块重叠
             // 使用 h+1 与 Tank 保持一致
             if (!occupied && Math.random() < 0.00008 && safeForStructure) {
-              structureQueue.push(() => generateUglyHouse(wx, h + 1, wz, fakeChunk, dPlaceholder));
+              const task = () => generateUglyHouse(wx, h + 1, wz, fakeChunk, dPlaceholder);
+              task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'uglyHouse';
+              structureQueue.push(task);
               occupied = true;
             }
           } else {
@@ -250,7 +263,9 @@ onmessage = function(e) {
             }
             if (!occupied && Math.random() < 0.005) {
               // 放入队列，确保在地形生成完成后执行，避免方块重叠
-              structureQueue.push(() => Tree.generate(wx, h + 1, wz, fakeChunk, 'default', dPlaceholder));
+              const task = () => Tree.generate(wx, h + 1, wz, fakeChunk, 'default', dPlaceholder);
+              task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'tree';
+              structureQueue.push(task);
               occupied = true;
             }
             if (!occupied) {
@@ -263,12 +278,16 @@ onmessage = function(e) {
               }
             }
             if (Math.random() < 0.001 && safeForStructure) {
-              structureQueue.push(() => generateStructure('house', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
+              const task = () => generateStructure('house', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers);
+              task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'house';
+              structureQueue.push(task);
             }
             // 在草地上生成坦克（低概率，确保不与其他物体重叠）
             // 放入队列，确保在地形生成完成后执行，避免方块重叠
             if (surf === 'grass' && !occupied && Math.random() < 0.0001 && safeForStructure) {
-              structureQueue.push(() => generateTank(wx, h + 1, wz, fakeChunk, dPlaceholder));
+              const task = () => generateTank(wx, h + 1, wz, fakeChunk, dPlaceholder);
+              task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'tank';
+              structureQueue.push(task);
               occupied = true;
             }
           }
@@ -291,7 +310,21 @@ onmessage = function(e) {
       const size = 30 + Math.floor(Math.random() * 21);
       Cloud.generateCluster(startX, 35, startZ, size, fakeChunk, dPlaceholder);
     }
-    structureQueue.forEach(task => task());
+
+    // 执行结构生成队列，并记录大型结构的中心点
+    // structureCenters 需要在生成结构时同步更新
+    const structureQueueWithCenters = structureQueue.map(task => {
+      // 尝试从任务中提取中心点（通过预存储的方式）
+      return { task, centerX: task.centerX, centerY: task.centerY, centerZ: task.centerZ, type: task.type };
+    });
+
+    structureQueueWithCenters.forEach(({ task, centerX, centerY, centerZ, type }) => {
+      task();
+      // 如果是大型结构，添加到结构中心列表
+      if (type && centerX !== undefined) {
+        structureCenters.push({ type, x: centerX, y: centerY, z: centerZ });
+      }
+    });
   }
 
   // 统一后处理：AO 计算、隐藏面剔除，并返回渲染数据
@@ -416,14 +449,62 @@ onmessage = function(e) {
   const minZ = cz * CHUNK_SIZE;
   const maxZ = (cz + 1) * CHUNK_SIZE;
 
+  // --- 跨区块实体渲染支持 ---
+  // 当一个结构/实体的中心在当前 Chunk 内时，渲染该结构的所有方块
+  // 即使方块位置超出 Chunk 边界
+  // structureCenters 已在上面定义
+
+  // 从实体列表中收集结构中心
+  if (realisticTrees) {
+    realisticTrees.forEach(pos => {
+      if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
+        structureCenters.push({ type: 'tree', ...pos });
+      }
+    });
+  }
+  if (modGunMan) {
+    modGunMan.forEach(pos => {
+      if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
+        structureCenters.push({ type: 'gunman', ...pos });
+      }
+    });
+  }
+  if (rovers) {
+    rovers.forEach(pos => {
+      if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
+        structureCenters.push({ type: 'rover', ...pos });
+      }
+    });
+  }
+
+  // 辅助函数：判断一个方块是否属于某个结构中心
+  const belongsToStructure = (bx, by, bz) => {
+    for (const center of structureCenters) {
+      let maxDist = 24; // 支持 UglyHouse 最大 40x40 尺寸
+      if (center.type === 'tree') maxDist = 8;
+      else if (center.type === 'gunman') maxDist = 3;
+      else if (center.type === 'rover') maxDist = 3;
+      else if (center.type === 'tank') maxDist = 3; // Tank 尺寸约 7x7x7
+      else if (center.type === 'uglyHouse') maxDist = 24; // UglyHouse 最大约 40x40
+      else if (center.type === 'house') maxDist = 5; // 普通小屋约 5x5
+
+      const dx = Math.abs(bx - center.x);
+      const dz = Math.abs(bz - center.z);
+      const dy = Math.abs(by - center.y);
+
+      if (dx <= maxDist && dz <= maxDist && dy <= 16) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   for (const [key, block] of blockMap) {
-    // 检查方块是否在当前区块范围内
     const inCurrentChunk = block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;
-    // if (block.type === 'air') {
-    //     allBlockTypes[key] = 'air';
-    //     continue;
-    // }
-    if (block.solid && inCurrentChunk) solidBlocks.push(key);
+    const isCrossChunkStructureBlock = !inCurrentChunk && belongsToStructure(block.x, block.y, block.z);
+
+    // 固体方块：只要在 Chunk 内或者是跨区结构方块，都添加到 solidBlocks
+    if (block.solid && (inCurrentChunk || isCrossChunkStructureBlock)) solidBlocks.push(key);
     let visible = true;
     if (block.solid) {
       const { x, y, z } = block;
@@ -437,11 +518,12 @@ onmessage = function(e) {
       if (covered && block.type !== 'chest') visible = false;
     }
 
-    // allBlockTypes 记录所有方块（包括跨区块的），用于持久化和 blockData 查找
     allBlockTypes[key] = { type: block.type, orientation: block.orientation || 0 };
 
-    // 只将当前区块范围内的方块添加到渲染数据中
-    if (inCurrentChunk && visible) {
+    // 渲染条件：在当前 Chunk 内，或者属于当前 Chunk 的跨区结构
+    const shouldRender = inCurrentChunk || isCrossChunkStructureBlock;
+
+    if (shouldRender && visible) {
       if (!d[block.type]) d[block.type] = [];
       let aoLow = 0;
       let aoHigh = 0;
