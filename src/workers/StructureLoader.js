@@ -121,9 +121,9 @@ export class StructureLoader {
    * @param {Object} chunk - 区块对象
    * @param {Array} blocks - 方块数组
    * @param {Object} dObj - 数据收集对象
-   * @param {boolean} optimizeTransparent - 是否对透明方块进行遮挡优化
+   * @param {boolean} _optimizeTransparent - 是否对透明方块进行遮挡优化（未使用）
    */
-  addToChunk(chunk, blocks, dObj, optimizeTransparent = true) {
+  addToChunk(chunk, blocks, dObj, _optimizeTransparent = true) {
     // 不进行优化，直接添加所有方块
     // 修复：跨区块结构（如 uglyHouse）的遮挡判断需要考虑相邻区块的方块
     // 简单方案：跳过遮挡优化，让主线程的 FaceCullingSystem 处理
@@ -156,3 +156,25 @@ export const structureLoaders = {
   birchTree: new StructureLoader('brich_tree', '../world/blockmods/brich_tree.json'),
   tank: new StructureLoader('tank', '../world/blockmods/tank.json')
 };
+
+/**
+ * 将所有结构加载器预加载
+ * 可在游戏初始化时调用
+ */
+export async function preloadAllStructures() {
+  await Promise.all([
+    structureLoaders.uglyHouse.load(),
+    structureLoaders.birchTree.load(),
+    structureLoaders.tank.load()
+  ]);
+  console.log('All structures preloaded');
+}
+
+/**
+ * 获取结构加载器实例
+ * @param {string} name - 加载器名称
+ * @returns {StructureLoader|undefined}
+ */
+export function getStructureLoader(name) {
+  return structureLoaders[name];
+}
