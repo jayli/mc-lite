@@ -8,7 +8,6 @@
 
 import { describe, test } from './runner.js';
 import { assertEqual, assertTrue, assertFalse, assertNotNull } from './assert.js';
-import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 import { Chunk } from '../world/Chunk.js';
 
 // 模拟的 Three.js 基础类（用于 Chunk 的依赖）
@@ -168,7 +167,8 @@ const BufferGeometryUtils = {
 const mockPersistenceService = {
   recordChange: () => {},
   saveChunkData: () => Promise.resolve(),
-  saveDebounced: () => {}
+  saveDebounced: () => {},
+  getChunkData: () => Promise.resolve(null)
 };
 
 // 模拟 faceCullingSystem
@@ -179,9 +179,15 @@ const mockFaceCullingSystem = {
   updateBlock: () => {}
 };
 
-// 模拟 materials
+// 模拟 materials - 返回带有 dispose 方法的材质对象
 const mockMaterials = {
-  getMaterial: (type) => ({ clone: () => ({}) }),
+  getMaterial: (type) => {
+    const material = {
+      clone: () => ({ ...material }),
+      dispose: () => {}
+    };
+    return material;
+  },
   dispose: () => {}
 };
 
@@ -228,14 +234,6 @@ class MockWorldWorker {
   }
 }
 
-// 模拟 FaceCullingWorker
-class MockFaceCullingWorker {
-  constructor() {
-    this.onmessage = null;
-  }
-  postMessage() {}
-}
-
 // 创建模拟的 World 对象
 const createMockWorld = () => ({
   chunks: new Map(),
@@ -245,29 +243,29 @@ const createMockWorld = () => ({
 
 describe('Chunk 真实类测试', (test) => {
 
-  let originalChunk, originalWorker, originalFaceCullingWorker;
+  let originalWorker;
   let originalPersistenceService, originalFaceCullingSystem;
-  let originalMaterials, originalBufferGeometryUtils, originalBlockData;
+  let originalMaterials, originalBlockData, originalCarModel, originalGunManModel;
 
   // 在测试前设置模拟环境
   const setupEnvironment = () => {
     // 保存原始引用
-    originalChunk = globalThis._chunkModule;
     originalWorker = globalThis.Worker;
-    originalFaceCullingWorker = globalThis._faceCullingWorker;
     originalPersistenceService = globalThis._persistenceService;
     originalFaceCullingSystem = globalThis._faceCullingSystem;
     originalMaterials = globalThis._materials;
-    originalBufferGeometryUtils = globalThis._bufferGeometryUtils;
     originalBlockData = globalThis._blockData;
+    originalCarModel = globalThis._carModel;
+    originalGunManModel = globalThis._gunManModel;
 
     // 设置模拟
     globalThis.Worker = MockWorldWorker;
     globalThis._persistenceService = mockPersistenceService;
     globalThis._faceCullingSystem = mockFaceCullingSystem;
     globalThis._materials = mockMaterials;
-    globalThis._bufferGeometryUtils = BufferGeometryUtils;
     globalThis._blockData = mockBlockData;
+    globalThis._carModel = { clone: () => null };
+    globalThis._gunManModel = { clone: () => null };
   };
 
   // 恢复原始环境
@@ -276,8 +274,9 @@ describe('Chunk 真实类测试', (test) => {
     if (originalPersistenceService) globalThis._persistenceService = originalPersistenceService;
     if (originalFaceCullingSystem) globalThis._faceCullingSystem = originalFaceCullingSystem;
     if (originalMaterials) globalThis._materials = originalMaterials;
-    if (originalBufferGeometryUtils) globalThis._bufferGeometryUtils = originalBufferGeometryUtils;
     if (originalBlockData) globalThis._blockData = originalBlockData;
+    if (originalCarModel) globalThis._carModel = originalCarModel;
+    if (originalGunManModel) globalThis._gunManModel = originalGunManModel;
   };
 
   // =========== 基础状态测试 ===========

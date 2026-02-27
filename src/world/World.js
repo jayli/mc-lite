@@ -9,6 +9,11 @@ import { noise } from '../utils/MathUtils.js';
 import { ParticleSystem } from './effects/ParticleSystem.js';
 import { parseBlockEntry } from '../utils/OrientationUtils.js';
 
+// --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
+const getPersistenceService = () => globalThis._persistenceService || persistenceService;
+const getChestManager = () => globalThis._chestManager || chestManager;
+const getParticleSystem = () => globalThis._ParticleSystem || ParticleSystem;
+
 // --- 全局世界常量 ---
 /** 每个区块在 X 和 Z 方向上的大小 (16x16) */
 const CHUNK_SIZE = 16;
@@ -29,7 +34,8 @@ export class World {
     this.chunks = new Map();
 
     // 初始化粒子系统，处理挖掘和爆炸的视觉效果
-    this.particles = new ParticleSystem(this.scene);
+    const ParticleSystemClass = getParticleSystem();
+    this.particles = new ParticleSystemClass(this.scene);
 
     /** 用于辅助计算变换矩阵的虚拟对象，避免频繁实例化 */
     this.dummy = new THREE.Object3D();
@@ -93,7 +99,7 @@ export class World {
       if (Math.abs(chunk.cx - cx) > RENDER_DIST + 1 || Math.abs(chunk.cz - cz) > RENDER_DIST + 1) {
         this.scene.remove(chunk.group);
         // 重要：在卸载前请求持久化，确保修改不丢失
-        persistenceService.saveChunkData(chunk.cx, chunk.cz);
+        getPersistenceService().saveChunkData(chunk.cx, chunk.cz);
         chunk.dispose(); // 释放显存
         this.chunks.delete(key);
       }
@@ -120,7 +126,7 @@ export class World {
     }
 
     // 更新宝箱打开/关闭动画
-    chestManager.update(dt);
+    getChestManager().update(dt);
   }
 
   /**

@@ -14,6 +14,21 @@ import { carModel, gunManModel } from '../core/Engine.js';
 import { getBlockProperties } from '../constants/BlockData.js';
 import { getRotationAngle, parseBlockEntry, serializeBlockEntry } from '../utils/OrientationUtils.js';
 
+// --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
+const getPersistenceService = () => globalThis._persistenceService || persistenceService;
+const getFaceCullingSystem = () => globalThis._faceCullingSystem || faceCullingSystem;
+const getMaterials = () => globalThis._materials || materials;
+const getCarModel = () => globalThis._carModel || carModel;
+const getGunManModel = () => globalThis._gunManModel || gunManModel;
+
+// 获取方块属性函数 - 优先使用测试环境的模拟
+function getBlockProps(type) {
+  if (globalThis._blockData && typeof globalThis._blockData.getBlockProperties === 'function') {
+    return globalThis._blockData.getBlockProperties(type);
+  }
+  return getBlockProperties(type);
+}
+
 /** 区块尺寸 - 每个区块在 X 和 Z 方向上的方块数量 (16x16 是 Voxel 游戏的标准区块大小) */
 const CHUNK_SIZE = 16;
 
@@ -350,7 +365,7 @@ export class Chunk {
         // 同理，保留合并期间新产生的碰撞体，但必须确保该位置在最新的 blockData 中依然是实心的
         for (const [key, mesh] of this.dynamicMeshes.entries()) {
           const type = mesh.userData.type;
-          if (this.blockData[key] && getBlockProperties(type).isSolid) {
+          if (this.blockData[key] && getBlockProps(type).isSolid) {
             this.solidBlocks.add(key);
           }
         }
@@ -452,7 +467,7 @@ export class Chunk {
    */
   async gen() {
     // 0. 加载持久化全量数据 (快照)
-    const snapshot = await persistenceService.getChunkData(this.cx, this.cz);
+    const snapshot = await getPersistenceService().getChunkData(this.cx, this.cz);
 
     return new Promise((resolve) => {
       const callbackKey = `${this.cx},${this.cz}`;
@@ -491,9 +506,10 @@ export class Chunk {
         }
 
         // 3.1 处理模型人 (gun_man.glb)
-        if (modGunMan && modGunMan.length > 0 && gunManModel) {
+        if (modGunMan && modGunMan.length > 0 && getGunManModel()) {
           modGunMan.forEach(pos => {
-            const gm = gunManModel.clone();
+            const gm = getGunManModel().clone();
+            if (!gm) return; // 测试环境中可能为 null
             gm.userData.isEntity = true;
             gm.userData.type = 'modGunMan';
             gm.position.set(pos.x + 0.5, pos.y, pos.z + 0.5);
@@ -524,9 +540,10 @@ export class Chunk {
         }
 
         // 3.1 处理火星车模型
-        if (rovers && rovers.length > 0 && carModel) {
+        if (rovers && rovers.length > 0 && getCarModel()) {
           rovers.forEach(pos => {
-            const car = carModel.clone();
+            const car = getCarModel().clone();
+            if (!car) return; // 测试环境中可能为 null
             car.userData.isEntity = true;
             car.userData.type = 'rover';
             // 放置在方块顶部中心，注意模型已经处理过，基座在 (0,0,0)
@@ -550,7 +567,7 @@ export class Chunk {
 
         // 4. 重要：在生成完成后，立即保存快照数据
         if (newSnapshot) {
-          persistenceService.saveChunkData(this.cx, this.cz, newSnapshot);
+          getPersistenceService().saveChunkData(this.cx, this.cz, newSnapshot);
         }
 
         this.isReady = true;
@@ -606,12 +623,12 @@ export class Chunk {
 
     // 遍历每种方块类型，为每种类型创建一个 InstancedMesh
     for (const type in d) {
-      const props = getBlockProperties(type);
+      const props = getBlockProps(type);
       if (d[type].length === 0 || !props.isRendered) continue;  // 跳过没有任何实例或不需渲染的方块类型
 
       // 从材质管理器和几何体映射表获取资源
       const geometry = geomMap[props.geometryType] || geomMap['default'];
-      const material = materials.getMaterial(type);
+      const material = getMaterials().getMaterial(type);
       // 创建实例化网格：指定几何体、材质和实例总数
       const mesh = new THREE.InstancedMesh(geometry, material, d[type].length);
 
@@ -709,7 +726,7 @@ export class Chunk {
   saveDebounced() {
     if (this.saveTimeout) clearTimeout(this.saveTimeout);
     this.saveTimeout = setTimeout(() => {
-      persistenceService.saveChunkData(this.cx, this.cz);
+      getPersistenceService().saveChunkData(this.cx, this.cz);
       this.saveTimeout = null;
     }, 500);
   }
@@ -737,7 +754,7 @@ export class Chunk {
     const oldType = oldParsed.type;
 
     // 更新内存中的快照数据
-    persistenceService.recordChange(x, y, z, entry);
+    getPersistenceService().recordChange(x, y, z, entry);
 
     // 更新数据和可见性状态
     if (type === 'air') {
@@ -775,13 +792,14 @@ export class Chunk {
 
     // 计算隐藏面剔除掩码与方块可见性
     let mask = 63; // 默认全显示 (111111)
-    if (faceCullingSystem && faceCullingSystem.isEnabled() && type !== 'air' && type !== 'collider' && type !== 'chest') {
+    const fcSystem = getFaceCullingSystem();
+    if (fcSystem && fcSystem.isEnabled() && type !== 'air' && type !== 'collider' && type !== 'chest') {
       const block = { type };
       const neighbors = getNeighborsOf(x, y, z);
-      mask = faceCullingSystem.calculateFaceVisibility(block, neighbors);
+      mask = fcSystem.calculateFaceVisibility(block, neighbors);
 
       // 如果方块完全被遮挡且不是透明方块，则标记为不可见
-      if (mask === 0 && !faceCullingSystem.isTransparent(type)) {
+      if (mask === 0 && !fcSystem.isTransparent(type)) {
         this.visibleKeys.delete(key);
       } else {
         this.visibleKeys.add(key);
@@ -904,7 +922,7 @@ export class Chunk {
     }
 
     // 更新碰撞体集合
-    const props = getBlockProperties(type);
+    const props = getBlockProps(type);
     if (props.isSolid) {
       this.solidBlocks.add(key);
     } else {
@@ -959,7 +977,7 @@ export class Chunk {
     } else {
       // 获取几何体和材质
       const geometry = geomMap[props.geometryType] || geomMap['default'];
-      let material = materials.getMaterial(type);
+      let material = getMaterials().getMaterial(type);
       // 克隆材质以避免潜在问题
       if (material) {
         if (Array.isArray(material)) {
@@ -1005,13 +1023,14 @@ export class Chunk {
     }
 
     // 隐藏面剔除系统更新 (通知邻居)
-    if (faceCullingSystem && faceCullingSystem.isEnabled()) {
+    const fcSystem2 = getFaceCullingSystem();
+    if (fcSystem2 && fcSystem2.isEnabled()) {
       const position = new THREE.Vector3(x, y, z);
       const block = { type };
 
       // 使用上面定义的辅助函数触发更新
-      faceCullingSystem.updateBlock(position, block, getNeighborsOf(x, y, z));
-      faceCullingSystem.updateNeighbors(position, (neighborPos) => {
+      fcSystem2.updateBlock(position, block, getNeighborsOf(x, y, z));
+      fcSystem2.updateNeighbors(position, (neighborPos) => {
         const nx = neighborPos.x, ny = neighborPos.y, nz = neighborPos.z;
         const nb = getNeighborBlock(nx, ny, nz);
         if (!nb) return null;
@@ -1092,7 +1111,7 @@ export class Chunk {
         delete this.blockData[key];
         this.visibleKeys.delete(key);
         this.solidBlocks.delete(key);
-        persistenceService.recordChange(px, py, pz, 'air');
+        getPersistenceService().recordChange(px, py, pz, 'air');
 
         // 收集周围 6 个方向的邻居坐标
         const offsets = [
@@ -1241,7 +1260,8 @@ export class Chunk {
    * 私有辅助方法：为单个方块触发 Face Culling 更新
    */
   _triggerFaceCullingUpdate(x, y, z, type) {
-    if (faceCullingSystem && faceCullingSystem.isEnabled()) {
+    const fcSystem = getFaceCullingSystem();
+    if (fcSystem && fcSystem.isEnabled()) {
       const position = new THREE.Vector3(x, y, z);
       const block = { type };
 
@@ -1264,7 +1284,7 @@ export class Chunk {
         east: getNeighborBlock(nx + 1, ny, nz)
       });
 
-      faceCullingSystem.updateBlock(position, block, getNeighborsOf(x, y, z));
+      fcSystem.updateBlock(position, block, getNeighborsOf(x, y, z));
     }
   }
 
@@ -1282,7 +1302,7 @@ export class Chunk {
       // 兼容新旧格式：当前类型可能是字符串或对象
       const blockType = typeof currentType === 'string' ? currentType : currentType.type;
       if (blockType) {
-        const props = getBlockProperties(blockType);
+        const props = getBlockProps(blockType);
         if (props.isIndestructible) {
           // 不可破坏方块，忽略移除请求
           console.log(`Block at ${x},${y},${z} is indestructible (${blockType})`);
@@ -1292,7 +1312,7 @@ export class Chunk {
     }
 
     // 记录持久化变更
-    persistenceService.recordChange(x, y, z, 'air');
+    getPersistenceService().recordChange(x, y, z, 'air');
     // 使用 addBlockDynamic 统一处理逻辑状态更新、内存缓存同步和隐藏面剔除
     this.addBlockDynamic(x, y, z, 'air');
   }
