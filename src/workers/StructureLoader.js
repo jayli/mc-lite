@@ -108,7 +108,7 @@ export class StructureLoader {
         y: worldY,
         z: worldZ,
         type: block.type,
-        solid: block.solid !== false,
+        solid: block.solid ?? getBlockProperties(block.type).isSolid,
         orientation: block.direction ?? 0
       });
     }
@@ -128,7 +128,7 @@ export class StructureLoader {
     // 修复：跨区块结构（如 uglyHouse）的遮挡判断需要考虑相邻区块的方块
     // 简单方案：跳过遮挡优化，让主线程的 FaceCullingSystem 处理
     blocks.forEach(b => {
-      chunk.add(b.x, b.y, b.z, b.type, dObj, b.solid !== false, b.orientation ?? 0);
+      chunk.add(b.x, b.y, b.z, b.type, dObj, b.solid, b.orientation ?? 0);
     });
   }
 

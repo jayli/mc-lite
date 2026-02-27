@@ -410,12 +410,20 @@ onmessage = function(e) {
   // 记录当前可见（已添加进d）的方块Key
   const visibleKeys = [];
 
+  // 计算当前区块的范围
+  const minX = cx * CHUNK_SIZE;
+  const maxX = (cx + 1) * CHUNK_SIZE;
+  const minZ = cz * CHUNK_SIZE;
+  const maxZ = (cz + 1) * CHUNK_SIZE;
+
   for (const [key, block] of blockMap) {
+    // 检查方块是否在当前区块范围内
+    const inCurrentChunk = block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;
     // if (block.type === 'air') {
     //     allBlockTypes[key] = 'air';
     //     continue;
     // }
-    if (block.solid) solidBlocks.push(key);
+    if (block.solid && inCurrentChunk) solidBlocks.push(key);
     let visible = true;
     if (block.solid) {
       const { x, y, z } = block;
@@ -429,7 +437,11 @@ onmessage = function(e) {
       if (covered && block.type !== 'chest') visible = false;
     }
 
-    if (visible) {
+    // allBlockTypes 记录所有方块（包括跨区块的），用于持久化和 blockData 查找
+    allBlockTypes[key] = { type: block.type, orientation: block.orientation || 0 };
+
+    // 只将当前区块范围内的方块添加到渲染数据中
+    if (inCurrentChunk && visible) {
       if (!d[block.type]) d[block.type] = [];
       let aoLow = 0;
       let aoHigh = 0;
@@ -448,7 +460,6 @@ onmessage = function(e) {
       d[block.type].push({x: block.x, y: block.y, z: block.z, aoLow, aoHigh, orientation: block.orientation || 0});
       visibleKeys.push(key);
     }
-    allBlockTypes[key] = { type: block.type, orientation: block.orientation || 0 };
   }
 
   // 返回数据
