@@ -40,7 +40,7 @@ const ROOMS_PER_CHUNK = 2;
 const MAX_ROOM_SIZE = 5;
 
 onmessage = function(e) {
-  const { cx, cz, seed, snapshot } = e.data;
+  const { cx, cz, seed, snapshot, structureCenters: incomingStructureCenters } = e.data;
 
   // 同步种子
   setSeed(seed);
@@ -51,6 +51,12 @@ onmessage = function(e) {
     birchTree.load(),
     tank.load()
   ]).catch(err => console.error('Failed to load structure data:', err));
+
+  // 计算当前区块的范围 - 提前定义，供 snapshot 模式使用
+  const minX = cx * CHUNK_SIZE;
+  const maxX = (cx + 1) * CHUNK_SIZE;
+  const minZ = cz * CHUNK_SIZE;
+  const maxZ = (cz + 1) * CHUNK_SIZE;
 
   // 使用 Map 暂存方块，确保同一位置后生成的方块覆盖旧方块
   const blockMap = new Map();
@@ -83,6 +89,29 @@ onmessage = function(e) {
       realisticTrees = snapshot.entities.realisticTrees || [];
       modGunMan = snapshot.entities.modGunMan || [];
       rovers = snapshot.entities.rovers || [];
+    }
+
+    // 从恢复的实体列表中重建结构中心
+    if (realisticTrees) {
+      realisticTrees.forEach(pos => {
+        if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
+          structureCenters.push({ type: 'tree', ...pos });
+        }
+      });
+    }
+    if (modGunMan) {
+      modGunMan.forEach(pos => {
+        if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
+          structureCenters.push({ type: 'gunman', ...pos });
+        }
+      });
+    }
+    if (rovers) {
+      rovers.forEach(pos => {
+        if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
+          structureCenters.push({ type: 'rover', ...pos });
+        }
+      });
     }
   } else {
     // 确保数据已加载（同步等待）
@@ -443,12 +472,6 @@ onmessage = function(e) {
   // 记录当前可见（已添加进d）的方块Key
   const visibleKeys = [];
 
-  // 计算当前区块的范围
-  const minX = cx * CHUNK_SIZE;
-  const maxX = (cx + 1) * CHUNK_SIZE;
-  const minZ = cz * CHUNK_SIZE;
-  const maxZ = (cz + 1) * CHUNK_SIZE;
-
   // --- 跨区块实体渲染支持 ---
   // 当一个结构/实体的中心在当前 Chunk 内时，渲染该结构的所有方块
   // 即使方块位置超出 Chunk 边界
@@ -475,6 +498,19 @@ onmessage = function(e) {
         structureCenters.push({ type: 'rover', ...pos });
       }
     });
+  }
+
+  // 合并从主线程传入的结构中心（用于 consolidate 场景）
+  if (incomingStructureCenters && Array.isArray(incomingStructureCenters)) {
+    for (const incoming of incomingStructureCenters) {
+      // 检查是否已存在，避免重复
+      const exists = structureCenters.some(c =>
+        c.type === incoming.type && c.x === incoming.x && c.y === incoming.y && c.z === incoming.z
+      );
+      if (!exists) {
+        structureCenters.push(incoming);
+      }
+    }
   }
 
   // 辅助函数：判断一个方块是否属于某个结构中心
@@ -547,6 +583,7 @@ onmessage = function(e) {
   // 返回数据
   postMessage({
     cx, cz, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys,
+    structureCenters, // 新增：当前 Chunk 负责渲染的结构中心列表
     snapshot: {
       blocks: blocksForSnapshot,
       entities: { realisticTrees, modGunMan, rovers }

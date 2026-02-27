@@ -217,7 +217,21 @@ export class World {
 
     // 获取方块在区块内的精确碰撞状态（通过 Set 进行 O(1) 查询）
     const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-    return chunk.solidBlocks.has(blockKey);
+
+    // --- 核心修复：主 Chunk 责任制 ---
+    // 首先检查方块位置所在的 Chunk
+    if (chunk.solidBlocks.has(blockKey)) {
+      return true;
+    }
+
+    // 如果不在，查询所有已加载的 Chunk（跨 Chunk 结构的碰撞体可能在其他 Chunk 中）
+    for (const [, otherChunk] of this.chunks) {
+      if (otherChunk.isReady && otherChunk !== chunk && otherChunk.solidBlocks.has(blockKey)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /**

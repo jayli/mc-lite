@@ -45,10 +45,10 @@ const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函
 const faceCullingCallbacks = new Map(); // 用于跟踪隐藏面剔除请求的回调函数
 
     worldWorker.onmessage = (e) => {
-  const { cx, cz, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot } = e.data;
+  const { cx, cz, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters } = e.data;
   const key = `${cx},${cz}`;
   if (workerCallbacks.has(key)) {
-    workerCallbacks.get(key)({ d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot });
+    workerCallbacks.get(key)({ d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters });
     workerCallbacks.delete(key);
   }
 };
@@ -271,6 +271,10 @@ export class Chunk {
       rovers: []
     };
 
+    // 存储结构中心点列表，用于跨 Chunk 碰撞体生成
+    this.structureCenters = [];
+    this._tempOriginalSolidBlocks = null; // 临时存储 Worker 原始返回的 solidBlocks
+
     // --- 后台合并系统 (Background Consolidation) ---
     this.dirtyBlocks = 0;            // 未优化的动态方块计数
     this.consolidationTimer = null;  // 合并防抖定时器
@@ -326,13 +330,23 @@ export class Chunk {
     const callbackKey = `${this.cx},${this.cz}`;
     // 注册 Worker 回调处理合并结果
     workerCallbacks.set(callbackKey, (data) => {
-      let { d, visibleKeys, solidBlocks } = data;
+      let { d, visibleKeys, solidBlocks, structureCenters: newStructureCenters } = data;
+
+      // 更新结构中心列表
+      if (newStructureCenters && newStructureCenters.length > 0) {
+        this.structureCenters = newStructureCenters;
+      }
 
       // --- 核心修复：根据主线程最新的 blockData 进行二次过滤，防止竞态导致的”幻影方块” ---
       if (visibleKeys) {
         visibleKeys = visibleKeys.filter(key => !!this.blockData[key]);
       }
+
+      // 保存原始的 Worker 返回的 solidBlocks 副本（用于跨 Chunk 方块）
+      const originalSolidBlocks = solidBlocks ? [...solidBlocks] : [];
+
       if (solidBlocks) {
+        // 对于本 Chunk 内的方块，按正常逻辑过滤
         solidBlocks = solidBlocks.filter(key => !!this.blockData[key]);
       }
       if (d) {
@@ -349,6 +363,9 @@ export class Chunk {
           });
         }
       }
+
+      // 保存原始 solidBlocks 到临时变量，供后面 regenerateCrossChunkColliders 使用
+      this._tempOriginalSolidBlocks = originalSolidBlocks;
 
       // 1. 同步可见性状态与碰撞状态 (完全替换，确保剔除状态同步)
       // 注意：需要保留在合并过程中新产生的动态数据
@@ -369,6 +386,8 @@ export class Chunk {
             this.solidBlocks.add(key);
           }
         }
+        // 重新生成跨 Chunk 结构方块的碰撞体（确保在 consolidate 后不会丢失）
+        this.regenerateCrossChunkColliders();
       }
 
       // --- 关键：保存宝箱状态 ---
@@ -457,6 +476,7 @@ export class Chunk {
         blocks: { ...this.blockData },
         entities: { ...this.entities }
       },
+      structureCenters: this.structureCenters, // 传递结构中心列表，用于跨 Chunk 碰撞体计算
       isOptimization: true // 标记这是一个优化请求
     });
   }
@@ -474,7 +494,7 @@ export class Chunk {
 
       // 注册 Worker 回调
       workerCallbacks.set(callbackKey, (data) => {
-        const { d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot: newSnapshot } = data;
+        const { d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot: newSnapshot, structureCenters } = data;
 
         // 1. 同步全量方块数据和可见性状态 (完全替换，确保剔除状态同步)
         if (allBlockTypes) this.blockData = allBlockTypes;
@@ -484,6 +504,9 @@ export class Chunk {
         if (solidBlocks) {
           this.solidBlocks = new Set(solidBlocks);
         }
+
+        // 1.1 保存结构中心列表，用于跨 Chunk 碰撞体生成
+        this.structureCenters = structureCenters || [];
 
         // 1.2 保存实体快照，用于后续合并
         this.entities.realisticTrees = realisticTrees || [];
@@ -749,6 +772,28 @@ export class Chunk {
     const blockOrientation = entry.orientation || 0;
 
     const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+
+    // --- 跨 Chunk 支持 ---
+    // 检查方块是否在当前 Chunk 范围内
+    const localX = Math.floor(x) - this.cx * CHUNK_SIZE;
+    const localZ = Math.floor(z) - this.cz * CHUNK_SIZE;
+    const isInChunk = localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE;
+
+    // 如果方块不在当前 Chunk 内，检查是否属于当前 Chunk 负责的结构
+    if (!isInChunk && this.structureCenters && this.structureCenters.length > 0) {
+      const belongsToCurrentChunkStructure = this.structureCenters.some(center => {
+        const maxDist = this.getStructureRenderDist(center.type);
+        return Math.abs(x - center.x) <= maxDist &&
+               Math.abs(z - center.z) <= maxDist &&
+               Math.abs(y - center.y) <= 16;
+      });
+
+      if (!belongsToCurrentChunkStructure) {
+        return; // 不属于当前 Chunk 负责的范围，跳过
+      }
+    }
+    // --- 跨 Chunk 支持结束 ---
+
     const oldEntry = this.blockData[key];
     const oldParsed = parseBlockEntry(oldEntry);
     const oldType = oldParsed.type;
@@ -1081,6 +1126,71 @@ export class Chunk {
     const entry = this.blockData[key];
     if (!entry) return null;
     return parseBlockEntry(entry);
+  }
+
+  /**
+   * 为跨 Chunk 结构方块重新生成碰撞体
+   * 调用时机：在 consolidate() 后，确保所有结构方块的碰撞体都被正确注册
+   */
+  regenerateCrossChunkColliders() {
+    // 关键修复：使用 Worker 原始返回的 solidBlocks，因为 Worker 有完整的跨 Chunk 方块信息
+    if (this._tempOriginalSolidBlocks && this._tempOriginalSolidBlocks.length > 0) {
+      for (const key of this._tempOriginalSolidBlocks) {
+        // 将 Worker 计算的所有 solidBlocks 都添加到主线程的 solidBlocks 中
+        // 信任 Worker 的计算结果，因为 Worker 有完整的 blockMap
+        this.solidBlocks.add(key);
+      }
+      // 清理临时变量
+      this._tempOriginalSolidBlocks = null;
+      return;
+    }
+
+    // 备用方案：如果没有临时原始数据，则通过结构中心遍历
+    if (!this.structureCenters || this.structureCenters.length === 0) return;
+
+    // 遍历所有结构中心，检查其覆盖的方块是否在当前 Chunk 的 solidBlocks 中
+    for (const center of this.structureCenters) {
+      const maxDist = this.getStructureRenderDist(center.type);
+      // 检查结构覆盖的所有方块
+      for (let dx = -maxDist; dx <= maxDist; dx++) {
+        for (let dy = -16; dy <= 16; dy++) {
+          for (let dz = -maxDist; dz <= maxDist; dz++) {
+            const bx = center.x + dx;
+            const by = center.y + dy;
+            const bz = center.z + dz;
+            const key = `${bx},${by},${bz}`;
+
+            // 主动检查：如果 blockData 中有该方块且是实心的，确保它在 solidBlocks 中
+            const entry = this.blockData[key];
+            if (entry) {
+              const type = typeof entry === 'string' ? entry : entry.type;
+              const props = getBlockProps(type);
+              if (props.isSolid) {
+                // 关键修复：确保跨 Chunk 结构方块始终在 solidBlocks 中
+                this.solidBlocks.add(key);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * 获取结构类型的渲染距离
+   * @param {string} type - 结构类型
+   * @returns {number} 渲染距离
+   */
+  getStructureRenderDist(type) {
+    const distMap = {
+      'uglyHouse': 24,
+      'tree': 8,
+      'house': 5,
+      'tank': 3,
+      'rover': 3,
+      'gunman': 3
+    };
+    return distMap[type] || 8;
   }
 
   /**
