@@ -2,129 +2,12 @@
 /**
  * FaceCullingSystem 测试套件
  * 测试隐藏面剔除系统的核心功能
- *
- * 使用模拟对象，避免 Three.js 依赖
  */
 
 import { describe, test } from './runner.js';
 import { assertEqual, assertTrue, assertFalse, assertNotNull } from './assert.js';
-
-// ========== 模拟 FaceCullingUtils ==========
-const faceMask = {
-  TOP: 1,
-  BOTTOM: 2,
-  NORTH: 4,
-  SOUTH: 8,
-  WEST: 16,
-  EAST: 32,
-  ALL: 63,
-  NONE: 0
-};
-
-function countVisibleFaces(mask) {
-  let count = 0;
-  let temp = mask;
-  while (temp) {
-    count += temp & 1;
-    temp >>= 1;
-  }
-  return count;
-}
-
-// ========== 模拟 FaceCullingSystem ==========
-class MockFaceCullingSystem {
-  constructor() {
-    this.enabled = true;
-    this.transparentBlocks = ['glass_block', 'leaves', 'water', 'air'];
-    this.showAllBlocks = ['chest', 'anvil', 'enchanting_table'];
-    this.errorCount = 0;
-    this.lastError = null;
-  }
-
-  isEnabled() {
-    return this.enabled;
-  }
-
-  enable() {
-    this.enabled = true;
-  }
-
-  disable(reason) {
-    this.enabled = false;
-  }
-
-  addTransparentType(type) {
-    if (!this.transparentBlocks.includes(type)) {
-      this.transparentBlocks.push(type);
-    }
-  }
-
-  getTransparentTypes() {
-    return [...this.transparentBlocks];
-  }
-
-  getStats() {
-    return {
-      enabled: this.enabled,
-      errorCount: this.errorCount,
-      lastError: this.lastError
-    };
-  }
-
-  isTransparent(blockType) {
-    return this.transparentBlocks.includes(blockType);
-  }
-
-  shouldShowFace(currentBlock, neighborBlock) {
-    if (!neighborBlock) return true;
-    if (!this.enabled) return true;
-
-    // 透明方块总是显示所有面
-    if (this.isTransparent(currentBlock.type)) return true;
-
-    // 特殊方块总是显示所有面
-    if (this.showAllBlocks.includes(currentBlock.type)) return true;
-
-    // 相邻方块是空气或透明方块时显示面
-    if (this.isTransparent(neighborBlock.type)) return true;
-
-    // 相邻固体方块时隐藏面
-    return false;
-  }
-
-  calculateFaceVisibility(block, neighbors) {
-    if (!this.enabled) return faceMask.ALL;
-
-    // 透明方块总是显示所有面
-    if (this.isTransparent(block.type)) return faceMask.ALL;
-
-    // 特殊方块总是显示所有面
-    if (this.showAllBlocks.includes(block.type)) return faceMask.ALL;
-
-    let visibility = faceMask.ALL;
-
-    if (neighbors.top && !this.isTransparent(neighbors.top.type)) {
-      visibility &= ~faceMask.TOP;
-    }
-    if (neighbors.bottom && !this.isTransparent(neighbors.bottom.type)) {
-      visibility &= ~faceMask.BOTTOM;
-    }
-    if (neighbors.north && !this.isTransparent(neighbors.north.type)) {
-      visibility &= ~faceMask.NORTH;
-    }
-    if (neighbors.south && !this.isTransparent(neighbors.south.type)) {
-      visibility &= ~faceMask.SOUTH;
-    }
-    if (neighbors.west && !this.isTransparent(neighbors.west.type)) {
-      visibility &= ~faceMask.WEST;
-    }
-    if (neighbors.east && !this.isTransparent(neighbors.east.type)) {
-      visibility &= ~faceMask.EAST;
-    }
-
-    return visibility;
-  }
-}
+import { faceMask, countVisibleFaces } from '../utils/FaceCullingUtils.js';
+import { FaceCullingSystem } from '../core/FaceCullingSystem.js';
 
 // ========== 测试套件 ==========
 describe('FaceCullingSystem 测试', (test) => {
@@ -133,7 +16,7 @@ describe('FaceCullingSystem 测试', (test) => {
 
   // 在每个测试前创建新实例
   const getFreshSystem = () => {
-    return new MockFaceCullingSystem();
+    return new FaceCullingSystem();
   };
 
   // =========== 系统初始化测试 ===========
@@ -490,7 +373,7 @@ describe('FaceCullingSystem 测试', (test) => {
     system.addTransparentType('diamond_block');
 
     assertTrue(system.isTransparent('diamond_block'), 'diamond_block 应该被识别为透明');
-    assertTrue(system.transparentBlocks.includes('diamond_block'), 'diamond_block 应该在列表中');
+    assertTrue(system.getTransparentTypes().includes('diamond_block'), 'diamond_block 应该在列表中');
   });
 
   test('getTransparentTypes - 获取透明类型列表', () => {

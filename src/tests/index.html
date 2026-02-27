@@ -259,9 +259,18 @@
 <body>
   <h1>MC Lite - 游戏测试套件</h1>
 
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
   <div class="controls">
-    <button id="run-all-btn" class="primary" onclick="runAllTests()">运行所有测试</button>
-    <button id="clear-btn" class="secondary" onclick="clearResults()">清除结果</button>
+    <button id="run-all-btn" class="primary">运行所有测试</button>
+    <button id="clear-btn" class="secondary">清除结果</button>
     <div class="checkbox-group">
       <input type="checkbox" id="auto-scroll" checked>
       <label for="auto-scroll">自动滚动到失败测试</label>
@@ -296,7 +305,7 @@
   </div>
 
   <script type="module">
-    import { runAllTests, displayResults, resetTestResults, getSuiteCount } from './runner.js';
+    import { runAllTests as _runAllTests, displayResults, resetTestResults, getSuiteCount } from './runner.js';
     import './test-orientation.js';
     import './test-block-data.js';
     import './test-face-culling.js';
@@ -305,9 +314,9 @@
     import './test-world.js';
     import './test-entity-system.js';
 
-    // 暴露函数到全局 scope
-    window.runAllTests = async function() {
-      const btn = document.getElementById('run-all-btn');
+    // 绑定按钮事件
+    document.getElementById('run-all-btn').addEventListener('click', async function() {
+      const btn = this;
       const statusBar = document.getElementById('status-bar');
 
       btn.disabled = true;
@@ -318,7 +327,7 @@
       resetTestResults();
 
       // 运行测试
-      const results = await runAllTests();
+      const results = await _runAllTests();
 
       // 显示结果
       displayResults(results);
@@ -344,13 +353,13 @@
 
       btn.disabled = false;
       btn.textContent = '运行所有测试';
-    };
+    });
 
-    window.clearResults = function() {
+    document.getElementById('clear-btn').addEventListener('click', function() {
       resetTestResults();
       document.getElementById('test-results').innerHTML = '<div class="loading">点击"运行所有测试"开始</div>';
       document.getElementById('status-bar').style.display = 'none';
-    };
+    });
   </script>
 </body>
 </html>

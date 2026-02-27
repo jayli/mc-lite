@@ -3,11 +3,13 @@
  * Chunk 测试套件
  * 测试区块的动态方块添加/移除功能
  *
- * 使用简化的测试方法，避免复杂的 Three.js 依赖
+ * 注意：由于 Chunk 类依赖 Three.js 和 Worker，
+ * 本测试使用简化的测试类来验证核心逻辑。
  */
 
 import { describe, test } from './runner.js';
 import { assertEqual, assertTrue, assertFalse, assertNotNull, assertDeepEqual } from './assert.js';
+import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 
 // 模拟的 Three.js 基础类
 const mockThree = {

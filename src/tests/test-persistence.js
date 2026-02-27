@@ -3,84 +3,13 @@
  * PersistenceService 测试套件
  * 测试 IndexedDB 持久化服务的基本功能
  *
- * 使用模拟对象，避免真实的 IndexedDB 依赖
+ * 注意：由于 PersistenceService 依赖 Worker 和 IndexedDB，
+ * 部分测试可能需要模拟环境或跳过。
  */
 
 import { describe, test } from './runner.js';
-import { assertEqual, assertTrue, assertFalse, assertNotNull, assertDeepEqual } from './assert.js';
-
-// ========== 模拟 PERSISTENCE_CONFIG ==========
-const PERSISTENCE_CONFIG = {
-  DB_NAME: 'mc_lite_persistence',
-  DB_VERSION: 1,
-  STORE_NAME: 'world_deltas',
-  SESSION_ONLY: true,
-  CACHE_LIMIT: 100,
-  CHUNK_SIZE: 16
-};
-
-// ========== 模拟 PersistenceService ==========
-class MockPersistenceService {
-  constructor() {
-    this.cache = new Map();
-    this.worker = { postMessage: () => {} }; // 模拟 worker
-  }
-
-  // 记录方块变更
-  recordChange(x, y, z, typeOrEntry, orientation = 0) {
-    const cx = Math.floor(x / PERSISTENCE_CONFIG.CHUNK_SIZE);
-    const cz = Math.floor(z / PERSISTENCE_CONFIG.CHUNK_SIZE);
-    const chunkKey = `${cx},${cz}`;
-
-    // 只在缓存中存在区块时记录
-    if (!this.cache.has(chunkKey)) {
-      return;
-    }
-
-    const chunkData = this.cache.get(chunkKey);
-    const blockKey = `${x},${y},${z}`;
-
-    const entry = typeof typeOrEntry === 'string'
-      ? { type: typeOrEntry, orientation }
-      : { type: typeOrEntry.type || 'air', orientation: typeOrEntry.orientation || 0 };
-
-    if (entry.type === 'air') {
-      delete chunkData.blocks[blockKey];
-    } else {
-      chunkData.blocks[blockKey] = entry;
-    }
-  }
-
-  // 获取区块数据
-  async getChunkData(cx, cz) {
-    const chunkKey = `${cx},${cz}`;
-    return this.cache.get(chunkKey) || null;
-  }
-
-  // 保存区块数据
-  async saveChunkData(cx, cz, data) {
-    const chunkKey = `${cx},${cz}`;
-    if (data) {
-      this.cache.set(chunkKey, data);
-    }
-  }
-
-  // 注入存档数据
-  injectSaveData(worldDeltas) {
-    this.cache.clear();
-    for (const delta of worldDeltas) {
-      this.cache.set(delta.key, {
-        blocks: delta.blocks || {},
-        entities: delta.entities || {}
-      });
-    }
-  }
-
-  // 清空会话
-  async clearSession() {
-    this.cache.clear();
-  }
-}
+import { assertEqual, assertNotNull, assertDeepEqual } from './assert.js';
+import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 
 // ========== 测试套件 ==========
 describe('PersistenceService 测试', (test) => {
@@ -88,16 +17,69 @@ describe('PersistenceService 测试', (test) => {
   let service;
 
   // 在每个测试前创建新实例
+  // 注意：由于 PersistenceService 依赖 Worker 和 IndexedDB，
+  // 我们创建一个简单的测试包装器
   const getFreshService = () => {
-    return new MockPersistenceService();
+    // 创建一个轻量级的测试用服务实例
+    // 直接测试核心逻辑，绕过 Worker 和 IndexedDB
+    return {
+      cache: new Map(),
+      recordChange: function(x, y, z, typeOrEntry, orientation = 0) {
+        const cx = Math.floor(x / PERSISTENCE_CONFIG.CHUNK_SIZE);
+        const cz = Math.floor(z / PERSISTENCE_CONFIG.CHUNK_SIZE);
+        const chunkKey = `${cx},${cz}`;
+
+        // 只在缓存中存在区块时记录
+        if (!this.cache.has(chunkKey)) {
+          return;
+        }
+
+        const chunkData = this.cache.get(chunkKey);
+        const blockKey = `${x},${y},${z}`;
+
+        const entry = typeof typeOrEntry === 'string'
+          ? { type: typeOrEntry, orientation }
+          : { type: typeOrEntry.type || 'air', orientation: typeOrEntry.orientation || 0 };
+
+        if (entry.type === 'air') {
+          delete chunkData.blocks[blockKey];
+        } else {
+          chunkData.blocks[blockKey] = entry;
+        }
+      },
+      getChunkData: async function(cx, cz) {
+        const chunkKey = `${cx},${cz}`;
+        return this.cache.get(chunkKey) || null;
+      },
+      saveChunkData: async function(cx, cz, data) {
+        const chunkKey = `${cx},${cz}`;
+        if (data) {
+          this.cache.set(chunkKey, data);
+        }
+      },
+      injectSaveData: function(worldDeltas) {
+        this.cache.clear();
+        for (const delta of worldDeltas) {
+          this.cache.set(delta.key, {
+            blocks: delta.blocks || {},
+            entities: delta.entities || {}
+          });
+        }
+      },
+      clearSession: async function() {
+        this.cache.clear();
+      }
+    };
   };
 
   // =========== 初始化测试 ===========
   test('服务可以实例化', () => {
     service = getFreshService();
     assertNotNull(service, '服务实例不应该为 null');
-    assertNotNull(service.worker, 'Worker 应该存在');
     assertNotNull(service.cache, '缓存应该存在');
+    assertNotNull(service.recordChange, 'recordChange 方法应该存在');
+    assertNotNull(service.getChunkData, 'getChunkData 方法应该存在');
+    assertNotNull(service.saveChunkData, 'saveChunkData 方法应该存在');
   });
 
   test('cache 初始为空', () => {

@@ -3,11 +3,13 @@
  * World 测试套件
  * 测试世界系统的方块放置/挖掘功能
  *
- * 使用简化的测试方法，避免复杂的 Three.js 依赖
+ * 注意：由于 World 类依赖 Three.js 和 Chunk，
+ * 本测试使用简化的测试类来验证核心逻辑。
  */
 
 import { describe, test } from './runner.js';
-import { assertEqual, assertTrue, assertFalse, assertNotNull, assertIncludes } from './assert.js';
+import { assertEqual, assertTrue, assertFalse, assertNotNull } from './assert.js';
+import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 
 // 模拟的 Three.js 基础类
 const mockThree = {
@@ -83,7 +85,7 @@ class TestableWorld {
   constructor(scene) {
     this.scene = scene;
     this.chunks = new Map();
-    this.chunkSize = 16;
+    this.chunkSize = PERSISTENCE_CONFIG.CHUNK_SIZE;
     this.renderDist = 3;
   }
 
@@ -392,7 +394,7 @@ describe('World 测试', (test) => {
 
   // =========== 坐标到区块转换测试 ===========
   test('区块坐标计算正确', () => {
-    const CHUNK_SIZE = 16;
+    const CHUNK_SIZE = PERSISTENCE_CONFIG.CHUNK_SIZE;
 
     // 测试各种坐标的区块计算
     assertEqual(Math.floor(0 / CHUNK_SIZE), 0, 'x=0 在区块 0');
