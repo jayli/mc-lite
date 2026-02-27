@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MC Lite - 游戏测试套件</title>
+  <title>MC Lite - 测试用例</title>
   <style>
     * {
       margin: 0;
@@ -257,7 +257,7 @@
   </style>
 </head>
 <body>
-  <h1>MC Lite - 游戏测试套件</h1>
+  <h1>MC Lite - 测试用例</h1>
 
   <script type="importmap">
     {
@@ -301,7 +301,7 @@
   </div>
 
   <div id="test-results">
-    <div class="loading">点击"运行所有测试"开始</div>
+    <div class="loading">loading</div>
   </div>
 
   <script type="module">
@@ -314,11 +314,18 @@
     import './test-world.js';
     import './test-entity-system.js';
 
-    // 所有脚本加载完成，启用运行按钮
+    // 等待所有脚本加载后再延时 700ms 启用按钮
     const runAllBtn = document.getElementById('run-all-btn');
-    runAllBtn.disabled = false;
-    runAllBtn.removeAttribute('title');
-    runAllBtn.title = '点击运行所有测试用例';
+    const testResultsDiv = document.getElementById('test-results');
+
+    setTimeout(() => {
+      runAllBtn.disabled = false;
+      runAllBtn.removeAttribute('title');
+      runAllBtn.title = '点击运行所有测试用例';
+
+      // 更新文案
+      testResultsDiv.innerHTML = '<div class="loading">点击"运行所有测试"开始..</div>';
+    }, 700);
 
     // 绑定按钮事件
     runAllBtn.addEventListener('click', async function() {
@@ -362,9 +369,7 @@
     });
 
     document.getElementById('clear-btn').addEventListener('click', function() {
-      resetTestResults();
-      document.getElementById('test-results').innerHTML = '<div class="loading">点击"运行所有测试"开始</div>';
-      document.getElementById('status-bar').style.display = 'none';
+      location.reload();
     });
   </script>
 </body>
