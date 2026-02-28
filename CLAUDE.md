@@ -30,6 +30,7 @@ MC Lite 是一个基于 Three.js 的 3D 体素游戏（Minecraft 克隆），基
 | Enemy AI | `src/workers/EnemyWorker.js` | 异步 AI 决策 |
 | World | `src/world/World.js` | 区块动态加载 (渲染距离：3)、方块操作 |
 | Chunk | `src/world/Chunk.js` | 区块渲染 (InstancedMesh)、隐藏面剔除 |
+| Custom Map | `src/workers/maps/` | 自定义地图 |
 
 ### Web Workers 异步处理
 | Worker | 用途 | 文件 |
@@ -59,6 +60,7 @@ MC Lite 是一个基于 Three.js 的 3D 体素游戏（Minecraft 克隆），基
 1. **添加方块**: `BlockData.js` → `MaterialManager.js` → `Chunk.js`
 2. **添加敌人**: 实体类 → `EnemyWorker.js` → `EnemyManager.js`
 3. **添加结构数据**: 在 `src/world/structures/` 添加 JSON 文件 → 在 `StructureLoader.js` 中注册
+4. **添加新地图**: 新地图加在 `src/workers/maps/` 中，参照`Pyramid.js`实现，在 `src/workers/WorldWorker.js`中被调用。
 
 ## 测试
 - **测试目录**: `src/tests/`，**测试入口**: `src/tests/index.html`
