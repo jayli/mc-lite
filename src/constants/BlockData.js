@@ -224,7 +224,8 @@ export const BLOCK_DATA = {
   'marble': { isAOEnabled: true },
   'dirt': {},
   'snow': { isAOEnabled: true },
-  'snow_grass': { isAOEnabled: true }
+  'snow_grass': { isAOEnabled: true },
+  'ice': { isAOEnabled: true }
 };
 
 /**

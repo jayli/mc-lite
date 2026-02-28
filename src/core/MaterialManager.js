@@ -296,7 +296,8 @@ export async function initializeMaterials() {
     './src/assets/textures/tnt_side.png',
     './src/assets/textures/tnt_top.png',
     './src/assets/textures/Snow_top.png',
-    './src/assets/textures/Snowy_Grass_Block_side.png'
+    './src/assets/textures/Snowy_Grass_Block_side.png',
+    './src/assets/textures/ice.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -750,5 +751,18 @@ materials.registerMaterial('snow_grass', {
     3: snowGrassBottom,  // 下面：泥土
     4: snowGrassSide,   // 南面：雪地侧面
     5: snowGrassSide    // 北面：雪地侧面
+  }
+});
+
+// 冰方块 - 六个面都是 ice.png
+const iceTexture = { textureUrl: './src/assets/textures/ice.png' };
+materials.registerMaterial('ice', {
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: iceTexture,  // 东面：冰
+    1: iceTexture,  // 西面：冰
+    2: iceTexture,  // 上面：冰
+    3: iceTexture,  // 下面：冰
+    4: iceTexture,  // 南面：冰
+    5: iceTexture   // 北面：冰
   }
 });
