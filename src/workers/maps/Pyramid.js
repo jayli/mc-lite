@@ -31,11 +31,33 @@ export function getPyramidInfo(wx, wz, seed, terrainGen) {
   const offsetX = Math.floor(randX * 300) + 100;  // 区域内偏移 100-400
   const offsetZ = Math.floor(randZ * 300) + 100;
 
-  const pyramidCx = regionX * regionSize + offsetX;
-  const pyramidCz = regionZ * regionSize + offsetZ;
+  let pyramidCx = regionX * regionSize + offsetX;
+  let pyramidCz = regionZ * regionSize + offsetZ;
 
   // 扩展后的金字塔总区域（包含过渡带）
   const totalHalfSize = halfSize + transitionSize;
+
+  // 确保金字塔中心不会太靠近区域边界（至少保留 totalHalfSize + 5 的缓冲）
+  const minMargin = totalHalfSize + 5;
+  const regionLeft = regionX * regionSize;
+  const regionRight = (regionX + 1) * regionSize;
+  const regionTop = regionZ * regionSize;
+  const regionBottom = (regionZ + 1) * regionSize;
+
+  // 调整 X 坐标
+  if (pyramidCx - minMargin < regionLeft) {
+    pyramidCx = regionLeft + minMargin;
+  } else if (pyramidCx + minMargin > regionRight) {
+    pyramidCx = regionRight - minMargin;
+  }
+
+  // 调整 Z 坐标
+  if (pyramidCz - minMargin < regionTop) {
+    pyramidCz = regionTop + minMargin;
+  } else if (pyramidCz + minMargin > regionBottom) {
+    pyramidCz = regionBottom - minMargin;
+  }
+
   const pyramidMinX = pyramidCx - totalHalfSize;
   const pyramidMaxX = pyramidCx + totalHalfSize;
   const pyramidMinZ = pyramidCz - totalHalfSize;
@@ -104,15 +126,15 @@ export function generatePyramid(wx, wz, h, pyInfo, fakeChunk, dPlaceholder) {
     // 金字塔主体区域：使用原始高度，保持完整形态
     finalSurfaceY = originalPyramidHeight;
   } else {
-    // 过渡带区域：限制与地形的高差不超过 2 个方块
+    // 过渡带区域：使用 transitionFactor 平滑混合，同时限制与地形的高差不超过 2 个方块
+    // 先平滑插值
+    const smoothHeight = Math.floor(h + (originalPyramidHeight - h) * (1 - pyInfo.transitionFactor));
+    // 再限制高差
     const maxDiff = 2;
-    const heightDiff = originalPyramidHeight - h;
-
+    const heightDiff = smoothHeight - h;
     if (Math.abs(heightDiff) <= maxDiff) {
-      // 高差已经在 2 以内，直接使用原始高度
-      finalSurfaceY = originalPyramidHeight;
+      finalSurfaceY = smoothHeight;
     } else {
-      // 高差超过 2，限制在 2 以内
       finalSurfaceY = h + Math.sign(heightDiff) * maxDiff;
     }
   }

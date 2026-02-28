@@ -232,6 +232,11 @@ export function generateFrozenMountain(wx, wz, h, fmInfo, fakeChunk, dPlaceholde
   // 最底层 end_stone
   fakeChunk.add(wx, rockBaseY - 12, wz, 'end_stone', dPlaceholder);
 
+  // 在冰封山峰上低密度生成 short_grass（仅在主体区域且不在海平面以下）
+  if (fmInfo.transitionFactor === 0 && !isBelowSeaLevel && Math.random() < 0.03) {
+    fakeChunk.add(wx, fillEndY + 1, wz, 'short_grass', dPlaceholder, false);
+  }
+
   // 返回地表高度，供 WorldWorker 生成树使用
   return { surfaceY: fillEndY, isBelowSeaLevel };
 }
