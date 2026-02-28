@@ -297,7 +297,8 @@ export async function initializeMaterials() {
     './src/assets/textures/tnt_top.png',
     './src/assets/textures/Snow_top.png',
     './src/assets/textures/Snowy_Grass_Block_side.png',
-    './src/assets/textures/ice.png'
+    './src/assets/textures/ice.png',
+    './src/assets/textures/leaves_with_snow.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -764,5 +765,20 @@ materials.registerMaterial('ice', {
     3: iceTexture,  // 下面：冰
     4: iceTexture,  // 南面：冰
     5: iceTexture   // 北面：冰
+  }
+});
+
+// 雪树叶方块 - 顶部雪，侧面带雪树叶，底部树叶
+const snowLeavesTop = { textureUrl: './src/assets/textures/Snow_top.png', transparent: true, alphaTest: 0.3 };
+const snowLeavesSide = { textureUrl: './src/assets/textures/leaves_with_snow.png', transparent: true, alphaTest: 0.3 };
+const snowLeavesBottom = { textureUrl: './src/assets/textures/leaves.png', transparent: true, alphaTest: 0.3 };
+materials.registerMaterial('snow_leaves', {
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: snowLeavesSide,   // 东面：带雪树叶
+    1: snowLeavesSide,   // 西面：带雪树叶
+    2: snowLeavesTop,    // 上面：雪
+    3: snowLeavesBottom,  // 下面：树叶
+    4: snowLeavesSide,   // 南面：带雪树叶
+    5: snowLeavesSide    // 北面：带雪树叶
   }
 });

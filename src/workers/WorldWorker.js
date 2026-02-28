@@ -17,7 +17,7 @@ self.onerror = (e) => {
 };
 
 // 结构数据加载器实例
-const { uglyHouse, birchTree, tank } = structureLoaders;
+const { uglyHouse, birchTree, birchTreeWithSnow, tank } = structureLoaders;
 
 // 线性插值
 function lerp(a, b, t) {
@@ -62,6 +62,7 @@ onmessage = async function(e) {
   await Promise.all([
     uglyHouse.load(),
     birchTree.load(),
+    birchTreeWithSnow.load(),
     tank.load()
   ]).catch(err => console.error('Failed to load structure data:', err));
 
@@ -188,9 +189,9 @@ onmessage = async function(e) {
           // 跳过后续的地表装饰生成，继续执行云生成逻辑
         } else if (inSnowLand) {
           const snowResult = SnowLand.generate(wx, wz, h, slInfo, fakeChunk, dPlaceholder);
-          // 在雪地以 0.002 概率生成白桦树（仅在主体区域且不在海平面以下）
+          // 在雪地以 0.002 概率生成带雪白桦树（仅在主体区域且不在海平面以下）
           if (slInfo.transitionFactor === 0 && !snowResult.isBelowSeaLevel && Math.random() < 0.002) {
-            const task = () => generateBirchTree(wx, snowResult.surfaceY + 1, wz, fakeChunk, dPlaceholder);
+            const task = () => generateBirchTreeWithSnow(wx, snowResult.surfaceY + 1, wz, fakeChunk, dPlaceholder);
             task.centerX = wx;
             task.centerY = snowResult.surfaceY + 1;
             task.centerZ = wz;
@@ -758,6 +759,18 @@ function generateStructure(type, x, y, z, chunk, dObj, rovers = []) {
  */
 function generateBirchTree(x, y, z, chunk, dObj) {
   birchTree.generate(x, y, z, chunk, dObj, true);
+}
+
+/**
+ * 生成带雪白桦树（从 JSON 数据）
+ * @param {number} x - X 坐标
+ * @param {number} y - Y 坐标
+ * @param {number} z - Z 坐标
+ * @param {Object} chunk - 区块对象
+ * @param {Object} dObj - 数据收集对象
+ */
+function generateBirchTreeWithSnow(x, y, z, chunk, dObj) {
+  birchTreeWithSnow.generate(x, y, z, chunk, dObj, true);
 }
 
 /**

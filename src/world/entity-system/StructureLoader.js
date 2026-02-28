@@ -154,6 +154,7 @@ export class StructureLoader {
 export const structureLoaders = {
   uglyHouse: new StructureLoader('ugly_house', '../world/structures/ugly_house.json'),
   birchTree: new StructureLoader('brich_tree', '../world/structures/brich_tree.json'),
+  birchTreeWithSnow: new StructureLoader('brich_tree_with_snow', '../world/structures/brich_tree_with_snow.json'),
   tank: new StructureLoader('tank', '../world/structures/tank.json')
 };
 
@@ -165,6 +166,7 @@ export async function preloadAllStructures() {
   await Promise.all([
     structureLoaders.uglyHouse.load(),
     structureLoaders.birchTree.load(),
+    structureLoaders.birchTreeWithSnow.load(),
     structureLoaders.tank.load()
   ]);
   console.log('All structures preloaded');

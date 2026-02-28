@@ -147,6 +147,9 @@ export const BLOCK_DATA = {
   'swamp_leaves': {
     isTransparent: true
   },
+  'snow_leaves': {
+    isTransparent: true
+  },
   'calcite': {
     isAOEnabled: false
   },

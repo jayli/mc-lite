@@ -181,6 +181,7 @@ export class Game {
     this.player.inventory.add('snow', 1500);
     this.player.inventory.add('snow_grass', 1500);
     this.player.inventory.add('ice', 1500);
+    this.player.inventory.add('snow_leaves', 1500);
     // this.player.inventory.add('cloud', 1500);
 
     // 预加载 JSON 结构数据
