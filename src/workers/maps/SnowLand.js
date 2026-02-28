@@ -177,6 +177,9 @@ export function generateSnowLand(wx, wz, h, slInfo, fakeChunk, dPlaceholder) {
   if (slInfo.transitionFactor === 0 && !isBelowSeaLevel && Math.random() < 0.03) {
     fakeChunk.add(wx, fillEndY + 1, wz, 'short_grass', dPlaceholder, false);
   }
+
+  // 返回地表高度，供 WorldWorker 生成树使用
+  return { surfaceY: fillEndY, isBelowSeaLevel };
 }
 
 /**
