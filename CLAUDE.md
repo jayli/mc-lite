@@ -1,58 +1,74 @@
 # CLAUDE.md
 
+## 项目简介
+MC Lite 是一个基于 Three.js 的 3D 体素游戏（Minecraft 克隆），基于 ES6+ Modules 开发。这是一个客户端应用，通过自定义 HTTP 服务器进行开发。
+
 ## 开发命令
-- **启动开发服务器**: `npm run start`
+- **启动开发服务器**: `npm run start` (端口 8080)
+- **运行测试**: 访问 http://localhost:8080/src/tests/index.html，点击"运行所有测试"
 - **规格驱动开发**: 使用 `Skill("speckit.specify")`、`Skill("speckit.tasks")`、`Skill("speckit.implement")`
-- **代码规范**: ES6 Modules、面向对象、材质统一管理 (`MaterialManager.js`)、方块属性集中配置 (`BlockData.js`)
 
-## 项目架构
+## 代码规范
+- **材质统一管理**: `src/core/MaterialManager.js`
+- **方块属性集中配置**: `src/constants/BlockData.js`
 
-### 核心分层
-| 层级 | 文件 | 职责 |
+## 核心架构
+### 三层架构
+- 表现层: UI 与渲染 : `src/ui/`, `src/core/Engine.js`
+- 业务逻辑层: 游戏系统 : `src/core/Game.js`, `src/world/World.js`
+- 数据层: 持久化与存储 : `src/services/`, `src/constants/`
+
+### 核心分层详解
+| 系统 | 文件 | 职责 |
 |------|------|------|
-| Engine | `src/core/Engine.js` | 渲染管线、相机、日夜光照 |
-| Game | `src/core/Game.js` | 游戏主循环与状态管理 |
-| Player | `src/entities/player/` | 玩家物理 (`Physics.js`)、背包 (`Slots.js`) |
-| Weapon | `src/entities/weapon/Gun.js` | 武器渲染与射击逻辑 |
+| Engine | `src/core/Engine.js` | Three.js 渲染管线、相机、日夜光照、阴影 |
+| Game | `src/core/Game.js` | 游戏主循环、状态管理、性能监控 |
+| Player | `src/actors/player/` | 玩家物理 (`Physics.js`)、背包 (`Slots.js`)、输入处理 |
+| Weapon | `src/actors/weapon/Gun.js` | 武器渲染与射击逻辑 |
 | Enemy | `src/core/EnemyManager.js` | 敌人生命周期与 Worker 通信 |
-| Enemy Render | `src/entities/enemy/ZombieInstancedRenderer.js` | 丧尸实例化渲染 |
+| Enemy Render | `src/actors/enemy/ZombieInstancedRenderer.js` | 丧尸实例化渲染 |
 | Enemy AI | `src/workers/EnemyWorker.js` | 异步 AI 决策 |
-| World | `src/world/World.js` | 区块动态加载 (渲染距离：3) |
-| Chunk | `src/world/Chunk.js` | 区块渲染 (`InstancedMesh`) |
+| World | `src/world/World.js` | 区块动态加载 (渲染距离：3)、方块操作 |
+| Chunk | `src/world/Chunk.js` | 区块渲染 (InstancedMesh)、隐藏面剔除 |
 
-### 异步处理
-- **地形生成**: `src/workers/WorldWorker.js`
-- **敌人 AI**: 主线程负责物理，Worker 负责决策
-- **隐藏面剔除**: `src/core/FaceCullingSystem.js` + `src/workers/FaceCullingWorker.js`
-- **持久化**: `src/services/PersistenceService.js` (IndexedDB)
+### Web Workers 异步处理
+| Worker | 用途 | 文件 |
+|--------|------|------|
+| WorldWorker | 地形生成与区块创建 | `src/workers/WorldWorker.js` |
+| EnemyWorker | 丧尸 AI 决策 | `src/workers/EnemyWorker.js` |
+| FaceCullingWorker | 隐藏面剔除计算 | `src/workers/FaceCullingWorker.js` |
+| ExplosionWorker | 爆炸效果计算 | `src/workers/ExplosionWorker.js` |
+| PersistenceWorker | IndexedDB 操作 | `src/workers/PersistenceWorker.js` |
+
+### 实体系统
+- **实体管理器**: `src/world/entity-system/EntityManager.js`
+- **代码实体**: `src/world/entity-system/CodeEntity.js` (程序化生成：树、云)
+- **JSON 实体**: `src/world/entity-system/JsonEntity.js` (数据驱动：房屋、坦克)
+- **结构加载器**: `src/world/entity-system/StructureLoader.js` (统一 JSON 结构加载)
 
 ### 其他系统
 - **音频**: `src/core/AudioManager.js`
-- **爆炸效果**: `src/workers/ExplosionWorker.js`
-- **树木生成**: `src/world/entities/RealisticTreeManager.js`
+- **持久化**: `src/services/PersistenceService.js` (IndexedDB)
 - **UI**: `src/ui/UIManager.js`、`src/ui/HUD.js`、`src/ui/Inventory.js`
-- **结构数据加载**: `src/workers/StructureLoader.js` (统一的 JSON 结构加载器)
-- **图标生成工具函数**: `src/utils/ItemIconUtils.js`
-- **方块面剔除工具函数**: `src/utils/FaceCullingUtils.js`
-- **方块方向工具函数**: `src/utils/OrientationUtils.js`
+- **工具函数**:
+  - `src/utils/ItemIconUtils.js` - 图标生成
+  - `src/utils/FaceCullingUtils.js` - 方块面剔除
+  - `src/utils/OrientationUtils.js` - 方块方向
 
 ## 开发工作流
 1. **添加方块**: `BlockData.js` → `MaterialManager.js` → `Chunk.js`
 2. **添加敌人**: 实体类 → `EnemyWorker.js` → `EnemyManager.js`
-3. **添加结构数据**: 在 `src/world/blockmods/` 添加 JSON 文件 → 在 `StructureLoader.js` 中注册
-4. **调试物理**: 玩家 `Physics.js` / 敌人实体 `update()` 方法
-5. **性能监控**: 按 `P` 键显示/隐藏调试信息，`I` 键显示/隐藏提示信息。
-6. **控制台调试**: 浏览器 DevTools Console 中可访问 `window.game` 获取游戏实例
+3. **添加结构数据**: 在 `src/world/structures/` 添加 JSON 文件 → 在 `StructureLoader.js` 中注册
+
+## 测试
+- **测试目录**: `src/tests/`，**测试入口**: `src/tests/index.html`
+- **运行方式**: 访问 http://localhost:8080/src/tests/index.html，点击 `#run-all-btn` 执行测试
 
 ## 代码提交
 - 任何情况你都不能自动提交代码，必须等待我的明确指令才提交代码，再次强调，你的任何修改都不能自动在未经我允许的情况下提交代码，必须等我的明确指令才能提交代码
 - 再次强调，请你不要擅自替我提交代码，必须等我明确的指令才提交代码。
 
-## 测试用例
-- 测试用例目录`src/tests/`，用例执行入口`src/tests/index.html`
-- 完成代码修改后，仅给出提示访问 <http://localhost:8080/src/tests/index.html> 进行用例测试，点击`#run-all-btn`执行测试。注意，仅给出提示即可，不要主动执行验证的动作。
 ## 文件操作最佳实践
-
 ### 读取文件
 - 使用 `Read` 工具读取文件内容
 - 如果读取失败或内容异常，先检查文件是否存在，再尝试重新读取
@@ -76,4 +92,3 @@
 
 ### 删除文件
 - 使用 `Bash` 命令 `rm <file>` 删除文件
-
