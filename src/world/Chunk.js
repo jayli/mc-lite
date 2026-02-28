@@ -337,29 +337,55 @@ export class Chunk {
         this.structureCenters = newStructureCenters;
       }
 
-      // --- 核心修复：根据主线程最新的 blockData 进行二次过滤，防止竞态导致的”幻影方块” ---
+      // 判断一个位置是否属于当前 Chunk 负责的结构
+      const belongsToStructure = (x, y, z) => {
+        if (!this.structureCenters || this.structureCenters.length === 0) return false;
+        return this.structureCenters.some(center => {
+          const maxDist = this.getStructureRenderDist(center.type);
+          return Math.abs(x - center.x) <= maxDist &&
+                 Math.abs(z - center.z) <= maxDist &&
+                 Math.abs(y - center.y) <= 16;
+        });
+      };
+
+      // --- 核心修复：根据主线程最新的 blockData 进行二次过滤，防止竞态导致的”幻影方块”
+      // 但对于跨 Chunk 结构方块，即使不在 blockData 中也保留，因为它们由当前 Chunk 负责渲染 ---
       if (visibleKeys) {
-        visibleKeys = visibleKeys.filter(key => !!this.blockData[key]);
+        visibleKeys = visibleKeys.filter(key => {
+          if (this.blockData[key]) return true;
+          // 如果不在 blockData 中，检查是否属于当前 Chunk 负责的结构
+          const [x, y, z] = key.split(',').map(Number);
+          return belongsToStructure(x, y, z);
+        });
       }
 
       // 保存原始的 Worker 返回的 solidBlocks 副本（用于跨 Chunk 方块）
       const originalSolidBlocks = solidBlocks ? [...solidBlocks] : [];
 
       if (solidBlocks) {
-        // 对于本 Chunk 内的方块，按正常逻辑过滤
-        solidBlocks = solidBlocks.filter(key => !!this.blockData[key]);
+        // 对于本 Chunk 内的方块，按正常逻辑过滤；对于跨 Chunk 结构方块保留
+        solidBlocks = solidBlocks.filter(key => {
+          if (this.blockData[key]) return true;
+          const [x, y, z] = key.split(',').map(Number);
+          return belongsToStructure(x, y, z);
+        });
       }
       if (d) {
         for (const type in d) {
           // 修复：过滤掉位置不在最新 blockData 中的方块，或者 blockData 中的类型与 d[type] 不匹配的方块
           // 这可以防止”方块消除后又重新出现”的 bug，因为旧类型的方块数据可能仍然存在于 Worker 返回的结果中
+          // 但对于跨 Chunk 结构方块，信任 Worker 返回的类型
           d[type] = d[type].filter(pos => {
             const key = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
             const currentEntry = this.blockData[key];
-            if (!currentEntry) return false; // 位置已空，过滤掉
-            // 检查类型是否匹配，防止旧类型的方块被重新渲染
-            const currentType = typeof currentEntry === 'string' ? currentEntry : currentEntry.type;
-            return currentType === type;
+            if (currentEntry) {
+              // 在 blockData 中的位置：正常检查类型匹配
+              const currentType = typeof currentEntry === 'string' ? currentEntry : currentEntry.type;
+              return currentType === type;
+            } else {
+              // 不在 blockData 中的位置：检查是否属于当前 Chunk 负责的结构
+              return belongsToStructure(Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.z));
+            }
           });
         }
       }
