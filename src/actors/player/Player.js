@@ -14,52 +14,33 @@ import { getBlockProperties } from '../../constants/BlockData.js';
 import { nextOrientation } from '../../utils/OrientationUtils.js';
 
 /**
- * 查找指定坐标附近的金字塔
- * @param {number} wx - 世界 X 坐标
- * @param {number} wz - 世界 Z 坐标
+ * 获取指定区域内的雪地中心位置
+ * @param {number} regionX - 区域 X 坐标
+ * @param {number} regionZ - 区域 Z 坐标
  * @param {number} seed - 世界种子
- * @returns {Object|null} 金字塔信息或 null
+ * @returns {Object} 雪地中心位置 {centerX, centerZ}
  */
-function findNearbyPyramid(wx, wz, seed) {
-  const pyramidSize = 40;
-  const halfSize = Math.floor(pyramidSize / 2);
-  const transitionSize = 8;
+function getSnowLandCenter(regionX, regionZ, seed) {
   const regionSize = 400;
 
-  // 计算当前坐标所在的区域
-  const regionX = Math.floor(wx / regionSize);
-  const regionZ = Math.floor(wz / regionSize);
+  // 计算该区域的金字塔中心（使用与 Pyramid.js 相同的算法）
+  const randX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
+  const randZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
+  const offsetX = Math.floor(randX * 300) + 100;
+  const offsetZ = Math.floor(randZ * 300) + 100;
 
-  // 检查当前区域和相邻区域（共 9 个区域）
-  for (let dx = -1; dx <= 1; dx++) {
-    for (let dz = -1; dz <= 1; dz++) {
-      const rx = regionX + dx;
-      const rz = regionZ + dz;
+  const pyramidCx = regionX * regionSize + offsetX;
+  const pyramidCz = regionZ * regionSize + offsetZ;
 
-      // 计算该区域的金字塔中心
-      const randX = Math.abs(Math.sin(seed * 1.5 + rx * 0.1));
-      const randZ = Math.abs(Math.sin(seed * 2.5 + rz * 0.1));
-      const offsetX = Math.floor(randX * 300) + 100;
-      const offsetZ = Math.floor(randZ * 300) + 100;
+  // 雪地位移 = 金字塔位置 + (160, 0) 偏移
+  // 金字塔半宽 28 + 间隔 100 + 雪地半宽 28 = 156，使用 160 确保有足够间隔
+  const snowLandCx = pyramidCx + 160;
+  const snowLandCz = pyramidCz;
 
-      const pyramidCx = rx * regionSize + offsetX;
-      const pyramidCz = rz * regionSize + offsetZ;
-
-      // 检查坐标是否在金字塔扩展范围内
-      const totalHalfSize = halfSize + transitionSize;
-      const distX = Math.abs(wx - pyramidCx);
-      const distZ = Math.abs(wz - pyramidCz);
-
-      if (distX <= totalHalfSize && distZ <= totalHalfSize) {
-        return {
-          centerX: pyramidCx,
-          centerZ: pyramidCz
-        };
-      }
-    }
-  }
-
-  return null;
+  return {
+    centerX: snowLandCx,
+    centerZ: snowLandCz
+  };
 }
 
 export class Player {
@@ -92,34 +73,26 @@ export class Player {
     // 初始出生点逻辑
     let spawnFound = false;
 
-    // 首先尝试在金字塔附近出生
-    for (let i = 0; i < 1000; i++) {
-      // 在大范围内随机查找
-      const searchX = (Math.random() - 0.5) * 20000;
-      const searchZ = (Math.random() - 0.5) * 20000;
+    // 首先尝试在雪地附近出生：直接获取一个区域的雪地中心
+    // 选择 0,0 区域附近的雪地
+    const slInfo = getSnowLandCenter(0, 0, WORLD_CONFIG.SEED);
 
-      // 查找这个位置附近的金字塔
-      const pyInfo = findNearbyPyramid(searchX, searchZ, WORLD_CONFIG.SEED);
-      if (pyInfo) {
-        // 在金字塔附近（但不在金字塔正上方）选择一个出生点
-        // 在金字塔边缘外 10-20 格的位置出生
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 15 + Math.random() * 10;
-        const spawnX = pyInfo.centerX + Math.cos(angle) * dist;
-        const spawnZ = pyInfo.centerZ + Math.sin(angle) * dist;
+    // 在雪地附近（但不在雪地正上方）选择一个出生点
+    // 在雪地边缘外 10-20 格的位置出生
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 15 + Math.random() * 10;
+    const spawnX = slInfo.centerX + Math.cos(angle) * dist;
+    const spawnZ = slInfo.centerZ + Math.sin(angle) * dist;
 
-        const biome = getBiome(spawnX, spawnZ);
-        // 确保出生点不在水里
-        const h = Math.floor(noise(spawnX, spawnZ, 0.08) + noise(spawnX, spawnZ, 0.02) * 3);
-        if (h > -0.5) {
-          this.position.set(spawnX, 70, spawnZ); // 出生点海拔高度保持 70 不变
-          spawnFound = true;
-          break;
-        }
-      }
+    const biome = getBiome(spawnX, spawnZ);
+    // 确保出生点不在水里
+    const h = Math.floor(noise(spawnX, spawnZ, 0.08) + noise(spawnX, spawnZ, 0.02) * 3);
+    if (h > -0.5) {
+      this.position.set(spawnX, 70, spawnZ); // 出生点海拔高度保持 70 不变
+      spawnFound = true;
     }
 
-    // 如果没找到金字塔附近的合适出生点，使用原有逻辑
+    // 如果没找到雪地附近的合适出生点，使用原有逻辑
     if (!spawnFound) {
       for (let i = 0; i < 1000; i++) {
         const tx = (Math.random() - 0.5) * 20000;

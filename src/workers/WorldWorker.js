@@ -7,6 +7,7 @@ import { Island } from '../world/entities/Island.js';
 import { getBlockProperties, BLOCK_DATA } from '../constants/BlockData.js';
 import { structureLoaders } from '../world/entity-system/StructureLoader.js';
 import { Pyramid } from './maps/Pyramid.js';
+import { SnowLand } from './maps/SnowLand.js';
 
 console.log('WorldWorker.js loaded');
 
@@ -176,11 +177,17 @@ onmessage = function(e) {
         const pyInfo = Pyramid.getPyramidInfo(wx, wz, seed, terrainGen);
         const inPyramid = pyInfo !== null;
 
+        // 检查当前坐标是否在雪地范围内
+        const slInfo = SnowLand.getSnowLandInfo(wx, wz, seed, terrainGen);
+        const inSnowLand = slInfo !== null;
+
         if (inPyramid) {
           Pyramid.generate(wx, wz, h, pyInfo, fakeChunk, dPlaceholder);
 
           // 金字塔区域不生成其他结构（树、房屋等），但云需要正常生成
           // 跳过后续的地表装饰生成，继续执行云生成逻辑
+        } else if (inSnowLand) {
+          SnowLand.generate(wx, wz, h, slInfo, fakeChunk, dPlaceholder);
         } else if (h < wLvl) {
           fakeChunk.add(wx, h, wz, 'sand', dPlaceholder);
           fakeChunk.add(wx, h - 1, wz, 'end_stone', dPlaceholder);
