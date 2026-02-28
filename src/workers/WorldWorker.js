@@ -171,7 +171,7 @@ onmessage = async function(e) {
           task.centerX = wx;
           task.centerY = snowResult.surfaceY + 1;
           task.centerZ = wz;
-          task.type = 'tree';
+          task.type = 'static_tree';
           structureQueue.push(task);
         }
       } else if (inFrozenMountain) {
@@ -182,7 +182,7 @@ onmessage = async function(e) {
           task.centerX = wx;
           task.centerY = fmResult.surfaceY + 1;
           task.centerZ = wz;
-          task.type = 'tree';
+          task.type = 'static_tree';
           structureQueue.push(task);
         }
       } else if (h < wLvl) {
@@ -233,7 +233,7 @@ onmessage = async function(e) {
               if (Math.random() < 0.1) {
                 // 放入队列，确保在地形生成完成后执行，避免方块重叠
                 const task = () => generateBirchTree(wx, h + 1, wz, fakeChunk, dPlaceholder);
-                task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'tree';
+                task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'static_tree';
                 structureQueue.push(task);
               } else {
                 const isYellow = Math.random() < 0.1;
@@ -242,7 +242,7 @@ onmessage = async function(e) {
                 const logType = isBirch ? 'birch_log' : null;
                 // 放入队列，确保在地形生成完成后执行，避免方块重叠
                 const task = () => Tree.generate(wx, h + 1, wz, fakeChunk, 'big', dPlaceholder, logType, leafType);
-                task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'tree';
+                task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'static_tree';
                 structureQueue.push(task);
               }
             }
@@ -251,14 +251,14 @@ onmessage = async function(e) {
           if (Math.random() < 0.045) {
             // 放入队列，确保在地形生成完成后执行，避免方块重叠
             const task = () => Tree.generate(wx, h + 1, wz, fakeChunk, 'azalea', dPlaceholder);
-            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'tree';
+            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'static_tree';
             structureQueue.push(task);
           }
         } else if (centerBiome === 'SWAMP') {
           if (Math.random() < 0.03) {
             // 放入队列，确保在地形生成完成后执行，避免方块重叠
             const task = () => Tree.generate(wx, h + 1, wz, fakeChunk, 'swamp', dPlaceholder);
-            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'tree';
+            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'static_tree';
             structureQueue.push(task);
           }
         } else if (centerBiome === 'DESERT') {
@@ -288,7 +288,7 @@ onmessage = async function(e) {
           if (!occupied && Math.random() < 0.005) {
             // 放入队列，确保在地形生成完成后执行，避免方块重叠
             const task = () => Tree.generate(wx, h + 1, wz, fakeChunk, 'default', dPlaceholder);
-            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'tree';
+            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'static_tree';
             structureQueue.push(task);
             occupied = true;
           }
@@ -361,7 +361,13 @@ onmessage = async function(e) {
     rovers = savedSnapshot.entities.rovers || [];
 
     // 重建结构中心列表（从实体列表）
+    // 修复：保留静态结构（如 tank, house, static_tree），只移除动态实体，避免 reload 后静态结构被截断
+    // 动态实体类型：tree (RealisticTree), gunman, rover
+    const staticCenters = structureCenters.filter(c =>
+      c.type !== 'tree' && c.type !== 'gunman' && c.type !== 'rover'
+    );
     structureCenters.length = 0; // 清空
+    structureCenters.push(...staticCenters);
 
     if (realisticTrees) {
       realisticTrees.forEach(pos => {
@@ -557,7 +563,7 @@ onmessage = async function(e) {
   const belongsToStructure = (bx, by, bz) => {
     for (const center of structureCenters) {
       let maxDist = 24; // 支持 UglyHouse 最大 40x40 尺寸
-      if (center.type === 'tree') maxDist = 8;
+      if (center.type === 'tree' || center.type === 'static_tree') maxDist = 8;
       else if (center.type === 'gunman') maxDist = 3;
       else if (center.type === 'rover') maxDist = 3;
       else if (center.type === 'tank') maxDist = 3; // Tank 尺寸约 7x7x7

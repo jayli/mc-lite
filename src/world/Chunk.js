@@ -1211,6 +1211,7 @@ export class Chunk {
     const distMap = {
       'uglyHouse': 24,
       'tree': 8,
+      'static_tree': 8,
       'house': 5,
       'tank': 3,
       'rover': 3,
