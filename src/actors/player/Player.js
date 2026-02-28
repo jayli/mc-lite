@@ -6,12 +6,61 @@ import * as THREE from 'three';
 import { audioManager } from '../../core/AudioManager.js';
 import { Physics } from './Physics.js';
 import { Inventory } from './Slots.js';
-import { getBiome, noise } from '../../utils/MathUtils.js';
+import { getBiome, noise, WORLD_CONFIG } from '../../utils/MathUtils.js';
 import { chestManager } from '../../world/entities/Chest.js';
 import { gunModel, mag7Model, minigunModel } from '../../core/Engine.js';
 import { Gun, WEAPON_TYPES } from '../weapon/Gun.js';
 import { getBlockProperties } from '../../constants/BlockData.js';
 import { nextOrientation } from '../../utils/OrientationUtils.js';
+
+/**
+ * 查找指定坐标附近的金字塔
+ * @param {number} wx - 世界 X 坐标
+ * @param {number} wz - 世界 Z 坐标
+ * @param {number} seed - 世界种子
+ * @returns {Object|null} 金字塔信息或 null
+ */
+function findNearbyPyramid(wx, wz, seed) {
+  const pyramidSize = 40;
+  const halfSize = Math.floor(pyramidSize / 2);
+  const transitionSize = 8;
+  const regionSize = 400;
+
+  // 计算当前坐标所在的区域
+  const regionX = Math.floor(wx / regionSize);
+  const regionZ = Math.floor(wz / regionSize);
+
+  // 检查当前区域和相邻区域（共 9 个区域）
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dz = -1; dz <= 1; dz++) {
+      const rx = regionX + dx;
+      const rz = regionZ + dz;
+
+      // 计算该区域的金字塔中心
+      const randX = Math.abs(Math.sin(seed * 1.5 + rx * 0.1));
+      const randZ = Math.abs(Math.sin(seed * 2.5 + rz * 0.1));
+      const offsetX = Math.floor(randX * 300) + 100;
+      const offsetZ = Math.floor(randZ * 300) + 100;
+
+      const pyramidCx = rx * regionSize + offsetX;
+      const pyramidCz = rz * regionSize + offsetZ;
+
+      // 检查坐标是否在金字塔扩展范围内
+      const totalHalfSize = halfSize + transitionSize;
+      const distX = Math.abs(wx - pyramidCx);
+      const distZ = Math.abs(wz - pyramidCz);
+
+      if (distX <= totalHalfSize && distZ <= totalHalfSize) {
+        return {
+          centerX: pyramidCx,
+          centerZ: pyramidCz
+        };
+      }
+    }
+  }
+
+  return null;
+}
 
 export class Player {
   /**
@@ -42,22 +91,54 @@ export class Player {
 
     // 初始出生点逻辑
     let spawnFound = false;
-    for (let i = 0; i < 1000; i++) {
-      const tx = (Math.random() - 0.5) * 20000;
-      const tz = (Math.random() - 0.5) * 20000;
 
-      const biome = getBiome(tx, tz);
-      // 尝试在森林或平原生物群系出生
-      if (biome === 'FOREST' || biome === 'PLAINS') {
-        // 计算预估地形高度，确保不在水面上（海平面约 -1.5）
-        const h = Math.floor(noise(tx, tz, 0.08) + noise(tx, tz, 0.02) * 3);
+    // 首先尝试在金字塔附近出生
+    for (let i = 0; i < 1000; i++) {
+      // 在大范围内随机查找
+      const searchX = (Math.random() - 0.5) * 20000;
+      const searchZ = (Math.random() - 0.5) * 20000;
+
+      // 查找这个位置附近的金字塔
+      const pyInfo = findNearbyPyramid(searchX, searchZ, WORLD_CONFIG.SEED);
+      if (pyInfo) {
+        // 在金字塔附近（但不在金字塔正上方）选择一个出生点
+        // 在金字塔边缘外 10-20 格的位置出生
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 15 + Math.random() * 10;
+        const spawnX = pyInfo.centerX + Math.cos(angle) * dist;
+        const spawnZ = pyInfo.centerZ + Math.sin(angle) * dist;
+
+        const biome = getBiome(spawnX, spawnZ);
+        // 确保出生点不在水里
+        const h = Math.floor(noise(spawnX, spawnZ, 0.08) + noise(spawnX, spawnZ, 0.02) * 3);
         if (h > -0.5) {
-          this.position.set(tx, 70, tz); // 出生点海拔高度
+          this.position.set(spawnX, 70, spawnZ); // 出生点海拔高度保持 70 不变
           spawnFound = true;
           break;
         }
       }
     }
+
+    // 如果没找到金字塔附近的合适出生点，使用原有逻辑
+    if (!spawnFound) {
+      for (let i = 0; i < 1000; i++) {
+        const tx = (Math.random() - 0.5) * 20000;
+        const tz = (Math.random() - 0.5) * 20000;
+
+        const biome = getBiome(tx, tz);
+        // 尝试在森林或平原生物群系出生
+        if (biome === 'FOREST' || biome === 'PLAINS') {
+          // 计算预估地形高度，确保不在水面上（海平面约 -1.5）
+          const h = Math.floor(noise(tx, tz, 0.08) + noise(tx, tz, 0.02) * 3);
+          if (h > -0.5) {
+            this.position.set(tx, 70, tz); // 出生点海拔高度
+            spawnFound = true;
+            break;
+          }
+        }
+      }
+    }
+
     if (!spawnFound) this.position.set(0, 70, 0); // 出生点海拔高度
 
     // 移动与跳跃属性

@@ -17,6 +17,17 @@ self.onerror = (e) => {
 // 结构数据加载器实例
 const { uglyHouse, birchTree, tank } = structureLoaders;
 
+// 线性插值
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+// Smoothstep 平滑插值
+function smoothstep(edge0, edge1, x) {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
 /**
  * 解析方块数据条目，兼容新旧格式
  * @param {string|object} value - 存储值
@@ -165,17 +176,41 @@ onmessage = function(e) {
         const inPyramid = pyInfo !== null;
 
         if (inPyramid) {
-          // 金字塔区域：生成沙子金字塔和岩石基础
-          const pyramidSurfaceY = h + pyInfo.layerHeight;
+          // 金字塔原始高度：当地形高度 + layerHeight（保持原来的计算方式）
+          const originalPyramidHeight = h + pyInfo.layerHeight;
+
+          let finalSurfaceY;
+
+          if (pyInfo.transitionFactor === 0) {
+            // 金字塔主体区域：使用原始高度，保持完整形态
+            finalSurfaceY = originalPyramidHeight;
+          } else {
+            // 过渡带区域：限制与地形的高差不超过 2 个方块
+            const maxDiff = 2;
+            const heightDiff = originalPyramidHeight - h;
+
+            if (Math.abs(heightDiff) <= maxDiff) {
+              // 高差已经在 2 以内，直接使用原始高度
+              finalSurfaceY = originalPyramidHeight;
+            } else {
+              // 高差超过 2，限制在 2 以内
+              finalSurfaceY = h + Math.sign(heightDiff) * maxDiff;
+            }
+          }
 
           // 生成金字塔主体（沙子）
-          for (let y = h; y <= pyramidSurfaceY; y++) {
+          const fillStartY = Math.min(h, finalSurfaceY);
+          const fillEndY = Math.max(h, finalSurfaceY);
+          for (let y = fillStartY; y <= fillEndY; y++) {
             fakeChunk.add(wx, y, wz, 'sand', dPlaceholder);
           }
 
+          // 计算岩石基础层的基准高度
+          const rockBaseY = Math.min(h, finalSurfaceY);
+
           // 生成岩石基础层（1-11 层，无矿洞）
           for (let k = 1; k <= 11; k++) {
-            const rockY = h - k;
+            const rockY = rockBaseY - k;
             if (k === 11) {
               fakeChunk.add(wx, rockY, wz, 'end_stone', dPlaceholder);
             } else if (k === 10) {
@@ -186,7 +221,7 @@ onmessage = function(e) {
             }
           }
           // 最底层 end_stone
-          fakeChunk.add(wx, h - 12, wz, 'end_stone', dPlaceholder);
+          fakeChunk.add(wx, rockBaseY - 12, wz, 'end_stone', dPlaceholder);
 
           // 金字塔区域不生成其他结构（树、房屋等），但云需要正常生成
           // 跳过后续的地表装饰生成，继续执行云生成逻辑
@@ -779,8 +814,11 @@ function generateUglyHouse(x, y, z, chunk, dObj) {
  * 每 500x500 的区域生成一个金字塔
  */
 function getPyramidInfo(wx, wz, seed) {
-  const pyramidSize = 40;  // 金字塔边长 40 格
+  const pyramidSize = 40;  // 金字塔主体边长 40 格
   const halfSize = Math.floor(pyramidSize / 2);
+  const coreSize = 20;     // 核心保护区边长 20 格
+  const halfCore = Math.floor(coreSize / 2);
+  const transitionSize = 8; // 过渡带大小 8 格
   const regionSize = 400;  // 每 400x400 区域生成一个金字塔
 
   // 计算当前坐标所在的区域
@@ -796,12 +834,14 @@ function getPyramidInfo(wx, wz, seed) {
   const pyramidCx = regionX * regionSize + offsetX;
   const pyramidCz = regionZ * regionSize + offsetZ;
 
-  const pyramidMinX = pyramidCx - halfSize;
-  const pyramidMaxX = pyramidCx + halfSize;
-  const pyramidMinZ = pyramidCz - halfSize;
-  const pyramidMaxZ = pyramidCz + halfSize;
+  // 扩展后的金字塔总区域（包含过渡带）
+  const totalHalfSize = halfSize + transitionSize;
+  const pyramidMinX = pyramidCx - totalHalfSize;
+  const pyramidMaxX = pyramidCx + totalHalfSize;
+  const pyramidMinZ = pyramidCz - totalHalfSize;
+  const pyramidMaxZ = pyramidCz + totalHalfSize;
 
-  // 检查是否在金字塔范围内
+  // 检查是否在扩展范围内
   if (wx < pyramidMinX || wx > pyramidMaxX || wz < pyramidMinZ || wz > pyramidMaxZ) {
     return null;
   }
@@ -811,13 +851,36 @@ function getPyramidInfo(wx, wz, seed) {
   const dz = Math.abs(wz - pyramidCz);
   const distFromCenter = Math.max(dx, dz);
 
+  // 计算金字塔基准高度（中心处的地形高度）
+  const centerBiome = terrainGen.getBiome(pyramidCx, pyramidCz);
+  const pyramidBaseHeight = terrainGen.generateHeight(pyramidCx, pyramidCz, centerBiome);
+
+  // 判断区域类型
+  let zone, transitionFactor;
+
+  if (distFromCenter <= halfSize) {
+    // 金字塔主体（核心 + 中间区域）：完整金字塔形态，不进行混合
+    zone = 'core';
+    transitionFactor = 0;
+  } else {
+    // 过渡带：在金字塔主体边缘外进行平滑混合
+    zone = 'transition';
+    // 从主体边缘 (halfSize) 到总边缘 (totalHalfSize) 过渡因子从 0 到 1
+    const t = (distFromCenter - halfSize) / transitionSize;
+    transitionFactor = t;
+  }
+
   // 金字塔坡度：每 2 个单位水平距离，高度下降 1 个单位
+  // 恢复原来的坡度计算，过渡带内也继续降低高度以保持金字塔形态
   const pyramidLayerHeight = Math.floor((halfSize - distFromCenter) / 2);
 
   return {
     centerX: pyramidCx,
     centerZ: pyramidCz,
     layerHeight: Math.max(0, pyramidLayerHeight),
-    isBaseLayer: pyramidLayerHeight === 0
+    isBaseLayer: pyramidLayerHeight === 0,
+    transitionFactor: transitionFactor,
+    zone: zone,
+    pyramidBaseHeight: pyramidBaseHeight
   };
 }
