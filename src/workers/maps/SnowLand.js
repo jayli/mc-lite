@@ -130,7 +130,7 @@ export function generateSnowLand(wx, wz, h, slInfo, fakeChunk, dPlaceholder) {
   const fillEndY = Math.max(h, finalSurfaceY);
 
   // 检查是否在海平面以下
-  const isBelowSeaLevel = finalSurfaceY <= seaLevel;
+  const isBelowSeaLevel = finalSurfaceY <= seaLevel - 1;
 
   // 随机决定 dirt 层数（3-5层）
   const dirtLayers = Math.floor(Math.random() * 3) + 3;

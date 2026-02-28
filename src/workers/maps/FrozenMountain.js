@@ -48,11 +48,33 @@ export function getFrozenMountainInfo(wx, wz, seed, terrainGen) {
   const pyramidCz = regionZ * regionSize + offsetZ;
 
   // 冰封山峰位移 = 金字塔位置 + (-160, 0) 偏移（与 SnowLand 相反的一侧）
-  const mountainCx = pyramidCx - 160;
-  const mountainCz = pyramidCz;
+  let mountainCx = pyramidCx - 160;
+  let mountainCz = pyramidCz;
 
   // 扩展后的冰封山峰总区域（包含过渡带）
   const totalHalfSize = halfSize + transitionSize;
+
+  // 确保山峰中心不会太靠近区域边界（至少保留 totalHalfSize + 5 的缓冲）
+  const minMargin = totalHalfSize + 5;
+  const regionLeft = regionX * regionSize;
+  const regionRight = (regionX + 1) * regionSize;
+  const regionTop = regionZ * regionSize;
+  const regionBottom = (regionZ + 1) * regionSize;
+
+  // 调整 X 坐标
+  if (mountainCx - minMargin < regionLeft) {
+    mountainCx = regionLeft + minMargin;
+  } else if (mountainCx + minMargin > regionRight) {
+    mountainCx = regionRight - minMargin;
+  }
+
+  // 调整 Z 坐标
+  if (mountainCz - minMargin < regionTop) {
+    mountainCz = regionTop + minMargin;
+  } else if (mountainCz + minMargin > regionBottom) {
+    mountainCz = regionBottom - minMargin;
+  }
+
   const mountainMinX = mountainCx - totalHalfSize;
   const mountainMaxX = mountainCx + totalHalfSize;
   const mountainMinZ = mountainCz - totalHalfSize;
@@ -163,6 +185,8 @@ function isInCave(wx, y, wz, surfaceY, rooms) {
  * @param {Array} rooms - 洞穴房间数组（可选）
  */
 export function generateFrozenMountain(wx, wz, h, fmInfo, fakeChunk, dPlaceholder, rooms = []) {
+  const seaLevel = -2; // 海平面高度
+
   // 冰封山峰原始高度：当地形高度 + layerHeight
   const originalMountainHeight = h + fmInfo.layerHeight;
 
@@ -172,12 +196,14 @@ export function generateFrozenMountain(wx, wz, h, fmInfo, fakeChunk, dPlaceholde
     // 冰封山峰主体区域：使用原始高度，保持完整形态
     finalSurfaceY = originalMountainHeight;
   } else {
-    // 过渡带区域：限制与地形的高差不超过 2 个方块
+    // 过渡带区域：使用 transitionFactor 平滑混合，同时限制与地形的高差不超过 2 个方块
+    // 先平滑插值
+    const smoothHeight = Math.floor(h + (originalMountainHeight - h) * (1 - fmInfo.transitionFactor));
+    // 再限制高差
     const maxDiff = 2;
-    const heightDiff = originalMountainHeight - h;
-
+    const heightDiff = smoothHeight - h;
     if (Math.abs(heightDiff) <= maxDiff) {
-      finalSurfaceY = originalMountainHeight;
+      finalSurfaceY = smoothHeight;
     } else {
       finalSurfaceY = h + Math.sign(heightDiff) * maxDiff;
     }
@@ -187,10 +213,13 @@ export function generateFrozenMountain(wx, wz, h, fmInfo, fakeChunk, dPlaceholde
   const fillStartY = Math.min(h, finalSurfaceY);
   const fillEndY = Math.max(h, finalSurfaceY);
 
+  // 检查是否在海平面以下
+  const isBelowSeaLevel = finalSurfaceY <= seaLevel - 1;
+
   // 随机决定 dirt 层数（2-3层）
   const dirtLayers = Math.floor(Math.random() * 2) + 2;
 
-  // 生成冰封山峰方块
+  // 生成冰封山峰方块或沙块
   for (let y = fillStartY; y <= fillEndY; y++) {
     // 检查是否在洞穴内，如果是则跳过（不生成方块）
     if (rooms.length > 0 && isInCave(wx, y, wz, fillEndY, rooms)) {
@@ -199,15 +228,20 @@ export function generateFrozenMountain(wx, wz, h, fmInfo, fakeChunk, dPlaceholde
 
     const depthFromSurface = fillEndY - y;
 
-    if (y === fillEndY) {
-      // 最顶层：snow_grass
-      fakeChunk.add(wx, y, wz, 'snow_grass', dPlaceholder);
-    } else if (depthFromSurface < dirtLayers) {
-      // 地下 2-3 层：dirt
-      fakeChunk.add(wx, y, wz, 'dirt', dPlaceholder);
+    if (isBelowSeaLevel) {
+      // 海平面以下：全部用沙块
+      fakeChunk.add(wx, y, wz, 'sand', dPlaceholder);
     } else {
-      // 下方：stone
-      fakeChunk.add(wx, y, wz, 'stone', dPlaceholder);
+      if (y === fillEndY) {
+        // 最顶层：snow_grass
+        fakeChunk.add(wx, y, wz, 'snow_grass', dPlaceholder);
+      } else if (depthFromSurface < dirtLayers) {
+        // 地下 2-3 层：dirt
+        fakeChunk.add(wx, y, wz, 'dirt', dPlaceholder);
+      } else {
+        // 下方：stone
+        fakeChunk.add(wx, y, wz, 'stone', dPlaceholder);
+      }
     }
   }
 
