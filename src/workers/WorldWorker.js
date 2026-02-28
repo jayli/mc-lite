@@ -385,8 +385,11 @@ onmessage = function(e) {
     structureQueueWithCenters.forEach(({ task, centerX, centerY, centerZ, type }) => {
       task();
       // 如果是大型结构，添加到结构中心列表
+      // 关键修复：只添加中心点在当前 Chunk 内的结构
       if (type && centerX !== undefined) {
-        structureCenters.push({ type, x: centerX, y: centerY, z: centerZ });
+        if (centerX >= minX && centerX < maxX && centerZ >= minZ && centerZ < maxZ) {
+          structureCenters.push({ type, x: centerX, y: centerY, z: centerZ });
+        }
       }
     });
   }
