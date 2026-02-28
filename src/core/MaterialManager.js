@@ -294,7 +294,9 @@ export async function initializeMaterials() {
     './src/assets/textures/Iron_Ore.png',
     './src/assets/textures/leaves_yellow.png',
     './src/assets/textures/tnt_side.png',
-    './src/assets/textures/tnt_top.png'
+    './src/assets/textures/tnt_top.png',
+    './src/assets/textures/Snow_top.png',
+    './src/assets/textures/Snowy_Grass_Block_side.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -720,5 +722,33 @@ materials.registerMaterial('tnt', {
     3: tntTopBottom,  // 下面：TNT底部（引线纹理）
     4: tntSide,       // 南面：TNT侧面（带文字纹理）
     5: tntSide        // 北面：TNT侧面（带文字纹理）
+  }
+});
+
+// 雪方块 - 六个面都是 Snow_top.png
+const snowTexture = { textureUrl: './src/assets/textures/Snow_top.png' };
+materials.registerMaterial('snow', {
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: snowTexture,  // 东面：雪
+    1: snowTexture,  // 西面：雪
+    2: snowTexture,  // 上面：雪
+    3: snowTexture,  // 下面：雪
+    4: snowTexture,  // 南面：雪
+    5: snowTexture   // 北面：雪
+  }
+});
+
+// 雪草方块 - 顶部雪，侧面雪地，底部泥土
+const snowGrassTop = { textureUrl: './src/assets/textures/Snow_top.png' };
+const snowGrassSide = { textureUrl: './src/assets/textures/Snowy_Grass_Block_side.png' };
+const snowGrassBottom = { textureUrl: './src/assets/textures/dirt.png' };
+materials.registerMaterial('snow_grass', {
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: snowGrassSide,   // 东面：雪地侧面
+    1: snowGrassSide,   // 西面：雪地侧面
+    2: snowGrassTop,    // 上面：雪
+    3: snowGrassBottom,  // 下面：泥土
+    4: snowGrassSide,   // 南面：雪地侧面
+    5: snowGrassSide    // 北面：雪地侧面
   }
 });

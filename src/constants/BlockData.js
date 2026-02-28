@@ -221,7 +221,10 @@ export const BLOCK_DATA = {
   'white_planks': { isAOEnabled: true },
   'oak_planks': { isAOEnabled: true },
   'gold_ore': { isAOEnabled: true },
-  'marble': { isAOEnabled: true }
+  'marble': { isAOEnabled: true },
+  'dirt': {},
+  'snow': { isAOEnabled: true },
+  'snow_grass': { isAOEnabled: true }
 };
 
 /**
