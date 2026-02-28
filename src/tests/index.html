@@ -314,7 +314,7 @@
     import './test-world.js';
     import './test-entity-system.js';
 
-    // 等待所有脚本加载后再延时 700ms 启用按钮
+    // 等待所有脚本加载后再延时 1000ms 启用按钮
     const runAllBtn = document.getElementById('run-all-btn');
     const testResultsDiv = document.getElementById('test-results');
 
@@ -325,7 +325,7 @@
 
       // 更新文案
       testResultsDiv.innerHTML = '<div class="loading">点击"运行所有测试"开始..</div>';
-    }, 700);
+    }, 1000);
 
     // 绑定按钮事件
     runAllBtn.addEventListener('click', async function() {

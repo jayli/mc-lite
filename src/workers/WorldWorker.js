@@ -52,14 +52,14 @@ const CHUNK_SIZE = 16;
 const ROOMS_PER_CHUNK = 2;
 const MAX_ROOM_SIZE = 5;
 
-onmessage = function(e) {
+onmessage = async function(e) {
   const { cx, cz, seed, snapshot, structureCenters: incomingStructureCenters } = e.data;
 
   // 同步种子
   setSeed(seed);
 
-  // 预加载所有结构数据（不阻塞主逻辑）
-  Promise.all([
+  // 预加载所有结构数据（等待完成后再生成地形）
+  await Promise.all([
     uglyHouse.load(),
     birchTree.load(),
     tank.load()
@@ -190,7 +190,7 @@ onmessage = function(e) {
           const snowResult = SnowLand.generate(wx, wz, h, slInfo, fakeChunk, dPlaceholder);
           // 在雪地以 0.002 概率生成白桦树（仅在主体区域且不在海平面以下）
           if (slInfo.transitionFactor === 0 && !snowResult.isBelowSeaLevel && Math.random() < 0.002) {
-            const task = () => Tree.generate(wx, snowResult.surfaceY + 1, wz, fakeChunk, 'default', dPlaceholder, 'birch_log', 'leaves');
+            const task = () => generateBirchTree(wx, snowResult.surfaceY + 1, wz, fakeChunk, dPlaceholder);
             task.centerX = wx;
             task.centerY = snowResult.surfaceY + 1;
             task.centerZ = wz;

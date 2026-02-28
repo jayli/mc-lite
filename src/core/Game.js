@@ -11,6 +11,7 @@ import { realisticTreeManager } from '../world/entity-system/RealisticTreeManage
 import { faceCullingSystem } from './FaceCullingSystem.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { EnemyManager } from './EnemyManager.js'; // 替换为新的敌人管理器
+import { preloadAllStructures } from '../world/entity-system/StructureLoader.js';
 import Stats from 'stats';
 
 /**
@@ -181,6 +182,13 @@ export class Game {
     this.player.inventory.add('snow_grass', 1500);
     this.player.inventory.add('ice', 1500);
     // this.player.inventory.add('cloud', 1500);
+
+    // 预加载 JSON 结构数据
+    preloadAllStructures().then(() => {
+      console.log('[Game] All JSON structures preloaded');
+    }).catch(err => {
+      console.warn('[Game] Failed to preload structures:', err);
+    });
 
     // 延迟执行 Face Culling 审计并同步场景
     setTimeout(() => {
