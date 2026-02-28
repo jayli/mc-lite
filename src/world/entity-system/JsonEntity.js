@@ -1,4 +1,4 @@
-// src/world/entities/JsonEntity.js
+// src/world/entity-system/JsonEntity.js
 
 import { EntityDefinition } from './EntityDefinition.js';
 

@@ -1,5 +1,5 @@
-// src/workers/StructureLoader.js
-import { getBlockProperties } from '../constants/BlockData.js';
+// src/world/entity-system/StructureLoader.js
+import { getBlockProperties } from '../../constants/BlockData.js';
 
 /**
  * 结构数据加载器类
@@ -152,9 +152,9 @@ export class StructureLoader {
  * 预定义的结构加载器实例
  */
 export const structureLoaders = {
-  uglyHouse: new StructureLoader('ugly_house', '../world/blockmods/ugly_house.json'),
-  birchTree: new StructureLoader('brich_tree', '../world/blockmods/brich_tree.json'),
-  tank: new StructureLoader('tank', '../world/blockmods/tank.json')
+  uglyHouse: new StructureLoader('ugly_house', '../world/structures/ugly_house.json'),
+  birchTree: new StructureLoader('brich_tree', '../world/structures/brich_tree.json'),
+  tank: new StructureLoader('tank', '../world/structures/tank.json')
 };
 
 /**

@@ -1,4 +1,4 @@
-// src/entities/weapon/Gun.js
+// src/actors/weapon/Gun.js
 import * as THREE from 'three';
 import { audioManager } from '../../core/AudioManager.js';
 

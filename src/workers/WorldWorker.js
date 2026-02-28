@@ -5,7 +5,7 @@ import { Tree } from '../world/entities/Tree.js';
 import { Cloud } from '../world/entities/Cloud.js';
 import { Island } from '../world/entities/Island.js';
 import { getBlockProperties, BLOCK_DATA } from '../constants/BlockData.js';
-import { structureLoaders } from './StructureLoader.js';
+import { structureLoaders } from '../world/entity-system/StructureLoader.js';
 
 console.log('WorldWorker.js loaded');
 

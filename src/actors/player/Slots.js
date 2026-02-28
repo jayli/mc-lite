@@ -1,4 +1,4 @@
-// src/entities/player/Slots.js
+// src/actors/player/Slots.js
 
 /**
  * 物品槽位类，存储单个位置的物品信息

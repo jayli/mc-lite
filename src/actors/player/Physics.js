@@ -1,4 +1,4 @@
-// src/entities/player/Physics.js
+// src/actors/player/Physics.js
 /**
  * 物理系统常量定义
  */

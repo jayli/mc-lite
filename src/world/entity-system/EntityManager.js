@@ -1,12 +1,12 @@
-// src/world/entities/EntityManager.js
+// src/world/entity-system/EntityManager.js
 
 import { EntityDefinition } from './EntityDefinition.js';
 import { CodeEntity } from './CodeEntity.js';
 import { JsonEntity } from './JsonEntity.js';
-import { Tree } from './Tree.js';
-import { Cloud } from './Cloud.js';
-import { Island } from './Island.js';
-import { RealisticTree } from './RealisticTree.js';
+import { Tree } from '../entities/Tree.js';
+import { Cloud } from '../entities/Cloud.js';
+import { Island } from '../entities/Island.js';
+import { RealisticTree } from '../entities/RealisticTree.js';
 
 /**
  * 实体管理器单例类

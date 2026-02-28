@@ -1,4 +1,4 @@
-// src/world/entities/RealisticTreeManager.js
+// src/world/entity-system/RealisticTreeManager.js
 // 真实树木模板管理器模块
 // 创建可重用的树木模板以供高效生成
 import * as THREE from 'three';

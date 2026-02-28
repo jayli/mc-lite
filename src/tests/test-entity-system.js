@@ -6,10 +6,10 @@
 
 import { describe, test } from './runner.js';
 import { assertEqual, assertTrue, assertFalse } from './assert.js';
-import { EntityDefinition } from '../world/entities/EntityDefinition.js';
-import { CodeEntity } from '../world/entities/CodeEntity.js';
-import { JsonEntity } from '../world/entities/JsonEntity.js';
-import { EntityManager } from '../world/entities/EntityManager.js';
+import { EntityDefinition } from '../world/entity-system/EntityDefinition.js';
+import { CodeEntity } from '../world/entity-system/CodeEntity.js';
+import { JsonEntity } from '../world/entity-system/JsonEntity.js';
+import { EntityManager } from '../world/entity-system/EntityManager.js';
 
 describe('EntityDefinition 基类测试', (test) => {
 

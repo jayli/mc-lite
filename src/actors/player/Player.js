@@ -1,4 +1,4 @@
-// src/entities/player/Player.js
+// src/actors/player/Player.js
 /**
  * 玩家类，负责处理玩家状态、输入、物理交互和渲染辅助（如相机位置、手臂）
  */

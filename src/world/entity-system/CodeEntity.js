@@ -1,4 +1,4 @@
-// src/world/entities/CodeEntity.js
+// src/world/entity-system/CodeEntity.js
 
 import { EntityDefinition } from './EntityDefinition.js';
 

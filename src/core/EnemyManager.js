@@ -1,7 +1,7 @@
 // src/core/EnemyManager.js
 // 敌人管理器，用于与EnemyWorker通信并在主线程管理丧尸实体
 
-import { ZombieInstancedRenderer } from '../entities/enemy/ZombieInstancedRenderer.js';
+import { ZombieInstancedRenderer } from '../actors/enemy/ZombieInstancedRenderer.js';
 
 export class EnemyManager {
   constructor(scene, world) {

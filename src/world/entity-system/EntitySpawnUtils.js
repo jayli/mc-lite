@@ -1,4 +1,4 @@
-// src/world/entities/EntitySpawnUtils.js
+// src/world/entity-system/EntitySpawnUtils.js
 
 /**
  * 实体生成工具函数

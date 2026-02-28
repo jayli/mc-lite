@@ -1,4 +1,4 @@
-// src/world/entities/EntityDefinition.js
+// src/world/entity-system/EntityDefinition.js
 
 /**
  * 实体定义基类

@@ -6,8 +6,8 @@ import { persistenceService } from '../services/PersistenceService.js';
 import { Engine } from './Engine.js';
 import { World } from '../world/World.js';
 import { UIManager } from '../ui/UIManager.js';
-import { Player } from '../entities/player/Player.js';
-import { realisticTreeManager } from '../world/entities/RealisticTreeManager.js';
+import { Player } from '../actors/player/Player.js';
+import { realisticTreeManager } from '../world/entity-system/RealisticTreeManager.js';
 import { faceCullingSystem } from './FaceCullingSystem.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { EnemyManager } from './EnemyManager.js'; // 替换为新的敌人管理器
@@ -103,7 +103,7 @@ export class Game {
         };
 
         // 创建一个僵尸实例用于渲染
-        import('../entities/enemy/Zombie.js').then(({ Zombie }) => {
+        import('../actors/enemy/Zombie.js').then(({ Zombie }) => {
           const zombie = new Zombie(adjustedSpawnPos);
 
           // 检查是否可以添加更多丧尸
