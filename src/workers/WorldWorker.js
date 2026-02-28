@@ -8,6 +8,7 @@ import { getBlockProperties, BLOCK_DATA } from '../constants/BlockData.js';
 import { structureLoaders } from '../world/entity-system/StructureLoader.js';
 import { Pyramid } from './maps/Pyramid.js';
 import { SnowLand } from './maps/SnowLand.js';
+import { FrozenMountain } from './maps/FrozenMountain.js';
 
 console.log('WorldWorker.js loaded');
 
@@ -182,6 +183,10 @@ onmessage = async function(e) {
         const slInfo = SnowLand.getSnowLandInfo(wx, wz, seed, terrainGen);
         const inSnowLand = slInfo !== null;
 
+        // 检查当前坐标是否在冰封山峰范围内
+        const fmInfo = FrozenMountain.getFrozenMountainInfo(wx, wz, seed, terrainGen);
+        const inFrozenMountain = fmInfo !== null;
+
         if (inPyramid) {
           Pyramid.generate(wx, wz, h, pyInfo, fakeChunk, dPlaceholder);
 
@@ -198,6 +203,8 @@ onmessage = async function(e) {
             task.type = 'tree';
             structureQueue.push(task);
           }
+        } else if (inFrozenMountain) {
+          FrozenMountain.generate(wx, wz, h, fmInfo, fakeChunk, dPlaceholder, rooms);
         } else if (h < wLvl) {
           fakeChunk.add(wx, h, wz, 'sand', dPlaceholder);
           fakeChunk.add(wx, h - 1, wz, 'end_stone', dPlaceholder);

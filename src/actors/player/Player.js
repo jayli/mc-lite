@@ -71,48 +71,18 @@ export class Player {
     this.moveCheckFrequency = 1;   // 碰撞检测频率 (每几帧检查一次)
 
     // 初始出生点逻辑
-    let spawnFound = false;
-
-    // 首先尝试在雪地附近出生：直接获取一个区域的雪地中心
-    // 选择 0,0 区域附近的雪地
+    // 直接在 snow_land 中心附近出生，100% 保证在雪地附近
     const slInfo = getSnowLandCenter(0, 0, WORLD_CONFIG.SEED);
 
-    // 在雪地附近（但不在雪地正上方）选择一个出生点
-    // 在雪地边缘外 10-20 格的位置出生
+    // 在雪地中心附近选择一个出生点（稍微偏移一点，避免正中心）
     const angle = Math.random() * Math.PI * 2;
-    const dist = 15 + Math.random() * 10;
+    const dist = 5 + Math.random() * 5; // 5-10 格偏移
     const spawnX = slInfo.centerX + Math.cos(angle) * dist;
     const spawnZ = slInfo.centerZ + Math.sin(angle) * dist;
 
-    const biome = getBiome(spawnX, spawnZ);
-    // 确保出生点不在水里
-    const h = Math.floor(noise(spawnX, spawnZ, 0.08) + noise(spawnX, spawnZ, 0.02) * 3);
-    if (h > -0.5) {
-      this.position.set(spawnX, 70, spawnZ); // 出生点海拔高度保持 70 不变
-      spawnFound = true;
-    }
-
-    // 如果没找到雪地附近的合适出生点，使用原有逻辑
-    if (!spawnFound) {
-      for (let i = 0; i < 1000; i++) {
-        const tx = (Math.random() - 0.5) * 20000;
-        const tz = (Math.random() - 0.5) * 20000;
-
-        const biome = getBiome(tx, tz);
-        // 尝试在森林或平原生物群系出生
-        if (biome === 'FOREST' || biome === 'PLAINS') {
-          // 计算预估地形高度，确保不在水面上（海平面约 -1.5）
-          const h = Math.floor(noise(tx, tz, 0.08) + noise(tx, tz, 0.02) * 3);
-          if (h > -0.5) {
-            this.position.set(tx, 70, tz); // 出生点海拔高度
-            spawnFound = true;
-            break;
-          }
-        }
-      }
-    }
-
-    if (!spawnFound) this.position.set(0, 70, 0); // 出生点海拔高度
+    // 直接在这个位置出生，不做高度/生物群系检查
+    // 玩家初始 y 坐标设为 70，会通过物理系统下落到地面
+    this.position.set(spawnX, 70, spawnZ);
 
     // 移动与跳跃属性
     this.velocity = new THREE.Vector3(); // 玩家当前速度向量 (x, y, z)
