@@ -231,6 +231,9 @@ export function generateFrozenMountain(wx, wz, h, fmInfo, fakeChunk, dPlaceholde
   }
   // 最底层 end_stone
   fakeChunk.add(wx, rockBaseY - 12, wz, 'end_stone', dPlaceholder);
+
+  // 返回地表高度，供 WorldWorker 生成树使用
+  return { surfaceY: fillEndY, isBelowSeaLevel };
 }
 
 /**
