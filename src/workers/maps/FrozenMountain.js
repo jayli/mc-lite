@@ -149,30 +149,6 @@ export function getFrozenMountainInfo(wx, wz, seed, terrainGen) {
   };
 }
 
-/**
- * 检查给定位置是否在洞穴内
- * @param {number} wx - 世界 X 坐标
- * @param {number} y - Y 坐标
- * @param {number} wz - 世界 Z 坐标
- * @param {number} surfaceY - 地表高度
- * @param {Array} rooms - 洞穴房间数组
- * @returns {boolean} 是否在洞穴内
- */
-function isInCave(wx, y, wz, surfaceY, rooms) {
-  // 最底部 2 层不生成洞穴
-  const depthFromSurface = surfaceY - y;
-  if (depthFromSurface <= 1) {
-    return false;
-  }
-
-  // 检查是否在任何房间内
-  for (const r of rooms) {
-    if (wx >= r.minX && wx <= r.maxX && wz >= r.minZ && wz <= r.maxZ && y >= r.minY && y <= r.maxY) {
-      return true;
-    }
-  }
-  return false;
-}
 
 /**
  * 生成冰封山峰方块
@@ -182,9 +158,8 @@ function isInCave(wx, y, wz, surfaceY, rooms) {
  * @param {Object} fmInfo - 冰封山峰信息对象
  * @param {Object} fakeChunk - 模拟 Chunk 对象
  * @param {Object} dPlaceholder - 数据占位符对象
- * @param {Array} rooms - 洞穴房间数组（可选）
  */
-export function generateFrozenMountain(wx, wz, h, fmInfo, fakeChunk, dPlaceholder, rooms = []) {
+export function generateFrozenMountain(wx, wz, h, fmInfo, fakeChunk, dPlaceholder) {
   const seaLevel = -2; // 海平面高度
 
   // 冰封山峰原始高度：当地形高度 + layerHeight
@@ -221,11 +196,6 @@ export function generateFrozenMountain(wx, wz, h, fmInfo, fakeChunk, dPlaceholde
 
   // 生成冰封山峰方块或沙块
   for (let y = fillStartY; y <= fillEndY; y++) {
-    // 检查是否在洞穴内，如果是则跳过（不生成方块）
-    if (rooms.length > 0 && isInCave(wx, y, wz, fillEndY, rooms)) {
-      continue;
-    }
-
     const depthFromSurface = fillEndY - y;
 
     if (isBelowSeaLevel) {
@@ -251,16 +221,11 @@ export function generateFrozenMountain(wx, wz, h, fmInfo, fakeChunk, dPlaceholde
   // 生成岩石基础层（1-11 层）
   for (let k = 1; k <= 11; k++) {
     const rockY = rockBaseY - k;
-    // 最底部 2 层不生成洞穴，总是添加方块
     if (k === 11) {
       fakeChunk.add(wx, rockY, wz, 'end_stone', dPlaceholder);
     } else if (k === 10) {
       fakeChunk.add(wx, rockY, wz, 'stone', dPlaceholder);
     } else {
-      // 检查是否在洞穴内，如果是则跳过（不生成方块）
-      if (rooms.length > 0 && isInCave(wx, rockY, wz, rockBaseY, rooms)) {
-        continue;
-      }
       fakeChunk.add(wx, rockY, wz, 'stone', dPlaceholder);
     }
   }

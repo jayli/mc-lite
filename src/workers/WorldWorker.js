@@ -204,7 +204,7 @@ onmessage = async function(e) {
             structureQueue.push(task);
           }
         } else if (inFrozenMountain) {
-          FrozenMountain.generate(wx, wz, h, fmInfo, fakeChunk, dPlaceholder, rooms);
+          FrozenMountain.generate(wx, wz, h, fmInfo, fakeChunk, dPlaceholder);
         } else if (h < wLvl) {
           fakeChunk.add(wx, h, wz, 'sand', dPlaceholder);
           fakeChunk.add(wx, h - 1, wz, 'end_stone', dPlaceholder);
