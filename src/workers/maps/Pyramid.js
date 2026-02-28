@@ -117,11 +117,25 @@ export function generatePyramid(wx, wz, h, pyInfo, fakeChunk, dPlaceholder) {
     }
   }
 
-  // 生成金字塔主体（沙子）
+  // 计算金字塔高度差
   const fillStartY = Math.min(h, finalSurfaceY);
   const fillEndY = Math.max(h, finalSurfaceY);
+
+  // 随机决定沙块层数（3-4层）
+  const sandLayers = Math.floor(Math.random() * 2) + 3;
+
+  // 生成金字塔方块
   for (let y = fillStartY; y <= fillEndY; y++) {
-    fakeChunk.add(wx, y, wz, 'sand', dPlaceholder);
+    const depthFromSurface = fillEndY - y;
+
+    if (depthFromSurface < sandLayers) {
+      // 顶部3-4层：沙块
+      fakeChunk.add(wx, y, wz, 'sand', dPlaceholder);
+    } else {
+      // 沙块下面：岩石或鹅卵石
+      const rockType = Math.random() < 0.3 ? 'cobblestone' : 'stone';
+      fakeChunk.add(wx, y, wz, rockType, dPlaceholder);
+    }
   }
 
   // 计算岩石基础层的基准高度
