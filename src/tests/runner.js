@@ -101,9 +101,10 @@ async function runSingleTest(testObj) {
 /**
  * 运行测试套件
  * @param {TestSuite} suite - 测试套件
+ * @param {Function} onTestComplete - 每个测试完成后的回调
  * @returns {Promise<Object>} 套件执行结果
  */
-async function runSuite(suite) {
+async function runSuite(suite, onTestComplete) {
   const results = {
     name: suite.name,
     tests: [],
@@ -123,6 +124,11 @@ async function runSuite(suite) {
     } else {
       results.failed++;
     }
+
+    // 通知单个测试完成
+    if (onTestComplete) {
+      onTestComplete();
+    }
   }
 
   results.duration = performance.now() - suiteStartTime;
@@ -131,6 +137,17 @@ async function runSuite(suite) {
   suite.results = results.tests;
 
   return results;
+}
+
+// 进度回调函数
+let progressCallback = null;
+
+/**
+ * 设置进度回调
+ * @param {Function} callback - 进度回调函数，接收 (current, total, currentTestName) 参数
+ */
+export function setProgressCallback(callback) {
+  progressCallback = callback;
 }
 
 /**
@@ -145,8 +162,22 @@ export async function runAllTests() {
   const allResults = [];
   const totalStartTime = performance.now();
 
+  // 计算总测试数
+  let totalTests = 0;
   for (const suite of testResults.suites) {
-    const suiteResults = await runSuite(suite);
+    totalTests += suite.tests.length;
+  }
+
+  let currentTestIndex = 0;
+
+  for (const suite of testResults.suites) {
+    const suiteResults = await runSuite(suite, () => {
+      currentTestIndex++;
+      // 通知进度更新
+      if (progressCallback) {
+        progressCallback(currentTestIndex, totalTests, suite.name);
+      }
+    });
     allResults.push(suiteResults);
     testResults.passed += suiteResults.passed;
     testResults.failed += suiteResults.failed;

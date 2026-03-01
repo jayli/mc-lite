@@ -254,6 +254,64 @@
       width: 16px;
       height: 16px;
     }
+
+    .progress-container {
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 15px;
+      background-color: #2a2a4a;
+      border-radius: 8px;
+      display: none;
+    }
+
+    .progress-container.visible {
+      display: block;
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .progress-text {
+      font-size: 14px;
+      color: #aaa;
+    }
+
+    .progress-current {
+      font-size: 18px;
+      font-weight: bold;
+      color: #00d9ff;
+    }
+
+    .progress-bar {
+      height: 20px;
+      background-color: #3a3a5a;
+      border-radius: 10px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #00d9ff, #00ff88);
+      transition: width 0.1s ease;
+      border-radius: 10px;
+    }
+
+    .progress-current-test {
+      margin-top: 10px;
+      padding: 8px;
+      background-color: rgba(0, 0, 0, 0.2);
+      border-radius: 4px;
+      font-size: 12px;
+      color: #888;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
   </style>
 </head>
 <body>
@@ -275,6 +333,17 @@
       <input type="checkbox" id="auto-scroll" checked>
       <label for="auto-scroll">自动滚动到失败测试</label>
     </div>
+  </div>
+
+  <div id="progress-container" class="progress-container">
+    <div class="progress-header">
+      <span class="progress-text">测试进度</span>
+      <span class="progress-current" id="progress-count">0 / 0</span>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill" style="width: 0%"></div>
+    </div>
+    <div class="progress-current-test" id="current-test-name">准备中...</div>
   </div>
 
   <div class="status-bar" id="status-bar" style="display: none;">
@@ -305,7 +374,7 @@
   </div>
 
   <script type="module">
-    import { runAllTests as _runAllTests, displayResults, resetTestResults, getSuiteCount } from './runner.js';
+    import { runAllTests as _runAllTests, displayResults, resetTestResults, getSuiteCount, setProgressCallback } from './runner.js';
     import './test-orientation.js';
     import './test-block-data.js';
     import './test-face-culling.js';
@@ -317,6 +386,18 @@
     // 等待所有脚本加载后再延时 1000ms 启用按钮
     const runAllBtn = document.getElementById('run-all-btn');
     const testResultsDiv = document.getElementById('test-results');
+    const progressContainer = document.getElementById('progress-container');
+    const progressFill = document.getElementById('progress-fill');
+    const progressCount = document.getElementById('progress-count');
+    const currentTestName = document.getElementById('current-test-name');
+
+    // 设置进度回调
+    setProgressCallback((current, total, suiteName) => {
+      const percentage = (current / total * 100).toFixed(1);
+      progressFill.style.width = percentage + '%';
+      progressCount.textContent = `${current} / ${total}`;
+      currentTestName.textContent = `正在运行：${suiteName}`;
+    });
 
     setTimeout(() => {
       runAllBtn.disabled = false;
@@ -336,11 +417,20 @@
       btn.textContent = '运行中...';
       statusBar.style.display = 'none';
 
+      // 显示进度条
+      progressContainer.classList.add('visible');
+      progressFill.style.width = '0%';
+      progressCount.textContent = '0 / 0';
+      currentTestName.textContent = '准备中...';
+
       // 重置结果
       resetTestResults();
 
       // 运行测试
       const results = await _runAllTests();
+
+      // 隐藏进度条
+      progressContainer.classList.remove('visible');
 
       // 显示结果
       displayResults(results);
