@@ -31,7 +31,7 @@ function mountainNoise(x, z, seed, scale) {
 export function getFrozenMountainInfo(wx, wz, seed, terrainGen) {
   const mountainSize = 60;  // 冰封山峰主体边长 60 格
   const halfSize = Math.floor(mountainSize / 2);
-  const transitionSize = 8; // 过渡带大小 8 格
+  const transitionSize = 4; // 过渡带大小 4 格
   const regionSize = 400;  // 每 400x400 区域生成一个冰封山峰
 
   // 计算当前坐标所在的区域
