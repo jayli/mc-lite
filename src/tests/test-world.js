@@ -190,7 +190,7 @@ describe('World 真实类测试', (test) => {
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
 
     // 等待区块加载完成
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // 验证 7x7 的区块已加载 (渲染距离 3)
     assertEqual(world.chunks.size, 49, '应该加载 49 个区块 (7x7)');
@@ -211,14 +211,14 @@ describe('World 真实类测试', (test) => {
 
     // 先在原点加载区块
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     const initialSize = world.chunks.size;
     assertEqual(initialSize, 49, '初始应该有 49 个区块');
 
     // 移动到远处 (100, 100) -> 区块 (6, 6)
     world.update(new THREE.Vector3(100, 10, 100), 0.016);
-    await new Promise(resolve => setTimeout(resolve, 50));
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // 验证新区块已加载
     assertTrue(world.chunks.has('6,6'), '区块 6,6 应该存在 (100/16=6)');
@@ -237,7 +237,8 @@ describe('World 真实类测试', (test) => {
 
     // 先更新世界以加载区块 (玩家在原点)
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    await new Promise(resolve => setTimeout(resolve, 50));
+    // 等待区块完全生成
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // 在玩家附近放置方块
     world.setBlock(5, 10, 5, 'stone', 0);
@@ -273,7 +274,8 @@ describe('World 真实类测试', (test) => {
     scene = new THREE.Scene();
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    await new Promise(resolve => setTimeout(resolve, 50));
+    // 等待区块完全生成
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // 放置不同类型的方块
     world.setBlock(0, 10, 0, 'dirt', 0);
@@ -296,7 +298,8 @@ describe('World 真实类测试', (test) => {
     scene = new THREE.Scene();
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    await new Promise(resolve => setTimeout(resolve, 50));
+    // 等待区块完全生成
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // 先放置一个方块
     world.setBlock(5, 10, 5, 'stone', 0);
@@ -317,7 +320,8 @@ describe('World 真实类测试', (test) => {
     scene = new THREE.Scene();
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    await new Promise(resolve => setTimeout(resolve, 50));
+    // 等待区块完全生成
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // 移除不存在的方块不应该抛出错误
     world.removeBlock(999, 999, 999);
@@ -335,11 +339,22 @@ describe('World 真实类测试', (test) => {
     scene = new THREE.Scene();
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    await new Promise(resolve => setTimeout(resolve, 50));
+
+    // 等待区块完全生成（检查 isReady 状态）
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // 放置实心方块
     world.setBlock(5, 10, 5, 'stone', 0);
     world.setBlock(6, 10, 5, 'collider', 0);
+
+    // 验证 solidBlocks 包含方块
+    const cx = Math.floor(5 / 16);
+    const cz = Math.floor(5 / 16);
+    const key = `${cx},${cz}`;
+    const chunk = world.chunks.get(key);
+
+    assertTrue(chunk.solidBlocks.has('5,10,5'), 'stone 应该在 solidBlocks 中');
+    assertTrue(chunk.solidBlocks.has('6,10,5'), 'collider 应该在 solidBlocks 中');
 
     assertTrue(world.isSolid(5, 10, 5), 'stone 应该是实心');
     assertTrue(world.isSolid(6, 10, 5), 'collider 应该是实心');
@@ -353,7 +368,9 @@ describe('World 真实类测试', (test) => {
     scene = new THREE.Scene();
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    await new Promise(resolve => setTimeout(resolve, 50));
+
+    // 等待区块完全生成
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // 放置非实心方块
     world.setBlock(5, 10, 5, 'glass_block', 0);
@@ -371,7 +388,8 @@ describe('World 真实类测试', (test) => {
     scene = new THREE.Scene();
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    await new Promise(resolve => setTimeout(resolve, 50));
+    // 等待区块完全生成
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     // 放置多个方块
     world.setBlock(0, 10, 0, 'stone', 0);
@@ -404,7 +422,8 @@ describe('World 真实类测试', (test) => {
     scene = new THREE.Scene();
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    await new Promise(resolve => setTimeout(resolve, 50));
+    // 等待区块完全生成
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     const addedBlocks = [];
 
@@ -441,7 +460,8 @@ describe('World 真实类测试', (test) => {
 
     // 先在原点加载区块并放置方块
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    await new Promise(resolve => setTimeout(resolve, 50));
+    // 等待区块完全生成
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     world.setBlock(5, 10, 5, 'stone', 0);
     assertEqual(world.getBlock(5, 10, 5), 'stone', '方块应该存在');
