@@ -348,13 +348,25 @@ export class Chunk {
         });
       };
 
+      // 判断一个位置是否在当前 Chunk 范围内
+      const isInChunkRange = (x, y, z) => {
+        const minX = this.cx * CHUNK_SIZE;
+        const maxX = (this.cx + 1) * CHUNK_SIZE;
+        const minZ = this.cz * CHUNK_SIZE;
+        const maxZ = (this.cz + 1) * CHUNK_SIZE;
+        return x >= minX && x < maxX && z >= minZ && z < maxZ;
+      };
+
       // --- 核心修复：根据主线程最新的 blockData 进行二次过滤，防止竞态导致的”幻影方块”
       // 但对于跨 Chunk 结构方块，即使不在 blockData 中也保留，因为它们由当前 Chunk 负责渲染 ---
       if (visibleKeys) {
         visibleKeys = visibleKeys.filter(key => {
           if (this.blockData[key]) return true;
-          // 如果不在 blockData 中，检查是否属于当前 Chunk 负责的结构
+          // 如果不在 blockData 中
           const [x, y, z] = key.split(',').map(Number);
+          // 如果在本 Chunk 范围内但不在 blockData 中，说明已被玩家删除，必须过滤掉
+          if (isInChunkRange(x, y, z)) return false;
+          // 只有不在本 Chunk 范围内的位置，才检查是否属于当前 Chunk 负责的结构
           return belongsToStructure(x, y, z);
         });
       }
@@ -367,6 +379,7 @@ export class Chunk {
         solidBlocks = solidBlocks.filter(key => {
           if (this.blockData[key]) return true;
           const [x, y, z] = key.split(',').map(Number);
+          if (isInChunkRange(x, y, z)) return false;
           return belongsToStructure(x, y, z);
         });
       }
@@ -383,8 +396,13 @@ export class Chunk {
               const currentType = typeof currentEntry === 'string' ? currentEntry : currentEntry.type;
               return currentType === type;
             } else {
-              // 不在 blockData 中的位置：检查是否属于当前 Chunk 负责的结构
-              return belongsToStructure(Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.z));
+              // 不在 blockData 中的位置
+              const x = Math.floor(pos.x);
+              const y = Math.floor(pos.y);
+              const z = Math.floor(pos.z);
+              if (isInChunkRange(x, y, z)) return false;
+              // 检查是否属于当前 Chunk 负责的结构
+              return belongsToStructure(x, y, z);
             }
           });
         }
