@@ -52,6 +52,7 @@ class MockWorkerWrapper {
       if (shouldMockWorkers) {
         // 只响应 Chunk 生成请求（有 seed 参数且不是 consolidate）
         if (msg.seed !== undefined && !msg.isOptimization) {
+          // 增加延迟时间，确保 Chunk 的 workerCallbacks 已经注册完成
           setTimeout(() => {
             if (handlers._onmessage) {
               handlers._onmessage({
@@ -70,7 +71,7 @@ class MockWorkerWrapper {
                 }
               });
             }
-          }, 30);
+          }, 100); // 增加到 100ms 确保 Chunk 初始化完成
           return;
         }
       }
@@ -406,17 +407,8 @@ describe('World 真实类测试', (test) => {
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
 
-    // 等待所有 Chunk 的 Worker 响应返回
-    // Chunk 生成是异步的，需要等待 isReady 为 true
-    let waitCount = 0;
-    while (waitCount < 50) { // 最多等待 5 秒
-      const chunk = world.chunks.get('0,0');
-      if (chunk && chunk.isReady) {
-        break;
-      }
-      await new Promise(resolve => setTimeout(resolve, 50));
-      waitCount++;
-    }
+    // 使用 waitForChunkReady 等待 Chunk 准备就绪
+    await waitForChunkReady(world, '0,0', 100);
 
     // 验证区块已准备就绪
     const chunk = world.chunks.get('0,0');
@@ -444,16 +436,8 @@ describe('World 真实类测试', (test) => {
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
 
-    // 等待所有 Chunk 的 Worker 响应返回
-    let waitCount = 0;
-    while (waitCount < 50) { // 最多等待 5 秒
-      const chunk = world.chunks.get('0,0');
-      if (chunk && chunk.isReady) {
-        break;
-      }
-      await new Promise(resolve => setTimeout(resolve, 50));
-      waitCount++;
-    }
+    // 使用 waitForChunkReady 等待 Chunk 准备就绪
+    await waitForChunkReady(world, '0,0', 100);
 
     // 验证区块已准备就绪
     const chunk = world.chunks.get('0,0');
