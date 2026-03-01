@@ -94,10 +94,3 @@ MC Lite 是一个基于 Three.js 的 3D 体素游戏（Minecraft 克隆），基
 
 ### 删除文件
 - 使用 `Bash` 命令 `rm <file>` 删除文件
-
-## Active Technologies
-- JavaScript (ES6+ Modules) + Three.js (existing) (017-frozen-mountain)
-- N/A (procedural generation only) (017-frozen-mountain)
-
-## Recent Changes
-- 017-frozen-mountain: Added JavaScript (ES6+ Modules) + Three.js (existing)
