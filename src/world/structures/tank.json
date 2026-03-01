@@ -1,1127 +1,2611 @@
 {
   "blocks": [
     {
-      "x": -10,
-      "y": 7,
-      "z": 0,
+      "x": -20,
+      "y": 26,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -20,
+      "y": 26,
+      "z": -19,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -20,
+      "y": 68,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -20,
+      "y": 70,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -20,
+      "y": 65,
+      "z": 18,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": -20,
+      "y": 68,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -20,
+      "y": 69,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -20,
+      "y": 70,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -20,
+      "y": 65,
+      "z": 19,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": -20,
+      "y": 66,
+      "z": 19,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": -20,
+      "y": 67,
+      "z": 19,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": -20,
+      "y": 68,
+      "z": 19,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": -20,
+      "y": 69,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -19,
+      "y": 26,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -19,
+      "y": 68,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -19,
+      "y": 69,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -19,
+      "y": 70,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -19,
+      "y": 68,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -19,
+      "y": 69,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -19,
+      "y": 70,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -19,
+      "y": 65,
+      "z": 19,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": -19,
+      "y": 68,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -19,
+      "y": 69,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -19,
+      "y": 70,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -18,
+      "y": 26,
+      "z": -20,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -18,
+      "y": 68,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -18,
+      "y": 70,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -18,
+      "y": 69,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -18,
+      "y": 70,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -18,
+      "y": 68,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -18,
+      "y": 69,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -18,
+      "y": 70,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 3,
+      "z": -8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 4,
+      "z": -8,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 3,
+      "z": -7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 4,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 3,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 3,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 4,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 3,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 4,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 3,
+      "z": -3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 4,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 3,
+      "z": -2,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 4,
+      "z": -2,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 2,
+      "z": -8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 4,
+      "z": -8,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 2,
+      "z": -7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 4,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 2,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 3,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 2,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 3,
+      "z": -5,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 4,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 2,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 3,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 4,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 2,
+      "z": -3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 4,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 2,
+      "z": -2,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 4,
+      "z": -2,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": -10,
-      "y": 7,
-      "z": 1,
+      "y": 1,
+      "z": -8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 3,
+      "z": -8,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 4,
+      "z": -8,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 1,
+      "z": -7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 3,
+      "z": -7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 4,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 1,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 2,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 3,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 1,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 2,
+      "z": -5,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 3,
+      "z": -5,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 4,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 1,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 2,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 3,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 4,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 1,
+      "z": -3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 3,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 4,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 1,
+      "z": -2,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 3,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 4,
+      "z": -2,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": -9,
-      "y": 7,
-      "z": 0,
+      "y": 1,
+      "z": -8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 2,
+      "z": -8,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 4,
+      "z": -8,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": -9,
-      "y": 7,
-      "z": 1,
+      "y": 1,
+      "z": -7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 2,
+      "z": -7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 4,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 1,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 2,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 3,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 1,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 4,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 1,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 2,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 3,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 4,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 1,
+      "z": -3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 2,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 4,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 1,
+      "z": -2,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 2,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 4,
+      "z": -2,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": -8,
-      "y": 7,
-      "z": 0,
+      "y": 1,
+      "z": -8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 3,
+      "z": -8,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 4,
+      "z": -8,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": -8,
-      "y": 7,
-      "z": 1,
+      "y": 1,
+      "z": -7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 3,
+      "z": -7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 4,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 1,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 2,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 3,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 1,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 4,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 1,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 2,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 3,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 4,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 1,
+      "z": -3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 3,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 4,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 1,
+      "z": -2,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 3,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 4,
+      "z": -2,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": -7,
-      "y": 3,
-      "z": -2,
+      "y": 1,
+      "z": -8,
       "type": "iron",
       "direction": 0
     },
     {
       "x": -7,
+      "y": 2,
+      "z": -8,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -7,
       "y": 4,
-      "z": -2,
+      "z": -8,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": -7,
-      "y": 3,
-      "z": -1,
+      "y": 1,
+      "z": -7,
       "type": "iron",
       "direction": 0
     },
     {
       "x": -7,
-      "y": 4,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -7,
-      "y": 3,
-      "z": 0,
-      "type": "green_planks",
+      "y": 2,
+      "z": -7,
+      "type": "cobblestone",
       "direction": 0
     },
     {
       "x": -7,
       "y": 4,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -7,
-      "y": 7,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -7,
-      "y": 3,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -7,
-      "y": 4,
-      "z": 1,
+      "z": -7,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": -7,
       "y": 7,
-      "z": 1,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": -6,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": -7,
+      "y": 2,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -7,
       "y": 3,
-      "z": 2,
+      "z": -6,
       "type": "iron",
       "direction": 0
     },
     {
       "x": -7,
       "y": 4,
-      "z": 2,
+      "z": -6,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": -7,
-      "y": 3,
-      "z": 3,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -7,
-      "y": 4,
-      "z": 3,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 2,
-      "z": -2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 4,
-      "z": -2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 2,
-      "z": -1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 4,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 2,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 3,
-      "z": 0,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 4,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 7,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 2,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 3,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 4,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 7,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 2,
-      "z": 2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 4,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 2,
-      "z": 3,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -6,
-      "y": 4,
-      "z": 3,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 1,
-      "z": -2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 3,
-      "z": -2,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 4,
-      "z": -2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 1,
-      "z": -1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 3,
-      "z": -1,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 4,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 1,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 2,
-      "z": 0,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 3,
-      "z": 0,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 4,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 7,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 1,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 2,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 3,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 4,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 7,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 1,
-      "z": 2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 3,
-      "z": 2,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 4,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 1,
-      "z": 3,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 3,
-      "z": 3,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -5,
-      "y": 4,
-      "z": 3,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 1,
-      "z": -2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 2,
-      "z": -2,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 4,
-      "z": -2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 1,
-      "z": -1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 2,
-      "z": -1,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 4,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 1,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 2,
-      "z": 0,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 3,
-      "z": 0,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 4,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 7,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 1,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 2,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 3,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 4,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 7,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 1,
-      "z": 2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 2,
-      "z": 2,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 4,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 1,
-      "z": 3,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 2,
-      "z": 3,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -4,
-      "y": 4,
-      "z": 3,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 1,
-      "z": -2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 3,
-      "z": -2,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 4,
-      "z": -2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 1,
-      "z": -1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 3,
-      "z": -1,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 4,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 1,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 2,
-      "z": 0,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 3,
-      "z": 0,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 4,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 7,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 1,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 2,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 3,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 4,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 7,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 1,
-      "z": 2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 3,
-      "z": 2,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 4,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 1,
-      "z": 3,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 3,
-      "z": 3,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 4,
-      "z": 3,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 1,
-      "z": -2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 2,
-      "z": -2,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 4,
-      "z": -2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 1,
-      "z": -1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 2,
-      "z": -1,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 4,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 1,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 2,
-      "z": 0,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 3,
-      "z": 0,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 4,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 7,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 1,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 2,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 3,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 4,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 7,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 1,
-      "z": 2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 2,
-      "z": 2,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 4,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 1,
-      "z": 3,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 2,
-      "z": 3,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 4,
-      "z": 3,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -1,
-      "y": 1,
-      "z": -2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -1,
-      "y": 3,
-      "z": -2,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -1,
-      "y": 4,
-      "z": -2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -1,
-      "y": 7,
-      "z": -2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -1,
-      "y": 1,
-      "z": -1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -1,
-      "y": 3,
-      "z": -1,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": -1,
-      "y": 4,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -1,
       "y": 6,
-      "z": -1,
+      "z": -6,
       "type": "green_planks",
-      "direction": 0
+      "direction": 1
     },
     {
-      "x": -1,
+      "x": -7,
       "y": 7,
-      "z": -1,
+      "z": -6,
       "type": "green_planks",
-      "direction": 0
+      "direction": 1
     },
     {
-      "x": -1,
+      "x": -7,
       "y": 8,
-      "z": -1,
+      "z": -6,
       "type": "green_planks",
-      "direction": 0
+      "direction": 1
     },
     {
-      "x": -1,
+      "x": -7,
       "y": 1,
-      "z": 0,
+      "z": -5,
       "type": "green_planks",
       "direction": 0
     },
     {
-      "x": -1,
-      "y": 2,
-      "z": 0,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -1,
-      "y": 3,
-      "z": 0,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": -1,
+      "x": -7,
       "y": 4,
-      "z": 0,
+      "z": -5,
       "type": "green_planks",
       "direction": 0
     },
     {
-      "x": -1,
+      "x": -7,
       "y": 6,
-      "z": 0,
+      "z": -5,
       "type": "green_planks",
-      "direction": 0
+      "direction": 1
     },
     {
-      "x": -1,
+      "x": -7,
       "y": 7,
-      "z": 0,
+      "z": -5,
       "type": "green_planks",
-      "direction": 0
+      "direction": 1
     },
     {
-      "x": -1,
+      "x": -7,
       "y": 8,
-      "z": 0,
+      "z": -5,
       "type": "green_planks",
-      "direction": 0
+      "direction": 1
     },
     {
-      "x": -1,
+      "x": -7,
       "y": 1,
-      "z": 1,
+      "z": -4,
       "type": "green_planks",
       "direction": 0
     },
     {
-      "x": -1,
+      "x": -7,
       "y": 2,
-      "z": 1,
+      "z": -4,
       "type": "iron",
       "direction": 0
     },
     {
-      "x": -1,
+      "x": -7,
       "y": 3,
-      "z": 1,
+      "z": -4,
       "type": "iron",
       "direction": 0
     },
     {
-      "x": -1,
+      "x": -7,
       "y": 4,
-      "z": 1,
+      "z": -4,
       "type": "green_planks",
       "direction": 0
     },
     {
-      "x": -1,
+      "x": -7,
       "y": 6,
-      "z": 1,
+      "z": -4,
       "type": "green_planks",
-      "direction": 0
+      "direction": 1
     },
     {
-      "x": -1,
+      "x": -7,
       "y": 7,
-      "z": 1,
+      "z": -4,
       "type": "green_planks",
-      "direction": 0
+      "direction": 1
     },
     {
-      "x": -1,
+      "x": -7,
       "y": 8,
-      "z": 1,
+      "z": -4,
       "type": "green_planks",
-      "direction": 0
+      "direction": 1
     },
     {
-      "x": -1,
+      "x": -7,
       "y": 1,
-      "z": 2,
+      "z": -3,
       "type": "iron",
       "direction": 0
     },
     {
-      "x": -1,
-      "y": 3,
-      "z": 2,
+      "x": -7,
+      "y": 2,
+      "z": -3,
       "type": "cobblestone",
       "direction": 0
     },
     {
-      "x": -1,
+      "x": -7,
       "y": 4,
-      "z": 2,
+      "z": -3,
       "type": "green_planks",
       "direction": 0
     },
     {
-      "x": -1,
+      "x": -7,
+      "y": 7,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": -2,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 2,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 4,
+      "z": -2,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": -8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": -8,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 4,
+      "z": -8,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": -7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": -7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 4,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -6,
       "y": 6,
-      "z": 2,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -6,
+      "y": 7,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -6,
+      "y": 8,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -6,
+      "y": 9,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 4,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -6,
+      "y": 9,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 4,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -6,
+      "y": 9,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": -3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 4,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 6,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -6,
+      "y": 7,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -6,
+      "y": 8,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": -2,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 4,
+      "z": -2,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -8,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": -8,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -5,
+      "y": 7,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -5,
+      "y": 26,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -5,
+      "y": 9,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -5,
+      "y": 26,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": -5,
+      "type": "gold",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 9,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -5,
+      "y": 26,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -5,
+      "y": 9,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -5,
+      "y": 7,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -2,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": -2,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": -8,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 4,
+      "z": -8,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 26,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": -7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 4,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 6,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 7,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 8,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 26,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 26,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 4,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 26,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 4,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 26,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 4,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 6,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 7,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 8,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -2,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 4,
+      "z": -2,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 26,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": -8,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": -8,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 26,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": -7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 7,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 26,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 3,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 6,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 7,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 26,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 6,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 7,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 26,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 3,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 6,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 7,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 26,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 7,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 26,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -2,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": -2,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 26,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 26,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 26,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": -8,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": -8,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 26,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": -7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 26,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 7,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -2,
+      "y": 26,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 6,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -2,
+      "y": 7,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -2,
+      "y": 26,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 7,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -2,
+      "y": 26,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -2,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": -2,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": -2,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -8,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": -8,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": -5,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": -1,
       "y": 7,
-      "z": 2,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -4,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": -1,
-      "y": 8,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -1,
-      "y": 1,
-      "z": 3,
+      "y": 2,
+      "z": -4,
       "type": "iron",
       "direction": 0
     },
     {
       "x": -1,
       "y": 3,
-      "z": 3,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -3,
       "type": "cobblestone",
       "direction": 0
     },
     {
       "x": -1,
       "y": 4,
-      "z": 3,
+      "z": -3,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": -1,
-      "y": 7,
-      "z": 3,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
       "y": 1,
       "z": -2,
       "type": "iron",
       "direction": 0
     },
     {
-      "x": 0,
+      "x": -1,
       "y": 2,
       "z": -2,
       "type": "cobblestone",
       "direction": 0
     },
     {
-      "x": 0,
+      "x": -1,
       "y": 4,
       "z": -2,
       "type": "green_planks",
@@ -1129,237 +2613,160 @@
     },
     {
       "x": 0,
-      "y": 6,
-      "z": -2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 7,
-      "z": -2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 8,
-      "z": -2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
       "y": 1,
-      "z": -1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 2,
-      "z": -1,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 4,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 5,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 9,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 1,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 2,
-      "z": 0,
+      "z": -8,
       "type": "iron",
       "direction": 0
     },
     {
       "x": 0,
       "y": 3,
-      "z": 0,
-      "type": "iron",
+      "z": -8,
+      "type": "cobblestone",
       "direction": 0
     },
     {
       "x": 0,
       "y": 4,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 5,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 9,
-      "z": 0,
+      "z": -8,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 0,
       "y": 1,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 2,
-      "z": 1,
+      "z": -7,
       "type": "iron",
       "direction": 0
     },
     {
       "x": 0,
       "y": 3,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 4,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 5,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 9,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 1,
-      "z": 2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 2,
-      "z": 2,
+      "z": -7,
       "type": "cobblestone",
       "direction": 0
     },
     {
       "x": 0,
       "y": 4,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 5,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 9,
-      "z": 2,
+      "z": -7,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 0,
       "y": 1,
-      "z": 3,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 2,
-      "z": 3,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": 0,
-      "y": 4,
-      "z": 3,
+      "z": -6,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 0,
-      "y": 6,
-      "z": 3,
+      "y": 2,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": -5,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 0,
       "y": 7,
-      "z": 3,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -4,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 0,
-      "y": 8,
-      "z": 3,
+      "y": 2,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -4,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": -4,
       "type": "green_planks",
       "direction": 0
     },
     {
-      "x": 1,
+      "x": 0,
+      "y": 1,
+      "z": -3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -3,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
       "y": 1,
       "z": -2,
       "type": "iron",
       "direction": 0
     },
     {
-      "x": 1,
+      "x": 0,
       "y": 3,
       "z": -2,
       "type": "cobblestone",
       "direction": 0
     },
     {
-      "x": 1,
+      "x": 0,
       "y": 4,
       "z": -2,
       "type": "green_planks",
@@ -1367,237 +2774,160 @@
     },
     {
       "x": 1,
-      "y": 6,
-      "z": -2,
+      "y": 1,
+      "z": -8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -8,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": -8,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": -5,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 1,
       "y": 7,
-      "z": -2,
+      "z": -5,
       "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 8,
-      "z": -2,
-      "type": "green_planks",
-      "direction": 0
+      "direction": 1
     },
     {
       "x": 1,
       "y": 1,
-      "z": -1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 3,
-      "z": -1,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 4,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 5,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 9,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 1,
-      "z": 0,
+      "z": -4,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 1,
       "y": 2,
-      "z": 0,
+      "z": -4,
       "type": "iron",
       "direction": 0
     },
     {
       "x": 1,
       "y": 3,
-      "z": 0,
+      "z": -4,
       "type": "iron",
       "direction": 0
     },
     {
       "x": 1,
       "y": 4,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 5,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 9,
-      "z": 0,
+      "z": -4,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 1,
       "y": 1,
-      "z": 1,
-      "type": "green_planks",
+      "z": -3,
+      "type": "iron",
       "direction": 0
     },
     {
       "x": 1,
       "y": 2,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 3,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 4,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 5,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 9,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 1,
-      "z": 2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 3,
-      "z": 2,
+      "z": -3,
       "type": "cobblestone",
       "direction": 0
     },
     {
       "x": 1,
       "y": 4,
-      "z": 2,
+      "z": -3,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 1,
-      "y": 5,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 9,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 1,
-      "z": 3,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 3,
-      "z": 3,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 4,
-      "z": 3,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 6,
-      "z": 3,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 7,
-      "z": 3,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 1,
-      "y": 8,
-      "z": 3,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
       "y": 1,
       "z": -2,
       "type": "iron",
       "direction": 0
     },
     {
-      "x": 2,
+      "x": 1,
       "y": 2,
       "z": -2,
       "type": "cobblestone",
       "direction": 0
     },
     {
-      "x": 2,
+      "x": 1,
       "y": 4,
       "z": -2,
       "type": "green_planks",
@@ -1605,237 +2935,174 @@
     },
     {
       "x": 2,
-      "y": 6,
-      "z": -2,
+      "y": 1,
+      "z": -8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": -8,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": -8,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": -7,
+      "type": "cobblestone",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": -5,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": -5,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": -5,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 2,
       "y": 7,
-      "z": -2,
+      "z": -5,
       "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 8,
-      "z": -2,
-      "type": "green_planks",
-      "direction": 0
+      "direction": 1
     },
     {
       "x": 2,
       "y": 1,
-      "z": -1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 2,
-      "z": -1,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 4,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 5,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 9,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 1,
-      "z": 0,
+      "z": -4,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 2,
       "y": 2,
-      "z": 0,
+      "z": -4,
       "type": "iron",
       "direction": 0
     },
     {
       "x": 2,
       "y": 3,
-      "z": 0,
+      "z": -4,
       "type": "iron",
       "direction": 0
     },
     {
       "x": 2,
       "y": 4,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 5,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 9,
-      "z": 0,
+      "z": -4,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 2,
       "y": 1,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 2,
-      "z": 1,
+      "z": -3,
       "type": "iron",
       "direction": 0
     },
     {
       "x": 2,
       "y": 3,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 4,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 5,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 9,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 1,
-      "z": 2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 2,
-      "z": 2,
+      "z": -3,
       "type": "cobblestone",
       "direction": 0
     },
     {
       "x": 2,
       "y": 4,
-      "z": 2,
+      "z": -3,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 2,
-      "y": 5,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 9,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 1,
-      "z": 3,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 2,
-      "z": 3,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 4,
-      "z": 3,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 6,
-      "z": 3,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 7,
-      "z": 3,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 2,
-      "y": 8,
-      "z": 3,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
       "y": 1,
       "z": -2,
       "type": "iron",
       "direction": 0
     },
     {
-      "x": 3,
+      "x": 2,
       "y": 3,
       "z": -2,
       "type": "cobblestone",
       "direction": 0
     },
     {
-      "x": 3,
+      "x": 2,
       "y": 4,
       "z": -2,
       "type": "green_planks",
@@ -1843,224 +3110,224 @@
     },
     {
       "x": 3,
-      "y": 6,
-      "z": -2,
+      "y": 2,
+      "z": -8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": -8,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": -7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": -6,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": -5,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": -5,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 3,
       "y": 7,
-      "z": -2,
+      "z": -5,
       "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 8,
-      "z": -2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 1,
-      "z": -1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 3,
-      "z": -1,
-      "type": "cobblestone",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 4,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 5,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 9,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 1,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 2,
-      "z": 0,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 3,
-      "z": 0,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 4,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 5,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 9,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 1,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 2,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 3,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 4,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 5,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 9,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 1,
-      "z": 2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 3,
-      "z": 2,
-      "type": "cobblestone",
       "direction": 1
     },
     {
       "x": 3,
-      "y": 4,
-      "z": 2,
+      "y": 2,
+      "z": -4,
       "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 5,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 9,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 3,
-      "y": 1,
-      "z": 3,
-      "type": "iron",
       "direction": 0
     },
     {
       "x": 3,
       "y": 3,
-      "z": 3,
-      "type": "cobblestone",
-      "direction": 2
+      "z": -4,
+      "type": "iron",
+      "direction": 0
     },
     {
       "x": 3,
       "y": 4,
-      "z": 3,
+      "z": -4,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 3,
-      "y": 6,
-      "z": 3,
+      "y": 2,
+      "z": -3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": -3,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 3,
-      "y": 7,
-      "z": 3,
-      "type": "green_planks",
+      "y": 2,
+      "z": -2,
+      "type": "iron",
       "direction": 0
     },
     {
       "x": 3,
-      "y": 8,
-      "z": 3,
+      "y": 4,
+      "z": -2,
       "type": "green_planks",
       "direction": 0
     },
     {
       "x": 4,
-      "y": 2,
+      "y": 3,
+      "z": -8,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "z": -8,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": -7,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "z": -7,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "z": -6,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 7,
+      "z": -5,
+      "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "z": -4,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": -3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "z": -3,
+      "type": "green_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
       "z": -2,
       "type": "iron",
       "direction": 0
@@ -2073,278 +3340,201 @@
       "direction": 0
     },
     {
-      "x": 4,
+      "x": 5,
       "y": 7,
-      "z": -2,
+      "z": -5,
       "type": "green_planks",
-      "direction": 0
+      "direction": 1
     },
     {
-      "x": 4,
-      "y": 2,
-      "z": -1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 4,
-      "y": 4,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 4,
-      "y": 6,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 4,
+      "x": 6,
       "y": 7,
-      "z": -1,
+      "z": -5,
       "type": "green_planks",
-      "direction": 0
+      "direction": 1
     },
     {
-      "x": 4,
-      "y": 8,
-      "z": -1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 4,
-      "y": 2,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 4,
-      "y": 3,
-      "z": 0,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 4,
-      "y": 4,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 4,
-      "y": 6,
-      "z": 0,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 4,
+      "x": 7,
       "y": 7,
-      "z": 0,
+      "z": -5,
       "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": 8,
+      "y": 26,
+      "z": -17,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 4,
-      "y": 8,
-      "z": 0,
-      "type": "green_planks",
+      "x": 8,
+      "y": 26,
+      "z": -16,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 4,
-      "y": 2,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 4,
-      "y": 3,
-      "z": 1,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 4,
-      "y": 4,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 4,
-      "y": 6,
-      "z": 1,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 4,
+      "x": 8,
       "y": 7,
-      "z": 1,
+      "z": -5,
       "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": 9,
+      "y": 26,
+      "z": -17,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 4,
-      "y": 8,
-      "z": 1,
-      "type": "green_planks",
+      "x": 9,
+      "y": 26,
+      "z": -16,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 4,
-      "y": 2,
-      "z": 2,
-      "type": "iron",
-      "direction": 0
-    },
-    {
-      "x": 4,
-      "y": 4,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 4,
-      "y": 6,
-      "z": 2,
-      "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": 4,
+      "x": 9,
       "y": 7,
-      "z": 2,
+      "z": -5,
       "type": "green_planks",
+      "direction": 1
+    },
+    {
+      "x": 10,
+      "y": 26,
+      "z": -18,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 4,
-      "y": 8,
-      "z": 2,
-      "type": "green_planks",
+      "x": 10,
+      "y": 26,
+      "z": -17,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 4,
-      "y": 2,
-      "z": 3,
-      "type": "iron",
+      "x": 10,
+      "y": 26,
+      "z": -16,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 4,
-      "y": 4,
-      "z": 3,
-      "type": "green_planks",
+      "x": 11,
+      "y": 26,
+      "z": -18,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 4,
-      "y": 7,
-      "z": 3,
-      "type": "green_planks",
+      "x": 11,
+      "y": 26,
+      "z": -17,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 5,
-      "y": 3,
-      "z": -2,
-      "type": "iron",
+      "x": 11,
+      "y": 26,
+      "z": -16,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 5,
-      "y": 4,
-      "z": -2,
-      "type": "green_planks",
+      "x": 12,
+      "y": 26,
+      "z": -19,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 5,
-      "y": 3,
-      "z": -1,
-      "type": "iron",
+      "x": 12,
+      "y": 26,
+      "z": -18,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 5,
-      "y": 4,
-      "z": -1,
-      "type": "green_planks",
+      "x": 12,
+      "y": 26,
+      "z": -17,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 5,
-      "y": 3,
-      "z": 0,
-      "type": "green_planks",
+      "x": 12,
+      "y": 26,
+      "z": -16,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 5,
-      "y": 4,
-      "z": 0,
-      "type": "green_planks",
+      "x": 13,
+      "y": 26,
+      "z": -19,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 5,
-      "y": 3,
-      "z": 1,
-      "type": "green_planks",
+      "x": 13,
+      "y": 26,
+      "z": -18,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 5,
-      "y": 4,
-      "z": 1,
-      "type": "green_planks",
+      "x": 13,
+      "y": 26,
+      "z": -17,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 5,
-      "y": 3,
-      "z": 2,
-      "type": "iron",
+      "x": 13,
+      "y": 26,
+      "z": -16,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 5,
-      "y": 4,
-      "z": 2,
-      "type": "green_planks",
+      "x": 14,
+      "y": 26,
+      "z": -19,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 5,
-      "y": 3,
-      "z": 3,
-      "type": "iron",
+      "x": 14,
+      "y": 26,
+      "z": -18,
+      "type": "cloud",
       "direction": 0
     },
     {
-      "x": 5,
-      "y": 4,
-      "z": 3,
-      "type": "green_planks",
+      "x": 14,
+      "y": 26,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 14,
+      "y": 26,
+      "z": -16,
+      "type": "cloud",
       "direction": 0
     }
   ],
   "metadata": {
-    "created": "2026-02-23T10:49:38.836Z",
+    "created": "2026-03-01T11:03:02.655Z",
     "dimensions": {
-      "width": 16,
-      "height": 9,
-      "depth": 6
+      "width": 35,
+      "height": 70,
+      "depth": 40
     }
   }
 }

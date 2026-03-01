@@ -23,9 +23,17 @@ export const STRUCTURE_RENDER_DIST = {
   tree: 8,            // RealisticTree 树木
   static_tree: 8,     // 静态树（白桦树、普通树等）
   house: 5,           // 普通小屋约 5x5
-  tank: 3,            // Tank 尺寸约 7x7x7
+  tank: 20,           // Tank 尺寸约 35x70x40 (X/Z: ±20, Y: 根据实际结构调整)
   rover: 3,           // 火星车
   gunman: 3           // 模型人
+};
+
+/**
+ * 特殊结构的 Y 轴高度范围配置
+ */
+export const STRUCTURE_HEIGHT_RANGE_SPECIAL = {
+  tank: 35,       // tank 结构 Y 方向±35（共 71 格），覆盖 1-70 的范围
+  uglyHouse: 22   // uglyHouse 结构 Y 方向±22（共 45 格），覆盖 1-44 的范围
 };
 
 /**
@@ -34,7 +42,7 @@ export const STRUCTURE_RENDER_DIST = {
 export const DEFAULT_RENDER_DIST = 8;
 
 /**
- * 结构高度范围（Y 轴方向的检查范围）
+ * 默认结构高度范围（Y 轴方向的检查范围）
  */
 export const STRUCTURE_HEIGHT_RANGE = 16;
 
@@ -62,11 +70,12 @@ export function belongsToStructure(x, y, z, structureCenters) {
 
   for (const center of structureCenters) {
     const maxDist = getStructureRenderDist(center.type);
+    const heightRange = STRUCTURE_HEIGHT_RANGE_SPECIAL[center.type] ?? STRUCTURE_HEIGHT_RANGE;
     const dx = Math.abs(x - center.x);
     const dz = Math.abs(z - center.z);
     const dy = Math.abs(y - center.y);
 
-    if (dx <= maxDist && dz <= maxDist && dy <= STRUCTURE_HEIGHT_RANGE) {
+    if (dx <= maxDist && dz <= maxDist && dy <= heightRange) {
       return true;
     }
   }
@@ -81,6 +90,7 @@ export const StructureUtils = {
   RENDER_DIST: STRUCTURE_RENDER_DIST,
   DEFAULT_RENDER_DIST,
   HEIGHT_RANGE: STRUCTURE_HEIGHT_RANGE,
+  HEIGHT_RANGE_SPECIAL: STRUCTURE_HEIGHT_RANGE_SPECIAL,
 
   /**
    * 获取结构类型的渲染距离
