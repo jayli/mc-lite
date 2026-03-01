@@ -151,11 +151,17 @@ export class StructureLoader {
 /**
  * 预定义的结构加载器实例
  */
+// 获取当前模块所在目录的 URL
+const moduleBase = new URL('.', import.meta.url).href;
+
+/**
+ * 预定义的结构加载器实例
+ */
 export const structureLoaders = {
-  uglyHouse: new StructureLoader('ugly_house', '../world/structures/ugly_house.json'),
-  birchTree: new StructureLoader('brich_tree', '../world/structures/brich_tree.json'),
-  birchTreeWithSnow: new StructureLoader('brich_tree_with_snow', '../world/structures/brich_tree_with_snow.json'),
-  tank: new StructureLoader('tank', '../world/structures/tank.json')
+  uglyHouse: new StructureLoader('ugly_house', new URL('../structures/ugly_house.json', moduleBase).href),
+  birchTree: new StructureLoader('brich_tree', new URL('../structures/brich_tree.json', moduleBase).href),
+  birchTreeWithSnow: new StructureLoader('brich_tree_with_snow', new URL('../structures/brich_tree_with_snow.json', moduleBase).href),
+  tank: new StructureLoader('tank', new URL('../structures/tank.json', moduleBase).href)
 };
 
 /**

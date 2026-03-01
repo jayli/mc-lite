@@ -9,6 +9,7 @@ import { structureLoaders } from '../world/entity-system/StructureLoader.js';
 import { Pyramid } from './maps/Pyramid.js';
 import { SnowLand } from './maps/SnowLand.js';
 import { FrozenMountain } from './maps/FrozenMountain.js';
+import { belongsToStructure as checkBelongsToStructure } from '../utils/StructureUtils.js';
 
 console.log('WorldWorker.js loaded');
 
@@ -579,27 +580,8 @@ onmessage = async function(e) {
     }
   }
 
-  // 辅助函数：判断一个方块是否属于某个结构中心
-  const belongsToStructure = (bx, by, bz) => {
-    for (const center of structureCenters) {
-      let maxDist = 24; // 支持 UglyHouse 最大 40x40 尺寸
-      if (center.type === 'tree' || center.type === 'static_tree') maxDist = 8;
-      else if (center.type === 'gunman') maxDist = 3;
-      else if (center.type === 'rover') maxDist = 3;
-      else if (center.type === 'tank') maxDist = 3; // Tank 尺寸约 7x7x7
-      else if (center.type === 'uglyHouse') maxDist = 24; // UglyHouse 最大约 40x40
-      else if (center.type === 'house') maxDist = 5; // 普通小屋约 5x5
-
-      const dx = Math.abs(bx - center.x);
-      const dz = Math.abs(bz - center.z);
-      const dy = Math.abs(by - center.y);
-
-      if (dx <= maxDist && dz <= maxDist && dy <= 16) {
-        return true;
-      }
-    }
-    return false;
-  };
+  // 辅助函数：判断一个方块是否属于某个结构中心（使用统一的工具函数）
+  const belongsToStructure = (bx, by, bz) => checkBelongsToStructure(bx, by, bz, structureCenters);
 
   for (const [key, block] of blockMap) {
     const inCurrentChunk = block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;

@@ -13,6 +13,7 @@ import { faceCullingSystem } from '../core/FaceCullingSystem.js';
 import { carModel, gunManModel } from '../core/Engine.js';
 import { getBlockProperties } from '../constants/BlockData.js';
 import { getRotationAngle, parseBlockEntry, serializeBlockEntry } from '../utils/OrientationUtils.js';
+import { StructureUtils, getStructureRenderDist, belongsToStructure } from '../utils/StructureUtils.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
@@ -317,201 +318,23 @@ export class Chunk {
     if (this.isConsolidating || !this.isReady) return;
     this.isConsolidating = true;
 
-    // 记录开始合并时的脏方块数量和动态 Mesh 键
+    // 阶段 1: 准备合并数据
     const consolidatedCount = this.dirtyBlocks;
     const consolidatedMeshKeys = new Set(this.dynamicMeshes.keys());
 
-    // 清除定时器（以防是通过阈值触发的）
+    // 清除定时器
     if (this.consolidationTimer) {
       clearTimeout(this.consolidationTimer);
       this.consolidationTimer = null;
     }
 
+    // 阶段 2: 注册 Worker 回调并请求重新计算
     const callbackKey = `${this.cx},${this.cz}`;
-    // 注册 Worker 回调处理合并结果
     workerCallbacks.set(callbackKey, (data) => {
-      let { d, visibleKeys, solidBlocks, structureCenters: newStructureCenters } = data;
-
-      // 更新结构中心列表
-      if (newStructureCenters && newStructureCenters.length > 0) {
-        this.structureCenters = newStructureCenters;
-      }
-
-      // 判断一个位置是否属于当前 Chunk 负责的结构
-      const belongsToStructure = (x, y, z) => {
-        if (!this.structureCenters || this.structureCenters.length === 0) return false;
-        return this.structureCenters.some(center => {
-          const maxDist = this.getStructureRenderDist(center.type);
-          return Math.abs(x - center.x) <= maxDist &&
-                 Math.abs(z - center.z) <= maxDist &&
-                 Math.abs(y - center.y) <= 16;
-        });
-      };
-
-      // 判断一个位置是否在当前 Chunk 范围内
-      const isInChunkRange = (x, y, z) => {
-        const minX = this.cx * CHUNK_SIZE;
-        const maxX = (this.cx + 1) * CHUNK_SIZE;
-        const minZ = this.cz * CHUNK_SIZE;
-        const maxZ = (this.cz + 1) * CHUNK_SIZE;
-        return x >= minX && x < maxX && z >= minZ && z < maxZ;
-      };
-
-      // --- 核心修复：根据主线程最新的 blockData 进行二次过滤，防止竞态导致的”幻影方块”
-      // 但对于跨 Chunk 结构方块，即使不在 blockData 中也保留，因为它们由当前 Chunk 负责渲染 ---
-      if (visibleKeys) {
-        visibleKeys = visibleKeys.filter(key => {
-          if (this.blockData[key]) return true;
-          // 如果不在 blockData 中
-          const [x, y, z] = key.split(',').map(Number);
-          // 如果在本 Chunk 范围内但不在 blockData 中，说明已被玩家删除，必须过滤掉
-          if (isInChunkRange(x, y, z)) return false;
-          // 只有不在本 Chunk 范围内的位置，才检查是否属于当前 Chunk 负责的结构
-          return belongsToStructure(x, y, z);
-        });
-      }
-
-      // 保存原始的 Worker 返回的 solidBlocks 副本（用于跨 Chunk 方块）
-      const originalSolidBlocks = solidBlocks ? [...solidBlocks] : [];
-
-      if (solidBlocks) {
-        // 对于本 Chunk 内的方块，按正常逻辑过滤；对于跨 Chunk 结构方块保留
-        solidBlocks = solidBlocks.filter(key => {
-          if (this.blockData[key]) return true;
-          const [x, y, z] = key.split(',').map(Number);
-          if (isInChunkRange(x, y, z)) return false;
-          return belongsToStructure(x, y, z);
-        });
-      }
-      if (d) {
-        for (const type in d) {
-          // 修复：过滤掉位置不在最新 blockData 中的方块，或者 blockData 中的类型与 d[type] 不匹配的方块
-          // 这可以防止”方块消除后又重新出现”的 bug，因为旧类型的方块数据可能仍然存在于 Worker 返回的结果中
-          // 但对于跨 Chunk 结构方块，信任 Worker 返回的类型
-          d[type] = d[type].filter(pos => {
-            const key = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
-            const currentEntry = this.blockData[key];
-            if (currentEntry) {
-              // 在 blockData 中的位置：正常检查类型匹配
-              const currentType = typeof currentEntry === 'string' ? currentEntry : currentEntry.type;
-              return currentType === type;
-            } else {
-              // 不在 blockData 中的位置
-              const x = Math.floor(pos.x);
-              const y = Math.floor(pos.y);
-              const z = Math.floor(pos.z);
-              if (isInChunkRange(x, y, z)) return false;
-              // 检查是否属于当前 Chunk 负责的结构
-              return belongsToStructure(x, y, z);
-            }
-          });
-        }
-      }
-
-      // 保存原始 solidBlocks 到临时变量，供后面 regenerateCrossChunkColliders 使用
-      this._tempOriginalSolidBlocks = originalSolidBlocks;
-
-      // 1. 同步可见性状态与碰撞状态 (完全替换，确保剔除状态同步)
-      // 注意：需要保留在合并过程中新产生的动态数据
-      if (visibleKeys) {
-        this.visibleKeys = new Set(visibleKeys);
-        // 重新添加当前仍在 dynamicMeshes 中的方块 (即在合并期间新产生的)
-        for (const key of this.dynamicMeshes.keys()) {
-          this.visibleKeys.add(key);
-        }
-      }
-
-      if (solidBlocks) {
-        this.solidBlocks = new Set(solidBlocks);
-        // 同理，保留合并期间新产生的碰撞体，但必须确保该位置在最新的 blockData 中依然是实心的
-        for (const [key, mesh] of this.dynamicMeshes.entries()) {
-          const type = mesh.userData.type;
-          if (this.blockData[key] && getBlockProps(type).isSolid) {
-            this.solidBlocks.add(key);
-          }
-        }
-        // 重新生成跨 Chunk 结构方块的碰撞体（确保在 consolidate 后不会丢失）
-        this.regenerateCrossChunkColliders();
-      }
-
-      // --- 关键：保存宝箱状态 ---
-      const savedChestStates = new Map();
-      const oldChestIndices = this.instanceIndexMap['chest'];
-      if (oldChestIndices) {
-        const oldChestMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'chest');
-        if (oldChestMesh && oldChestMesh.userData.chests) {
-          for (const [posKey, idx] of oldChestIndices) {
-            if (oldChestMesh.userData.chests[idx]) {
-              savedChestStates.set(posKey, { ...oldChestMesh.userData.chests[idx] });
-            }
-          }
-        }
-      }
-
-      // 2. 执行平滑替换 (Swap)
-      consolidatedMeshKeys.forEach((key) => {
-        const mesh = this.dynamicMeshes.get(key);
-        if (mesh) {
-          if (mesh.geometry) mesh.geometry.dispose();
-          if (mesh.material) {
-            if (Array.isArray(mesh.material)) mesh.material.forEach(m => m.dispose());
-            else mesh.material.dispose();
-          }
-          this.group.remove(mesh);
-          this.dynamicMeshes.delete(key);
-        }
-      });
-
-      // 移除旧的 InstancedMesh (保留实体和树木)
-      for (let i = this.group.children.length - 1; i >= 0; i--) {
-        const child = this.group.children[i];
-        if (child.isInstancedMesh) {
-          // 保留树木的 InstancedMesh
-          if (child.userData.type === 'realistic_trunk' || child.userData.type === 'realistic_leaves') {
-            continue; // 跳过树木
-          }
-          // 这里不 dispose 材质，因为材质是共享的，只清理几何体（如果是克隆的）
-          if (child.geometry && child.geometry !== geomMap[child.userData.type] && child.geometry !== geomMap['default']) {
-             child.geometry.dispose();
-          }
-          this.group.remove(child);
-        }
-      }
-
-      // 3. 构建新的渲染网格 (跳过实体和树木，因为已存在)
-      this.buildMeshes(d);
-
-      // --- 关键：还原宝箱状态 ---
-      if (savedChestStates.size > 0) {
-        const newChestMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'chest');
-        const newChestIndices = this.instanceIndexMap['chest'];
-        if (newChestMesh && newChestIndices) {
-          const dummy = new THREE.Matrix4();
-          const zeroScale = new THREE.Vector3(0, 0, 0);
-          for (const [posKey, state] of savedChestStates) {
-            if (newChestIndices.has(posKey)) {
-              const newIdx = newChestIndices.get(posKey);
-              newChestMesh.userData.chests[newIdx] = state;
-              // 如果宝箱已开启，确保新网格中的对应实例也是隐藏的（缩放为0）
-              if (state.open) {
-                newChestMesh.getMatrixAt(newIdx, dummy);
-                dummy.scale(zeroScale);
-                newChestMesh.setMatrixAt(newIdx, dummy);
-              }
-            }
-          }
-          newChestMesh.instanceMatrix.needsUpdate = true;
-        }
-      }
-
-      // 4. 重置状态
-      this.dirtyBlocks = Math.max(0, this.dirtyBlocks - consolidatedCount);
-      this.isConsolidating = false;
-
-      if (this.dirtyBlocks > 0) this.scheduleConsolidation();
+      this._applyConsolidateResult(data, consolidatedCount, consolidatedMeshKeys);
     });
 
-    // 发送当前最完整的 blockData 作为 snapshot 给 Worker
+    // 发送请求到 Worker
     worldWorker.postMessage({
       cx: this.cx,
       cz: this.cz,
@@ -520,9 +343,213 @@ export class Chunk {
         blocks: { ...this.blockData },
         entities: { ...this.entities }
       },
-      structureCenters: this.structureCenters, // 传递结构中心列表，用于跨 Chunk 碰撞体计算
-      isOptimization: true // 标记这是一个优化请求
+      structureCenters: this.structureCenters,
+      isOptimization: true
     });
+  }
+
+  /**
+   * 应用 Worker 返回的合并结果
+   * @param {Object} data - Worker 返回的数据
+   * @param {number} consolidatedCount - 合并前的脏方块数量
+   * @param {Set} consolidatedMeshKeys - 合并前的动态 Mesh 键集合
+   */
+  _applyConsolidateResult(data, consolidatedCount, consolidatedMeshKeys) {
+    let { d, visibleKeys, solidBlocks, structureCenters: newStructureCenters } = data;
+
+    // 更新结构中心列表
+    if (newStructureCenters && newStructureCenters.length > 0) {
+      this.structureCenters = newStructureCenters;
+    }
+
+    // 过滤 Worker 结果，防止幻影方块
+    ({ visibleKeys, solidBlocks, d } = this._filterWorkerResult(data));
+
+    // 保存原始 solidBlocks 用于跨 Chunk 碰撞体
+    this._tempOriginalSolidBlocks = solidBlocks ? [...solidBlocks] : [];
+
+    // 同步可见性状态与碰撞状态
+    this._syncVisibilityAndCollision(visibleKeys, solidBlocks);
+
+    // 保存宝箱状态
+    const savedChestStates = this._saveChestStates();
+
+    // 清理旧网格
+    this._cleanupOldMeshes(consolidatedMeshKeys);
+
+    // 构建新的渲染网格
+    this.buildMeshes(d);
+
+    // 恢复宝箱状态
+    this._restoreChestStates(savedChestStates);
+
+    // 重置状态
+    this.dirtyBlocks = Math.max(0, this.dirtyBlocks - consolidatedCount);
+    this.isConsolidating = false;
+
+    if (this.dirtyBlocks > 0) this.scheduleConsolidation();
+  }
+
+  /**
+   * 过滤 Worker 返回的结果，防止幻影方块
+   */
+  _filterWorkerResult(data) {
+    let { d, visibleKeys, solidBlocks } = data;
+
+    const isInChunkRange = (x, y, z) => {
+      const minX = this.cx * CHUNK_SIZE;
+      const maxX = (this.cx + 1) * CHUNK_SIZE;
+      const minZ = this.cz * CHUNK_SIZE;
+      const maxZ = (this.cz + 1) * CHUNK_SIZE;
+      return x >= minX && x < maxX && z >= minZ && z < maxZ;
+    };
+
+    const checkBelongsToStructure = (x, y, z) => {
+      return belongsToStructure(x, y, z, this.structureCenters);
+    };
+
+    // 过滤 visibleKeys
+    if (visibleKeys) {
+      visibleKeys = visibleKeys.filter(key => {
+        if (this.blockData[key]) return true;
+        const [x, y, z] = key.split(',').map(Number);
+        if (isInChunkRange(x, y, z)) return false;
+        return checkBelongsToStructure(x, y, z);
+      });
+    }
+
+    // 过滤 solidBlocks
+    if (solidBlocks) {
+      solidBlocks = solidBlocks.filter(key => {
+        if (this.blockData[key]) return true;
+        const [x, y, z] = key.split(',').map(Number);
+        if (isInChunkRange(x, y, z)) return false;
+        return checkBelongsToStructure(x, y, z);
+      });
+    }
+
+    // 过滤 d（渲染数据）
+    if (d) {
+      for (const type in d) {
+        d[type] = d[type].filter(pos => {
+          const key = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
+          const currentEntry = this.blockData[key];
+          if (currentEntry) {
+            const currentType = typeof currentEntry === 'string' ? currentEntry : currentEntry.type;
+            return currentType === type;
+          } else {
+            const x = Math.floor(pos.x);
+            const y = Math.floor(pos.y);
+            const z = Math.floor(pos.z);
+            if (isInChunkRange(x, y, z)) return false;
+            return checkBelongsToStructure(x, y, z);
+          }
+        });
+      }
+    }
+
+    return { visibleKeys, solidBlocks, d };
+  }
+
+  /**
+   * 同步可见性状态与碰撞状态
+   */
+  _syncVisibilityAndCollision(visibleKeys, solidBlocks) {
+    if (visibleKeys) {
+      this.visibleKeys = new Set(visibleKeys);
+      for (const key of this.dynamicMeshes.keys()) {
+        this.visibleKeys.add(key);
+      }
+    }
+
+    if (solidBlocks) {
+      this.solidBlocks = new Set(solidBlocks);
+      for (const [key, mesh] of this.dynamicMeshes.entries()) {
+        const type = mesh.userData.type;
+        if (this.blockData[key] && getBlockProps(type).isSolid) {
+          this.solidBlocks.add(key);
+        }
+      }
+      this.regenerateCrossChunkColliders();
+    }
+  }
+
+  /**
+   * 保存宝箱状态
+   */
+  _saveChestStates() {
+    const savedChestStates = new Map();
+    const oldChestIndices = this.instanceIndexMap['chest'];
+    if (oldChestIndices) {
+      const oldChestMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'chest');
+      if (oldChestMesh && oldChestMesh.userData.chests) {
+        for (const [posKey, idx] of oldChestIndices) {
+          if (oldChestMesh.userData.chests[idx]) {
+            savedChestStates.set(posKey, { ...oldChestMesh.userData.chests[idx] });
+          }
+        }
+      }
+    }
+    return savedChestStates;
+  }
+
+  /**
+   * 恢复宝箱状态
+   */
+  _restoreChestStates(savedChestStates) {
+    if (savedChestStates.size === 0) return;
+
+    const newChestMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'chest');
+    const newChestIndices = this.instanceIndexMap['chest'];
+    if (newChestMesh && newChestIndices) {
+      const dummy = new THREE.Matrix4();
+      const zeroScale = new THREE.Vector3(0, 0, 0);
+      for (const [posKey, state] of savedChestStates) {
+        if (newChestIndices.has(posKey)) {
+          const newIdx = newChestIndices.get(posKey);
+          newChestMesh.userData.chests[newIdx] = state;
+          if (state.open) {
+            newChestMesh.getMatrixAt(newIdx, dummy);
+            dummy.scale(zeroScale);
+            newChestMesh.setMatrixAt(newIdx, dummy);
+          }
+        }
+      }
+      newChestMesh.instanceMatrix.needsUpdate = true;
+    }
+  }
+
+  /**
+   * 清理旧的网格
+   */
+  _cleanupOldMeshes(consolidatedMeshKeys) {
+    // 清理动态网格
+    consolidatedMeshKeys.forEach((key) => {
+      const mesh = this.dynamicMeshes.get(key);
+      if (mesh) {
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) mesh.material.forEach(m => m.dispose());
+          else mesh.material.dispose();
+        }
+        this.group.remove(mesh);
+        this.dynamicMeshes.delete(key);
+      }
+    });
+
+    // 移除旧的 InstancedMesh（保留树木）
+    for (let i = this.group.children.length - 1; i >= 0; i--) {
+      const child = this.group.children[i];
+      if (child.isInstancedMesh) {
+        if (child.userData.type === 'realistic_trunk' || child.userData.type === 'realistic_leaves') {
+          continue;
+        }
+        if (child.geometry && child.geometry !== geomMap[child.userData.type] && child.geometry !== geomMap['default']) {
+          child.geometry.dispose();
+        }
+        this.group.remove(child);
+      }
+    }
   }
 
   /**
@@ -798,6 +825,295 @@ export class Chunk {
     }, 500);
   }
 
+  // ============================================================
+  // addBlockDynamic 辅助方法
+  // ============================================================
+
+  /**
+   * 检查指定位置是否在当前 Chunk 的责任范围内
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @returns {boolean} 是否在责任范围内（Chunk 内或属于当前 Chunk 负责的结构）
+   */
+  _isInResponsibility(x, y, z) {
+    const localX = Math.floor(x) - this.cx * CHUNK_SIZE;
+    const localZ = Math.floor(z) - this.cz * CHUNK_SIZE;
+    const isInChunk = localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE;
+
+    if (isInChunk) return true;
+
+    // 检查是否属于当前 Chunk 负责的结构
+    if (this.structureCenters && this.structureCenters.length > 0) {
+      return belongsToStructure(x, y, z, this.structureCenters);
+    }
+
+    return false;
+  }
+
+  /**
+   * 更新方块的数据状态（blockData, visibleKeys, solidBlocks）
+   * @param {string} key - 方块键
+   * @param {string} type - 方块类型
+   * @param {Object} entry - 方块条目
+   */
+  _updateBlockState(key, type, entry) {
+    if (type === 'air') {
+      delete this.blockData[key];
+      this.visibleKeys.delete(key);
+    } else {
+      this.blockData[key] = entry;
+      this.visibleKeys.add(key);
+    }
+
+    // 更新碰撞体集合
+    const props = getBlockProps(type);
+    if (props.isSolid) {
+      this.solidBlocks.add(key);
+    } else {
+      this.solidBlocks.delete(key);
+    }
+  }
+
+  /**
+   * 从 InstancedMesh 中移除指定位置的方块实例
+   * @param {string} key - 方块键
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @param {string} oldType - 旧方块类型
+   * @returns {boolean} 是否成功移除
+   */
+  _removeInstancedMeshBlock(key, x, y, z, oldType) {
+    if (!oldType) return false;
+
+    for (let i = this.group.children.length - 1; i >= 0; i--) {
+      const child = this.group.children[i];
+      if (!child.isInstancedMesh || child.userData.type !== oldType) continue;
+
+      const typeMap = this.instanceIndexMap[oldType];
+      if (typeMap && typeMap.has(key)) {
+        const idx = typeMap.get(key);
+        const dummy = new THREE.Matrix4();
+        dummy.makeScale(0, 0, 0);
+        child.setMatrixAt(idx, dummy);
+        child.instanceMatrix.needsUpdate = true;
+        typeMap.delete(key);
+        return true;
+      } else {
+        // Fallback: 慢速搜索
+        const dummy = new THREE.Matrix4();
+        const pos = new THREE.Vector3();
+        for (let j = 0; j < child.count; j++) {
+          child.getMatrixAt(j, dummy);
+          pos.setFromMatrixPosition(dummy);
+          if (Math.floor(pos.x) === Math.floor(x) &&
+              Math.floor(pos.y) === Math.floor(y) &&
+              Math.floor(pos.z) === Math.floor(z)) {
+            dummy.makeScale(0, 0, 0);
+            child.setMatrixAt(j, dummy);
+            child.instanceMatrix.needsUpdate = true;
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * 处理实体移除逻辑（当碰撞体被移除时）
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @param {string} oldType - 旧方块类型
+   * @returns {boolean} 是否处理了实体移除
+   */
+  _handleEntityRemoval(x, y, z, oldType) {
+    if (oldType !== 'collider') return false;
+
+    for (let i = this.group.children.length - 1; i >= 0; i--) {
+      const child = this.group.children[i];
+      if (!child.userData.isEntity || !child.userData.collisionBlocks) continue;
+
+      const isHit = child.userData.collisionBlocks.some(b =>
+        Math.floor(b.x) === Math.floor(x) &&
+        Math.floor(b.y) === Math.floor(y) &&
+        Math.floor(b.z) === Math.floor(z)
+      );
+
+      if (isHit) {
+        this.group.remove(child);
+        child.userData.collisionBlocks.forEach(b => {
+          const bKey = `${Math.floor(b.x)},${Math.floor(b.y)},${Math.floor(b.z)}`;
+          if (this.blockData[bKey] === 'collider') {
+            this.removeBlock(b.x, b.y, b.z);
+          }
+        });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * 处理 RealisticTree 实例化树木移除逻辑
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @param {string} oldType - 旧方块类型
+   */
+  _handleRealisticTreeRemoval(x, y, z, oldType) {
+    if (oldType !== 'realistic_trunk_collider') return;
+
+    const posKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const dummy = new THREE.Matrix4();
+    dummy.makeScale(0, 0, 0);
+
+    // 隐藏树干实例
+    const trunkMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'realistic_trunk');
+    if (trunkMesh && this.instanceIndexMap['realistic_trunk']) {
+      const idx = this.instanceIndexMap['realistic_trunk'].get(posKey);
+      if (idx !== undefined) {
+        trunkMesh.setMatrixAt(idx, dummy);
+        trunkMesh.instanceMatrix.needsUpdate = true;
+      }
+    }
+
+    // 隐藏树叶实例
+    const leavesMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'realistic_leaves');
+    if (leavesMesh && this.instanceIndexMap['realistic_leaves']) {
+      const idx = this.instanceIndexMap['realistic_leaves'].get(posKey);
+      if (idx !== undefined) {
+        leavesMesh.setMatrixAt(idx, dummy);
+        leavesMesh.instanceMatrix.needsUpdate = true;
+      }
+    }
+  }
+
+  /**
+   * 移除指定位置的动态网格
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @param {string} key - 方块键
+   */
+  _removeDynamicMesh(x, y, z, key) {
+    const matchX = Math.floor(x);
+    const matchY = Math.floor(y);
+    const matchZ = Math.floor(z);
+
+    for (let i = this.group.children.length - 1; i >= 0; i--) {
+      const child = this.group.children[i];
+      if (child.isInstancedMesh || child.userData.isEntity) continue;
+
+      if (Math.floor(child.position.x) === matchX &&
+          Math.floor(child.position.y) === matchY &&
+          Math.floor(child.position.z) === matchZ) {
+
+        this.dynamicMeshes.delete(key);
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+          else child.material.dispose();
+        }
+        this.group.remove(child);
+      }
+    }
+  }
+
+  /**
+   * 当方块被移除时，唤醒周围被隐藏的邻居方块
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   */
+  _revealNeighbors(x, y, z) {
+    const neighbors = [
+      { dx: 1, dy: 0, dz: 0 }, { dx: -1, dy: 0, dz: 0 },
+      { dx: 0, dy: 1, dz: 0 }, { dx: 0, dy: -1, dz: 0 },
+      { dx: 0, dy: 0, dz: 1 }, { dx: 0, dy: 0, dz: -1 }
+    ];
+
+    for (const offset of neighbors) {
+      const nx = x + offset.dx;
+      const ny = y + offset.dy;
+      const nz = z + offset.dz;
+
+      const nCx = Math.floor(nx / CHUNK_SIZE);
+      const nCz = Math.floor(nz / CHUNK_SIZE);
+
+      if (nCx === this.cx && nCz === this.cz) {
+        const nKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
+        if (this.blockData[nKey]) {
+          if (!this.visibleKeys.has(nKey)) {
+            this.addBlockDynamic(nx, ny, nz, this.blockData[nKey]);
+          } else {
+            this._triggerFaceCullingUpdate(nx, ny, nz, this.blockData[nKey]);
+          }
+        }
+      } else {
+        const neighborChunkKey = `${nCx},${nCz}`;
+        const neighborChunk = this.world.chunks.get(neighborChunkKey);
+        if (neighborChunk && neighborChunk.isReady) {
+          neighborChunk.checkReveal(nx, ny, nz);
+        }
+      }
+    }
+  }
+
+  /**
+   * 创建动态方块的网格
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @param {string} key - 方块键
+   * @param {string} type - 方块类型
+   * @param {number} orientation - 方块朝向
+   * @returns {THREE.Mesh|null} 创建的网格或 null
+   */
+  _createDynamicBlockMesh(x, y, z, key, type, orientation) {
+    const props = getBlockProps(type);
+    if (!props.isRendered || !this.visibleKeys.has(key)) {
+      return null;
+    }
+
+    const geometry = geomMap[props.geometryType] || geomMap['default'];
+    let material = getMaterials().getMaterial(type);
+
+    if (material) {
+      if (Array.isArray(material)) {
+        material = material.map(m => m.clone());
+      } else {
+        material = material.clone();
+      }
+    }
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(Math.floor(x) + 0.5, Math.floor(y) + 0.5, Math.floor(z) + 0.5);
+    mesh.rotation.set(0, getRotationAngle(orientation), 0);
+    mesh.userData = { type, orientation };
+    mesh.frustumCulled = false;
+
+    // 设置 AO 属性
+    if (props.isAOEnabled) {
+      mesh.geometry = geometry.clone();
+      const count = mesh.geometry.attributes.position.count;
+      const aoLowArray = new Float32Array(count).fill(16777215);
+      const aoHighArray = new Float32Array(count).fill(16777215);
+      mesh.geometry.setAttribute('aAoLow', new THREE.BufferAttribute(aoLowArray, 1));
+      mesh.geometry.setAttribute('aAoHigh', new THREE.BufferAttribute(aoHighArray, 1));
+    }
+
+    // 设置阴影
+    if (props.isShadowEnabled) {
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+    }
+
+    return mesh;
+  }
+
   /**
    * 动态添加单个方块（与批量生成相对）
    * 用于游戏运行时玩家放置方块
@@ -808,65 +1124,39 @@ export class Chunk {
    * @param {number} [orientation=0] - 朝向 (0-3)，当 typeOrEntry 为字符串时使用
    */
   addBlockDynamic(x, y, z, typeOrEntry, orientation = 0) {
-    // 解析输入参数，支持新旧两种调用方式
+    // 1. 解析参数
     const entry = typeof typeOrEntry === 'string'
       ? { type: typeOrEntry, orientation }
       : parseBlockEntry(typeOrEntry);
     const { type } = entry;
     const blockOrientation = entry.orientation || 0;
-
     const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
 
-    // --- 跨 Chunk 支持 ---
-    // 检查方块是否在当前 Chunk 范围内
-    const localX = Math.floor(x) - this.cx * CHUNK_SIZE;
-    const localZ = Math.floor(z) - this.cz * CHUNK_SIZE;
-    const isInChunk = localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE;
+    // 2. 边界检查（跨 Chunk）
+    if (!this._isInResponsibility(x, y, z)) return;
 
-    // 如果方块不在当前 Chunk 内，检查是否属于当前 Chunk 负责的结构
-    if (!isInChunk && this.structureCenters && this.structureCenters.length > 0) {
-      const belongsToCurrentChunkStructure = this.structureCenters.some(center => {
-        const maxDist = this.getStructureRenderDist(center.type);
-        return Math.abs(x - center.x) <= maxDist &&
-               Math.abs(z - center.z) <= maxDist &&
-               Math.abs(y - center.y) <= 16;
-      });
-
-      if (!belongsToCurrentChunkStructure) {
-        return; // 不属于当前 Chunk 负责的范围，跳过
-      }
-    }
-    // --- 跨 Chunk 支持结束 ---
-
+    // 3. 获取旧方块信息
     const oldEntry = this.blockData[key];
     const oldParsed = parseBlockEntry(oldEntry);
     const oldType = oldParsed.type;
 
-    // 更新内存中的快照数据
+    // 4. 更新持久化记录
     getPersistenceService().recordChange(x, y, z, entry);
 
-    // 更新数据和可见性状态
-    if (type === 'air') {
-      delete this.blockData[key];
-      this.visibleKeys.delete(key);
-    } else {
-      this.blockData[key] = entry;
-      this.visibleKeys.add(key);
-    }
-
-    // 触发持久化刷新 (防抖)
+    // 5. 更新数据状态
+    this._updateBlockState(key, type, entry);
     this.saveDebounced();
 
-    // --- 定义邻居获取辅助函数，供后续逻辑复用 ---
+    // 6. 计算 Face Culling 掩码
     const getNeighborBlock = (nx, ny, nz) => {
       const cx = Math.floor(nx / 16);
       const cz = Math.floor(nz / 16);
       let chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(`${cx},${cz}`);
       if (!chunk || !chunk.isReady) return null;
-      const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-      const entry = chunk.blockData[key];
-      if (!entry) return null;
-      const parsed = parseBlockEntry(entry);
+      const nKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
+      const nEntry = chunk.blockData[nKey];
+      if (!nEntry) return null;
+      const parsed = parseBlockEntry(nEntry);
       return { type: parsed.type, orientation: parsed.orientation };
     };
 
@@ -879,15 +1169,13 @@ export class Chunk {
       east: getNeighborBlock(nx + 1, ny, nz)
     });
 
-    // 计算隐藏面剔除掩码与方块可见性
-    let mask = 63; // 默认全显示 (111111)
+    let mask = 63;
     const fcSystem = getFaceCullingSystem();
     if (fcSystem && fcSystem.isEnabled() && type !== 'air' && type !== 'collider' && type !== 'chest') {
       const block = { type };
       const neighbors = getNeighborsOf(x, y, z);
       mask = fcSystem.calculateFaceVisibility(block, neighbors);
 
-      // 如果方块完全被遮挡且不是透明方块，则标记为不可见
       if (mask === 0 && !fcSystem.isTransparent(type)) {
         this.visibleKeys.delete(key);
       } else {
@@ -895,229 +1183,36 @@ export class Chunk {
       }
     }
 
-    // 检查并移除/隐藏该位置已有的方块（处理实例化网格和动态网格）
-    for (let i = this.group.children.length - 1; i >= 0; i--) {
-      const child = this.group.children[i];
+    // 7. 移除旧的渲染网格
+    this._removeInstancedMeshBlock(key, x, y, z, oldType);
+    this._handleEntityRemoval(x, y, z, oldType);
+    this._handleRealisticTreeRemoval(x, y, z, oldType);
+    this._removeDynamicMesh(x, y, z, key);
 
-      // 处理实例化网格 (静态生成的方块)
-      if (child.isInstancedMesh) {
-        if (oldType && child.userData.type === oldType) {
-          const typeMap = this.instanceIndexMap[oldType];
-          if (typeMap && typeMap.has(key)) {
-            const idx = typeMap.get(key);
-            const dummy = new THREE.Matrix4();
-            dummy.makeScale(0, 0, 0);
-            child.setMatrixAt(idx, dummy);
-            child.instanceMatrix.needsUpdate = true;
-            typeMap.delete(key);
-          } else {
-            // Fallback to slow search if map fails
-            const dummy = new THREE.Matrix4();
-            const pos = new THREE.Vector3();
-            for (let j = 0; j < child.count; j++) {
-              child.getMatrixAt(j, dummy);
-              pos.setFromMatrixPosition(dummy);
-              if (Math.floor(pos.x) === Math.floor(x) &&
-                  Math.floor(pos.y) === Math.floor(y) &&
-                  Math.floor(pos.z) === Math.floor(z)) {
-                dummy.makeScale(0, 0, 0);
-                child.setMatrixAt(j, dummy);
-                child.instanceMatrix.needsUpdate = true;
-                break;
-              }
-            }
-          }
-        }
-        continue;
-      }
-
-      // --- 处理实体移除逻辑 ---
-      // 如果移除的是碰撞体(collider)，则需要把关联的整个实体（如 Rook, Rover, modTree）炸掉
-      if (child.userData.isEntity && child.userData.collisionBlocks && type === 'air' && oldType === 'collider') {
-        const isHit = child.userData.collisionBlocks.some(b =>
-          Math.floor(b.x) === Math.floor(x) &&
-          Math.floor(b.y) === Math.floor(y) &&
-          Math.floor(b.z) === Math.floor(z)
-        );
-
-        if (isHit) {
-          // 1. 从场景中移除实体模型
-          this.group.remove(child);
-
-          // 2. 递归移除该实体的所有其他碰撞块，确保逻辑彻底清理
-          child.userData.collisionBlocks.forEach(b => {
-            const bKey = `${Math.floor(b.x)},${Math.floor(b.y)},${Math.floor(b.z)}`;
-            // 只有当该位置确实还是碰撞体时才移除，避免无限递归
-            if (this.blockData[bKey] === 'collider') {
-              this.removeBlock(b.x, b.y, b.z);
-            }
-          });
-          continue;
-        }
-      }
-
-      // --- 处理 RealisticTree 实例化树木移除逻辑 ---
-      // 当移除 realistic_trunk_collider 时，需要隐藏对应的 InstancedMesh 实例
-      if (type === 'air' && oldType === 'realistic_trunk_collider') {
-        // 查找 realistic_trunk InstancedMesh
-        const trunkMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'realistic_trunk');
-        if (trunkMesh && this.instanceIndexMap['realistic_trunk']) {
-          const posKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-          const idx = this.instanceIndexMap['realistic_trunk'].get(posKey);
-          if (idx !== undefined) {
-            const dummy = new THREE.Matrix4();
-            dummy.makeScale(0, 0, 0);
-            trunkMesh.setMatrixAt(idx, dummy);
-            trunkMesh.instanceMatrix.needsUpdate = true;
-          }
-        }
-        // 同时查找并隐藏树叶实例
-        const leavesMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'realistic_leaves');
-        if (leavesMesh && this.instanceIndexMap['realistic_leaves']) {
-          const posKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-          const idx = this.instanceIndexMap['realistic_leaves'].get(posKey);
-          if (idx !== undefined) {
-            const dummy = new THREE.Matrix4();
-            dummy.makeScale(0, 0, 0);
-            leavesMesh.setMatrixAt(idx, dummy);
-            leavesMesh.instanceMatrix.needsUpdate = true;
-          }
-        }
-      }
-
-      if (child.userData.isEntity) continue;
-
-      // 处理动态网格 (玩家放置的单体 Mesh)
-      // 核心修复：移除该位置的所有动态 mesh，防止"方块消除后又重新出现"的 bug
-      const matchX = Math.floor(x);
-      const matchY = Math.floor(y);
-      const matchZ = Math.floor(z);
-
-      if (Math.floor(child.position.x) === matchX &&
-          Math.floor(child.position.y) === matchY &&
-          Math.floor(child.position.z) === matchZ) {
-
-        // 从追踪映射中移除
-        this.dynamicMeshes.delete(key);
-
-        if (child.geometry) child.geometry.dispose();
-        if (child.material && !child.isInstancedMesh) {
-          if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
-          else child.material.dispose();
-        }
-        this.group.remove(child);
-        // 注意：这里不 continue，继续检查是否有其他 mesh 在同一位置（修复叠加方块问题）
-      }
-    }
-
-    // 更新碰撞体集合
-    const props = getBlockProps(type);
-    if (props.isSolid) {
-      this.solidBlocks.add(key);
-    } else {
-      this.solidBlocks.delete(key);
-    }
-
-    // 如果方块被移除（变成空气），检查并恢复周围隐藏的方块
+    // 8. 如果是移除方块，唤醒邻居
     if (type === 'air') {
       this.dirtyBlocks++;
       this.scheduleConsolidation();
-
-      const neighbors = [
-        { dx: 1, dy: 0, dz: 0 }, { dx: -1, dy: 0, dz: 0 },
-        { dx: 0, dy: 1, dz: 0 }, { dx: 0, dy: -1, dz: 0 },
-        { dx: 0, dy: 0, dz: 1 }, { dx: 0, dy: 0, dz: -1 }
-      ];
-
-      for (const offset of neighbors) {
-        const nx = x + offset.dx;
-        const ny = y + offset.dy;
-        const nz = z + offset.dz;
-
-        const nCx = Math.floor(nx / CHUNK_SIZE);
-        const nCz = Math.floor(nz / CHUNK_SIZE);
-
-        if (nCx === this.cx && nCz === this.cz) {
-          // 邻居在当前 Chunk
-          const nKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-          // 如果邻居存在且当前不可见，则显示它
-          if (this.blockData[nKey]) {
-            if (!this.visibleKeys.has(nKey)) {
-              this.addBlockDynamic(nx, ny, nz, this.blockData[nKey]);
-            } else {
-              // 核心修复：如果本来就可见，也要重新触发 Face Culling 更新以显示新的暴露面
-              this._triggerFaceCullingUpdate(nx, ny, nz, this.blockData[nKey]);
-            }
-          }
-        } else {
-          // 邻居在隔壁 Chunk
-          const neighborChunkKey = `${nCx},${nCz}`;
-          const neighborChunk = this.world.chunks.get(neighborChunkKey);
-          if (neighborChunk && neighborChunk.isReady) {
-            neighborChunk.checkReveal(nx, ny, nz);
-          }
-        }
-      }
+      this._revealNeighbors(x, y, z);
+      return;
     }
 
-    // 对于空气方块和碰撞体方块，或者因完全遮挡而不可见的方块，不创建网格
-    if (!props.isRendered || !this.visibleKeys.has(key)) {
-       // ...
-    } else {
-      // 获取几何体和材质
-      const geometry = geomMap[props.geometryType] || geomMap['default'];
-      let material = getMaterials().getMaterial(type);
-      // 克隆材质以避免潜在问题
-      if (material) {
-        if (Array.isArray(material)) {
-            material = material.map(m => m.clone());
-        } else {
-            material = material.clone();
-        }
-      }
-
-      // 创建单个网格
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.position.set(Math.floor(x) + 0.5, Math.floor(y) + 0.5, Math.floor(z) + 0.5); // 增加 0.5 偏移
-      // 应用朝向旋转
-      mesh.rotation.set(0, getRotationAngle(blockOrientation), 0);
-      mesh.userData = { type: type, orientation: blockOrientation };
-      mesh.frustumCulled = false; // 防止视锥剔除误判
-
-      // --- 为动态方块设置空的 AO 属性，防止报错 ---
-      if (props.isAOEnabled) {
-        mesh.geometry = geometry.clone();
-        const count = mesh.geometry.attributes.position.count;
-        const aoLowArray = new Float32Array(count).fill(16777215); // AO = 3 for all vertices
-        const aoHighArray = new Float32Array(count).fill(16777215);
-        mesh.geometry.setAttribute('aAoLow', new THREE.BufferAttribute(aoLowArray, 1));
-        mesh.geometry.setAttribute('aAoHigh', new THREE.BufferAttribute(aoHighArray, 1));
-      }
-
-      // 设置阴影
-      if(props.isShadowEnabled) {
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-      }
-
-      // 添加到区块组中
+    // 9. 创建新的动态网格
+    const mesh = this._createDynamicBlockMesh(x, y, z, key, type, blockOrientation);
+    if (mesh) {
       this.group.add(mesh);
-      // 记录到动态 Mesh 映射中，以便后续合并时销毁
       this.dynamicMeshes.set(key, mesh);
       this.dirtyBlocks++;
       this.scheduleConsolidation();
-
       mesh.updateMatrix();
       mesh.updateMatrixWorld();
     }
 
-    // 隐藏面剔除系统更新 (通知邻居)
+    // 10. 通知 Face Culling 系统更新
     const fcSystem2 = getFaceCullingSystem();
     if (fcSystem2 && fcSystem2.isEnabled()) {
       const position = new THREE.Vector3(x, y, z);
       const block = { type };
-
-      // 使用上面定义的辅助函数触发更新
       fcSystem2.updateBlock(position, block, getNeighborsOf(x, y, z));
       fcSystem2.updateNeighbors(position, (neighborPos) => {
         const nx = neighborPos.x, ny = neighborPos.y, nz = neighborPos.z;
@@ -1224,18 +1319,10 @@ export class Chunk {
    * 获取结构类型的渲染距离
    * @param {string} type - 结构类型
    * @returns {number} 渲染距离
+   * @deprecated 使用 StructureUtils.getRenderDist() 代替
    */
   getStructureRenderDist(type) {
-    const distMap = {
-      'uglyHouse': 24,
-      'tree': 8,
-      'static_tree': 8,
-      'house': 5,
-      'tank': 3,
-      'rover': 3,
-      'gunman': 3
-    };
-    return distMap[type] || 8;
+    return getStructureRenderDist(type);
   }
 
   /**
