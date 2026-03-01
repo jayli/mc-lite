@@ -57,22 +57,24 @@ class MockWorkerWrapper {
           // 使用 150ms 以确保在各种情况下都能正常工作
           setTimeout(() => {
             if (handlers._onmessage) {
-              // 注意：直接使用与真实 Worker 相同的消息格式
+              // 注意：使用与真实 Worker 相同的消息格式
               // 真实 Worker: postMessage({ cx, cz, d, ... })
               // Chunk.js: const { cx, cz, ... } = e.data;
               try {
                 handlers._onmessage({
-                  cx: msg.cx,
-                  cz: msg.cz,
-                  d: {},
-                  solidBlocks: [],
-                  realisticTrees: [],
-                  modGunMan: [],
-                  rovers: [],
-                  allBlockTypes: {},
-                  visibleKeys: [],
-                  snapshot: null,
-                  structureCenters: []
+                  data: {
+                    cx: msg.cx,
+                    cz: msg.cz,
+                    d: {},
+                    solidBlocks: [],
+                    realisticTrees: [],
+                    modGunMan: [],
+                    rovers: [],
+                    allBlockTypes: {},
+                    visibleKeys: [],
+                    snapshot: null,
+                    structureCenters: []
+                  }
                 });
               } catch (err) {
                 console.error('MockWorker response error:', err);
