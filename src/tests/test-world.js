@@ -19,25 +19,31 @@ class MockWorldWorker {
     this.onerror = null;
   }
   postMessage(msg) {
-    // 模拟 Worker 响应，延迟触发 onmessage
-    setTimeout(() => {
-      if (this.onmessage) {
-        this.onmessage({
-          data: {
-            cx: msg.cx,
-            cz: msg.cz,
-            d: {},
-            solidBlocks: [],
-            realisticTrees: [],
-            modGunMan: [],
-            rovers: [],
-            allBlockTypes: [],
-            visibleKeys: [],
-            snapshot: null
-          }
-        });
-      }
-    }, 10);
+    // 只响应 Chunk 生成请求（有 seed 参数）
+    // consolidate 请求（isOptimization: true）不响应，避免清空 solidBlocks
+    if (msg.seed !== undefined && !msg.isOptimization) {
+      // 模拟 Worker 响应，延迟触发 onmessage
+      setTimeout(() => {
+        if (this.onmessage) {
+          this.onmessage({
+            data: {
+              cx: msg.cx,
+              cz: msg.cz,
+              d: {},
+              solidBlocks: [],
+              realisticTrees: [],
+              modGunMan: [],
+              rovers: [],
+              allBlockTypes: {},
+              visibleKeys: [],
+              snapshot: null,
+              structureCenters: []
+            }
+          });
+        }
+      }, 10);
+    }
+    // consolidate 请求不响应，避免清空 solidBlocks
   }
 }
 
@@ -340,19 +346,20 @@ describe('World 真实类测试', (test) => {
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
 
-    // 等待区块完全生成（检查 isReady 状态）
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // 等待区块完全生成（Worker 响应返回）
+    // 重要：必须等待 Worker 响应返回后再放置方块，否则 solidBlocks 会被 Worker 响应清空
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    // 验证区块已准备就绪
+    const chunk = world.chunks.get('0,0');
+    assertNotNull(chunk, 'chunk 应该存在');
+    assertTrue(chunk.isReady, 'chunk 应该是 ready 状态');
 
     // 放置实心方块
     world.setBlock(5, 10, 5, 'stone', 0);
     world.setBlock(6, 10, 5, 'collider', 0);
 
     // 验证 solidBlocks 包含方块
-    const cx = Math.floor(5 / 16);
-    const cz = Math.floor(5 / 16);
-    const key = `${cx},${cz}`;
-    const chunk = world.chunks.get(key);
-
     assertTrue(chunk.solidBlocks.has('5,10,5'), 'stone 应该在 solidBlocks 中');
     assertTrue(chunk.solidBlocks.has('6,10,5'), 'collider 应该在 solidBlocks 中');
 
@@ -369,8 +376,13 @@ describe('World 真实类测试', (test) => {
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
 
-    // 等待区块完全生成
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // 等待区块完全生成（Worker 响应返回）
+    await new Promise(resolve => setTimeout(resolve, 150));
+
+    // 验证区块已准备就绪
+    const chunk = world.chunks.get('0,0');
+    assertNotNull(chunk, 'chunk 应该存在');
+    assertTrue(chunk.isReady, 'chunk 应该是 ready 状态');
 
     // 放置非实心方块
     world.setBlock(5, 10, 5, 'glass_block', 0);
