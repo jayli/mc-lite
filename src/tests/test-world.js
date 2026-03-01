@@ -10,50 +10,110 @@ import { describe, test } from './runner.js';
 import { assertEqual, assertTrue, assertFalse, assertNotNull } from './assert.js';
 import * as THREE from 'three';
 import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
+
+// ============================================
+// Worker 模拟 - 在导入 World 之前设置
+// ============================================
+
+// 保存原始 Worker 类
+const OriginalWorker = globalThis.Worker;
+
+// 存储所有 Worker 实例及其消息处理器
+const workerInstances = new Map();
+let shouldMockWorkers = true;
+
+// Worker 包装器 - 拦截所有 Worker 实例创建
+class MockWorkerWrapper {
+  constructor(url, options) {
+    // 创建真实 Worker
+    const realWorker = new OriginalWorker(url, options);
+
+    // 存储处理器
+    const handlers = { _onmessage: null, _onerror: null };
+    workerInstances.set(realWorker, { handlers, url: url.toString() });
+
+    // 拦截 onmessage
+    Object.defineProperty(realWorker, 'onmessage', {
+      set(fn) { handlers._onmessage = fn; },
+      get() { return handlers._onmessage; },
+      configurable: true
+    });
+
+    // 拦截 onerror
+    Object.defineProperty(realWorker, 'onerror', {
+      set(fn) { handlers._onerror = fn; },
+      get() { return handlers._onerror; },
+      configurable: true
+    });
+
+    // 包装 postMessage
+    const originalPostMessage = realWorker.postMessage.bind(realWorker);
+    realWorker.postMessage = function(msg) {
+      if (shouldMockWorkers) {
+        // 只响应 Chunk 生成请求（有 seed 参数且不是 consolidate）
+        if (msg.seed !== undefined && !msg.isOptimization) {
+          setTimeout(() => {
+            if (handlers._onmessage) {
+              handlers._onmessage({
+                data: {
+                  cx: msg.cx,
+                  cz: msg.cz,
+                  d: {},
+                  solidBlocks: [],
+                  realisticTrees: [],
+                  modGunMan: [],
+                  rovers: [],
+                  allBlockTypes: {},
+                  visibleKeys: [],
+                  snapshot: null,
+                  structureCenters: []
+                }
+              });
+            }
+          }, 30);
+          return;
+        }
+      }
+      return originalPostMessage(msg);
+    };
+
+    return realWorker;
+  }
+}
+
+// 立即设置全局 Worker 为包装器（在导入 World 之前）
+globalThis.Worker = MockWorkerWrapper;
+
+// 现在导入 World（Chunk.js 会使用 MockWorkerWrapper）
 import { World } from '../world/World.js';
 
-// 模拟 WorldWorker
-class MockWorldWorker {
-  constructor() {
-    this.onmessage = null;
-    this.onerror = null;
-  }
-  postMessage(msg) {
-    // 只响应 Chunk 生成请求（有 seed 参数）
-    // consolidate 请求（isOptimization: true）不响应，避免清空 solidBlocks
-    if (msg.seed !== undefined && !msg.isOptimization) {
-      // 模拟 Worker 响应，延迟触发 onmessage
-      setTimeout(() => {
-        if (this.onmessage) {
-          this.onmessage({
-            data: {
-              cx: msg.cx,
-              cz: msg.cz,
-              d: {},
-              solidBlocks: [],
-              realisticTrees: [],
-              modGunMan: [],
-              rovers: [],
-              allBlockTypes: {},
-              visibleKeys: [],
-              snapshot: null,
-              structureCenters: []
-            }
-          });
-        }
-      }, 10);
+// ============================================
+// 辅助函数
+// ============================================
+
+/**
+ * 等待指定 Chunk 准备就绪
+ * @param {World} world - World 实例
+ * @param {string} chunkKey - Chunk 键（如 '0,0'）
+ * @param {number} maxWaitCount - 最大等待次数（每次 50ms）
+ * @returns {Promise<boolean>} Chunk 是否准备就绪
+ */
+async function waitForChunkReady(world, chunkKey, maxWaitCount = 50) {
+  let waitCount = 0;
+  while (waitCount < maxWaitCount) {
+    const chunk = world.chunks.get(chunkKey);
+    if (chunk && chunk.isReady) {
+      return true;
     }
-    // consolidate 请求不响应，避免清空 solidBlocks
+    await new Promise(resolve => setTimeout(resolve, 50));
+    waitCount++;
   }
+  return false;
 }
 
-// 模拟 FaceCullingWorker
-class MockFaceCullingWorker {
-  constructor() {
-    this.onmessage = null;
-  }
-  postMessage() {}
-}
+// ============================================
+// 其他依赖模拟
+// ============================================
 
 // 模拟 persistenceService
 const mockPersistenceService = {
@@ -68,7 +128,8 @@ const mockFaceCullingSystem = {
   isEnabled: () => false,
   isTransparent: (type) => ['glass_block', 'leaves', 'water', 'air'].includes(type),
   calculateFaceVisibility: (block, neighbors) => 63,
-  updateBlock: () => {}
+  updateBlock: () => {},
+  updateNeighbors: () => {}
 };
 
 // 模拟 materials - 返回带有 dispose 方法的材质对象
@@ -114,13 +175,12 @@ class MockParticleSystem {
 }
 
 // 保存原始引用用于恢复
-let originalWorker, originalPersistenceService, originalFaceCullingSystem;
+let originalPersistenceService, originalFaceCullingSystem;
 let originalMaterials, originalBlockData, originalChestManager, originalParticleSystem;
 let originalCarModel, originalGunManModel;
 
 // 设置模拟环境
 const setupEnvironment = () => {
-  originalWorker = globalThis.Worker;
   originalPersistenceService = globalThis._persistenceService;
   originalFaceCullingSystem = globalThis._faceCullingSystem;
   originalMaterials = globalThis._materials;
@@ -130,7 +190,6 @@ const setupEnvironment = () => {
   originalCarModel = globalThis._carModel;
   originalGunManModel = globalThis._gunManModel;
 
-  globalThis.Worker = MockWorldWorker;
   globalThis._persistenceService = mockPersistenceService;
   globalThis._faceCullingSystem = mockFaceCullingSystem;
   globalThis._materials = mockMaterials;
@@ -139,11 +198,13 @@ const setupEnvironment = () => {
   globalThis._ParticleSystem = MockParticleSystem;
   globalThis._carModel = { clone: () => null };
   globalThis._gunManModel = { clone: () => null };
+
+  // 启用 Worker 模拟
+  shouldMockWorkers = true;
 };
 
 // 恢复原始环境
 const teardownEnvironment = () => {
-  if (originalWorker) globalThis.Worker = originalWorker;
   if (originalPersistenceService) globalThis._persistenceService = originalPersistenceService;
   if (originalFaceCullingSystem) globalThis._faceCullingSystem = originalFaceCullingSystem;
   if (originalMaterials) globalThis._materials = originalMaterials;
@@ -152,6 +213,9 @@ const teardownEnvironment = () => {
   if (originalParticleSystem) globalThis._ParticleSystem = originalParticleSystem;
   if (originalCarModel) globalThis._carModel = originalCarModel;
   if (originalGunManModel) globalThis._gunManModel = originalGunManModel;
+
+  // 禁用 Worker 模拟
+  shouldMockWorkers = false;
 };
 
 describe('World 真实类测试', (test) => {
@@ -196,7 +260,7 @@ describe('World 真实类测试', (test) => {
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
 
     // 等待区块加载完成
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await waitForChunkReady(world, '0,0');
 
     // 验证 7x7 的区块已加载 (渲染距离 3)
     assertEqual(world.chunks.size, 49, '应该加载 49 个区块 (7x7)');
@@ -217,14 +281,14 @@ describe('World 真实类测试', (test) => {
 
     // 先在原点加载区块
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await waitForChunkReady(world, '0,0');
 
     const initialSize = world.chunks.size;
     assertEqual(initialSize, 49, '初始应该有 49 个区块');
 
     // 移动到远处 (100, 100) -> 区块 (6, 6)
     world.update(new THREE.Vector3(100, 10, 100), 0.016);
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await waitForChunkReady(world, '6,6');
 
     // 验证新区块已加载
     assertTrue(world.chunks.has('6,6'), '区块 6,6 应该存在 (100/16=6)');
@@ -243,8 +307,7 @@ describe('World 真实类测试', (test) => {
 
     // 先更新世界以加载区块 (玩家在原点)
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    // 等待区块完全生成
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await waitForChunkReady(world, '0,0');
 
     // 在玩家附近放置方块
     world.setBlock(5, 10, 5, 'stone', 0);
@@ -280,8 +343,7 @@ describe('World 真实类测试', (test) => {
     scene = new THREE.Scene();
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    // 等待区块完全生成
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await waitForChunkReady(world, '0,0');
 
     // 放置不同类型的方块
     world.setBlock(0, 10, 0, 'dirt', 0);
@@ -304,8 +366,7 @@ describe('World 真实类测试', (test) => {
     scene = new THREE.Scene();
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    // 等待区块完全生成
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await waitForChunkReady(world, '0,0');
 
     // 先放置一个方块
     world.setBlock(5, 10, 5, 'stone', 0);
@@ -326,8 +387,7 @@ describe('World 真实类测试', (test) => {
     scene = new THREE.Scene();
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    // 等待区块完全生成
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await waitForChunkReady(world, '0,0');
 
     // 移除不存在的方块不应该抛出错误
     world.removeBlock(999, 999, 999);
@@ -346,9 +406,17 @@ describe('World 真实类测试', (test) => {
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
 
-    // 等待区块完全生成（Worker 响应返回）
-    // 重要：必须等待 Worker 响应返回后再放置方块，否则 solidBlocks 会被 Worker 响应清空
-    await new Promise(resolve => setTimeout(resolve, 150));
+    // 等待所有 Chunk 的 Worker 响应返回
+    // Chunk 生成是异步的，需要等待 isReady 为 true
+    let waitCount = 0;
+    while (waitCount < 50) { // 最多等待 5 秒
+      const chunk = world.chunks.get('0,0');
+      if (chunk && chunk.isReady) {
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 50));
+      waitCount++;
+    }
 
     // 验证区块已准备就绪
     const chunk = world.chunks.get('0,0');
@@ -376,8 +444,16 @@ describe('World 真实类测试', (test) => {
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
 
-    // 等待区块完全生成（Worker 响应返回）
-    await new Promise(resolve => setTimeout(resolve, 150));
+    // 等待所有 Chunk 的 Worker 响应返回
+    let waitCount = 0;
+    while (waitCount < 50) { // 最多等待 5 秒
+      const chunk = world.chunks.get('0,0');
+      if (chunk && chunk.isReady) {
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 50));
+      waitCount++;
+    }
 
     // 验证区块已准备就绪
     const chunk = world.chunks.get('0,0');
@@ -400,8 +476,7 @@ describe('World 真实类测试', (test) => {
     scene = new THREE.Scene();
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    // 等待区块完全生成
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await waitForChunkReady(world, '0,0');
 
     // 放置多个方块
     world.setBlock(0, 10, 0, 'stone', 0);
@@ -434,8 +509,7 @@ describe('World 真实类测试', (test) => {
     scene = new THREE.Scene();
     world = new World(scene);
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    // 等待区块完全生成
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await waitForChunkReady(world, '0,0');
 
     const addedBlocks = [];
 
@@ -472,8 +546,7 @@ describe('World 真实类测试', (test) => {
 
     // 先在原点加载区块并放置方块
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    // 等待区块完全生成
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await waitForChunkReady(world, '0,0');
 
     world.setBlock(5, 10, 5, 'stone', 0);
     assertEqual(world.getBlock(5, 10, 5), 'stone', '方块应该存在');
