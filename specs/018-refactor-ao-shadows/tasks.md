@@ -1,6 +1,6 @@
 # Tasks: AO 阴影渲染逻辑重构
 
-**Input**: Design documents from `/specs/001-refactor-ao-shadows/`
+**Input**: Design documents from `/specs/018-refactor-ao-shadows/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, contracts/ao-worker-protocol.md, quickstart.md
 
 **Tests**: Included for validation purposes - TDD approach recommended for core AO logic
@@ -34,7 +34,7 @@ Single project structure at repository root:
 - [ ] T002 [P] Audit existing AO shader injection in src/core/MaterialManager.js (lines 179-227)
 - [ ] T003 [P] Audit existing BlockData.js AO flags (lines 180-209, 244-248)
 - [ ] T004 Establish performance baseline for current AO computation time
-- [ ] T005 Create specs/001-refactor-ao-shadows/ directory structure for artifacts
+- [ ] T005 Create specs/018-refactor-ao-shadows/ directory structure for artifacts
 
 ---
 

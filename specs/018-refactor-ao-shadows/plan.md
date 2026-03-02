@@ -1,7 +1,7 @@
 # Implementation Plan: AO 阴影渲染逻辑重构
 
-**Branch**: `001-refactor-ao-shadows` | **Date**: 2026-03-02 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `/specs/001-refactor-ao-shadows/spec.md`
+**Branch**: `018-refactor-ao-shadows` | **Date**: 2026-03-02 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/018-refactor-ao-shadows/spec.md`
 
 ## Summary
 
@@ -49,7 +49,7 @@
 ### Documentation (this feature)
 
 ```text
-specs/001-refactor-ao-shadows/
+specs/018-refactor-ao-shadows/
 ├── plan.md              # 本文件
 ├── research.md          # Phase 0 输出：现有 AO 逻辑分析与技术方案
 ├── data-model.md        # Phase 1 输出：AO 数据结构与接口定义

@@ -1,7 +1,7 @@
 # AO Refactoring Quickstart Guide
 
 **Feature**: AO 阴影渲染逻辑重构
-**Branch**: `001-refactor-ao-shadows`
+**Branch**: `018-refactor-ao-shadows`
 
 ---
 

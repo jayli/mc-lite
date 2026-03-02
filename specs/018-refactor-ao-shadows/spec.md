@@ -1,6 +1,6 @@
 # Feature Specification: AO 阴影渲染逻辑重构
 
-**Feature Branch**: `001-refactor-ao-shadows`
+**Feature Branch**: `018-refactor-ao-shadows`
 **Created**: 2026-03-02
 **Status**: Draft
 **Input**: 用户描述：b3be4d06b4917ace4459838f6c0e28c9aec43840 这次提交对渲染管线做了重构、并在随后的几次提交里完善了测试用例，目前 Chunk 的生成、实体的生成、方块的 InstancedMesh、face culling 以及 background consolidation 等动作基本跟玩家可以很好的互动和运行。chunk/map/entities/actor 的几层架构也基本定型，且 worker 机制也确立了下来。经过几次重构，最早的方块的 AO 阴影的绘制和管理逐渐暴露出了一些问题，包括跟 Map 地形的阴影计算的兼容，部分场景下阴影缺失，等等问题。我尝试修改 bug 没有成功，主要还是 AO 阴影的计算和渲染逻辑过于复杂。因此我希望在当前代码技术上进行 AO 逻辑的重新设计和重构，从设计上很好的跟现有程序架构兼容，即 AO 阴影的渲染核心逻辑保持跟老的实现类似的情况下，能够不受 Chunk、实体、动态方块等属性的干扰，而能做到对所有实心且不透明的方块统一对待，即针对所有实心且不透明的方块都做 AO 阴影的绘制（不用再单独给某类方块定义是否支持 AO 渲染了），AO 的渲染对象仅仅是方块（不包括特殊类型的模型比如从 src/assets/mod 目录里加载进来的诸如 ModGunMan 之类的模型）起作用。

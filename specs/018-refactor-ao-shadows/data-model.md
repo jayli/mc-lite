@@ -1,7 +1,7 @@
 # AO Data Model & Design
 
 **Feature**: AO 阴影渲染逻辑重构
-**Branch**: `001-refactor-ao-shadows`
+**Branch**: `018-refactor-ao-shadows`
 **Date**: 2026-03-02
 
 ---
