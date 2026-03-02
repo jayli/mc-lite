@@ -126,8 +126,8 @@ export function getFrozenMountainInfo(wx, wz, seed, terrainGen) {
   // 添加噪声起伏，让山坡更自然
   // 使用多种频率的噪声叠加
   const noise1 = mountainNoise(wx, wz, seed, 0.04) * 3;
-  const noise2 = mountainNoise(wx, wz, seed + 100, 0.15) * 1.5;
-  const noise3 = mountainNoise(wx, wz, seed + 200, 0.25) * 0.8;
+  const noise2 = mountainNoise(wx, wz, seed + 100, 0.10) * 1.5;
+  const noise3 = mountainNoise(wx, wz, seed + 200, 0.15) * 0.8;
 
   // 山脊效果：沿 X 轴和 Z 轴创建一些起伏的山脊
   const ridgeX = Math.sin(dz * 0.25) * 2;
