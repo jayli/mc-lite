@@ -177,8 +177,8 @@ onmessage = async function(e) {
         }
       } else if (inFrozenMountain) {
         const fmResult = FrozenMountain.generate(wx, wz, h, fmInfo, fakeChunk, dPlaceholder);
-        // 在冰封山峰以 0.0007 概率生成带雪白桦树（仅在主体区域且不在海平面以下）
-        if (fmInfo.transitionFactor === 0 && !fmResult.isBelowSeaLevel && seededRandom(wx, wz, seed + 11) < 0.0007) {
+        // 在冰封山峰以 0.0010 概率生成带雪白桦树（仅在主体区域且不在海平面以下）
+        if (fmInfo.transitionFactor === 0 && !fmResult.isBelowSeaLevel && seededRandom(wx, wz, seed + 11) < 0.0010) {
           const task = () => generateBirchTreeWithSnow(wx, fmResult.surfaceY + 1, wz, fakeChunk, dPlaceholder);
           task.centerX = wx;
           task.centerY = fmResult.surfaceY + 1;

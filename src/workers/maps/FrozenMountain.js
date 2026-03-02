@@ -29,7 +29,7 @@ function mountainNoise(x, z, seed, scale) {
  * @returns {Object|null} 冰封山峰信息对象或 null
  */
 export function getFrozenMountainInfo(wx, wz, seed, terrainGen) {
-  const mountainSize = 60;  // 冰封山峰主体边长 60 格
+  const mountainSize = 80;  // 冰封山峰主体边长 80 格
   const halfSize = Math.floor(mountainSize / 2);
   const transitionSize = 4; // 过渡带大小 4 格
   const regionSize = 400;  // 每 400x400 区域生成一个冰封山峰
@@ -125,7 +125,7 @@ export function getFrozenMountainInfo(wx, wz, seed, terrainGen) {
 
   // 添加噪声起伏，让山坡更自然
   // 使用多种频率的噪声叠加
-  const noise1 = mountainNoise(wx, wz, seed, 0.08) * 3;
+  const noise1 = mountainNoise(wx, wz, seed, 0.04) * 3;
   const noise2 = mountainNoise(wx, wz, seed + 100, 0.15) * 1.5;
   const noise3 = mountainNoise(wx, wz, seed + 200, 0.25) * 0.8;
 
@@ -192,7 +192,7 @@ export function generateFrozenMountain(wx, wz, h, fmInfo, fakeChunk, dPlaceholde
   const isBelowSeaLevel = finalSurfaceY <= seaLevel - 1;
 
   // 随机决定 dirt 层数（2-3层）
-  const dirtLayers = Math.floor(Math.random() * 2) + 2;
+  const dirtLayers = Math.floor(Math.random() * 2) + 1;
 
   // 生成冰封山峰方块或沙块
   for (let y = fillStartY; y <= fillEndY; y++) {
