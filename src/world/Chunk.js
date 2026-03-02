@@ -727,7 +727,8 @@ export class Chunk {
       const mesh = new THREE.InstancedMesh(geometry, material, d[type].length);
 
       // --- 添加 AO 属性 ---
-      if (props.isAOEnabled) {
+      // AO 适用于所有实心且不透明的方块
+      if (props.isSolid && !props.isTransparent) {
         const aoLowArray = new Float32Array(d[type].length);
         const aoHighArray = new Float32Array(d[type].length);
         d[type].forEach((pos, i) => {
@@ -1096,7 +1097,8 @@ export class Chunk {
     mesh.frustumCulled = false;
 
     // 设置 AO 属性
-    if (props.isAOEnabled) {
+    // AO 适用于所有实心且不透明的方块
+    if (props.isSolid && !props.isTransparent) {
       mesh.geometry = geometry.clone();
       const count = mesh.geometry.attributes.position.count;
       const aoLowArray = new Float32Array(count).fill(16777215);

@@ -82,8 +82,9 @@ export class MaterialManager {
    */
   _createMaterial(def, type) {
     // 根据配置判断是否允许使用 AO 阴影
+    // AO 适用于所有实心且不透明的方块
     const props = getBlockProperties(type);
-    const useAO = props.isAOEnabled;
+    const useAO = props.isSolid && !props.isTransparent;
 
     // 情况0：多面材质（用于立方体不同面使用不同材质）
     if (def.faces) {

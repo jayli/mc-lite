@@ -2,6 +2,7 @@
 // 专门处理隐藏面剔除计算的Worker
 
 import { getBlockProperties } from '../constants/BlockData.js';
+import { calculateAOForBlock, isAOApplicable } from '../utils/AOUtils.js';
 
 // 用于隐藏面剔除的辅助函数
 const getBlockType = (x, y, z, blockData) => {
@@ -14,6 +15,40 @@ const isTransparent = (type) => {
   const props = getBlockProperties(type);
   return props.isTransparent;
 };
+
+/**
+ * 构建跨区块查询的 isOccluding 函数
+ * @param {Object} blockData - 当前区块数据
+ * @param {Array} worldChunks - 相邻区块数据
+ * @param {number} currentCx - 当前区块 X 坐标
+ * @param {number} currentCz - 当前区块 Z 坐标
+ * @returns {Function} isOccluding(x, y, z) => boolean
+ */
+function createOccludingChecker(blockData, worldChunks, currentCx, currentCz) {
+  return function isOccluding(x, y, z) {
+    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+
+    // 检查是否在当前区块内
+    const xChunk = Math.floor(x / 16);
+    const zChunk = Math.floor(z / 16);
+
+    let type = null;
+    if (xChunk === currentCx && zChunk === currentCz) {
+      type = blockData[key];
+    } else {
+      // 从相邻区块查找
+      const chunkKey = `${xChunk},${zChunk}`;
+      const chunk = worldChunks?.find(c => c.cx === xChunk && c.cz === zChunk);
+      if (chunk && chunk.blockData) {
+        type = chunk.blockData[key];
+      }
+    }
+
+    if (!type) return false;
+    const props = getBlockProperties(type);
+    return !props.isTransparent;
+  };
+}
 
 /**
  * 计算单个方块的可见面掩码
@@ -226,6 +261,114 @@ function calculateFaceVisibilityWithWorld(block, blockData, worldChunks, current
   return mask;
 }
 
+/**
+ * 批量计算 AO 数据（用于区块生成）
+ * @param {Array} blocks - 方块数组 [{x, y, z, type}]
+ * @param {Object} blockData - 完整方块数据 {"x,y,z": "type"}
+ * @param {number} cx - 区块 X 坐标
+ * @param {number} cz - 区块 Z 坐标
+ * @param {Array} worldChunks - 相邻区块数据
+ * @returns {Object} AO 计算结果
+ */
+function computeBatchAO(blocks, blockData, cx, cz, worldChunks = []) {
+  const startTime = performance.now();
+  const aoData = [];
+  const affectedNeighbors = [];
+
+  // 创建跨区块 occluding 检查器
+  const isOccluding = createOccludingChecker(blockData, worldChunks, cx, cz);
+
+  for (const block of blocks) {
+    if (isAOApplicable(block.type)) {
+      const { aoLow, aoHigh } = calculateAOForBlock(block.x, block.y, block.z, isOccluding);
+      aoData.push({
+        x: block.x,
+        y: block.y,
+        z: block.z,
+        type: block.type,
+        aoLow,
+        aoHigh
+      });
+    }
+  }
+
+  return {
+    aoData,
+    affectedNeighbors,
+    duration: performance.now() - startTime,
+    cx,
+    cz
+  };
+}
+
+/**
+ * 增量计算 AO 数据（用于动态方块更新）
+ * @param {Object} position - 方块位置 {x, y, z}
+ * @param {'PLACE'|'DESTROY'} operation - 操作类型
+ * @param {string} blockType - 方块类型
+ * @param {Object} blockData - 局部方块数据
+ * @param {number} neighborhoodRadius - 邻居半径
+ * @returns {Object} AO 计算结果
+ */
+function computeIncrementalAO(position, operation, blockType, blockData, neighborhoodRadius = 1) {
+  const startTime = performance.now();
+  const aoData = [];
+  const affectedNeighbors = [];
+
+  const isOccluding = (x, y, z) => {
+    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const type = blockData[key];
+    if (!type) return false;
+    const props = getBlockProperties(type);
+    return !props.isTransparent;
+  };
+
+  const { x, y, z } = position;
+  const affected = new Set();
+
+  // 如果是放置方块，计算该方块的 AO
+  if (operation === 'PLACE' && isAOApplicable(blockType)) {
+    affected.add(`${x},${y},${z}`);
+  }
+
+  // 计算邻居方块的 AO 更新
+  for (let dx = -neighborhoodRadius; dx <= neighborhoodRadius; dx++) {
+    for (let dy = -neighborhoodRadius; dy <= neighborhoodRadius; dy++) {
+      for (let dz = -neighborhoodRadius; dz <= neighborhoodRadius; dz++) {
+        if (dx === 0 && dy === 0 && dz === 0) continue;
+
+        const nx = x + dx;
+        const ny = y + dy;
+        const nz = z + dz;
+        const key = `${nx},${ny},${nz}`;
+        const type = blockData[key];
+
+        if (type && isAOApplicable(type)) {
+          affected.add(key);
+        }
+      }
+    }
+  }
+
+  // 计算 AO
+  for (const key of affected) {
+    const [bx, by, bz] = key.split(',').map(Number);
+    const type = blockData[key];
+
+    if (type && isAOApplicable(type)) {
+      const { aoLow, aoHigh } = calculateAOForBlock(bx, by, bz, isOccluding);
+      aoData.push({ x: bx, y: by, z: bz, type, aoLow, aoHigh });
+      affectedNeighbors.push({ x: bx, y: by, z: bz });
+    }
+  }
+
+  return {
+    aoData,
+    affectedNeighbors,
+    duration: performance.now() - startTime
+  };
+}
+
 // Worker 消息处理器
 self.onmessage = function(e) {
   const { type, data } = e.data;
@@ -248,6 +391,27 @@ self.onmessage = function(e) {
           data.cx,
           data.cz,
           data.worldChunks || null
+        );
+        break;
+
+      // AO 计算相关消息
+      case 'COMPUTE_AO_BATCH':
+        result = computeBatchAO(
+          data.blocks,
+          data.blockData,
+          data.cx,
+          data.cz,
+          data.worldChunks || []
+        );
+        break;
+
+      case 'COMPUTE_AO_INCREMENTAL':
+        result = computeIncrementalAO(
+          data.position,
+          data.operation,
+          data.blockType,
+          data.blockData,
+          data.neighborhoodRadius || 1
         );
         break;
 
