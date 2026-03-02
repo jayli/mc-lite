@@ -43,7 +43,8 @@ export const GUN_CONFIGS = {
     tracerOpacity: 1.0,
     tracerThickness: 6,
     tracerLifetime: 0.15,
-    isShotgun: true
+    isShotgun: true,
+    chainDelay: 7  // 连锁击毁延迟（毫秒），给 AO 计算留出时间
   },
   [WEAPON_TYPES.MINIGUN]: {
     name: 'Minigun',

@@ -176,14 +176,15 @@ export const BLOCK_DATA = {
     isShadowEnabled: false,
     isIndestructible: true  // 不可被 TNT、机枪或玩家破坏
   },
-  // AO 启用的方块 (严格匹配原 aoAllowedTypes 列表)
-  'sand': { isAOEnabled: true },
-  'stone': { isAOEnabled: true },
-  'stone_diorite': { isAOEnabled: true },
-  'mossy_stone': { isAOEnabled: true },
-  'cobblestone': { isAOEnabled: true },
-  'bricks': { isAOEnabled: true },
-  'planks': { isAOEnabled: true },
+  // 注意：AO 现在自动适用于所有 solid + non-transparent 方块
+  // 无需手动设置 isAOEnabled 标志
+  'sand': {},
+  'stone': {},
+  'stone_diorite': {},
+  'mossy_stone': {},
+  'cobblestone': {},
+  'bricks': {},
+  'planks': {},
   'planks_step': {
     isSolid: true,
     isTransparent: true,  // 不参与 face culling，相邻面都显示
@@ -199,14 +200,14 @@ export const BLOCK_DATA = {
     isTransparent: true,  // 不参与 face culling，相邻面都显示
     geometryType: 'cobblestone_step'
   },
-  'white_planks': { isAOEnabled: true },
-  'oak_planks': { isAOEnabled: true },
-  'gold_ore': { isAOEnabled: true },
-  'marble': { isAOEnabled: true },
+  'white_planks': {},
+  'oak_planks': {},
+  'gold_ore': {},
+  'marble': {},
   'dirt': {},
-  'snow': { isAOEnabled: true },
-  'snow_grass': { isAOEnabled: true },
-  'ice': { isAOEnabled: true }
+  'snow': {},
+  'snow_grass': {},
+  'ice': {}
 };
 
 /**

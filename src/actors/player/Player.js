@@ -648,12 +648,19 @@ export class Player {
       this._tempVector.set(midBlock.x + 0.5, midBlock.y + 0.5, midBlock.z + 0.5);
       this.spawnParticles(this._tempVector, 'stone');
 
-      sortedDistances.forEach((dist, index) => {
+      // 按距离排序后，逐个销毁方块（而不是成批销毁），确保 AO 计算能跟上
+      const allBlocks = [];
+      sortedDistances.forEach(dist => {
         const group = blocksByDistance.get(dist);
+        allBlocks.push(...group);
+      });
+
+      // 逐个方块设置定时器，每个方块间隔 chainDelay 毫秒
+      allBlocks.forEach((block, index) => {
         const timeoutId = setTimeout(() => {
-          this.world.removeBlocksBatch(group);
+          this.world.removeBlock(block.x, block.y, block.z);
           this.mag7Timeouts = this.mag7Timeouts.filter(id => id !== timeoutId);
-        }, index * 90);
+        }, index * this.weapon.config.chainDelay);
         this.mag7Timeouts.push(timeoutId);
       });
     }
