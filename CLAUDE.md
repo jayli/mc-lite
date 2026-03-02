@@ -94,10 +94,3 @@
 
 ### 删除文件
 - 使用 `Bash` 命令 `rm <file>` 删除文件
-
-## Active Technologies
-- ES6+ Modules (JavaScript) + Three.js (r128+) (018-refactor-ao-shadows)
-- IndexedDB (通过 PersistenceWorker) (018-refactor-ao-shadows)
-
-## Recent Changes
-- 018-refactor-ao-shadows: Added ES6+ Modules (JavaScript) + Three.js (r128+)
