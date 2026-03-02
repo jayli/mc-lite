@@ -1,0 +1,249 @@
+// src/utils/AOUtils.js
+// AO（环境光遮蔽）计算辅助函数
+
+import { getBlockProperties } from '../constants/BlockData.js';
+
+/**
+ * 预计算的邻居偏移量（按面和角索引）
+ * 避免运行时坐标计算，提升性能
+ * 格式：[faceIdx][cornerIdx] = { side1: [dx,dy,dz], side2: [dx,dy,dz], corner: [dx,dy,dz] }
+ */
+const AO_NEIGHBOR_OFFSETS = [
+  // Face 0 (+X side)
+  [
+    { side1: [0, 1, 0], side2: [0, 0, 1], corner: [0, 1, 1] },  // V0: Top, PZ
+    { side1: [0, 1, 0], side2: [0, 0, -1], corner: [0, 1, -1] }, // V1: Top, NZ
+    { side1: [0, -1, 0], side2: [0, 0, 1], corner: [0, -1, 1] }, // V2: Bottom, PZ
+    { side1: [0, -1, 0], side2: [0, 0, -1], corner: [0, -1, -1] } // V3: Bottom, NZ
+  ],
+  // Face 1 (-X side)
+  [
+    { side1: [0, 1, 0], side2: [0, 0, -1], corner: [0, 1, -1] }, // V4: Top, NZ
+    { side1: [0, 1, 0], side2: [0, 0, 1], corner: [0, 1, 1] },   // V5: Top, PZ
+    { side1: [0, -1, 0], side2: [0, 0, -1], corner: [0, -1, -1] }, // V6: Bottom, NZ
+    { side1: [0, -1, 0], side2: [0, 0, 1], corner: [0, -1, 1] }  // V7: Bottom, PZ
+  ],
+  // Face 2 (+Y top)
+  [
+    { side1: [-1, 0, 0], side2: [0, 0, -1], corner: [-1, 0, -1] }, // V8: NX, NZ
+    { side1: [1, 0, 0], side2: [0, 0, -1], corner: [1, 0, -1] },   // V9: PX, NZ
+    { side1: [-1, 0, 0], side2: [0, 0, 1], corner: [-1, 0, 1] },   // V10: NX, PZ
+    { side1: [1, 0, 0], side2: [0, 0, 1], corner: [1, 0, 1] }      // V11: PX, PZ
+  ],
+  // Face 3 (-Y bottom)
+  [
+    { side1: [-1, 0, 0], side2: [0, 0, 1], corner: [-1, 0, 1] },   // V12: NX, PZ
+    { side1: [1, 0, 0], side2: [0, 0, 1], corner: [1, 0, 1] },     // V13: PX, PZ
+    { side1: [-1, 0, 0], side2: [0, 0, -1], corner: [-1, 0, -1] }, // V14: NX, NZ
+    { side1: [1, 0, 0], side2: [0, 0, -1], corner: [1, 0, -1] }    // V15: PX, NZ
+  ],
+  // Face 4 (+Z side)
+  [
+    { side1: [-1, 0, 0], side2: [0, 1, 0], corner: [-1, 1, 0] },   // V16: NX, Top
+    { side1: [1, 0, 0], side2: [0, 1, 0], corner: [1, 1, 0] },     // V17: PX, Top
+    { side1: [-1, 0, 0], side2: [0, -1, 0], corner: [-1, -1, 0] }, // V18: NX, Bottom
+    { side1: [1, 0, 0], side2: [0, -1, 0], corner: [1, -1, 0] }    // V19: PX, Bottom
+  ],
+  // Face 5 (-Z side)
+  [
+    { side1: [1, 0, 0], side2: [0, 1, 0], corner: [1, 1, 0] },     // V20: PX, Top
+    { side1: [-1, 0, 0], side2: [0, 1, 0], corner: [-1, 1, 0] },   // V21: NX, Top
+    { side1: [1, 0, 0], side2: [0, -1, 0], corner: [1, -1, 0] },   // V22: PX, Bottom
+    { side1: [-1, 0, 0], side2: [0, -1, 0], corner: [-1, -1, 0] }  // V23: NX, Bottom
+  ]
+];
+
+/**
+ * 计算单个角落的 AO 值 (0-3)
+ * AO = 3 - (side1 + side2 + corner)
+ * 如果 side1 和 side2 都是空气，则忽略 corner (Minecraft 优化逻辑)
+ * @param {boolean} side1 - 侧边 1 是否遮挡
+ * @param {boolean} side2 - 侧边 2 是否遮挡
+ * @param {boolean} corner - 角落是否遮挡
+ * @returns {number} AO 值 (0-3)
+ */
+export function getAOValue(side1, side2, corner) {
+  const s1 = side1 ? 1 : 0;
+  const s2 = side2 ? 1 : 0;
+  // Minecraft 逻辑：只有当侧边存在时才考虑对角
+  const c = (side1 || side2) ? (corner ? 1 : 0) : 0;
+
+  if (s1 && s2) return 0; // 两个侧面都遮挡，AO 为 0 (最暗)
+  return 3 - (s1 + s2 + c);
+}
+
+/**
+ * 计算方块单个面的 4 个角落 AO 值
+ * @param {number} x - 方块世界 X 坐标
+ * @param {number} y - 方块世界 Y 坐标
+ * @param {number} z - 方块世界 Z 坐标
+ * @param {number} faceIdx - 面索引 (0-5: +X, -X, +Y, -Y, +Z, -Z)
+ * @param {Function} isOccludingFn - 判断方块是否遮挡的函数 (x,y,z) => boolean
+ * @returns {Uint8Array} 4 个角落的 AO 值数组
+ */
+export function getAOForFace(x, y, z, faceIdx, isOccludingFn) {
+  const ix = Math.floor(x);
+  const iy = Math.floor(y);
+  const iz = Math.floor(z);
+
+  const aos = new Uint8Array(4).fill(3);
+  const offsets = AO_NEIGHBOR_OFFSETS[faceIdx];
+
+  for (let cornerIdx = 0; cornerIdx < 4; cornerIdx++) {
+    const offset = offsets[cornerIdx];
+    const side1Occ = isOccludingFn(ix + offset.side1[0], iy + offset.side1[1], iz + offset.side1[2]);
+    const side2Occ = isOccludingFn(ix + offset.side2[0], iy + offset.side2[1], iz + offset.side2[2]);
+    const cornerOcc = isOccludingFn(ix + offset.corner[0], iy + offset.corner[1], iz + offset.corner[2]);
+
+    aos[cornerIdx] = getAOValue(side1Occ, side2Occ, cornerOcc);
+  }
+
+  return aos;
+}
+
+/**
+ * 计算方块所有 6 个面的 AO 值（共 24 个顶点）
+ * @param {number} x - 方块世界 X 坐标
+ * @param {number} y - 方块世界 Y 坐标
+ * @param {number} z - 方块世界 Z 坐标
+ * @param {Function} isOccludingFn - 判断方块是否遮挡的函数 (x,y,z) => boolean
+ * @returns {Object} { aoLow: number, aoHigh: number } 打包的 AO 数据
+ */
+export function calculateAOForBlock(x, y, z, isOccludingFn) {
+  let aoLow = 0;
+  let aoHigh = 0;
+
+  // 计算 6 个面的 AO 值
+  for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
+    const aos = getAOForFace(x, y, z, faceIdx, isOccludingFn);
+
+    for (let cornerIdx = 0; cornerIdx < 4; cornerIdx++) {
+      const vertexIdx = faceIdx * 4 + cornerIdx;
+      const aoVal = aos[cornerIdx];
+
+      if (vertexIdx < 12) {
+        // 前 12 个顶点 (0-11) 存储在 aoLow
+        aoLow |= (aoVal << (vertexIdx * 2));
+      } else {
+        // 后 12 个顶点 (12-23) 存储在 aoHigh
+        aoHigh |= (aoVal << ((vertexIdx - 12) * 2));
+      }
+    }
+  }
+
+  return { aoLow, aoHigh };
+}
+
+/**
+ * 打包 24 个 AO 值为两个 32 位整数
+ * @param {Uint8Array} aos - 24 个 AO 值数组 (每个值 0-3)
+ * @returns {Object} { aoLow: number, aoHigh: number }
+ */
+export function packAOData(aos) {
+  if (aos.length !== 24) {
+    throw new Error('AO array must have exactly 24 values');
+  }
+
+  let aoLow = 0;
+  let aoHigh = 0;
+
+  for (let i = 0; i < 24; i++) {
+    const aoVal = aos[i] & 0x03; // 确保值在 0-3 范围内
+
+    if (i < 12) {
+      aoLow |= (aoVal << (i * 2));
+    } else {
+      aoHigh |= (aoVal << ((i - 12) * 2));
+    }
+  }
+
+  return { aoLow, aoHigh };
+}
+
+/**
+ * 解包单个顶点的 AO 值
+ * @param {number} aoLow - 低 12 个顶点的打包 AO 数据
+ * @param {number} aoHigh - 高 12 个顶点的打包 AO 数据
+ * @param {number} vertexIdx - 顶点索引 (0-23)
+ * @returns {number} AO 值 (0-3)
+ */
+export function unpackAOValue(aoLow, aoHigh, vertexIdx) {
+  if (vertexIdx < 0 || vertexIdx > 23) {
+    throw new Error('Vertex index must be between 0 and 23');
+  }
+
+  if (vertexIdx < 12) {
+    return (aoLow >> (vertexIdx * 2)) & 0x03;
+  } else {
+    return (aoHigh >> ((vertexIdx - 12) * 2)) & 0x03;
+  }
+}
+
+/**
+ * 解包所有 24 个顶点的 AO 值
+ * @param {number} aoLow - 低 12 个顶点的打包 AO 数据
+ * @param {number} aoHigh - 高 12 个顶点的打包 AO 数据
+ * @returns {number[]} 24 个 AO 值数组
+ */
+export function unpackAllAO(aoLow, aoHigh) {
+  const aos = new Array(24);
+  for (let i = 0; i < 24; i++) {
+    aos[i] = unpackAOValue(aoLow, aoHigh, i);
+  }
+  return aos;
+}
+
+/**
+ * 判断 AO 是否适用于指定方块类型
+ * @param {string} blockType - 方块类型
+ * @returns {boolean} AO 是否适用
+ */
+export function isAOApplicable(blockType) {
+  if (!blockType) return false;
+
+  const props = getBlockProperties(blockType);
+  // AO 适用于所有实心且不透明的方块
+  return props.isSolid && !props.isTransparent;
+}
+
+/**
+ * 获取 AO 计算的邻居坐标
+ * @param {number} x - 方块 X 坐标
+ * @param {number} y - 方块 Y 坐标
+ * @param {number} z - 方块 Z 坐标
+ * @param {number} faceIdx - 面索引 (0-5)
+ * @param {number} cornerIdx - 角落索引 (0-3)
+ * @returns {Object} { side1: {x,y,z}, side2: {x,y,z}, corner: {x,y,z} }
+ */
+export function getAONeighbors(x, y, z, faceIdx, cornerIdx) {
+  const offsets = AO_NEIGHBOR_OFFSETS[faceIdx][cornerIdx];
+
+  return {
+    side1: { x: x + offsets.side1[0], y: y + offsets.side1[1], z: z + offsets.side1[2] },
+    side2: { x: x + offsets.side2[0], y: y + offsets.side2[1], z: z + offsets.side2[2] },
+    corner: { x: x + offsets.corner[0], y: y + offsets.corner[1], z: z + offsets.corner[2] }
+  };
+}
+
+/**
+ * 验证 AO 值是否合法 (0-3)
+ * @param {number} ao - AO 值
+ * @returns {boolean} 是否合法
+ */
+export function validateAOValue(ao) {
+  return Number.isInteger(ao) && ao >= 0 && ao <= 3;
+}
+
+/**
+ * 验证打包的 AO 数据是否合法
+ * @param {number} aoLow - 低 12 个顶点的打包 AO 数据
+ * @param {number} aoHigh - 高 12 个顶点的打包 AO 数据
+ * @returns {boolean} 是否合法
+ */
+export function validatePackedAO(aoLow, aoHigh) {
+  for (let i = 0; i < 24; i++) {
+    const ao = unpackAOValue(aoLow, aoHigh, i);
+    if (!validateAOValue(ao)) return false;
+  }
+  return true;
+}

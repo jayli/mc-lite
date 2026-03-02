@@ -30,11 +30,11 @@ Single project structure at repository root:
 
 **Purpose**: Project initialization and existing code audit
 
-- [ ] T001 [P] Audit existing AO implementation in src/workers/WorldWorker.js (lines 447-629)
-- [ ] T002 [P] Audit existing AO shader injection in src/core/MaterialManager.js (lines 179-227)
-- [ ] T003 [P] Audit existing BlockData.js AO flags (lines 180-209, 244-248)
-- [ ] T004 Establish performance baseline for current AO computation time
-- [ ] T005 Create specs/018-refactor-ao-shadows/ directory structure for artifacts
+- [X] T001 [P] Audit existing AO implementation in src/workers/WorldWorker.js (lines 447-629)
+- [X] T002 [P] Audit existing AO shader injection in src/core/MaterialManager.js (lines 179-227)
+- [X] T003 [P] Audit existing BlockData.js AO flags (lines 180-209, 244-248)
+- [X] T004 Establish performance baseline for current AO computation time
+- [X] T005 Create specs/018-refactor-ao-shadows/ directory structure for artifacts
 
 ---
 
@@ -44,21 +44,21 @@ Single project structure at repository root:
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T006 [P] Create src/utils/AOUtils.js with AO calculation helper functions
+- [X] T006 [P] Create src/utils/AOUtils.js with AO calculation helper functions
   - packAOData(aos: Uint8Array) → { aoLow, aoHigh }
   - unpackAOValue(aoLow, aoHigh, vertexIdx) → number
   - isAOApplicable(blockType) → boolean
   - getAONeighbors(x, y, z, faceIdx, cornerIdx) → neighbor coordinates
-- [ ] T007 [P] Create src/core/AOSystem.js framework class
+- [X] T007 [P] Create src/core/AOSystem.js framework class
   - Constructor with Worker reference
   - computeChunkAO() method stub
   - computeBlockAO() method stub
   - applyToMesh() method stub
-- [ ] T008 [P] Extend src/workers/FaceCullingWorker.js with AO message handlers
+- [X] T008 [P] Extend src/workers/FaceCullingWorker.js with AO message handlers
   - Add COMPUTE_AO_BATCH message type handler
   - Add COMPUTE_AO_INCREMENTAL message type handler
   - Import AOUtils functions
-- [ ] T009 Update src/constants/BlockData.js to remove explicit isAOEnabled flags
+- [X] T009 Update src/constants/BlockData.js to remove explicit isAOEnabled flags
   - Remove isAOEnabled: true from lines 180-209
   - Update getBlockProperties() to auto-compute: !isTransparent && isSolid
 
@@ -76,39 +76,39 @@ Single project structure at repository root:
 
 > **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
 
-- [ ] T010 [P] [US1] Create test-ao.js with AO calculation unit tests
+- [X] T010 [P] [US1] Create test-ao.js with AO calculation unit tests
   - Test getAOValue() with all 8 neighbor combinations
   - Test packAOData() round-trip (pack → unpack → verify)
   - Test isAOApplicable() for solid+opaque vs transparent blocks
-- [ ] T011 [P] [US1] Create integration test for chunk AO generation in src/tests/test-chunk-ao.js
+- [X] T011 [P] [US1] Create integration test for chunk AO generation in src/tests/test-chunk-ao.js
   - Generate test chunk, verify all solid blocks have AO data
   - Verify transparent blocks excluded from AO
   - Verify AO continuity at chunk boundaries
 
 ### Implementation for User Story 1
 
-- [ ] T012 [P] [US1] Implement AOUtils.getAOValue() in src/utils/AOUtils.js
+- [X] T012 [P] [US1] Implement AOUtils.getAOValue() in src/utils/AOUtils.js
   - Port existing formula from WorldWorker.js line 452-458
   - Preserve Minecraft optimization (corner ignored when both sides air)
-- [ ] T013 [P] [US1] Implement AOUtils.getAO() for single block in src/utils/AOUtils.js
+- [X] T013 [P] [US1] Implement AOUtils.getAO() for single block in src/utils/AOUtils.js
   - Port existing getAO() function from WorldWorker.js lines 461-528
   - Support all 6 faces × 4 corners = 24 vertices
-- [ ] T014 [US1] Implement FaceCullingWorker COMPUTE_AO_BATCH handler in src/workers/FaceCullingWorker.js
+- [X] T014 [US1] Implement FaceCullingWorker COMPUTE_AO_BATCH handler in src/workers/FaceCullingWorker.js
   - Use AOUtils.calculateAOForBlock() for each solid+opaque block
   - Support cross-chunk neighbor lookups via worldChunks parameter
   - Return packed aoLow/aoHigh for each block
-- [ ] T015 [US1] Implement AOSystem.computeChunkAO() in src/core/AOSystem.js
+- [X] T015 [US1] Implement AOSystem.computeChunkAO() in src/core/AOSystem.js
   - Send COMPUTE_AO_BATCH request to Worker
   - Handle AO_RESULT response with Promise
   - Transfer large data via Transferable Objects
-- [ ] T016 [US1] Integrate AO computation into src/world/Chunk.js mergeChunk()
+- [X] T016 [US1] Integrate AO computation into src/world/Chunk.js mergeChunk()
   - Call AOSystem.computeChunkAO() after block data received from WorldWorker
   - Store AO data in chunk.aoData Map
   - Apply AO data to InstancedMesh attributes
-- [ ] T017 [US1] Update src/core/MaterialManager.js to simplify AO detection
+- [X] T017 [US1] Update src/core/MaterialManager.js to simplify AO detection
   - Replace props.isAOEnabled check with: !props.isTransparent && props.isSolid
   - Auto-apply AO shader for all solid+opaque blocks
-- [ ] T018 [US1] Implement dynamic block AO update in src/core/AOSystem.js
+- [X] T018 [US1] Implement dynamic block AO update in src/core/AOSystem.js
   - computeBlockAO() for single block placement/destruction
   - Queue affected neighbors for AO recalculation
   - Debounce rapid updates (player placing multiple blocks)
@@ -128,20 +128,20 @@ Single project structure at repository root:
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T019 [P] [US2] Create test for automatic AO on new block types in src/tests/test-ao.js
+- [X] T019 [P] [US2] Create test for automatic AO on new block types in src/tests/test-ao.js
   - Add temporary test block type to BlockData.js
   - Verify AO data generated without explicit isAOEnabled flag
   - Remove test block type after verification
 
 ### Implementation for User Story 2
 
-- [ ] T020 [P] [US2] Update src/constants/BlockData.js getBlockProperties() helper
+- [X] T020 [P] [US2] Update src/constants/BlockData.js getBlockProperties() helper
   - Ensure auto-computed isAOEnabled logic is correct
   - Add JSDoc comment explaining automatic AO behavior
-- [ ] T021 [US2] Verify src/world/Chunk.js uses isAOApplicable() not explicit flags
+- [X] T021 [US2] Verify src/world/Chunk.js uses isAOApplicable() not explicit flags
   - Check all AO-related code paths
   - Remove any remaining isAOEnabled references
-- [ ] T022 [US2] Update src/core/AOSystem.js to log AO auto-application
+- [X] T022 [US2] Update src/core/AOSystem.js to log AO auto-application
   - Add debug logging when new block type gets AO automatically
   - Include block type name in log for debugging
 - [ ] T023 [US2] Add developer documentation to src/constants/BlockData.js
