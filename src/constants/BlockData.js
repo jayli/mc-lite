@@ -55,23 +55,19 @@ export const BLOCK_DATA = {
   },
   'birch_log': {
     isSolid: true,
-    isTransparent: false,
-    isAOEnabled: false
+    isTransparent: false
   },
   'wood': {
     isSolid: true,
-    isTransparent: false,
-    isAOEnabled: false
+    isTransparent: false
   },
   'sky_wood': {
     isSolid: true,
-    isTransparent: false,
-    isAOEnabled: false
+    isTransparent: false
   },
   'azalea_log': {
     isSolid: true,
-    isTransparent: false,
-    isAOEnabled: false
+    isTransparent: false
   },
   'azalea_leaves': {
     isTransparent: true
@@ -150,28 +146,15 @@ export const BLOCK_DATA = {
   'snow_leaves': {
     isTransparent: true
   },
-  'calcite': {
-    isAOEnabled: false
-  },
-  'end_stone': {
-    isAOEnabled: true
-  },
-  'iron': {
-    isAOEnabled: true
-  },
-  'diamond': {
-    isAOEnabled: true
-  },
-  'obsidian': {
-    isAOEnabled: false
-  },
-  'moss': {
-    isAOEnabled: false
-  },
+  'calcite': {},
+  'end_stone': {},
+  'iron': {},
+  'diamond': {},
+  'obsidian': {},
+  'moss': {},
   'chest': {
     isSolid: true,
-    isTransparent: true,
-    isAOEnabled: false
+    isTransparent: true
   },
   'realistic_trunk_collider': {
     isSolid: true,
@@ -184,14 +167,12 @@ export const BLOCK_DATA = {
     isTransparent: false,
     isRendered: true,
     isShadowEnabled: false,
-    isAOEnabled: false,
     isIndestructible: true  // 不可被 TNT、机枪或玩家破坏
   },
   'playground_center_block': {
     isSolid: true,
     isTransparent: false,
     isRendered: true,
-    isAOEnabled: false,
     isShadowEnabled: false,
     isIndestructible: true  // 不可被 TNT、机枪或玩家破坏
   },
@@ -206,19 +187,16 @@ export const BLOCK_DATA = {
   'planks_step': {
     isSolid: true,
     isTransparent: true,  // 不参与 face culling，相邻面都显示
-    isAOEnabled: false,
     geometryType: 'planks_step'
   },
   'cobblestone_step': {
     isSolid: true,
     isTransparent: true,  // 不参与 face culling，相邻面都显示
-    isAOEnabled: false,
     geometryType: 'cobblestone_step'
   },
   'stone_diorite_step': {
     isSolid: true,
     isTransparent: true,  // 不参与 face culling，相邻面都显示
-    isAOEnabled: false,
     geometryType: 'cobblestone_step'
   },
   'white_planks': { isAOEnabled: true },
@@ -233,8 +211,9 @@ export const BLOCK_DATA = {
 
 /**
  * 获取方块属性的辅助函数
+ * 自动为非透明方块启用AO（环境光遮蔽）
  * @param {string|object} type - 方块类型字符串或对象
- * @returns {Object} 方块属性对象
+ * @returns {Object} 方块属性对象（包含自动计算的isAOEnabled）
  */
 export function getBlockProperties(type) {
   if (!type) return { ...DEFAULT_PROPERTIES };
@@ -249,22 +228,26 @@ export function getBlockProperties(type) {
 
   // 处理动态生成的或带前缀的方块类型（如 'realistic_oak_leaves_1'）
   // 如果完全匹配则直接返回
+  let props;
   if (BLOCK_DATA[typeStr]) {
-    return { ...DEFAULT_PROPERTIES, ...BLOCK_DATA[typeStr] };
+    props = { ...DEFAULT_PROPERTIES, ...BLOCK_DATA[typeStr] };
+  } else if (typeStr.includes('leaves')) {
+    props = { ...DEFAULT_PROPERTIES, ...BLOCK_DATA['leaves'] };
+  } else if (typeStr.includes('glass')) {
+    props = { ...DEFAULT_PROPERTIES, ...BLOCK_DATA['glass_block'] };
+  } else if (typeStr.includes('water')) {
+    props = { ...DEFAULT_PROPERTIES, ...BLOCK_DATA['water'] };
+  } else {
+    props = { ...DEFAULT_PROPERTIES };
   }
 
-  // 模糊匹配特殊类型
-  if (typeStr.includes('leaves')) {
-    return { ...DEFAULT_PROPERTIES, ...BLOCK_DATA['leaves'] };
-  }
-  if (typeStr.includes('glass')) {
-    return { ...DEFAULT_PROPERTIES, ...BLOCK_DATA['glass_block'] };
-  }
-  if (typeStr.includes('water')) {
-    return { ...DEFAULT_PROPERTIES, ...BLOCK_DATA['water'] };
+  // 自动AO逻辑：非透明且实心的方块默认启用AO
+  // 只有当手动设置了isAOEnabled时才使用手动值，否则根据isTransparent和isSolid自动判断
+  if (props.isAOEnabled === undefined) {
+    props.isAOEnabled = !props.isTransparent && props.isSolid;
   }
 
-  return { ...DEFAULT_PROPERTIES };
+  return props;
 }
 
 /**
@@ -301,4 +284,19 @@ export function getNonSolidTypes() {
  */
 export function getAOAllowedTypes() {
   return Object.keys(BLOCK_DATA).filter(type => BLOCK_DATA[type].isAOEnabled);
+}
+
+/**
+ * 获取方块属性（包含自动AO设置）
+ * 所有非透明方块默认启用AO，透明方块不启用AO
+ * @param {string} type - 方块类型
+ * @returns {Object} 包含 isAOEnabled 的完整属性对象
+ */
+export function getBlockProps(type) {
+  const props = getBlockProperties(type);
+  return {
+    ...props,
+    // 非透明方块默认启用AO，透明方块不启用
+    isAOEnabled: !props.isTransparent
+  };
 }

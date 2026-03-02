@@ -434,15 +434,14 @@ onmessage = async function(e) {
   const d = {};
   const solidBlocks = [];
 
-  // 辅助函数：判断指定位置的方块是否遮挡视线
+  // 辅助函数：判断指定位置的方块是否遮挡视线（简化版）
+  // 简化：只有非透明方块才遮挡，透明方块不遮挡
   const isOccluding = (x, y, z) => {
     const k = `${x},${y},${z}`;
     const b = blockMap.get(k);
     if (!b) return false;
-    if (!b.solid) return false;
-    // 如果方块是透明的，则不遮挡视线
-    if (getBlockProperties(b.type).isTransparent) return false;
-    return true;
+    // 简化：只有非透明方块才遮挡
+    return !getBlockProperties(b.type).isTransparent;
   };
 
   /**
@@ -611,8 +610,10 @@ onmessage = async function(e) {
       if (!d[block.type]) d[block.type] = [];
       let aoLow = 0;
       let aoHigh = 0;
+      // 简化AO逻辑：非透明且实心的方块自动启用AO
       const props = getBlockProperties(block.type);
-      if (props.isAOEnabled) {
+      const isAOEnabled = !props.isTransparent && props.isSolid;
+      if (isAOEnabled) {
         for (let f = 0; f < 6; f++) {
           const aos = getAO(block.x, block.y, block.z, f);
           for (let v = 0; v < 4; v++) {
