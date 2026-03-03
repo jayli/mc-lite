@@ -1,59 +1,53 @@
 # Skill: Fix Spec Directory Numbering
 
-Use this skill when the user runs `/fixspec <spec-name>` to fix duplicate or incorrect spec directory numbering.
+Use this skill when the user runs `/fixspec` to fix duplicate or incorrect spec directory numbering.
 
 ## Usage
 
 ```
-/fixspec <spec-name>
+/fixspec [<spec-name>]
 ```
-
-Where `<spec-name>` is the spec directory name with incorrect numbering (e.g., `001-bbb`).
 
 ## Instructions
 
-1. **Validate Input**:
-   - Ensure the user provided a spec directory name
-   - Verify the directory exists under `./specs/`
+### Phase 1: Get Spec Selection
 
-2. **Find Maximum编号**:
-   - List all directories under `./specs/`
-   - Extract directories matching the pattern `NNN-name` (three digits followed by hyphen and name)
-   - Find the maximum编号 value among existing directories
+1. **Execute Shell Script**:
+   - Run: `.claude/skills/fixspec/fixspec-interactive.sh [<spec-name>]`
+   - If `DIRECT_MODE:<name>`: jump to Phase 2 with that spec
+   - If `LIST_MODE`: start interactive selection below
 
-3. **Calculate New编号**:
-   - New编号 = max编号 + 1
-   - Format as three digits (e.g., `004`)
+2. **Interactive Selection (LIST_MODE)**:
+   - Parse specs from script output into an array
+   - Display specs in pages of 3 items each
+   - **Page navigation options**:
+     - Page 1: [spec1, spec2, spec3, "→ 下一页"]
+     - Middle pages: [spec1, spec2, spec3, "→ 下一页" / "← 上一页"]
+     - Last page: [spec1, spec2, spec3 (or less), "← 上一页"]
+   - Use label pattern: `next-N` for next page, `prev-N` for prev page, spec name for selection
+   - When user selects a spec name, proceed to Phase 2
 
-4. **Rename Directory**:
-   - Extract the name part from the input (e.g., `bbb` from `001-bbb`)
-   - Rename `./specs/<old-name>` to `./specs/<new-number>-<name>`
-   - Use `git mv` if the directory is under git version control, otherwise use `mv`
+### Phase 2: Fix Directory Numbering
 
-5. **Update Internal References**:
-   - Recursively search all files in the renamed directory
-   - Replace all occurrences of the old directory name with the new directory name
-   - Also update any references in markdown files that point to the old directory path
+3. **Validate Spec**: Verify directory exists under `./specs/`
 
-6. **Report**:
-   - Inform the user of the renaming performed
-   - List files that were updated with the new references
+4. **Find Maximum 编号**: List all `NNN-name` pattern directories, find max
+
+5. **Calculate New 编号**: New = max + 1, format as `004`
+
+6. **Rename Directory**:
+   - Extract name part (e.g., `bbb` from `001-bbb`)
+   - `git mv ./specs/<old> ./specs/<new>` or `mv` if not in git
+
+7. **Update Internal References**:
+   - Search and replace old directory name → new directory name
+   - Update markdown links, text references, hardcoded paths
+
+8. **Report**: Inform user of renaming and list updated files
 
 ## Example
 
-Given directories: `001-aaa`, `001-bbb`, `002-ccc`, `003-ddd`
-
-Running `/fixspec 001-bbb`:
-- Max编号 is `003`
-- New编号 becomes `004`
-- Rename `001-bbb` to `004-bbb`
-- Update all internal references from `001-bbb` to `004-bbb`
-
-## Implementation Notes
-
-- Use Bash tool for directory operations
-- Parse directory names carefully to handle the `NNN-name` pattern
-- When updating references, consider:
-  - Markdown links: `[text](./001-bbb/file.md)`
-  - Text references in spec files
-  - Any hardcoded paths in code or config files
+```
+/fixspec 001-bbb → rename to 004-bbb
+/fixspec         → interactive selection → rename selected
+```
