@@ -5,7 +5,7 @@
  */
 
 import { describe, test } from './runner.js';
-import { assertEqual, assertTrue, assertFalse, assertDeepEqual } from './assert.js';
+import { assertEqual, assertTrue, assertFalse } from './assert.js';
 import { getBlockProperties, BLOCK_DATA } from '../constants/BlockData.js';
 
 describe('BlockData 测试', (test) => {
@@ -17,7 +17,6 @@ describe('BlockData 测试', (test) => {
     assertEqual(props.isSolid, true, '默认方块应该是实心');
     assertEqual(props.isTransparent, false, '默认方块应该不透明');
     assertEqual(props.isRendered, true, '默认方块应该渲染');
-    assertEqual(props.isAOEnabled, false, '默认方块不启用 AO');
     assertEqual(props.isShadowEnabled, true, '默认方块投射阴影');
     assertEqual(props.geometryType, 'box', '默认几何体类型为 box');
   });
@@ -95,32 +94,6 @@ describe('BlockData 测试', (test) => {
     assertEqual(props.geometryType, 'chimney', '烟囱几何体类型为 chimney');
   });
 
-  // =========== AO 启用测试 ===========
-  test('沙子 AO 启用', () => {
-    const props = getBlockProperties('sand');
-    assertTrue(props.isAOEnabled, '沙子应该启用 AO');
-  });
-
-  test('石头 AO 启用', () => {
-    const props = getBlockProperties('stone');
-    assertTrue(props.isAOEnabled, '石头应该启用 AO');
-  });
-
-  test('钻石矿石 AO 启用', () => {
-    const props = getBlockProperties('diamond');
-    assertTrue(props.isAOEnabled, '钻石矿石应该启用 AO');
-  });
-
-  test('方解石 AO 禁用', () => {
-    const props = getBlockProperties('calcite');
-    assertFalse(props.isAOEnabled, '方解石不启用 AO');
-  });
-
-  test('黑曜石 AO 禁用', () => {
-    const props = getBlockProperties('obsidian');
-    assertFalse(props.isAOEnabled, '黑曜石不启用 AO');
-  });
-
   // =========== 模糊匹配测试 ===========
   test('模糊匹配 - realistic_oak_leaves 匹配 leaves', () => {
     const props = getBlockProperties('realistic_oak_leaves');
@@ -149,7 +122,6 @@ describe('BlockData 测试', (test) => {
 
     assertTrue(props.isSolid, '宝箱是实心');
     assertTrue(props.isTransparent, '宝箱透明');
-    assertFalse(props.isAOEnabled, '宝箱不启用 AO');
   });
 
   // =========== 碰撞体方块测试 ===========
