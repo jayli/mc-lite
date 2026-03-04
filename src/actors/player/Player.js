@@ -624,7 +624,8 @@ export class Player {
     const blocksByDistance = new Map();
     const origin = this.camera.position;
     let totalBlocks = 0;
-    const MAX_MAG7_BLOCKS = 70; // Mag7 一次射击最多销毁方块的上限
+    // 超过 40 就会出现 FrozenMountain 内 AO 渲染失败的情况，原因未知
+    const MAX_MAG7_BLOCKS = 40; // Mag7 一次射击最多销毁方块的上限
 
     for (let d = 1; d <= 10; d += 0.5) {
       const distanceStep = Math.floor((d - 1) / 2);

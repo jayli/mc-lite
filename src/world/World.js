@@ -68,6 +68,10 @@ export class World {
         targetScale: 8.0  // 球体扩张的目标缩放
       });
     }
+
+    // --- 批量 Face Culling 更新定时器 ---
+    // 用于 Mag7、TNT 等批量删除场景，避免 AO 阴影计算丢失
+    this.batchFaceCullingTimeout = null;
   }
 
   /**
@@ -100,6 +104,12 @@ export class World {
         this.scene.remove(chunk.group);
         // 重要：在卸载前请求持久化，确保修改不丢失
         getPersistenceService().saveChunkData(chunk.cx, chunk.cz);
+        // 清理待处理的 Face Culling 更新
+        chunk.pendingBatchFaceCullingUpdates?.clear();
+        if (chunk.batchFaceCullingTimer) {
+          clearTimeout(chunk.batchFaceCullingTimer);
+          chunk.batchFaceCullingTimer = null;
+        }
         chunk.dispose(); // 释放显存
         this.chunks.delete(key);
       }
@@ -171,8 +181,11 @@ export class World {
   /**
    * 批量移除指定位置的方块（用于爆炸或大规模编辑）
    * @param {Array<{x:number, y:number, z:number}>} positions - 待移除方块的世界坐标列表
+   * @param {boolean} isBatch - 是否启用批量模式（默认 true）。启用时，Face Culling 更新会被收集并延迟处理，
+   *                           等待所有区块处理完成后统一调用 processPendingFaceCullingUpdates，
+   *                           避免 Mag7、TNT 等批量删除场景中 AO 阴影计算丢失。
    */
-  removeBlocksBatch(positions) {
+  removeBlocksBatch(positions, isBatch = true) {
     // 将坐标按区块分组，减少跨区块调用次数，提升性能
     const chunkGroups = new Map();
     positions.forEach(p => {
@@ -187,8 +200,25 @@ export class World {
     for (const [key, chunkPosList] of chunkGroups) {
       const chunk = this.chunks.get(key);
       if (chunk) {
-        chunk.removeBlocksBatch(chunkPosList);
+        chunk.removeBlocksBatch(chunkPosList, isBatch);
       }
+    }
+
+    // 批量模式：在所有区块处理完成后，统一触发待处理的 Face Culling 更新
+    // 使用防抖定时器，确保连续多次调用时只在最后一次完成后处理
+    if (isBatch) {
+      if (this.batchFaceCullingTimeout) {
+        clearTimeout(this.batchFaceCullingTimeout);
+      }
+      this.batchFaceCullingTimeout = setTimeout(() => {
+        // 遍历所有区块，处理待更新的 Face Culling
+        this.chunks.forEach(chunk => {
+          if (chunk.processPendingFaceCullingUpdates) {
+            chunk.processPendingFaceCullingUpdates();
+          }
+        });
+        this.batchFaceCullingTimeout = null;
+      }, 100); // 100ms 防抖，等待所有批次完成
     }
   }
 

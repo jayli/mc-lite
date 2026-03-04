@@ -282,6 +282,12 @@ export class Chunk {
     this.isConsolidating = false;    // 是否正在合并中
     this.dynamicMeshes = new Map();  // 存储动态生成的单体 Mesh: Key "x,y,z" -> Mesh
 
+    // --- 批量 Face Culling 更新系统 ---
+    // 用于收集批量删除操作中需要更新 Face Culling 的邻居方块
+    // 在 Mag7、TNT 等批量删除场景中，避免频繁重复计算导致 AO 阴影丢失
+    this.pendingBatchFaceCullingUpdates = new Set(); // 存储待处理的邻居坐标 "x,y,z"
+    this.batchFaceCullingTimer = null; // 批量 Face Culling 更新的防抖定时器
+
     this.gen();                      // 生成区块内容
   }
 
@@ -795,6 +801,15 @@ export class Chunk {
       clearTimeout(this.consolidationTimer);
       this.consolidationTimer = null;
     }
+
+    // 清除批量 Face Culling 更新定时器
+    if (this.batchFaceCullingTimer) {
+      clearTimeout(this.batchFaceCullingTimer);
+      this.batchFaceCullingTimer = null;
+    }
+
+    // 清空待处理的 Face Culling 更新队列
+    this.pendingBatchFaceCullingUpdates.clear();
 
     // 遍历组中的所有子对象
     this.group.children.forEach(c => {
@@ -1495,8 +1510,12 @@ export class Chunk {
   /**
    * 批量移除方块优化
    * @param {Array<{x,y,z}>} positions - 待移除的坐标列表
+   * @param {boolean} isBatch - 是否为批量操作模式。true 时不立即更新 Face Culling，
+   *                           而是将需要更新的邻居收集到 pendingBatchFaceCullingUpdates 中，
+   *                           等待外部统一调用 processPendingFaceCullingUpdates 处理。
+   *                           适用于 Mag7、TNT 等批量删除场景，避免 AO 阴影计算丢失。
    */
-  removeBlocksBatch(positions) {
+  removeBlocksBatch(positions, isBatch = true) {
     if (positions.length === 0) return;
 
     const dummy = new THREE.Matrix4();
@@ -1629,6 +1648,8 @@ export class Chunk {
     }
 
     // 3. 核心修复：更新周围邻居的 Face Culling 状态，让原本隐藏的面显示出来
+    // 关键优化：在批量删除场景（如 Mag7、TNT）中，将需要更新的邻居收集起来，
+    // 等待所有批量操作完成后统一处理，避免 AO 阴影计算丢失
     neighborsToUpdate.forEach(nKey => {
       // 如果邻居本身也在本次删除列表中，跳过
       if (positions.some(p => `${Math.floor(p.x)},${Math.floor(p.y)},${Math.floor(p.z)}` === nKey)) return;
@@ -1640,19 +1661,33 @@ export class Chunk {
       if (nCx === this.cx && nCz === this.cz) {
         // 邻居在当前区块
         if (this.blockData[nKey]) {
-          // 如果邻居存在但不可见（被剔除了），则“唤醒”它
+          // 如果邻居存在但不可见（被剔除了），则”唤醒”它
           if (!this.visibleKeys.has(nKey)) {
             this.addBlockDynamic(nx, ny, nz, this.blockData[nKey]);
           } else {
             // 如果本来就可见，也要重新触发 Face Culling 更新以显示新的暴露面
-            this._triggerFaceCullingUpdate(nx, ny, nz, this.blockData[nKey]);
+            if (isBatch) {
+              // 批量模式：收集到待处理队列，不立即更新
+              this.pendingBatchFaceCullingUpdates.add(nKey);
+              // 启动防抖定时器，在最后一批删除完成后统一处理
+              this._scheduleBatchFaceCullingUpdate();
+            } else {
+              // 非批量模式：立即更新
+              this._triggerFaceCullingUpdate(nx, ny, nz, this.blockData[nKey]);
+            }
           }
         }
       } else {
         // 跨区块邻居处理
         const neighborChunk = this.world.chunks.get(`${nCx},${nCz}`);
         if (neighborChunk && neighborChunk.isReady) {
-          neighborChunk.checkReveal(nx, ny, nz);
+          if (isBatch) {
+            // 批量模式：将跨区块的更新也收集起来
+            this.pendingBatchFaceCullingUpdates.add(nKey);
+            this._scheduleBatchFaceCullingUpdate();
+          } else {
+            neighborChunk.checkReveal(nx, ny, nz);
+          }
         }
       }
     });
@@ -1695,6 +1730,57 @@ export class Chunk {
 
       fcSystem.updateBlock(position, block, getNeighborsOf(x, y, z));
     }
+  }
+
+  /**
+   * 调度批量 Face Culling 更新
+   * 使用防抖定时器，在最后一批删除操作完成后统一处理所有待更新的邻居
+   */
+  _scheduleBatchFaceCullingUpdate() {
+    if (this.batchFaceCullingTimer) {
+      clearTimeout(this.batchFaceCullingTimer);
+    }
+    // 使用与 consolidation 相同的延迟时间
+    this.batchFaceCullingTimer = setTimeout(() => {
+      this.processPendingFaceCullingUpdates();
+    }, CONSOLIDATION_DELAY);
+  }
+
+  /**
+   * 处理所有待处理的批量 Face Culling 更新
+   * 在 Mag7、TNT 等批量删除操作完成后调用，统一更新所有暴露面的 AO 阴影
+   */
+  processPendingFaceCullingUpdates() {
+    if (this.pendingBatchFaceCullingUpdates.size === 0) return;
+
+    // 清除定时器
+    if (this.batchFaceCullingTimer) {
+      clearTimeout(this.batchFaceCullingTimer);
+      this.batchFaceCullingTimer = null;
+    }
+
+    // 处理所有待更新的邻居
+    this.pendingBatchFaceCullingUpdates.forEach(nKey => {
+      const [nx, ny, nz] = nKey.split(',').map(Number);
+      const nCx = Math.floor(nx / CHUNK_SIZE);
+      const nCz = Math.floor(nz / CHUNK_SIZE);
+
+      if (nCx === this.cx && nCz === this.cz) {
+        // 邻居在当前区块
+        if (this.blockData[nKey]) {
+          this._triggerFaceCullingUpdate(nx, ny, nz, this.blockData[nKey]);
+        }
+      } else {
+        // 跨区块邻居处理
+        const neighborChunk = this.world.chunks.get(`${nCx},${nCz}`);
+        if (neighborChunk && neighborChunk.isReady) {
+          neighborChunk.checkReveal(nx, ny, nz);
+        }
+      }
+    });
+
+    // 清空待处理队列
+    this.pendingBatchFaceCullingUpdates.clear();
   }
 
   /**
