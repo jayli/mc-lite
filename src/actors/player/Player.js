@@ -623,11 +623,16 @@ export class Player {
 
     const blocksByDistance = new Map();
     const origin = this.camera.position;
+    let totalBlocks = 0;
+    const MAX_MAG7_BLOCKS = 70; // Mag7 一次射击最多销毁方块的上限
 
     for (let d = 1; d <= 10; d += 0.5) {
       const distanceStep = Math.floor((d - 1) / 2);
       for (let i = -1; i <= 1; i++) {
         for (let j = -1; j <= 1; j++) {
+          // 检查是否已达到上限
+          if (totalBlocks >= MAX_MAG7_BLOCKS) break;
+
           this._tempVector.copy(origin).addScaledVector(dir, d).addScaledVector(right, i).addScaledVector(up, j);
           const bx = Math.floor(this._tempVector.x), by = Math.floor(this._tempVector.y), bz = Math.floor(this._tempVector.z);
           const type = this.world.getBlock(bx, by, bz);
@@ -635,10 +640,15 @@ export class Player {
             const key = `${bx},${by},${bz}`;
             if (!blocksByDistance.has(distanceStep)) blocksByDistance.set(distanceStep, []);
             const group = blocksByDistance.get(distanceStep);
-            if (!group.some(b => b.key === key)) group.push({ x: bx, y: by, z: bz, key: key });
+            if (!group.some(b => b.key === key)) {
+              group.push({ x: bx, y: by, z: bz, key: key });
+              totalBlocks++;
+            }
           }
         }
+        if (totalBlocks >= MAX_MAG7_BLOCKS) break;
       }
+      if (totalBlocks >= MAX_MAG7_BLOCKS) break;
     }
 
     const sortedDistances = Array.from(blocksByDistance.keys()).sort((a, b) => a - b);
@@ -648,21 +658,36 @@ export class Player {
       this._tempVector.set(midBlock.x + 0.5, midBlock.y + 0.5, midBlock.z + 0.5);
       this.spawnParticles(this._tempVector, 'stone');
 
-      // 按距离排序后，逐个销毁方块（而不是成批销毁），确保 AO 计算能跟上
+      // 按距离排序收集所有要销毁的方块
       const allBlocks = [];
       sortedDistances.forEach(dist => {
         const group = blocksByDistance.get(dist);
         allBlocks.push(...group);
       });
 
-      // 逐个方块设置定时器，每个方块间隔 chainDelay 毫秒
-      allBlocks.forEach((block, index) => {
+      // Mag7 射击：使用批量移除模式（类似 TNT 爆炸）
+      // 关键修复：使用 removeBlocksBatch 而不是逐个 removeBlock
+      // 这样可以确保 AO 计算在统一的状态变更后执行，避免状态混乱
+
+      // 分批处理，每批延迟执行，模拟散弹效果但保持批量语义
+      const batchSize = 5; // 每批最多销毁 5 个方块
+      const batchDelay = this.weapon.config.chainDelay || 50;
+
+      for (let i = 0; i < allBlocks.length; i += batchSize) {
+        const batch = allBlocks.slice(i, i + batchSize);
         const timeoutId = setTimeout(() => {
-          this.world.removeBlock(block.x, block.y, block.z);
+          // 过滤掉已经被销毁的方块（可能是之前批次处理的）
+          const validBlocks = batch.filter(b => {
+            const type = this.world.getBlock(b.x, b.y, b.z);
+            return type && type !== 'end_stone' && type !== 'bedrock';
+          });
+          if (validBlocks.length > 0) {
+            this.world.removeBlocksBatch(validBlocks);
+          }
           this.mag7Timeouts = this.mag7Timeouts.filter(id => id !== timeoutId);
-        }, index * this.weapon.config.chainDelay);
+        }, Math.floor(i / batchSize) * batchDelay);
         this.mag7Timeouts.push(timeoutId);
-      });
+      }
     }
 
     this.raycaster.far = 10;
