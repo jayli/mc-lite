@@ -1,6 +1,7 @@
 // src/core/AOSystem.js
 // 统一 AO（环境光遮蔽）计算与管理系统
 
+import * as THREE from 'three';
 import { calculateAOForBlock, isAOApplicable, packAOData, unpackAllAO } from '../utils/AOUtils.js';
 import { getBlockProperties } from '../constants/BlockData.js';
 
@@ -34,8 +35,18 @@ export class AOSystem {
     this.batchQueueTimer = null;
     this.BATCH_DELAY_MS = 16; // 等待 16ms（一帧）来批量处理请求
 
-    // 绑定 Worker 消息处理
-    this._bindWorkerMessages();
+    // AO 更新队列（带 debounce）
+    this.aoUpdateQueue = [];
+    this.aoUpdateTimer = null;
+    this.AO_UPDATE_DEBOUNCE_MS = 100; // 100ms 缓冲，避免扎堆
+    this.pendingMeshCallbacks = new Map(); // 存储 Mesh 回调 { requestId: { mesh, callback } }
+
+    // 绑定 Worker 消息处理（如果提供了 worker）
+    if (this.worker) {
+      this._bindWorkerMessages();
+    } else {
+      console.warn('AOSystem: No worker provided on initialization, will be set later');
+    }
 
     console.log('AOSystem initialized');
   }
@@ -45,39 +56,8 @@ export class AOSystem {
    * @private
    */
   _bindWorkerMessages() {
-    if (!this.worker) {
-      console.warn('AOSystem: No worker provided, AO computation will be disabled');
-      return;
-    }
-
-    this.worker.onmessage = (e) => {
-      const { type, messageType, data, id, error } = e.data;
-
-      if (type === 'AO_RESULT' || messageType === 'COMPUTE_AO_BATCH' || messageType === 'COMPUTE_AO_INCREMENTAL') {
-        const request = this.pendingRequests.get(id);
-        if (request) {
-          const duration = performance.now() - request.startTime;
-          this.stats.totalComputed += (data.aoData?.length || 0);
-          this.stats.totalDuration += duration;
-          this.stats.averageDuration = this.stats.totalDuration / (this.stats.batchRequests + this.stats.incrementalRequests);
-
-          request.resolve({
-            ...data,
-            duration
-          });
-          this.pendingRequests.delete(id);
-          this.stats.pendingRequests = this.pendingRequests.size;
-        }
-      } else if (type === 'AO_ERROR' || error) {
-        const request = this.pendingRequests.get(id);
-        if (request) {
-          request.reject(new Error(error?.message || 'AO computation failed'));
-          this.pendingRequests.delete(id);
-          this.stats.errors++;
-          this.stats.pendingRequests = this.pendingRequests.size;
-        }
-      }
-    };
+    // 注意：WorkerManager 中已经接管了消息处理
+    // 这个方法保留用于独立运行 AOSystem 的情况
   }
 
   /**
@@ -252,6 +232,130 @@ export class AOSystem {
   }
 
   /**
+   * 将 AO 数据应用到动态单体 Mesh
+   * @param {THREE.Mesh} mesh - 单体网格
+   * @param {number} aoLow - 低 12 个顶点的 AO 打包数据
+   * @param {number} aoHigh - 高 12 个顶点的 AO 打包数据
+   */
+  applyToDynamicMesh(mesh, aoLow, aoHigh) {
+    if (!mesh || !mesh.geometry) return;
+
+    const count = mesh.geometry.attributes.position?.count || 0;
+    if (count === 0) return;
+
+    // 创建或更新 AO 属性
+    const aoLowArray = new Float32Array(count);
+    const aoHighArray = new Float32Array(count);
+    aoLowArray.fill(aoLow);
+    aoHighArray.fill(aoHigh);
+
+    let aoLowAttr = mesh.geometry.getAttribute('aAoLow');
+    let aoHighAttr = mesh.geometry.getAttribute('aAoHigh');
+
+    if (!aoLowAttr) {
+      mesh.geometry.setAttribute('aAoLow', new THREE.BufferAttribute(aoLowArray, 1));
+    } else {
+      aoLowAttr.array.set(aoLowArray);
+      aoLowAttr.needsUpdate = true;
+    }
+
+    if (!aoHighAttr) {
+      mesh.geometry.setAttribute('aAoHigh', new THREE.BufferAttribute(aoHighArray, 1));
+    } else {
+      aoHighAttr.array.set(aoHighArray);
+      aoHighAttr.needsUpdate = true;
+    }
+  }
+
+  /**
+   * 计算并更新单个动态方块的 AO（直接同步方法）
+   * @param {Object} position - 方块位置 {x, y, z}
+   * @param {string} blockType - 方块类型
+   * @param {Object} blockData - 周围方块数据
+   * @param {THREE.Mesh} mesh - 要更新的 Mesh
+   */
+  updateDynamicMeshAO(position, blockType, blockData, mesh) {
+    if (!this.worker || !mesh) return;
+
+    const requestId = ++this.requestId;
+
+    // 注册回调
+    if (!this.pendingMeshCallbacks) this.pendingMeshCallbacks = new Map();
+    this.pendingMeshCallbacks.set(requestId, {
+      mesh: mesh,
+      callback: (aoResult) => {
+        this.applyToDynamicMesh(mesh, aoResult.aoLow, aoResult.aoHigh);
+      }
+    });
+
+    const workerRequest = {
+      type: 'COMPUTE_AO_INCREMENTAL',
+      id: requestId,
+      data: {
+        position: position,
+        operation: 'PLACE',
+        blockType: blockType,
+        neighborhoodRadius: 1,
+        blockData: blockData
+      }
+    };
+
+    this.stats.incrementalRequests++;
+    this.worker.postMessage(workerRequest);
+  }
+
+  /**
+   * 批量更新邻居 AO（用于批量删除后）
+   * @param {Array} positions - 位置数组 [{x, y, z}]
+   * @param {Object} blockData - 方块数据
+   * @param {Object} chunk - 区块引用
+   */
+  scheduleNeighborAOUpdates(positions, blockData, chunk) {
+    // 收集所有受影响的邻居方块
+    const affectedPositions = new Set();
+
+    for (const pos of positions) {
+      const { x, y, z } = pos;
+      // 添加周围 3x3x3 范围内的实心方块
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dz = -1; dz <= 1; dz++) {
+            if (dx === 0 && dy === 0 && dz === 0) continue;
+            const nx = x + dx, ny = y + dy, nz = z + dz;
+            const key = `${nx},${ny},${nz}`;
+            const type = blockData[key];
+            if (type && isAOApplicable(type)) {
+              affectedPositions.add(key);
+            }
+          }
+        }
+      }
+    }
+
+    // 对每个受影响的方块，更新其 AO
+    for (const key of affectedPositions) {
+      const [x, y, z] = key.split(',').map(Number);
+      const mesh = chunk.dynamicMeshes?.get(key);
+      if (mesh) {
+        // 收集这个方块周围的 blockData
+        const localBlockData = {};
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dz = -1; dz <= 1; dz++) {
+              const nkey = `${x + dx},${y + dy},${z + dz}`;
+              if (blockData[nkey]) {
+                localBlockData[nkey] = blockData[nkey];
+              }
+            }
+          }
+        }
+
+        this.updateDynamicMeshAO({ x, y, z }, blockData[key], localBlockData, mesh);
+      }
+    }
+  }
+
+  /**
    * 获取性能统计信息
    * @returns {Object} 性能统计
    */
@@ -283,6 +387,7 @@ export class AOSystem {
       request.reject(new Error('AOSystem disposed'));
     }
     this.pendingRequests.clear();
+    this.pendingMeshCallbacks.clear();
 
     // 清除批处理队列
     if (this.batchQueueTimer) {
@@ -290,6 +395,13 @@ export class AOSystem {
       this.batchQueueTimer = null;
     }
     this.batchQueue = [];
+
+    // 清除 AO 更新队列
+    if (this.aoUpdateTimer) {
+      clearTimeout(this.aoUpdateTimer);
+      this.aoUpdateTimer = null;
+    }
+    this.aoUpdateQueue = [];
 
     console.log('AOSystem disposed');
   }
@@ -397,9 +509,3 @@ export class AOSystem {
     };
   }
 }
-
-// 导入 THREE.js（延迟导入，避免循环依赖）
-import * as THREE from 'three';
-
-// 导出单例（可选）
-export const aoSystem = null; // 需要时由外部初始化
