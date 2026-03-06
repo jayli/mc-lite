@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import { getBlockProperties } from '../constants/BlockData.js';
 import { getStructureRenderDist } from '../utils/StructureUtils.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
-import { CONSOLIDATION_DELAY, geomMap } from './ChunkConsolidation.js';
+import { CONSOLIDATION_DELAY } from './ChunkConsolidation.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getFaceCullingSystem = () => globalThis._faceCullingSystem || faceCullingSystem;
