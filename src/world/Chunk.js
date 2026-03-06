@@ -16,6 +16,10 @@ import { getRotationAngle, parseBlockEntry, serializeBlockEntry } from '../utils
 import { StructureUtils, getStructureRenderDist, belongsToStructure } from '../utils/StructureUtils.js';
 import { faceCullingWorker, faceCullingCallbacks, aoSystem } from '../core/WorkerManager.js';
 import { createOcclusionChecker, computeBlockAOPacked, isAOApplicable } from '../utils/AOUtils.js';
+import { extendChunk as extendWithConsolidation } from './ChunkConsolidation.js';
+import { extendChunk as extendWithGenerator } from './ChunkGenerator.js';
+import { extendChunk as extendWithPersistence } from './ChunkPersistence.js';
+import { extendChunk as extendWithRenderUtils } from './ChunkRenderUtils.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
@@ -1792,3 +1796,9 @@ export class Chunk {
     this.removeBlock(x, y, z);
   }
 }
+
+// 扩展Chunk类功能
+extendWithConsolidation(Chunk);
+extendWithGenerator(Chunk);
+extendWithPersistence(Chunk);
+extendWithRenderUtils(Chunk);
