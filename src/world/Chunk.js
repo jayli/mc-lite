@@ -131,16 +131,6 @@ export class Chunk {
     this.group.clear();
   }
 
-  /**
-   * 防抖保存区块数据
-   */
-  saveDebounced() {
-    if (this.saveTimeout) clearTimeout(this.saveTimeout);
-    this.saveTimeout = setTimeout(() => {
-      getPersistenceService().saveChunkData(this.cx, this.cz);
-      this.saveTimeout = null;
-    }, 500);
-  }
 
   // ============================================================
   // addBlockDynamic 辅助方法
