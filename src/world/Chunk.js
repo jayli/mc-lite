@@ -5,16 +5,12 @@
  */
 import * as THREE from 'three';
 import { materials } from '../core/MaterialManager.js';
-import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { persistenceService } from '../services/PersistenceService.js';
-import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
-import { carModel, gunManModel } from '../core/Engine.js';
 import { getBlockProperties } from '../constants/BlockData.js';
-import { getRotationAngle, parseBlockEntry, serializeBlockEntry } from '../utils/OrientationUtils.js';
-import { StructureUtils, getStructureRenderDist, belongsToStructure } from '../utils/StructureUtils.js';
-import { faceCullingWorker, faceCullingCallbacks, aoSystem } from '../core/WorkerManager.js';
-import { createOcclusionChecker, computeBlockAOPacked, isAOApplicable } from '../utils/AOUtils.js';
+import { getRotationAngle, parseBlockEntry } from '../utils/OrientationUtils.js';
+import { getStructureRenderDist, belongsToStructure } from '../utils/StructureUtils.js';
+import { createOcclusionChecker, computeBlockAOPacked } from '../utils/AOUtils.js';
 import { extendChunk as extendWithConsolidation, CHUNK_SIZE, geomMap } from './ChunkConsolidation.js';
 import { extendChunk as extendWithGenerator } from './ChunkGenerator.js';
 import { extendChunk as extendWithPersistence } from './ChunkPersistence.js';
@@ -24,18 +20,18 @@ import { extendChunk as extendWithRenderUtils } from './ChunkRenderUtils.js';
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
 const getFaceCullingSystem = () => globalThis._faceCullingSystem || faceCullingSystem;
 const getMaterials = () => globalThis._materials || materials;
-const getCarModel = () => globalThis._carModel || carModel;
-const getGunManModel = () => globalThis._gunManModel || gunManModel;
 
-// 获取方块属性函数 - 优先使用测试环境的模拟
+/**
+ * 获取方块属性函数 - 优先使用测试环境的模拟
+ * @param {string} type - 方块类型
+ * @returns {Object} 方块属性对象
+ */
 function getBlockProps(type) {
   if (globalThis._blockData && typeof globalThis._blockData.getBlockProperties === 'function') {
     return globalThis._blockData.getBlockProperties(type);
   }
   return getBlockProperties(type);
 }
-
-
 
 /**
  * 区块类 - 负责单个区块的生成、管理和渲染
@@ -50,52 +46,43 @@ export class Chunk {
    * @param {World} world - 对所属 World 实例的引用，用于跨区块通信和资源访问
    */
   constructor(cx, cz, world) {
-    this.cx = cx;                    // 区块的X坐标
-    this.cz = cz;                    // 区块的Z坐标
-    this.world = world;              // 世界引用
-    this.group = new THREE.Group();  // Three.js 组，包含区块内所有网格
-    this.keys = [];                  // 区块标识符（当前未使用）
-    this.solidBlocks = new Set();    // 实心方块的集合，用于碰撞检测
-    this.blockData = {};             // 全量方块类型数据
-    this.visibleKeys = new Set();    // 当前已渲染方块的 Key 集合
-    this.isReady = false;            // 区块是否已完成生成
-    this.instanceIndexMap = new Map(); // Key: "type" -> Map("x,y,z" -> index)
-    this.saveTimeout = null;         // 用于防抖保存
+    // 基础属性
+    this.cx = cx;
+    this.cz = cz;
+    this.world = world;
+    this.group = new THREE.Group();
+    this.isReady = false;
 
-    // 存储实体数据，用于合并优化
-    this.entities = {
-      realisticTrees: [],
-      modGunMan: [],
-      rovers: []
-    };
+    // 数据存储
+    this.blockData = {};
+    this.solidBlocks = new Set();
+    this.visibleKeys = new Set();
+    this.instanceIndexMap = new Map();
 
-    // 存储结构中心点列表，用于跨 Chunk 碰撞体生成
+    // 实体与结构数据
+    this.entities = { realisticTrees: [], modGunMan: [], rovers: [] };
     this.structureCenters = [];
-    this._tempOriginalSolidBlocks = null; // 临时存储 Worker 原始返回的 solidBlocks
+    this._tempOriginalSolidBlocks = null;
 
-    // --- 后台合并系统 (Background Consolidation) ---
-    this.dirtyBlocks = 0;            // 未优化的动态方块计数
-    this.consolidationTimer = null;  // 合并防抖定时器
-    this.isConsolidating = false;    // 是否正在合并中
-    this.dynamicMeshes = new Map();  // 存储动态生成的单体 Mesh: Key "x,y,z" -> Mesh
+    // 后台合并系统
+    this.dirtyBlocks = 0;
+    this.consolidationTimer = null;
+    this.isConsolidating = false;
+    this.dynamicMeshes = new Map();
 
-    // --- 批量 Face Culling 更新系统 ---
-    // 用于收集批量删除操作中需要更新 Face Culling 的邻居方块
-    // 在 Mag7、TNT 等批量删除场景中，避免频繁重复计算导致 AO 阴影丢失
-    this.pendingBatchFaceCullingUpdates = new Set(); // 存储待处理的邻居坐标 "x,y,z"
-    this.batchFaceCullingTimer = null; // 批量 Face Culling 更新的防抖定时器
+    // 批量 Face Culling 更新系统
+    this.pendingBatchFaceCullingUpdates = new Set();
+    this.batchFaceCullingTimer = null;
 
-    this.gen();                      // 生成区块内容
+    // 持久化
+    this.saveTimeout = null;
+
+    // 启动区块生成
+    this.gen();
   }
 
-
-
-
-
-
-
   // ============================================================
-  // addBlockDynamic 辅助方法
+  // 私有辅助方法
   // ============================================================
 
   /**
@@ -112,8 +99,7 @@ export class Chunk {
 
     if (isInChunk) return true;
 
-    // 检查是否属于当前 Chunk 负责的结构
-    if (this.structureCenters && this.structureCenters.length > 0) {
+    if (this.structureCenters?.length > 0) {
       return belongsToStructure(x, y, z, this.structureCenters);
     }
 
@@ -351,11 +337,9 @@ export class Chunk {
     let material = getMaterials().getMaterial(type);
 
     if (material) {
-      if (Array.isArray(material)) {
-        material = material.map(m => m.clone());
-      } else {
-        material = material.clone();
-      }
+      material = Array.isArray(material)
+        ? material.map(m => m.clone())
+        : material.clone();
     }
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -365,13 +349,11 @@ export class Chunk {
     mesh.frustumCulled = false;
 
     // 设置 AO 属性
-    // AO 适用于所有实心且不透明的方块
     if (props.isSolid && !props.isTransparent) {
       mesh.geometry = geometry.clone();
       const count = mesh.geometry.attributes.position.count;
 
       // 计算 AO（同步计算，确保 FrozenMountain 山体内 AO 正确显示）
-      // 创建遮挡检测函数（封装 Chunk 边界处理和未加载区域的默认行为）
       const isOccluding = createOcclusionChecker(
         { chunk: this, chunks: this.world.chunks },
         CHUNK_SIZE,
@@ -396,6 +378,10 @@ export class Chunk {
 
     return mesh;
   }
+
+  // ============================================================
+  // 公共 API
+  // ============================================================
 
   /**
    * 动态添加单个方块（与批量生成相对）
@@ -434,7 +420,7 @@ export class Chunk {
     const getNeighborBlock = (nx, ny, nz) => {
       const cx = Math.floor(nx / 16);
       const cz = Math.floor(nz / 16);
-      let chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(`${cx},${cz}`);
+      const chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(`${cx},${cz}`);
       if (!chunk || !chunk.isReady) return null;
       const nKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
       const nEntry = chunk.blockData[nKey];
@@ -459,11 +445,9 @@ export class Chunk {
       const neighbors = getNeighborsOf(x, y, z);
       mask = fcSystem.calculateFaceVisibility(block, neighbors);
 
-      if (mask === 0 && !fcSystem.isTransparent(type)) {
-        this.visibleKeys.delete(key);
-      } else {
-        this.visibleKeys.add(key);
-      }
+      mask === 0 && !fcSystem.isTransparent(type)
+        ? this.visibleKeys.delete(key)
+        : this.visibleKeys.add(key);
     }
 
     // 7. 移除旧的渲染网格
@@ -508,6 +492,9 @@ export class Chunk {
 
   /**
    * 检查指定位置是否是隐藏方块，如果是则显示它
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
    */
   checkReveal(x, y, z) {
     const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
@@ -550,7 +537,6 @@ export class Chunk {
     return parseBlockEntry(entry);
   }
 
-
   /**
    * 获取结构类型的渲染距离
    * @param {string} type - 结构类型
@@ -588,17 +574,14 @@ export class Chunk {
       if (oldEntry) {
         // 解析方块类型，兼容新旧格式
         const oldParsed = typeof oldEntry === 'string' ? { type: oldEntry, orientation: 0 } : parseBlockEntry(oldEntry);
-        affectedTypes.add(oldParsed.type); // 存储类型字符串，而不是完整对象
-        // this.blockData[key] = 'air';
+        affectedTypes.add(oldParsed.type);
         delete this.blockData[key];
         this.visibleKeys.delete(key);
         this.solidBlocks.delete(key);
         getPersistenceService().recordChange(px, py, pz, 'air');
 
         // 收集周围 6 个方向的邻居坐标
-        const offsets = [
-          [1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]
-        ];
+        const offsets = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
         offsets.forEach(([dx, dy, dz]) => {
           const nx = px + dx;
           const ny = py + dy;
@@ -653,7 +636,7 @@ export class Chunk {
           if (updated) child.instanceMatrix.needsUpdate = true;
         }
       } else if (child.userData.isEntity) {
-        // --- 处理实体批量移除逻辑 (如 TNT 爆炸) ---
+        // 处理实体批量移除逻辑 (如 TNT 爆炸)
         if (child.userData.collisionBlocks) {
           const isHit = child.userData.collisionBlocks.some(b =>
             positions.some(p =>
@@ -696,7 +679,6 @@ export class Chunk {
             else child.material.dispose();
           }
           this.group.remove(child);
-          // 注意：这里不 break，继续检查是否有其他 mesh 在同一位置
         }
       }
     }
@@ -715,7 +697,7 @@ export class Chunk {
       if (nCx === this.cx && nCz === this.cz) {
         // 邻居在当前区块
         if (this.blockData[nKey]) {
-          // 如果邻居存在但不可见（被剔除了），则”唤醒”它
+          // 如果邻居存在但不可见（被剔除了），则"唤醒"它
           if (!this.visibleKeys.has(nKey)) {
             this.addBlockDynamic(nx, ny, nz, this.blockData[nKey]);
           } else {
@@ -753,9 +735,6 @@ export class Chunk {
     // 5. 触发持久化刷新 (防抖)
     this.saveDebounced();
   }
-
-
-
 
   /**
    * 移除方块
