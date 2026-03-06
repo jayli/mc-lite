@@ -247,3 +247,63 @@ export function validatePackedAO(aoLow, aoHigh) {
   }
   return true;
 }
+
+/**
+ * 创建 Chunk 环境下的遮挡检测函数
+ * 封装 Chunk 特定的边界处理和未加载区域的默认行为
+ * @param {Object} world - World 实例，用于访问其他 chunks
+ * @param {number} CHUNK_SIZE - 区块尺寸
+ * @param {Function} getBlockPropsFn - 获取方块属性的函数
+ * @returns {Function} isOccluding 函数 (x, y, z) => boolean
+ */
+export function createOcclusionChecker(world, CHUNK_SIZE, getBlockPropsFn) {
+  /**
+   * 判断指定坐标的方块是否遮挡光线
+   * @param {number} ox - 世界坐标 X
+   * @param {number} oy - 世界坐标 Y
+   * @param {number} oz - 世界坐标 Z
+   * @returns {boolean} 是否遮挡
+   */
+  return function isOccluding(ox, oy, oz) {
+    const cx = Math.floor(ox / CHUNK_SIZE);
+    const cz = Math.floor(oz / CHUNK_SIZE);
+    let chunk = (cx === world.chunk.cx && cz === world.chunk.cz)
+      ? world.chunk
+      : world.chunks.get(`${cx},${cz}`);
+
+    // 邻居 Chunk 不存在，默认为实体 (遮挡)，避免死白
+    if (!chunk) return true;
+
+    const key = `${Math.floor(ox)},${Math.floor(oy)},${Math.floor(oz)}`;
+    const entry = chunk.blockData[key];
+
+    if (entry) {
+      const type = typeof entry === 'string' ? entry : entry.type;
+      const props = getBlockPropsFn(type);
+      return props.isSolid && !props.isTransparent;
+    }
+
+    // blockData 中没有该方块
+    if (chunk.isReady) {
+      // Chunk 已加载完成且没有该记录 -> 确实是空气
+      return false;
+    } else {
+      // Chunk 未加载完成且没有该记录 -> 未知区域
+      // 在山体和地下默认为实体遮挡，视觉效果更好
+      return true;
+    }
+  };
+}
+
+/**
+ * 计算动态方块的 AO 数据（打包格式）
+ * 封装完整的 AO 计算流程，用于动态方块网格创建
+ * @param {number} x - 方块世界 X 坐标
+ * @param {number} y - 方块世界 Y 坐标
+ * @param {number} z - 方块世界 Z 坐标
+ * @param {Function} isOccludingFn - 遮挡检测函数
+ * @returns {Object} { aoLow: number, aoHigh: number } 打包的 AO 数据
+ */
+export function computeBlockAOPacked(x, y, z, isOccludingFn) {
+  return calculateAOForBlock(x, y, z, isOccludingFn);
+}

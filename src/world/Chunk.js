@@ -15,6 +15,7 @@ import { getBlockProperties } from '../constants/BlockData.js';
 import { getRotationAngle, parseBlockEntry, serializeBlockEntry } from '../utils/OrientationUtils.js';
 import { StructureUtils, getStructureRenderDist, belongsToStructure } from '../utils/StructureUtils.js';
 import { faceCullingWorker, faceCullingCallbacks, aoSystem } from '../core/WorkerManager.js';
+import { createOcclusionChecker, computeBlockAOPacked, isAOApplicable } from '../utils/AOUtils.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
@@ -1102,106 +1103,18 @@ export class Chunk {
       const count = mesh.geometry.attributes.position.count;
 
       // 计算 AO（同步计算，确保 FrozenMountain 山体内 AO 正确显示）
+      // 创建遮挡检测函数（封装 Chunk 边界处理和未加载区域的默认行为）
+      const isOccluding = createOcclusionChecker(
+        { chunk: this, chunks: this.world.chunks },
+        CHUNK_SIZE,
+        getBlockProps
+      );
+
+      // 计算 AO 数据（打包格式）
+      const { aoLow, aoHigh } = computeBlockAOPacked(x, y, z, isOccluding);
+
       const aoLowArray = new Float32Array(count);
       const aoHighArray = new Float32Array(count);
-
-      // 辅助函数：判断是否遮挡
-      const isOccluding = (ox, oy, oz) => {
-        const cx = Math.floor(ox / CHUNK_SIZE);
-        const cz = Math.floor(oz / CHUNK_SIZE);
-        let chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(`${cx},${cz}`);
-
-        // 核心修复：即使 Chunk 未 Ready，只要 blockData 中有数据，就应该使用
-        if (!chunk) return true; // 邻居 Chunk 不存在，默认为实体(遮挡)，避免死白
-
-        const key = `${Math.floor(ox)},${Math.floor(oy)},${Math.floor(oz)}`;
-        const entry = chunk.blockData[key];
-
-        if (entry) {
-          const type = typeof entry === 'string' ? entry : entry.type;
-          const p = getBlockProps(type);
-          return p.isSolid && !p.isTransparent;
-        }
-
-        // 如果 blockData 中没有该方块
-        if (chunk.isReady) {
-           // Chunk 已加载完成且没有该记录 -> 确实是空气
-           return false;
-        } else {
-           // Chunk 未加载完成且没有该记录 -> 未知区域
-           // 在这种情况下，默认为实体(遮挡)通常比默认为空气(发光)视觉效果更好
-           // 尤其是在山体和地下
-           return true;
-        }
-      };
-
-      // 辅助函数：计算 AO 值 (0-3)
-      const getAOValue = (side1, side2, corner) => {
-        const s1 = side1 ? 1 : 0;
-        const s2 = side2 ? 1 : 0;
-        const c = (side1 || side2) ? (corner ? 1 : 0) : 0;
-        if (s1 && s2) return 0;
-        return 3 - (s1 + s2 + c);
-      };
-
-      // 计算每个面的 AO
-      const getAO = (faceIdx) => {
-        const ix = Math.floor(x);
-        const iy = Math.floor(y);
-        const iz = Math.floor(z);
-        const aos = new Uint8Array(4).fill(3);
-
-        if (faceIdx === 0) { // px (+X side)
-          aos[0] = getAOValue(isOccluding(ix+1, iy+1, iz), isOccluding(ix+1, iy, iz+1), isOccluding(ix+1, iy+1, iz+1));
-          aos[1] = getAOValue(isOccluding(ix+1, iy+1, iz), isOccluding(ix+1, iy, iz-1), isOccluding(ix+1, iy+1, iz-1));
-          aos[2] = getAOValue(isOccluding(ix+1, iy-1, iz), isOccluding(ix+1, iy, iz+1), isOccluding(ix+1, iy-1, iz+1));
-          aos[3] = getAOValue(isOccluding(ix+1, iy-1, iz), isOccluding(ix+1, iy, iz-1), isOccluding(ix+1, iy-1, iz-1));
-        } else if (faceIdx === 1) { // nx (-X side)
-          aos[0] = getAOValue(isOccluding(ix-1, iy+1, iz), isOccluding(ix-1, iy, iz-1), isOccluding(ix-1, iy+1, iz-1));
-          aos[1] = getAOValue(isOccluding(ix-1, iy+1, iz), isOccluding(ix-1, iy, iz+1), isOccluding(ix-1, iy+1, iz+1));
-          aos[2] = getAOValue(isOccluding(ix-1, iy-1, iz), isOccluding(ix-1, iy, iz-1), isOccluding(ix-1, iy-1, iz-1));
-          aos[3] = getAOValue(isOccluding(ix-1, iy-1, iz), isOccluding(ix-1, iy, iz+1), isOccluding(ix-1, iy-1, iz+1));
-        } else if (faceIdx === 2) { // py (+Y top)
-          aos[0] = getAOValue(isOccluding(ix-1, iy+1, iz), isOccluding(ix, iy+1, iz-1), isOccluding(ix-1, iy+1, iz-1));
-          aos[1] = getAOValue(isOccluding(ix+1, iy+1, iz), isOccluding(ix, iy+1, iz-1), isOccluding(ix+1, iy+1, iz-1));
-          aos[2] = getAOValue(isOccluding(ix-1, iy+1, iz), isOccluding(ix, iy+1, iz+1), isOccluding(ix-1, iy+1, iz+1));
-          aos[3] = getAOValue(isOccluding(ix+1, iy+1, iz), isOccluding(ix, iy+1, iz+1), isOccluding(ix+1, iy+1, iz+1));
-        } else if (faceIdx === 3) { // ny (-Y bottom)
-          aos[0] = getAOValue(isOccluding(ix-1, iy-1, iz), isOccluding(ix, iy-1, iz+1), isOccluding(ix-1, iy-1, iz+1));
-          aos[1] = getAOValue(isOccluding(ix+1, iy-1, iz), isOccluding(ix, iy-1, iz+1), isOccluding(ix+1, iy-1, iz+1));
-          aos[2] = getAOValue(isOccluding(ix-1, iy-1, iz), isOccluding(ix, iy-1, iz-1), isOccluding(ix-1, iy-1, iz-1));
-          aos[3] = getAOValue(isOccluding(ix+1, iy-1, iz), isOccluding(ix, iy-1, iz-1), isOccluding(ix+1, iy-1, iz-1));
-        } else if (faceIdx === 4) { // pz (+Z side)
-          aos[0] = getAOValue(isOccluding(ix-1, iy, iz+1), isOccluding(ix, iy+1, iz+1), isOccluding(ix-1, iy+1, iz+1));
-          aos[1] = getAOValue(isOccluding(ix+1, iy, iz+1), isOccluding(ix, iy+1, iz+1), isOccluding(ix+1, iy+1, iz+1));
-          aos[2] = getAOValue(isOccluding(ix-1, iy, iz+1), isOccluding(ix, iy-1, iz+1), isOccluding(ix-1, iy-1, iz+1));
-          aos[3] = getAOValue(isOccluding(ix+1, iy, iz+1), isOccluding(ix, iy-1, iz+1), isOccluding(ix+1, iy-1, iz+1));
-        } else if (faceIdx === 5) { // nz (-Z side)
-          aos[0] = getAOValue(isOccluding(ix+1, iy, iz-1), isOccluding(ix, iy+1, iz-1), isOccluding(ix+1, iy+1, iz-1));
-          aos[1] = getAOValue(isOccluding(ix-1, iy, iz-1), isOccluding(ix, iy+1, iz-1), isOccluding(ix-1, iy+1, iz-1));
-          aos[2] = getAOValue(isOccluding(ix+1, iy, iz-1), isOccluding(ix, iy-1, iz-1), isOccluding(ix+1, iy-1, iz-1));
-          aos[3] = getAOValue(isOccluding(ix-1, iy, iz-1), isOccluding(ix, iy-1, iz-1), isOccluding(ix-1, iy-1, iz-1));
-        }
-        return aos;
-      };
-
-      let aoLow = 0;
-      let aoHigh = 0;
-      for (let f = 0; f < 6; f++) {
-        const aos = getAO(f);
-        for (let v = 0; v < 4; v++) {
-          const vertexIdx = f * 4 + v;
-          if (vertexIdx < count) { // 安全检查
-             const aoVal = aos[v];
-             if (vertexIdx < 12) aoLow |= (aoVal << (vertexIdx * 2));
-             else aoHigh |= (aoVal << ((vertexIdx - 12) * 2));
-          }
-        }
-      }
-
-      // 将计算出的打包值填充给所有顶点
-      aoLowArray.fill(aoLow);
-      aoHighArray.fill(aoHigh);
 
       mesh.geometry.setAttribute('aAoLow', new THREE.BufferAttribute(aoLowArray, 1));
       mesh.geometry.setAttribute('aAoHigh', new THREE.BufferAttribute(aoHighArray, 1));
