@@ -3,23 +3,183 @@
  * 负责动态方块的合并优化、InstancedMesh生成等功能
  */
 import * as THREE from 'three';
-import { WORLD_CONFIG, CHUNK_SIZE } from '../utils/MathUtils.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { getBlockProperties as getBlockProps } from '../constants/BlockData.js';
 import { belongsToStructure } from '../utils/StructureUtils.js';
-import { geomMap } from './Chunk.js';
+
+// 区块大小常量
+export const CHUNK_SIZE = 16;
 
 // 合并机制常量
-export const DIRTY_THRESHOLD = 50;
-export const CONSOLIDATION_DELAY = 1000;
+const DIRTY_THRESHOLD = 50;
+const CONSOLIDATION_DELAY = 1000;
 
 // Worker 实例与回调映射
-export const worldWorker = new Worker(new URL('../workers/WorldWorker.js', import.meta.url), { type: 'module' });
-export const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函数
+const worldWorker = new Worker(new URL('../workers/WorldWorker.js', import.meta.url), { type: 'module' });
+const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函数
+
+// 共享几何体定义 - 用于优化渲染性能，避免在每个区块中重复创建相同的几何体，减少 GPU 内存占用
+
+/**
+ * 为几何体添加顶点 ID 属性，用于着色器中索引 AO 数据
+ */
+function addVertexIdAttribute(geometry) {
+  const count = geometry.attributes.position.count;
+  const vertexIds = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    vertexIds[i] = i;
+  }
+  geometry.setAttribute('aVertexId', new THREE.BufferAttribute(vertexIds, 1));
+  return geometry;
+}
+
+/**
+ * 构建交叉平面几何体（用于花、藤蔓等植物）
+ * 由两个垂直交叉的平面组成，形成十字形状，使其在各个角度看都有体积感
+ * @param {number} offsetY - Y 轴偏移，用于调整植物模型相对于方块底部的垂直高度
+ * @returns {THREE.BufferGeometry} 合并后的交叉平面几何体
+ */
+function buildCrossGeo(offsetY = -0.25) {
+  const p1 = new THREE.PlaneGeometry(0.7, 0.7); // 基础平面尺寸 0.7x0.7
+  const p2 = new THREE.PlaneGeometry(0.7, 0.7);
+  p2.rotateY(Math.PI / 2); // 绕 Y 轴旋转 90 度
+  const merged = BufferGeometryUtils.mergeGeometries([p1, p2]); // 合并几何体减少渲染开销
+  merged.translate(0, offsetY, 0); // 应用垂直偏移
+  return addVertexIdAttribute(merged);
+}
+// 花的几何体（交叉平面，向下偏移0.25单位，使花朵看起来生长在地面上）
+const geoFlower = buildCrossGeo(-0.25);
+// 藤蔓的几何体（交叉平面，无偏移，使藤蔓看起来附着在方块上）
+const geoVine = buildCrossGeo(0);
+
+/**
+ * 睡莲几何体 - 一个旋转为水平方向的平面
+ * 用于沼泽生物群系，浮在水面上
+ */
+const geoLily = (() => {
+  const geo = new THREE.PlaneGeometry(0.8, 0.8);
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(0, -0.48, 0);
+  return addVertexIdAttribute(geo);
+})();
+
+/**
+ * 仙人掌几何体 - 由主茎和多个分支组成的复杂几何体
+ * 用于沙漠生物群系，模拟真实仙人掌的形状
+ */
+const geoCactus = (() => {
+  const geoms = [];
+  geoms.push(new THREE.BoxGeometry(0.65, 1, 0.65));
+  const la = new THREE.BoxGeometry(0.25, 0.25, 0.25); la.translate(-0.4, 0.1, 0); geoms.push(la);
+  const lau = new THREE.BoxGeometry(0.25, 0.4, 0.25); lau.translate(-0.4, 0.35, 0); geoms.push(lau);
+  const ra = new THREE.BoxGeometry(0.25, 0.25, 0.25); ra.translate(0.4, -0.1, 0); geoms.push(ra);
+  const rau = new THREE.BoxGeometry(0.25, 0.3, 0.25); rau.translate(0.4, 0.1, 0); geoms.push(rau);
+  return addVertexIdAttribute(BufferGeometryUtils.mergeGeometries(geoms));
+})();
+
+/** 烟囱几何体 - 一个略窄的圆柱体 */
+const geoChimney = addVertexIdAttribute(new THREE.CylinderGeometry(0.15, 0.15, 2, 8));
+
+/**
+ * 栏杆几何体 - L 形状，由中心柱子和东/北方向的把手组成
+ */
+const geoHandrail = (() => {
+  const geoms = [];
+  // 中心柱子：宽 0.5，高 1.0
+  geoms.push(new THREE.BoxGeometry(0.5, 1, 0.5));
+  // 东方把手 (正 X 方向)：从中心向东延伸 0.5 单位
+  const barEast = new THREE.BoxGeometry(0.5, 0.15, 0.15);
+  barEast.translate(0.375, 0.35, 0); // 中心在 x=0.375 (0.25+0.125)
+  geoms.push(barEast);
+  // 北方把手 (正 Z 方向)：从中心向北延伸 0.5 单位
+  const barNorth = new THREE.BoxGeometry(0.15, 0.15, 0.5);
+  barNorth.translate(0, 0.35, 0.375); // 中心在 z=0.375 (0.25+0.125)
+  geoms.push(barNorth);
+  return addVertexIdAttribute(BufferGeometryUtils.mergeGeometries(geoms));
+})();
+
+/**
+ * 栏杆 A 几何体 - 中心柱子和 X 轴向把手 (东西向)
+ */
+const geoHandrailA = (() => {
+  const geoms = [];
+  geoms.push(new THREE.BoxGeometry(0.3, 1, 0.3));
+  const barX = new THREE.BoxGeometry(1, 0.15, 0.15);
+  barX.translate(0, 0.35, 0);
+  geoms.push(barX);
+  return addVertexIdAttribute(BufferGeometryUtils.mergeGeometries(geoms));
+})();
+
+/**
+ * 栏杆 B 几何体 - 中心柱子和 Z 轴向把手 (南北向)
+ */
+const geoHandrailB = (() => {
+  const geoms = [];
+  geoms.push(new THREE.BoxGeometry(0.3, 1, 0.3));
+  const barZ = new THREE.BoxGeometry(0.15, 0.15, 0.5);
+  barZ.translate(0, 0.35, 0);
+  geoms.push(barZ);
+  return addVertexIdAttribute(BufferGeometryUtils.mergeGeometries(geoms));
+})();
+
+/**
+ * 柱子几何体 - 一个竖直的长方体，粗细等同于handrailA
+ */
+const geoPillar = (() => {
+  const geoms = [];
+  geoms.push(new THREE.BoxGeometry(0.3, 1, 0.3));
+  return addVertexIdAttribute(BufferGeometryUtils.mergeGeometries(geoms));
+})();
+
+/**
+ * 木台阶几何体 - 一个缺了右上角四分之一的立方体
+ * 从侧面看是一个 L 形，占据左下、右下、左上三个象限
+ */
+const geoPlanksStep = (() => {
+  const geoms = [];
+  // 底部整体：x: [-0.5, 0.5], y: [-0.5, 0], z: [-0.5, 0.5]
+  const bottom = new THREE.BoxGeometry(1, 0.5, 1);
+  bottom.translate(0, -0.25, 0);
+  geoms.push(bottom);
+  // 左上部分：x: [-0.5, 0], y: [0, 0.5], z: [-0.5, 0.5]
+  const topLeft = new THREE.BoxGeometry(0.5, 0.5, 1);
+  topLeft.translate(-0.25, 0.25, 0);
+  geoms.push(topLeft);
+  return addVertexIdAttribute(BufferGeometryUtils.mergeGeometries(geoms));
+})();
+
+/**
+ * 鹅卵石台阶几何体 - 与木台阶形状相同
+ */
+const geoCobblestoneStep = geoPlanksStep;
+
+/**
+ * 几何体映射表 - 将方块类型映射到对应的几何体
+ */
+export const geomMap = {
+  'flower': geoFlower,
+  'short_grass': geoFlower,
+  'allium': geoFlower,
+  'vine': geoVine,
+  'lilypad': geoLily,
+  'cactus': geoCactus,
+  'chimney': geoChimney,
+  'handrail': geoHandrail,
+  'handrailA': geoHandrailA,
+  'handrailB': geoHandrailB,
+  'pillar': geoPillar,
+  'planks_step': geoPlanksStep,
+  'cobblestone_step': geoCobblestoneStep,
+  'stone_diorite_step': geoCobblestoneStep,
+  'default': addVertexIdAttribute(new THREE.BoxGeometry(1, 1, 1))
+};
 
 export function extendChunk(Chunk) {
   // 注册 Worker 消息处理器
   worldWorker.onmessage = (e) => {
-    const { key, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters } = e.data;
+    const { cx, cz, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters } = e.data;
+    const key = `${cx},${cz}`;
     if (workerCallbacks.has(key)) {
       workerCallbacks.get(key)({ d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters });
       workerCallbacks.delete(key);
@@ -27,7 +187,14 @@ export function extendChunk(Chunk) {
   };
 
   worldWorker.onerror = (e) => {
-    console.error('WorldWorker error:', e);
+    console.error('WorldWorker Error:', e);
+    console.error('Error details:', {
+      message: e.message,
+      filename: e.filename,
+      lineno: e.lineno,
+      colno: e.colno,
+      error: e.error
+    });
   };
 
   /**
