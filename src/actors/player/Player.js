@@ -683,7 +683,9 @@ export class Player {
             return type && type !== 'end_stone' && type !== 'bedrock';
           });
           if (validBlocks.length > 0) {
-            this.world.removeBlocksBatch(validBlocks);
+            // 使用 isBatch=false，复用徒手消除方块的逻辑
+            // 立即更新 Face Culling，等 consolidation 时重新生成完整网格（AO 自然正确）
+            this.world.removeBlocksBatch(validBlocks, false);
           }
           this.mag7Timeouts = this.mag7Timeouts.filter(id => id !== timeoutId);
         }, Math.floor(i / batchSize) * batchDelay);

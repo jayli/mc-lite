@@ -8,6 +8,7 @@ import { persistenceService } from '../services/PersistenceService.js';
 import { noise } from '../utils/MathUtils.js';
 import { ParticleSystem } from './effects/ParticleSystem.js';
 import { parseBlockEntry } from '../utils/OrientationUtils.js';
+// import { AORepairManager } from '../core/AORepairManager.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
@@ -72,6 +73,9 @@ export class World {
     // --- 批量 Face Culling 更新定时器 ---
     // 用于 Mag7、TNT 等批量删除场景，避免 AO 阴影计算丢失
     this.batchFaceCullingTimeout = null;
+
+    // 初始化 AO 修复管理器（暂时禁用，Mag7 现在使用 isBatch=false）
+    // this.aoRepairManager = new AORepairManager(this);
   }
 
   /**
@@ -220,6 +224,11 @@ export class World {
         this.batchFaceCullingTimeout = null;
       }, 100); // 100ms 防抖，等待所有批次完成
     }
+
+    // 记录批量删除，触发 AO 修复（暂时禁用，Mag7 现在使用 isBatch=false）
+    // if (this.aoRepairManager) {
+    //   this.aoRepairManager.recordBatchRemoval(positions);
+    // }
   }
 
   /**
