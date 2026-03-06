@@ -10,6 +10,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **运行测试**: 访问 http://localhost:8080/src/tests/index.html，点击"运行所有测试"
 - **规格驱动开发**: 使用 `Skill("speckit.specify")`、`Skill("speckit.tasks")`、`Skill("speckit.implement")`
 
+> 注意：项目目前没有配置独立的 build/lint 命令，开发服务器会自动提供热加载能力。
+
 ## 调试
 - 游戏实例暴露在 `window.game`，可在浏览器控制台中访问
 - 可通过 `window.game.world`、`window.game.engine` 等访问子系统
@@ -23,6 +25,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 表现层: UI 与渲染 : `src/ui/`, `src/core/Engine.js`
 - 业务逻辑层: 游戏系统 : `src/core/Game.js`, `src/world/World.js`
 - 数据层: 持久化与存储 : `src/services/`, `src/constants/`
+
+### 关键机制（需要跨文件理解）
+1. **Consolidation 合并机制**
+   - 动态添加/删除的方块会先作为独立动态网格存在
+   - 当脏方块数量达到 50 个，或玩家停止操作 1000ms 后，会触发后台合并
+   - 合并过程会将区块数据发送到 Worker 重新计算所有可见面和 AO，生成优化的 InstancedMesh
+   - 竞态条件风险：主线程 AO 更新与 Worker 合并结果可能存在时序冲突
+
+2. **AO 阴影计算**
+   - 主线程与 Worker 有两套 AO 计算逻辑，对未加载区域的处理不同
+   - 主线程：未加载区块默认认为是遮挡的（适合 FrozenMountain 等封闭地图）
+   - Worker：未加载/不存在的方块默认认为是不遮挡的（适合开放地形）
+   - AO 工具函数统一在 `src/utils/AOUtils.js`，建议优先复用
 
 ### 核心分层详解
 | 系统 | 文件 | 职责 |
@@ -79,3 +94,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 代码提交
 任何修改都不能自动提交代码，必须等待明确的指令才能提交。
+
+## 重要提示
+- 项目在线演示：<https://js-perf.cn>
+- 已实现 AO 修复管理器 (`src/core/AORepairManager.js`) 作为兜底机制，处理批量删除后的 AO 阴影不一致问题，当前默认禁用
+- 批量删除方块时使用 `isBatch=false` 参数会复用单次删除逻辑，避免竞态条件导致的 AO 丢失问题
