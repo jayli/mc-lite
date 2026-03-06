@@ -16,8 +16,8 @@ const DIRTY_THRESHOLD = 50;
 const CONSOLIDATION_DELAY = 1000;
 
 // Worker 实例与回调映射
-const worldWorker = new Worker(new URL('../workers/WorldWorker.js', import.meta.url), { type: 'module' });
-const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函数
+export const worldWorker = new Worker(new URL('../workers/WorldWorker.js', import.meta.url), { type: 'module' });
+export const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函数
 
 // 共享几何体定义 - 用于优化渲染性能，避免在每个区块中重复创建相同的几何体，减少 GPU 内存占用
 
