@@ -1573,10 +1573,10 @@ export class Chunk {
     if (this.batchFaceCullingTimer) {
       clearTimeout(this.batchFaceCullingTimer);
     }
-    // 使用与 consolidation 相同的延迟时间
+    // 比 consolidation 延迟多100ms，确保Worker合并完成后再更新AO，避免竞态条件
     this.batchFaceCullingTimer = setTimeout(() => {
       this.processPendingFaceCullingUpdates();
-    }, CONSOLIDATION_DELAY);
+    }, CONSOLIDATION_DELAY + 100);
   }
 
   /**
