@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 ## 项目简介
 这是一个基于 Three.js 的 3D 体素游戏（Minecraft 克隆），基于 ES6+ Modules 开发。这是一个客户端应用，通过自定义 HTTP 服务器进行开发。
 
@@ -7,6 +9,10 @@
 - **启动开发服务器**: `npm run start` (端口 8080)
 - **运行测试**: 访问 http://localhost:8080/src/tests/index.html，点击"运行所有测试"
 - **规格驱动开发**: 使用 `Skill("speckit.specify")`、`Skill("speckit.tasks")`、`Skill("speckit.implement")`
+
+## 调试
+- 游戏实例暴露在 `window.game`，可在浏览器控制台中访问
+- 可通过 `window.game.world`、`window.game.engine` 等访问子系统
 
 ## 代码规范
 - **材质统一管理**: `src/core/MaterialManager.js`
@@ -30,6 +36,7 @@
 | Enemy AI | `src/workers/EnemyWorker.js` | 异步 AI 决策 |
 | World | `src/world/World.js` | 区块动态加载 (渲染距离：3)、方块操作 |
 | Chunk | `src/world/Chunk.js` | 区块渲染 (InstancedMesh)、隐藏面剔除 |
+| AO System | `src/core/AOSystem.js` | 环境光遮蔽阴影计算 |
 | Custom Map | `src/workers/maps/` | 自定义地图 |
 
 ### Web Workers 异步处理
@@ -42,55 +49,33 @@
 | PersistenceWorker | IndexedDB 操作 | `src/workers/PersistenceWorker.js` |
 
 ### 实体系统
-- **实体管理器**: `src/world/entity-system/EntityManager.js`
-- **代码实体**: `src/world/entity-system/CodeEntity.js` (程序化生成：树、云)
-- **JSON 实体**: `src/world/entity-system/JsonEntity.js` (数据驱动：房屋、坦克)
-- **结构加载器**: `src/world/entity-system/StructureLoader.js` (统一 JSON 结构加载)
+实体系统位于 `src/world/entity-system/`，用于程序化生成和 JSON 数据驱动的结构。
+- **实体管理器**: `EntityManager.js` - 注册和管理所有实体定义
+- **代码实体**: `CodeEntity.js` - 程序化生成（树、云等）
+- **JSON 实体**: `JsonEntity.js` - 数据驱动（房屋、坦克等）
+- **结构加载器**: `StructureLoader.js` - 统一 JSON 结构加载
+- **详细文档**: `src/world/entity-system/README_ENTITY_SYSTEM.js`
 
 ### 其他系统
 - **音频**: `src/core/AudioManager.js`
 - **持久化**: `src/services/PersistenceService.js` (IndexedDB)
 - **UI**: `src/ui/UIManager.js`、`src/ui/HUD.js`、`src/ui/Inventory.js`
 - **工具函数**:
-  - `src/utils/ItemIconUtils.js` - 图标生成
+  - `src/utils/AOUtils.js` - AO 阴影计算
   - `src/utils/FaceCullingUtils.js` - 方块面剔除
   - `src/utils/OrientationUtils.js` - 方块方向
+  - `src/utils/ItemIconUtils.js` - 图标生成
 
 ## 开发工作流
 1. **添加方块**: `BlockData.js` → `MaterialManager.js` → `Chunk.js`
 2. **添加敌人**: 实体类 → `EnemyWorker.js` → `EnemyManager.js`
 3. **添加结构数据**: 在 `src/world/structures/` 添加 JSON 文件 → 在 `StructureLoader.js` 中注册
-4. **添加新地图**: 新地图加在 `src/workers/maps/` 中，参照`Pyramid.js`实现，在 `src/workers/WorldWorker.js`中被调用。
+4. **添加新地图**: 新地图加在 `src/workers/maps/` 中，参照 `Pyramid.js` 实现，在 `WorldWorker.js` 中被调用
 
 ## 测试
-- **测试目录**: `src/tests/`，**测试入口**: `src/tests/index.html`
-- **运行方式**: 访问 http://localhost:8080/src/tests/index.html，点击 `#run-all-btn` 执行测试
+- **测试目录**: `src/tests/`
+- **测试入口**: `src/tests/index.html`
+- **运行方式**: 启动服务器后访问 http://localhost:8080/src/tests/index.html，点击"运行所有测试"
 
 ## 代码提交
-- 任何情况你都不能自动提交代码，必须等待我的明确指令才提交代码，再次强调，你的任何修改都不能自动在未经我允许的情况下提交代码，必须等我的明确指令才能提交代码
-- 再次强调，请你不要擅自替我提交代码，必须等我明确的指令才提交代码。
-
-## 文件操作最佳实践
-### 读取文件
-- 使用 `Read` 工具读取文件内容
-- 如果读取失败或内容异常，先检查文件是否存在，再尝试重新读取
-
-### 修改文件
-1. **优先使用 `Edit` 工具** 进行小幅度修改
-2. **`Edit` 工具匹配失败时**：使用 `Bash` + `node` 脚本或 `sed` 命令修改文件
-   ```bash
-   node << 'SCRIPT'
-   const fs = require('fs');
-   const path = 'path/to/file';
-   let content = fs.readFileSync(path, 'utf8');
-   content = content.replace('old_string', 'new_string');
-   fs.writeFileSync(path, content);
-   SCRIPT
-   ```
-3. **如果不慎清空文件**：立即使用 `git checkout HEAD -- <file>` 恢复
-
-### 新建文件
-- 使用 `Write` 工具创建新文件
-
-### 删除文件
-- 使用 `Bash` 命令 `rm <file>` 删除文件
+任何修改都不能自动提交代码，必须等待明确的指令才能提交。
