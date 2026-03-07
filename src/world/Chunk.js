@@ -775,6 +775,85 @@ export class Chunk {
     // 移除碰撞键的操作现在与移除方块逻辑完全一致，确保状态同步
     this.removeBlock(x, y, z);
   }
+
+  /**
+   * 仅移除渲染网格（用于跨Chunk实体方块）
+   * 当跨Chunk实体方块的blockData存储在其他Chunk时，只更新本Chunk的渲染网格
+   * @param {Array<{x,y,z}>} positions - 待移除的坐标列表
+   */
+  removeBlocksBatchRenderOnly(positions) {
+    if (positions.length === 0) return;
+
+    const dummy = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+
+    // 移除渲染网格（隐藏方块）
+    for (let i = this.group.children.length - 1; i >= 0; i--) {
+      const child = this.group.children[i];
+
+      if (child.isInstancedMesh) {
+        const type = child.userData.type;
+        const typeMap = this.instanceIndexMap[type];
+        let updated = false;
+
+        if (typeMap) {
+          positions.forEach(p => {
+            const key = `${Math.floor(p.x)},${Math.floor(p.y)},${Math.floor(p.z)}`;
+            if (typeMap.has(key)) {
+              const idx = typeMap.get(key);
+              dummy.makeScale(0, 0, 0);
+              child.setMatrixAt(idx, dummy);
+              typeMap.delete(key);
+              updated = true;
+            }
+          });
+        } else {
+          // Fallback: 全量扫描
+          for (let j = 0; j < child.count; j++) {
+            child.getMatrixAt(j, dummy);
+            pos.setFromMatrixPosition(dummy);
+            const mx = Math.floor(pos.x);
+            const my = Math.floor(pos.y);
+            const mz = Math.floor(pos.z);
+
+            const isMatch = positions.some(p =>
+              Math.floor(p.x) === mx && Math.floor(p.y) === my && Math.floor(p.z) === mz
+            );
+
+            if (isMatch) {
+              dummy.makeScale(0, 0, 0);
+              child.setMatrixAt(j, dummy);
+              updated = true;
+            }
+          }
+        }
+        if (updated) child.instanceMatrix.needsUpdate = true;
+      } else if (!child.userData.isEntity) {
+        // 处理动态网格
+        const cx = Math.floor(child.position.x);
+        const cy = Math.floor(child.position.y);
+        const cz = Math.floor(child.position.z);
+        const isMatch = positions.some(p =>
+          Math.floor(p.x) === cx && Math.floor(p.y) === cy && Math.floor(p.z) === cz
+        );
+
+        if (isMatch) {
+          const key = `${cx},${cy},${cz}`;
+          this.dynamicMeshes.delete(key);
+          if (child.geometry) child.geometry.dispose();
+          if (child.material) {
+            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+            else child.material.dispose();
+          }
+          this.group.remove(child);
+        }
+      }
+    }
+
+    // 标记区块为脏并调度合并
+    this.dirtyBlocks += positions.length;
+    this.scheduleConsolidation();
+  }
 }
 
 // 扩展Chunk类功能

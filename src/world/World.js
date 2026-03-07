@@ -190,21 +190,69 @@ export class World {
    *                           避免 Mag7、TNT 等批量删除场景中 AO 阴影计算丢失。
    */
   removeBlocksBatch(positions, isBatch = true) {
-    // 将坐标按区块分组，减少跨区块调用次数，提升性能
+    // 将坐标按实际存储 blockData 的 Chunk 分组
+    // 跨Chunk实体方块的 blockData 存储在结构中心所在的Chunk中
     const chunkGroups = new Map();
+    // 同时收集方块坐标所在的Chunk，用于更新渲染网格
+    const renderChunks = new Map();
+
     positions.forEach(p => {
+      const px = Math.floor(p.x);
+      const py = Math.floor(p.y);
+      const pz = Math.floor(p.z);
+      const blockKey = `${px},${py},${pz}`;
+
+      // 首先查找方块坐标所在的Chunk
       const cx = Math.floor(p.x / CHUNK_SIZE);
       const cz = Math.floor(p.z / CHUNK_SIZE);
-      const key = `${cx},${cz}`;
-      if (!chunkGroups.has(key)) chunkGroups.set(key, []);
-      chunkGroups.get(key).push(p);
+      const coordKey = `${cx},${cz}`;
+      const coordChunk = this.chunks.get(coordKey);
+
+      // 记录方块坐标所在的Chunk（用于渲染更新）
+      if (!renderChunks.has(coordKey)) renderChunks.set(coordKey, []);
+      renderChunks.get(coordKey).push(p);
+
+      let targetChunk = null;
+
+      // 检查方块坐标所在的Chunk是否有该方块
+      if (coordChunk && coordChunk.blockData[blockKey]) {
+        targetChunk = coordChunk;
+      } else {
+        // 跨Chunk实体方块查找：搜索所有已加载的Chunk
+        for (const [, otherChunk] of this.chunks) {
+          if (otherChunk.isReady && otherChunk !== coordChunk && otherChunk.blockData[blockKey]) {
+            targetChunk = otherChunk;
+            break;
+          }
+        }
+      }
+
+      // 如果找到存储该方块的Chunk，将其加入对应分组
+      if (targetChunk) {
+        const targetKey = `${targetChunk.cx},${targetChunk.cz}`;
+        if (!chunkGroups.has(targetKey)) chunkGroups.set(targetKey, []);
+        chunkGroups.get(targetKey).push(p);
+      }
     });
 
-    // 针对每个区块执行批量删除优化
+    // 针对每个区块执行批量删除优化（更新blockData）
     for (const [key, chunkPosList] of chunkGroups) {
       const chunk = this.chunks.get(key);
       if (chunk) {
         chunk.removeBlocksBatch(chunkPosList, isBatch);
+      }
+    }
+
+    // 跨Chunk实体方块渲染更新：
+    // 对于方块坐标所在的Chunk，也需要更新渲染网格
+    for (const [key, chunkPosList] of renderChunks) {
+      // 跳过已经处理过的Chunk（blockData所在的Chunk已经在上面处理过）
+      if (chunkGroups.has(key)) continue;
+
+      const chunk = this.chunks.get(key);
+      if (chunk && chunk.isReady) {
+        // 只更新渲染网格，不更新blockData
+        chunk.removeBlocksBatchRenderOnly(chunkPosList);
       }
     }
 
@@ -285,14 +333,29 @@ export class World {
     const cz = Math.floor(z / CHUNK_SIZE);
     const key = `${cx},${cz}`;
     const chunk = this.chunks.get(key);
-    if (!chunk) return null;
 
     const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-    const entry = chunk.blockData[blockKey];
-    if (!entry) return null;
-    // 兼容新旧格式：返回类型字符串
-    const parsed = parseBlockEntry(entry);
-    return parsed.type;
+
+    // 首先查找方块坐标所在的Chunk
+    if (chunk) {
+      const entry = chunk.blockData[blockKey];
+      if (entry) {
+        return parseBlockEntry(entry).type;
+      }
+    }
+
+    // 跨Chunk实体方块查找：搜索所有已加载的Chunk
+    // 跨Chunk实体的blockData存储在结构中心所在的Chunk中
+    for (const [, otherChunk] of this.chunks) {
+      if (otherChunk.isReady && otherChunk !== chunk) {
+        const entry = otherChunk.blockData[blockKey];
+        if (entry) {
+          return parseBlockEntry(entry).type;
+        }
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -307,12 +370,28 @@ export class World {
     const cz = Math.floor(z / CHUNK_SIZE);
     const key = `${cx},${cz}`;
     const chunk = this.chunks.get(key);
-    if (!chunk) return null;
 
     const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-    const entry = chunk.blockData[blockKey];
-    if (!entry) return null;
-    return parseBlockEntry(entry);
+
+    // 首先查找方块坐标所在的Chunk
+    if (chunk) {
+      const entry = chunk.blockData[blockKey];
+      if (entry) {
+        return parseBlockEntry(entry);
+      }
+    }
+
+    // 跨Chunk实体方块查找：搜索所有已加载的Chunk
+    for (const [, otherChunk] of this.chunks) {
+      if (otherChunk.isReady && otherChunk !== chunk) {
+        const entry = otherChunk.blockData[blockKey];
+        if (entry) {
+          return parseBlockEntry(entry);
+        }
+      }
+    }
+
+    return null;
   }
 
   /**
@@ -349,8 +428,21 @@ export class World {
     const cz = Math.floor(z / CHUNK_SIZE);
     const key = `${cx},${cz}`;
     const chunk = this.chunks.get(key);
-    if (chunk) {
+
+    const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+
+    // 首先尝试在方块坐标所在的Chunk删除
+    if (chunk && chunk.blockData[blockKey]) {
       chunk.removeBlock(x, y, z);
+      return;
+    }
+
+    // 跨Chunk实体方块：在存储该方块的Chunk中删除
+    for (const [, otherChunk] of this.chunks) {
+      if (otherChunk.isReady && otherChunk !== chunk && otherChunk.blockData[blockKey]) {
+        otherChunk.removeBlock(x, y, z);
+        return;
+      }
     }
   }
 

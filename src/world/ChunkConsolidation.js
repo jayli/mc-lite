@@ -304,43 +304,26 @@ export function extendChunk(Chunk) {
 
   /**
    * 过滤 Worker 返回的结果，防止幻影方块
+   * 核心原则：只保留 blockData 中存在的方块，避免已删除的跨Chunk实体方块被重新生成
    */
   Chunk.prototype._filterWorkerResult = function(data) {
     let { d, visibleKeys, solidBlocks } = data;
 
-    const isInChunkRange = (x, y, z) => {
-      const minX = this.cx * CHUNK_SIZE;
-      const maxX = (this.cx + 1) * CHUNK_SIZE;
-      const minZ = this.cz * CHUNK_SIZE;
-      const maxZ = (this.cz + 1) * CHUNK_SIZE;
-      return x >= minX && x < maxX && z >= minZ && z < maxZ;
-    };
-
-    const checkBelongsToStructure = (x, y, z) => {
-      return belongsToStructure(x, y, z, this.structureCenters);
-    };
-
-    // 过滤 visibleKeys
+    // 过滤 visibleKeys：只保留 blockData 中存在的方块
     if (visibleKeys) {
       visibleKeys = visibleKeys.filter(key => {
-        if (this.blockData[key]) return true;
-        const [x, y, z] = key.split(',').map(Number);
-        if (isInChunkRange(x, y, z)) return false;
-        return checkBelongsToStructure(x, y, z);
+        return this.blockData[key] !== undefined;
       });
     }
 
-    // 过滤 solidBlocks
+    // 过滤 solidBlocks：只保留 blockData 中存在的方块
     if (solidBlocks) {
       solidBlocks = solidBlocks.filter(key => {
-        if (this.blockData[key]) return true;
-        const [x, y, z] = key.split(',').map(Number);
-        if (isInChunkRange(x, y, z)) return false;
-        return checkBelongsToStructure(x, y, z);
+        return this.blockData[key] !== undefined;
       });
     }
 
-    // 过滤 d（渲染数据）
+    // 过滤 d（渲染数据）：只保留 blockData 中存在且类型匹配的方块
     if (d) {
       for (const type in d) {
         d[type] = d[type].filter(pos => {
@@ -349,13 +332,8 @@ export function extendChunk(Chunk) {
           if (currentEntry) {
             const currentType = typeof currentEntry === 'string' ? currentEntry : currentEntry.type;
             return currentType === type;
-          } else {
-            const x = Math.floor(pos.x);
-            const y = Math.floor(pos.y);
-            const z = Math.floor(pos.z);
-            if (isInChunkRange(x, y, z)) return false;
-            return checkBelongsToStructure(x, y, z);
           }
+          return false;
         });
       }
     }
