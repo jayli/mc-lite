@@ -13,7 +13,7 @@ export const CHUNK_SIZE = 16;
 
 // 合并机制常量
 const DIRTY_THRESHOLD = 50;
-const CONSOLIDATION_DELAY = 1000;
+export const CONSOLIDATION_DELAY = 1000;
 
 // Worker 实例与回调映射
 export const worldWorker = new Worker(new URL('../workers/WorldWorker.js', import.meta.url), { type: 'module' });
