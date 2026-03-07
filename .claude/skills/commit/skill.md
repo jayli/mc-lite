@@ -1,36 +1,39 @@
+---
+name: "commit"
+description: "Analyze git changes, stage as needed, generate a Conventional Commit message, and create a commit."
+argument-hint: "[optional commit intent]"
+user-invocable: true
+---
+
 # Skill: Smart Git Commit
 
 Use this skill when the user runs `/commit` or asks to commit changes.
 
-## Configuration
-
-- **Model**: Prioritize using the model configured in environment variable `ANTHROPIC_DEFAULT_HAIKU_MODEL`. If this environment variable is not available, use the default model.
-
 ## Instructions
 
-1.  **Analyze Context**:
-    - Run `git status` to identify modified, added, or deleted files.
-    - Run `git diff` to inspect the actual code changes in unstaged files.
-    - Run `git diff --cached` to inspect changes in staged files.
+1. **Analyze Context**:
+   - Run `git status` to identify modified, added, or deleted files.
+   - Run `git diff` to inspect changes in unstaged files.
+   - Run `git diff --cached` to inspect changes in staged files.
 
-2.  **Stage Changes**:
-    - If there are unstaged changes, run `git add -A` to stage all changes (unless the user specifically asked to partial commit).
+2. **Stage Changes**:
+   - If there are unstaged changes, run `git add -A` to stage all changes unless the user explicitly requested a partial commit.
 
-3.  **Generate Commit Message**:
-    - Analyze the diffs to understand the *intent* of the changes.
-    - Draft a commit message following the **Conventional Commits** specification:
-      ```
-      <type>(<scope>): <description>
+3. **Generate Commit Message**:
+   - Analyze diffs to understand the intent of changes.
+   - Draft a message following **Conventional Commits**:
+     ```
+     <type>(<scope>): <description>
 
-      [optional body]
-      ```
-    - **Types**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`.
-    - **Scope**: (Optional) The module or file affected (e.g., `proxy`, `ui`, `deps`).
-    - **Description**: Concise summary in imperative mood (e.g., "add support for...", not "added").
+     [optional body]
+     ```
+   - Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`.
+   - Scope is optional and should reflect the affected area.
+   - Description should be concise and imperative.
 
-4.  **Execute Commit**:
-    - Run `git commit -m "generated_message" --author="Claude <noreply@anthropic.com>"`.
-    - If the message has a body, use multiple `-m` flags or a heredoc.
+4. **Execute Commit**:
+   - Run `git commit -m "generated_message"`.
+   - If a body is needed, use multiple `-m` flags.
 
-5.  **Report**:
-    - Inform the user of the commit message used and the result.
+5. **Report**:
+   - Inform the user of the commit message used and commit result.

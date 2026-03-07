@@ -1,3 +1,10 @@
+---
+name: "fixspec"
+description: "Fix duplicate or incorrect numbering in spec directories by renaming and updating references."
+argument-hint: "[spec-name]"
+user-invocable: true
+---
+
 # Skill: Fix Spec Directory Numbering
 
 Use this skill when the user runs `/fixspec` to fix duplicate or incorrect spec directory numbering.
@@ -19,13 +26,9 @@ Use this skill when the user runs `/fixspec` to fix duplicate or incorrect spec 
 
 2. **Interactive Selection (LIST_MODE)**:
    - Parse specs from script output into an array
-   - Display specs in pages of 3 items each
-   - **Page navigation options**:
-     - Page 1: [spec1, spec2, spec3, "→ 下一页"]
-     - Middle pages: [spec1, spec2, spec3, "→ 下一页" / "← 上一页"]
-     - Last page: [spec1, spec2, spec3 (or less), "← 上一页"]
-   - Use label pattern: `next-N` for next page, `prev-N` for prev page, spec name for selection
-   - When user selects a spec name, proceed to Phase 2
+   - Show specs in pages of 3 items each.
+   - Support page navigation with `next-N` and `prev-N` labels.
+   - Allow user to select by spec name; then proceed to Phase 2.
 
 ### Phase 2: Fix Directory Numbering
 

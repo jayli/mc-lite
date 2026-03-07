@@ -1,6 +1,6 @@
 ---
-name: planify
-description: 判断并升级 skill 为基于 plan 文件驱动的模式。用法: /planify <skill-name>
+name: "planify"
+description: "判断并升级 skill 为基于 plan 文件驱动的模式。用法: /planify <skill-name>"
 argument-hint: "<skill-name>"
 user-invocable: true
 ---
