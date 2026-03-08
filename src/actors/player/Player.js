@@ -1062,6 +1062,11 @@ export class Player {
    * @returns {number} 放置的朝向 (0-3)
    */
   getPlacementOrientation(x, y, z, type) {
+    const props = getBlockProperties(type);
+    if (!props.orientationEnabled) {
+      return 0;
+    }
+
     // 检查是否在同一位置放置相同类型的方块（用于旋转）
     const isRebuildingSameBlock = this.lastRemovedBlock &&
         this.lastRemovedBlock.x === x &&

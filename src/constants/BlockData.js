@@ -9,6 +9,7 @@ const DEFAULT_PROPERTIES = {
   isTransparent: false,   // 是否透明（影响面剔除）
   isRendered: true,      // 是否需要渲染网格
   isAOEnabled: false,    // 是否启用环境光遮蔽（AO）
+  orientationEnabled: true, // 是否允许放置时旋转朝向
   isShadowEnabled: true, // 是否投射/接收阴影
   geometryType: 'box'    // 几何体类型
 };
@@ -21,152 +22,186 @@ export const BLOCK_DATA = {
     isSolid: false,
     isTransparent: true,
     isRendered: false,
-    isShadowEnabled: false
+    isShadowEnabled: false,
+    orientationEnabled: true
   },
   'collider': {
     isSolid: true,
     isTransparent: true,
     isRendered: false,
-    isShadowEnabled: false
+    isShadowEnabled: false,
+    orientationEnabled: true
   },
   'water': {
     isSolid: false,
     isTransparent: true,
-    isShadowEnabled: false
+    isShadowEnabled: false,
+    orientationEnabled: true
   },
   'swamp_water': {
     isSolid: false,
     isTransparent: true,
-    isShadowEnabled: false
+    isShadowEnabled: false,
+    orientationEnabled: true
   },
   'cloud': {
     isSolid: false,
     isTransparent: true,
-    isShadowEnabled: false
+    isShadowEnabled: false,
+    orientationEnabled: true
   },
   'glass_block': {
-    isTransparent: true
+    isTransparent: true,
+    orientationEnabled: true
   },
   'glass_blink': {
-    isTransparent: true
+    isTransparent: true,
+    orientationEnabled: true
   },
   'leaves': {
-    isTransparent: true
+    isTransparent: true,
+    orientationEnabled: true
   },
   'birch_log': {
     isSolid: true,
-    isTransparent: false
+    isTransparent: false,
+    orientationEnabled: false
   },
   'wood': {
     isSolid: true,
-    isTransparent: false
+    isTransparent: false,
+    orientationEnabled: false
   },
   'sky_wood': {
     isSolid: true,
-    isTransparent: false
+    isTransparent: false,
+    orientationEnabled: false
   },
   'azalea_log': {
     isSolid: true,
-    isTransparent: false
+    isTransparent: false,
+    orientationEnabled: false
   },
   'azalea_leaves': {
-    isTransparent: true
+    isTransparent: true,
+    orientationEnabled: true
   },
   'azalea_flowers': {
-    isTransparent: true
+    isTransparent: true,
+    orientationEnabled: true
   },
   'yellow_leaves': {
-    isTransparent: true
+    isTransparent: true,
+    orientationEnabled: true
   },
   'sky_leaves': {
-    isTransparent: true
+    isTransparent: true,
+    orientationEnabled: true
   },
   'realistic_oak_leaves': {
-    isTransparent: true
+    isTransparent: true,
+    orientationEnabled: true
   },
   'realistic_yellow_leaves': {
-    isTransparent: true
+    isTransparent: true,
+    orientationEnabled: true
   },
   'flower': {
     isSolid: false,
     isTransparent: true,
     isShadowEnabled: false,
-    geometryType: 'flower'
+    geometryType: 'flower',
+    orientationEnabled: true
   },
   'short_grass': {
     isSolid: false,
     isTransparent: true,
     isShadowEnabled: false,
-    geometryType: 'flower'
+    geometryType: 'flower',
+    orientationEnabled: true
   },
   'allium': {
     isSolid: false,
     isTransparent: true,
     isShadowEnabled: false,
-    geometryType: 'flower'
+    geometryType: 'flower',
+    orientationEnabled: true
   },
   'vine': {
     isSolid: false,
     isTransparent: true,
     isShadowEnabled: false,
-    geometryType: 'vine'
+    geometryType: 'vine',
+    orientationEnabled: true
   },
   'lilypad': {
     isSolid: false,
     isTransparent: true,
     isShadowEnabled: false,
-    geometryType: 'lilypad'
+    geometryType: 'lilypad',
+    orientationEnabled: true
   },
   'cactus': {
     isTransparent: true,
-    geometryType: 'cactus'
+    geometryType: 'cactus',
+    orientationEnabled: true
   },
   'handrail': {
     isTransparent: true,
-    geometryType: 'handrail'
+    geometryType: 'handrail',
+    orientationEnabled: true
   },
   'handrailA': {
     isTransparent: true,
-    geometryType: 'handrailA'
+    geometryType: 'handrailA',
+    orientationEnabled: true
   },
   'handrailB': {
     isTransparent: true,
-    geometryType: 'handrailB'
+    geometryType: 'handrailB',
+    orientationEnabled: true
   },
   'pillar': {
     isTransparent: true,
-    geometryType: 'pillar'
+    geometryType: 'pillar',
+    orientationEnabled: true
   },
   'chimney': {
-    geometryType: 'chimney'
+    geometryType: 'chimney',
+    orientationEnabled: false
   },
   'swamp_leaves': {
-    isTransparent: true
+    isTransparent: true,
+    orientationEnabled: true
   },
   'snow_leaves': {
-    isTransparent: true
+    isTransparent: true,
+    orientationEnabled: true
   },
-  'calcite': {},
-  'end_stone': {},
-  'iron': {},
-  'diamond': {},
-  'obsidian': {},
-  'moss': {},
+  'calcite': { orientationEnabled: false },
+  'end_stone': { orientationEnabled: false },
+  'iron': { orientationEnabled: false },
+  'diamond': { orientationEnabled: false },
+  'obsidian': { orientationEnabled: false },
+  'moss': { orientationEnabled: false },
   'chest': {
     isSolid: true,
-    isTransparent: true
+    isTransparent: true,
+    orientationEnabled: true
   },
   'realistic_trunk_collider': {
     isSolid: true,
     isTransparent: true,
     isRendered: false,
-    isShadowEnabled: false
+    isShadowEnabled: false,
+    orientationEnabled: true
   },
   'playground_block': {
     isSolid: true,
     isTransparent: false,
     isRendered: true,
     isShadowEnabled: false,
+    orientationEnabled: false,
     isIndestructible: true  // 不可被 TNT、机枪或玩家破坏
   },
   'playground_center_block': {
@@ -174,40 +209,58 @@ export const BLOCK_DATA = {
     isTransparent: false,
     isRendered: true,
     isShadowEnabled: false,
+    orientationEnabled: false,
     isIndestructible: true  // 不可被 TNT、机枪或玩家破坏
   },
-  // 注意：AO 现在自动适用于所有 solid + non-transparent 方块
-  // 无需手动设置 isAOEnabled 标志
-  'sand': {},
-  'stone': {},
-  'stone_diorite': {},
-  'mossy_stone': {},
-  'cobblestone': {},
-  'bricks': {},
-  'planks': {},
+  // 规则：满足 solid + non-transparent 且四个水平面纹理一致的方块禁用旋转
+  'sand': { orientationEnabled: false },
+  'stone': { orientationEnabled: false },
+  'stone_diorite': { orientationEnabled: false },
+  'mossy_stone': { orientationEnabled: false },
+  'cobblestone': { orientationEnabled: false },
+  'bricks': { orientationEnabled: false },
+  'planks': { orientationEnabled: false },
   'planks_step': {
     isSolid: true,
     isTransparent: true,  // 不参与 face culling，相邻面都显示
-    geometryType: 'planks_step'
+    geometryType: 'planks_step',
+    orientationEnabled: true
   },
   'cobblestone_step': {
     isSolid: true,
     isTransparent: true,  // 不参与 face culling，相邻面都显示
-    geometryType: 'cobblestone_step'
+    geometryType: 'cobblestone_step',
+    orientationEnabled: true
   },
   'stone_diorite_step': {
     isSolid: true,
     isTransparent: true,  // 不参与 face culling，相邻面都显示
-    geometryType: 'cobblestone_step'
+    geometryType: 'cobblestone_step',
+    orientationEnabled: true
   },
-  'white_planks': {},
-  'oak_planks': {},
-  'gold_ore': {},
-  'marble': {},
-  'dirt': {},
-  'snow': {},
-  'snow_grass': {},
-  'ice': {}
+  'white_planks': { orientationEnabled: false },
+  'oak_planks': { orientationEnabled: false },
+  'gold_ore': { orientationEnabled: false },
+  'marble': { orientationEnabled: false },
+  'dirt': { orientationEnabled: false },
+  'snow': { orientationEnabled: false },
+  'snow_grass': { orientationEnabled: false },
+  'ice': { orientationEnabled: false },
+
+  // 以下类型在 MaterialManager 中有定义且可放置，补齐旋转能力定义，避免走默认值
+  'grass': { orientationEnabled: false },
+  'dark_planks': { orientationEnabled: false },
+  'blue_planks': { orientationEnabled: false },
+  'green_planks': { orientationEnabled: false },
+  'hay_bale': { orientationEnabled: false },
+  'swamp_grass': { orientationEnabled: false },
+  'bookbox': { orientationEnabled: true },
+  'gold_block': { orientationEnabled: false },
+  'emerald': { orientationEnabled: false },
+  'amethyst': { orientationEnabled: false },
+  'iron_ore': { orientationEnabled: false },
+  'debris': { orientationEnabled: false },
+  'tnt': { orientationEnabled: false }
 };
 
 /**

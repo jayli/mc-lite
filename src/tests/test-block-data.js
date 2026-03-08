@@ -18,6 +18,7 @@ describe('BlockData 测试', (test) => {
     assertEqual(props.isTransparent, false, '默认方块应该不透明');
     assertEqual(props.isRendered, true, '默认方块应该渲染');
     assertEqual(props.isShadowEnabled, true, '默认方块投射阴影');
+    assertEqual(props.orientationEnabled, true, '默认方块允许旋转');
     assertEqual(props.geometryType, 'box', '默认几何体类型为 box');
   });
 
@@ -165,6 +166,38 @@ describe('BlockData 测试', (test) => {
     assertTrue('isSolid' in airData, 'air 应该定义 isSolid');
     assertTrue('isTransparent' in airData, 'air 应该定义 isTransparent');
     // 注意：某些方块可能显式定义所有属性，这是设计选择，不是 bug
+  });
+
+  // =========== orientationEnabled 测试 ===========
+  test('BLOCK_DATA 所有条目都显式定义 orientationEnabled', () => {
+    for (const [type, data] of Object.entries(BLOCK_DATA)) {
+      assertTrue(Object.prototype.hasOwnProperty.call(data, 'orientationEnabled'), `${type} 必须显式定义 orientationEnabled`);
+    }
+  });
+
+  test('实心不透明且四个水平面一致的方块禁用旋转', () => {
+    const shouldDisableOrientation = [
+      'stone', 'dirt', 'grass', 'sand', 'planks', 'cobblestone',
+      'stone_diorite', 'mossy_stone', 'snow', 'snow_grass', 'ice',
+      'wood', 'birch_log', 'tnt', 'gold_ore', 'gold_block'
+    ];
+
+    for (const type of shouldDisableOrientation) {
+      const props = getBlockProperties(type);
+      assertFalse(props.orientationEnabled, `${type} 应该禁用旋转`);
+    }
+  });
+
+  test('具备方向性的方块保持可旋转', () => {
+    const shouldEnableOrientation = [
+      'handrail', 'handrailA', 'handrailB', 'planks_step',
+      'cobblestone_step', 'stone_diorite_step', 'bookbox', 'chest'
+    ];
+
+    for (const type of shouldEnableOrientation) {
+      const props = getBlockProperties(type);
+      assertTrue(props.orientationEnabled, `${type} 应该允许旋转`);
+    }
   });
 
 });
