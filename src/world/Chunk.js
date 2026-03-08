@@ -198,17 +198,46 @@ export class Chunk {
       );
 
       if (isHit) {
-        this.group.remove(child);
-        child.userData.collisionBlocks.forEach(b => {
-          const bKey = `${Math.floor(b.x)},${Math.floor(b.y)},${Math.floor(b.z)}`;
-          if (this.blockData[bKey] === 'collider') {
-            this.removeBlock(b.x, b.y, b.z);
-          }
-        });
+        this._removeEntityWithCollisionBlocks(child);
         return true;
       }
     }
     return false;
+  }
+
+  /**
+   * 获取指定 key 对应方块类型（兼容字符串/对象条目）
+   * @param {string} key - 方块键
+   * @returns {string|null} 方块类型
+   */
+  _getBlockTypeByKey(key) {
+    const entry = this.blockData[key];
+    if (!entry) return null;
+    return parseBlockEntry(entry).type;
+  }
+
+  /**
+   * 移除实体及其绑定的碰撞块（兜底统一清理）
+   * @param {THREE.Object3D} entity - 实体对象
+   */
+  _removeEntityWithCollisionBlocks(entity) {
+    if (!entity) return;
+    this.group.remove(entity);
+
+    const collisionBlocks = entity.userData?.collisionBlocks;
+    if (!Array.isArray(collisionBlocks) || collisionBlocks.length === 0) return;
+
+    collisionBlocks.forEach(b => {
+      const bx = Math.floor(b.x);
+      const by = Math.floor(b.y);
+      const bz = Math.floor(b.z);
+      const bKey = `${bx},${by},${bz}`;
+
+      // 兼容 blockData 对象格式，避免 "实体已删但碰撞体残留"
+      if (this._getBlockTypeByKey(bKey) === 'collider') {
+        this.removeBlock(bx, by, bz);
+      }
+    });
   }
 
   /**
@@ -647,17 +676,7 @@ export class Chunk {
           );
 
           if (isHit) {
-            // 1. 从场景中移除实体模型
-            this.group.remove(child);
-
-            // 2. 递归移除该实体的所有其他碰撞块，确保逻辑彻底清理
-            child.userData.collisionBlocks.forEach(b => {
-              const bKey = `${Math.floor(b.x)},${Math.floor(b.y)},${Math.floor(b.z)}`;
-              // 只有当该位置确实还是碰撞体时才移除
-              if (this.blockData[bKey] === 'collider') {
-                this.removeBlock(b.x, b.y, b.z);
-              }
-            });
+            this._removeEntityWithCollisionBlocks(child);
           }
         }
       } else {

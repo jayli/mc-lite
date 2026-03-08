@@ -422,6 +422,22 @@ export class Player {
   }
 
   /**
+   * 从命中对象向上查找绑定碰撞块的特殊实体
+   * @param {THREE.Object3D} obj - 命中对象
+   * @returns {THREE.Object3D|null} 特殊实体对象
+   */
+  findSpecialEntityFromHit(obj) {
+    let current = obj;
+    while (current && current.type !== 'Scene') {
+      if (current.userData?.isEntity && Array.isArray(current.userData?.collisionBlocks)) {
+        return current;
+      }
+      current = current.parent;
+    }
+    return null;
+  }
+
+  /**
    * 处理射击逻辑
    * 根据当前武器类型和射击状态执行相应的射击操作
    * @param {number} dt - 时间步长
@@ -759,18 +775,19 @@ export class Player {
         break; // 击中一个丧尸后停止
       }
 
-      // 检查是否击中小汽车 (rover)
-      else if (obj.userData?.type === 'rover' || obj.parent?.userData?.type === 'rover') {
-        const car = obj.userData?.type === 'rover' ? obj : obj.parent;
-        if (car && car.userData.collisionBlocks) {
-          // 移除碰撞方块
-          this.world.removeBlocksBatch(car.userData.collisionBlocks);
-          console.log(`[Combat] Mag7 击中小汽车，移除 ${car.userData.collisionBlocks.length} 个碰撞方块`);
+      // 检查是否击中绑定碰撞块的特殊实体（rover / modGunMan / 后续同类）
+      else {
+        const specialEntity = this.findSpecialEntityFromHit(obj);
+        if (!specialEntity) continue;
+
+        if (specialEntity.userData.collisionBlocks.length > 0) {
+          this.world.removeBlocksBatch(specialEntity.userData.collisionBlocks);
+          console.log(`[Combat] Mag7 击中特殊实体(${specialEntity.userData.type || 'unknown'})，移除 ${specialEntity.userData.collisionBlocks.length} 个碰撞方块`);
         }
-        // 移除小汽车模型
-        if (car && car.parent) {
-          car.parent.remove(car);
-          console.log(`[Combat] Mag7 击中小汽车，模型已移除`);
+
+        if (specialEntity.parent) {
+          specialEntity.parent.remove(specialEntity);
+          console.log(`[Combat] Mag7 击中特殊实体(${specialEntity.userData.type || 'unknown'})，模型已移除`);
         }
         break; // 击中一个后停止
       }
