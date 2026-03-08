@@ -527,30 +527,19 @@ export class Player {
       }
 
       // 2. Check if Block (Terrain/Other)
-      // Determine if it's a solid block
-      // Calculate block coordinate slightly inside the hit face
-      const p = hit.point.clone().addScaledVector(hit.face.normal, -0.01);
-      const bx = Math.floor(p.x);
-      const by = Math.floor(p.y);
-      const bz = Math.floor(p.z);
-      const blockType = this.world.getBlock(bx, by, bz);
+      // 统一用世界坐标反查方块，避免 InstancedMesh 旋转后 face.normal 偏差导致误判
+      const blockHit = this._resolveBlockHitFromRaycast(hit);
+      const blockType = blockHit?.type;
 
       if (blockType && blockType !== 'air') {
         // 优先检查是否是 TNT 方块，无论是否是实心都触发爆炸
         if (blockType === 'tnt') {
           finalHit = hit;
           hasHitSolid = true;
-          // Ignite TNT logic
-          if (obj.isInstancedMesh) {
-            obj.getMatrixAt(hit.instanceId, this._dummyMatrix);
-            this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
-          } else {
-            this._tempVector.copy(obj.position);
-          }
-          const key = `${Math.floor(this._tempVector.x)},${Math.floor(this._tempVector.y)},${Math.floor(this._tempVector.z)}`;
+          const key = `${blockHit.bx},${blockHit.by},${blockHit.bz}`;
           if (!this.ignitingTNTs.has(key)) {
             this.ignitingTNTs.add(key);
-            this.explode(this._tempVector.x, this._tempVector.y, this._tempVector.z);
+            this.explode(blockHit.bx, blockHit.by, blockHit.bz);
           }
           break;
         }
@@ -605,6 +594,45 @@ export class Player {
 
     const effect = this.weapon.onFire(finalHit ? finalHit.point : null);
     this.spawnTracer(effect.start, effect.end, effect.config);
+  }
+
+  /**
+   * 从射线命中结果中解析方块世界坐标与类型
+   * 优先使用实例矩阵/网格位置，避免旋转实例时 face.normal 带来的坐标偏差
+   * @param {Object} hit - 射线命中结果
+   * @returns {{ bx: number, by: number, bz: number, type: string|null }|null}
+   */
+  _resolveBlockHitFromRaycast(hit) {
+    if (!hit || !hit.object) return null;
+
+    const obj = hit.object;
+    let bx;
+    let by;
+    let bz;
+
+    if (obj.isInstancedMesh && hit.instanceId !== undefined) {
+      obj.getMatrixAt(hit.instanceId, this._dummyMatrix);
+      this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
+      bx = Math.floor(this._tempVector.x);
+      by = Math.floor(this._tempVector.y);
+      bz = Math.floor(this._tempVector.z);
+    } else if (obj.position) {
+      bx = Math.floor(obj.position.x);
+      by = Math.floor(obj.position.y);
+      bz = Math.floor(obj.position.z);
+    } else {
+      this._tempVector.copy(hit.point).addScaledVector(this.raycaster.ray.direction, -0.01);
+      bx = Math.floor(this._tempVector.x);
+      by = Math.floor(this._tempVector.y);
+      bz = Math.floor(this._tempVector.z);
+    }
+
+    return {
+      bx,
+      by,
+      bz,
+      type: this.world.getBlock(bx, by, bz)
+    };
   }
 
   /**
