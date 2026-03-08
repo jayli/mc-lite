@@ -195,6 +195,24 @@ describe('PersistenceService 真实类测试', (test) => {
     teardownService();
   });
 
+  test('recordChangeForChunk - 跨 Chunk 方块写入 owner chunk', () => {
+    const service = createTestService();
+
+    service.cache.set('0,0', { blocks: {}, entities: {} });
+    service.cache.set('1,0', { blocks: {}, entities: {} });
+
+    // 世界坐标 (20,8,2) 按坐标属于 chunk 1,0，但归属强制写到 chunk 0,0
+    service.recordChangeForChunk(0, 0, 20, 8, 2, 'stone', 0);
+
+    const ownerChunk = service.cache.get('0,0');
+    const coordChunk = service.cache.get('1,0');
+
+    assertNotNull(ownerChunk.blocks['20,8,2'], 'owner chunk 应该包含该方块');
+    assertEqual(coordChunk.blocks['20,8,2'], undefined, '坐标 chunk 不应写入该方块');
+
+    teardownService();
+  });
+
   test('recordChange - 未缓存的区块不记录', () => {
     const service = createTestService();
 

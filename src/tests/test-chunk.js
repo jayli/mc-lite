@@ -43,7 +43,13 @@ class MockWorldWorker {
 
 // 模拟 persistenceService
 const mockPersistenceService = {
-  recordChange: () => {},
+  calls: [],
+  recordChange: (...args) => {
+    mockPersistenceService.calls.push({ method: 'recordChange', args });
+  },
+  recordChangeForChunk: (...args) => {
+    mockPersistenceService.calls.push({ method: 'recordChangeForChunk', args });
+  },
   saveChunkData: () => Promise.resolve(),
   saveDebounced: () => {},
   getChunkData: () => Promise.resolve(null)
@@ -116,6 +122,7 @@ describe('Chunk 真实类测试', (test) => {
     globalThis._blockData = mockBlockData;
     globalThis._carModel = { clone: () => null };
     globalThis._gunManModel = { clone: () => null };
+    mockPersistenceService.calls = [];
   };
 
   // 恢复原始环境
@@ -289,6 +296,85 @@ describe('Chunk 真实类测试', (test) => {
 
     // 状态应该保持不变
     assertEqual(chunk.blockData['100,100,100'], undefined, '不存在的方块应该保持不存在');
+
+    teardownEnvironment();
+  });
+
+  test('removeBlock - 跨 Chunk 归属方块删除应写入 owner chunk', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const ownerChunk = new Chunk(0, 0, world);
+    const neighborChunk = new Chunk(1, 0, world);
+    world.chunks.set('0,0', ownerChunk);
+    world.chunks.set('1,0', neighborChunk);
+
+    // 模拟跨区归属：方块坐标在 chunk 1,0，但数据存储在 ownerChunk(0,0)
+    ownerChunk.structureCenters = [{ type: 'tank', x: 8, y: 10, z: 8 }];
+    ownerChunk.addBlockDynamic(16, 10, 8, 'stone', 0);
+    ownerChunk.removeBlock(16, 10, 8);
+
+    const ownerWrite = mockPersistenceService.calls.find(call =>
+      call.method === 'recordChangeForChunk' &&
+      call.args[0] === 0 &&
+      call.args[1] === 0 &&
+      call.args[2] === 16 &&
+      call.args[3] === 10 &&
+      call.args[4] === 8 &&
+      call.args[5] &&
+      call.args[5].type === 'air'
+    );
+
+    const wrongWrite = mockPersistenceService.calls.find(call =>
+      call.method === 'recordChangeForChunk' &&
+      call.args[0] === 1 &&
+      call.args[1] === 0 &&
+      call.args[2] === 16 &&
+      call.args[3] === 10 &&
+      call.args[4] === 8 &&
+      call.args[5] &&
+      call.args[5].type === 'air'
+    );
+
+    assertNotNull(ownerWrite, '应写入 owner chunk(0,0)');
+    assertEqual(wrongWrite, undefined, '不应写入坐标 chunk(1,0)');
+
+    teardownEnvironment();
+  });
+
+  test('removeBlocksBatch - 跨 Chunk 归属方块批量删除应写入 owner chunk', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const ownerChunk = new Chunk(0, 0, world);
+    world.chunks.set('0,0', ownerChunk);
+
+    ownerChunk.structureCenters = [{ type: 'tank', x: 8, y: 10, z: 8 }];
+    ownerChunk.addBlockDynamic(16, 10, 8, 'stone', 0);
+    ownerChunk.removeBlocksBatch([{ x: 16, y: 10, z: 8 }], false);
+
+    const ownerWrite = mockPersistenceService.calls.find(call =>
+      call.method === 'recordChangeForChunk' &&
+      call.args[0] === 0 &&
+      call.args[1] === 0 &&
+      call.args[2] === 16 &&
+      call.args[3] === 10 &&
+      call.args[4] === 8 &&
+      call.args[5] === 'air'
+    );
+
+    const wrongWrite = mockPersistenceService.calls.find(call =>
+      call.method === 'recordChangeForChunk' &&
+      call.args[0] === 1 &&
+      call.args[1] === 0 &&
+      call.args[2] === 16 &&
+      call.args[3] === 10 &&
+      call.args[4] === 8 &&
+      call.args[5] === 'air'
+    );
+
+    assertNotNull(ownerWrite, '批量删除应写入 owner chunk(0,0)');
+    assertEqual(wrongWrite, undefined, '批量删除不应写入坐标 chunk(1,0)');
 
     teardownEnvironment();
   });

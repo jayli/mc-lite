@@ -410,7 +410,7 @@ export class Chunk {
     const oldType = oldParsed.type;
 
     // 4. 更新持久化记录
-    getPersistenceService().recordChange(x, y, z, entry);
+    getPersistenceService().recordChangeForChunk(this.cx, this.cz, x, y, z, entry);
 
     // 5. 更新数据状态
     this._updateBlockState(key, type, entry);
@@ -578,7 +578,7 @@ export class Chunk {
         delete this.blockData[key];
         this.visibleKeys.delete(key);
         this.solidBlocks.delete(key);
-        getPersistenceService().recordChange(px, py, pz, 'air');
+        getPersistenceService().recordChangeForChunk(this.cx, this.cz, px, py, pz, 'air');
 
         // 收集周围 6 个方向的邻居坐标
         const offsets = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
@@ -759,8 +759,6 @@ export class Chunk {
       }
     }
 
-    // 记录持久化变更
-    getPersistenceService().recordChange(x, y, z, 'air');
     // 使用 addBlockDynamic 统一处理逻辑状态更新、内存缓存同步和隐藏面剔除
     this.addBlockDynamic(x, y, z, 'air');
   }

@@ -402,12 +402,17 @@ onmessage = async function(e) {
 
     // 用 snapshot 中的方块覆盖 blockMap（保留玩家修改）
     if (savedSnapshot.blocks) {
-      // 关键修复：在 snapshot 模式下，需要根据 snapshot 来清理当前 Chunk 内部被删除的方块
-      // 因为 TerrainGen 总是会生成原始方块，如果不清理，被删除的方块会在合并后复显
+      // 在 snapshot 模式下，需要根据 snapshot 清理“当前 Chunk 负责渲染/存储范围”的被删除方块
+      // 注意：跨 Chunk 结构方块也可能归属当前 Chunk，仅清理 chunk 内坐标会导致读档后复显
       for (const [key, b] of blockMap) {
-        // 只处理当前 Chunk 内部的方块
-        if (b.x >= minX && b.x < maxX && b.z >= minZ && b.z < maxZ) {
-          // 如果该坐标不在 snapshot 中，说明玩家已删除该方块 (或该坐标原本就是空气)
+        const inCurrentChunk = b.x >= minX && b.x < maxX && b.z >= minZ && b.z < maxZ;
+        const isCrossChunkStructureBlock = !inCurrentChunk &&
+          checkBelongsToStructure(b.x, b.y, b.z, structureCenters);
+        const isInResponsibility = inCurrentChunk || isCrossChunkStructureBlock;
+
+        // 只清理当前 Chunk 责任范围内的方块
+        if (isInResponsibility) {
+          // 如果该坐标不在 snapshot 中，说明玩家已删除该方块（或该坐标原本就是空气）
           if (!savedSnapshot.blocks[key]) {
             blockMap.delete(key);
           }
@@ -834,4 +839,3 @@ function generateTank(x, y, z, chunk, dObj) {
 function generateUglyHouse(x, y, z, chunk, dObj) {
   uglyHouse.generate(x, y, z, chunk, dObj, true);
 }
-

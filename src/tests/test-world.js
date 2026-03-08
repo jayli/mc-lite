@@ -130,6 +130,7 @@ async function waitForChunkReady(world, chunkKey, maxWaitCount = 100) {
 // 模拟 persistenceService
 const mockPersistenceService = {
   recordChange: () => {},
+  recordChangeForChunk: () => {},
   saveChunkData: () => Promise.resolve(),
   saveDebounced: () => {},
   getChunkData: () => Promise.resolve(null)

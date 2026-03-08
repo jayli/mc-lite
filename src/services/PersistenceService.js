@@ -86,7 +86,21 @@ export class PersistenceService {
   recordChange(x, y, z, typeOrEntry, orientation) {
     const cx = Math.floor(x / PERSISTENCE_CONFIG.CHUNK_SIZE);
     const cz = Math.floor(z / PERSISTENCE_CONFIG.CHUNK_SIZE);
-    const chunkKey = `${cx},${cz}`;
+    this.recordChangeForChunk(cx, cz, x, y, z, typeOrEntry, orientation);
+  }
+
+  /**
+   * 记录一个方块的变更到指定归属区块（用于跨 Chunk 结构）
+   * @param {number} ownerCx - 归属区块X坐标
+   * @param {number} ownerCz - 归属区块Z坐标
+   * @param {number} x - 世界坐标X
+   * @param {number} y - 世界坐标Y
+   * @param {number} z - 世界坐标Z
+   * @param {string|object} typeOrEntry - 方块类型 ('air' 表示删除) 或完整条目对象 { type, orientation }
+   * @param {number} [orientation] - 朝向（当第一个参数为字符串时使用）
+   */
+  recordChangeForChunk(ownerCx, ownerCz, x, y, z, typeOrEntry, orientation) {
+    const chunkKey = `${ownerCx},${ownerCz}`;
     const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
 
     const chunkData = this.cache.get(chunkKey);
