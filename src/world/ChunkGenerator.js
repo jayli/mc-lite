@@ -136,9 +136,13 @@ export function extendChunk(Chunk) {
 
         // 4. 重要：在生成完成后，立即保存快照数据
         if (newSnapshot) {
+          const persistence = getPersistenceService();
           // 先更新内存缓存，避免刚加载完成后立刻修改时写入不到缓存
-          getPersistenceService().cache.set(`${this.cx},${this.cz}`, newSnapshot);
-          getPersistenceService().saveChunkData(this.cx, this.cz, newSnapshot);
+          // 测试环境的 mock persistence 可能没有 cache 字段，需要兼容
+          if (persistence?.cache?.set) {
+            persistence.cache.set(`${this.cx},${this.cz}`, newSnapshot);
+          }
+          persistence?.saveChunkData?.(this.cx, this.cz, newSnapshot);
         }
 
         this.isReady = true;
