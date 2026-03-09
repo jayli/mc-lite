@@ -40,6 +40,26 @@ export class Physics {
     this.playerWidth = PHYSICS_CONSTANTS.PLAYER_WIDTH;   // 玩家宽度
     this.jumpForce = PHYSICS_CONSTANTS.JUMP_FORCE;       // 跳跃力度
     this.speed = PHYSICS_CONSTANTS.SPEED;               // 移动速度
+
+    // 单帧查询缓存：避免同一帧内重复查询同一坐标
+    this._solidQueryCache = new Map();
+    this._isFrameCacheActive = false;
+  }
+
+  /**
+   * 每帧开始时清理缓存，保证缓存只在当前帧生效
+   */
+  beginFrame() {
+    this._isFrameCacheActive = true;
+    this._solidQueryCache.clear();
+  }
+
+  /**
+   * 每帧结束后关闭缓存，避免帧外事件读取到旧查询结果
+   */
+  endFrame() {
+    this._isFrameCacheActive = false;
+    this._solidQueryCache.clear();
   }
 
   /**
@@ -263,9 +283,23 @@ export class Physics {
   * 判断指定方块坐标是否为实心
   */
   isSolid(x, y, z) {
-    if (this.world.isSolid(x, y, z)) return true;
-    const type = this.world.getBlock(x, y, z);
-    if (!type) return false;
-    return getBlockProperties(type).isSolid;
+    const cacheKey = `${x},${y},${z}`;
+
+    if (this._isFrameCacheActive && this._solidQueryCache.has(cacheKey)) {
+      return this._solidQueryCache.get(cacheKey);
+    }
+
+    let result = false;
+    if (this.world.isSolid(x, y, z)) {
+      result = true;
+    } else {
+      const type = this.world.getBlock(x, y, z);
+      result = !!(type && getBlockProperties(type).isSolid);
+    }
+
+    if (this._isFrameCacheActive) {
+      this._solidQueryCache.set(cacheKey, result);
+    }
+    return result;
   }
 }

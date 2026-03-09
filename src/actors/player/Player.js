@@ -227,6 +227,7 @@ export class Player {
   update(dt = 0.016) {
     this.camera.rotation.x = this.cameraPitch;
     dt = Math.min(dt, 0.1);
+    this.physics.beginFrame();
 
     const oldX = this.position.x;
     const oldZ = this.position.z;
@@ -387,6 +388,7 @@ export class Player {
     this.handleShooting(dt);
     this.updateCameraBob(actualDx, actualDz, dt, isCurrentlyStuck);
     this.updateTracers(dt);
+    this.physics.endFrame();
   }
 
   /**
