@@ -109,31 +109,84 @@ export function getFrozenMountainInfo(wx, wz, seed, terrainGen) {
     transitionFactor = t;
   }
 
-  // 基础高度：降低整体高度，使用更平缓的坡度
+  // 基础高度：使用平滑曲线并通过确定性抖动取整，减少“等高线台阶感”
   // 平顶效果：在中心区域保持相对平坦
   const flatRadius = 10; // 平顶半径
-  let baseHeight;
+  let baseHeightFloat;
+
+  const summitHeight = (halfSize - flatRadius) / 1.3;
 
   if (euclidDist < flatRadius) {
     // 平顶区域：高度基本一致
-    baseHeight = Math.floor((halfSize - flatRadius) / 1.3);
+    baseHeightFloat = summitHeight;
   } else {
     // 从平顶边缘开始下降
-    const distFromFlat = euclidDist - flatRadius;
-    baseHeight = Math.floor((halfSize - flatRadius - distFromFlat) / 1.3);
+    const slopeRange = Math.max(1, halfSize - flatRadius);
+    const t = Math.max(0, Math.min(1, (euclidDist - flatRadius) / slopeRange));
+
+    // 山腰局部陡坡：使用低频噪声选择“更陡区域”，避免整体都像台阶。
+    const localSteepNoise =
+      mountainNoise(wx, wz, seed + 411, 0.012) * 0.7 +
+      mountainNoise(wx, wz, seed + 503, 0.020) * 0.3;
+    const localSteep01 = Math.max(0, Math.min(1, localSteepNoise * 0.5 + 0.5));
+    const steepZoneMask = Math.sin(Math.PI * t); // 山腰最明显，顶/脚最弱
+    // 下调“墙感”强度，避免陡坡变成整面直立墙
+    const steepFactor = 1 + steepZoneMask * (0.08 + 0.14 * localSteep01);
+    const effectiveT = Math.max(0, Math.min(1, t * steepFactor));
+
+    // 略偏陡的剖面曲线，搭配局部 steepFactor 增加自然陡坡感
+    const profile = 1 - Math.pow(effectiveT, 1.18);
+    baseHeightFloat = summitHeight * profile;
+
+    // 给陡坡增加“嶙峋感”：中高频噪声形成岩面起伏，不再像一整面直墙
+    const ruggedMask = steepZoneMask * Math.max(0, (localSteep01 - 0.35) / 0.65);
+    const ruggedSigned =
+      mountainNoise(wx, wz, seed + 619, 0.050) * 0.7 +
+      mountainNoise(wx, wz, seed + 701, 0.085) * 0.3;
+    const ruggedCrag = (Math.abs(mountainNoise(wx, wz, seed + 733, 0.072)) - 0.55) * 1.1;
+    const ruggedOffsetRaw = (ruggedSigned * 0.75 + ruggedCrag) * ruggedMask;
+    const ruggedOffset = Math.max(-0.6, Math.min(1.1, ruggedOffsetRaw));
+    baseHeightFloat += ruggedOffset;
   }
 
-  // 添加噪声起伏，让山坡更自然
-  // 使用多种频率的噪声叠加
-  const noise1 = mountainNoise(wx, wz, seed, 0.04) * 3;
-  const noise2 = mountainNoise(wx, wz, seed + 100, 0.05) * 0.5;
-  const noise3 = mountainNoise(wx, wz, seed + 200, 0.05) * 0.8;
+  // 在山腰注入超低频起伏，打散过直的坡线，山顶/山脚影响较小
+  const baseSlopeRange = Math.max(1, halfSize - flatRadius);
+  const baseSlopeT = Math.max(0, Math.min(1, (euclidDist - flatRadius) / baseSlopeRange));
+  const baseSlopeMask = Math.sin(Math.PI * baseSlopeT);
+  const broadUndulation = mountainNoise(wx, wz, seed + 151, 0.010) * 1.2 * baseSlopeMask;
+  baseHeightFloat += broadUndulation;
 
-  // 山脊效果：沿 X 轴和 Z 轴创建一些起伏的山脊
-  const ridgeX = Math.sin(dz * 0.25) * 2;
-  const ridgeZ = Math.sin(dx * 0.25) * 2;
+  // 确定性抖动取整：避免同一高度线过长形成“人工台阶”
+  const baseFloor = Math.floor(baseHeightFloat);
+  const frac = Math.max(0, Math.min(1, baseHeightFloat - baseFloor));
+  const dither = mountainNoise(wx, wz, seed + 777, 0.09) * 0.5 + 0.5;
+  const baseHeight = baseFloor + (dither < frac ? 1 : 0);
 
-  const noiseOffset = Math.floor(noise1 + noise2 + noise3 + ridgeX + ridgeZ);
+  // 低频平滑扰动：去掉高频山脊，避免地表出现“窟窿/毛刺”
+  // 使用十字采样平滑噪声，保证相邻列的高度变化更连续。
+  const sampleOffsets = [
+    [0, 0],
+    [1.5, 0],
+    [-1.5, 0],
+    [0, 1.5],
+    [0, -1.5]
+  ];
+  let smoothNoise = 0;
+  for (const [ox, oz] of sampleOffsets) {
+    const n1 = mountainNoise(wx + ox, wz + oz, seed + 37, 0.014);
+    const n2 = mountainNoise(wx + ox, wz + oz, seed + 91, 0.022) * 0.35;
+    smoothNoise += (n1 + n2);
+  }
+  smoothNoise /= sampleOffsets.length;
+
+  // 山顶与山脚都降低扰动，只在山腰保留轻微变化
+  const slopeRange = Math.max(1, halfSize - flatRadius);
+  const slopeT = Math.max(0, Math.min(1, (euclidDist - flatRadius) / slopeRange));
+  const slopeMask = Math.sin(Math.PI * slopeT);
+
+  // 振幅严格限制在 [-1, 1]，避免相邻列出现突兀的坑
+  const noiseOffsetRaw = Math.round(smoothNoise * slopeMask * 1.1);
+  const noiseOffset = Math.max(-1, Math.min(1, noiseOffsetRaw));
 
   // 最终高度
   const mountainLayerHeight = Math.max(0, baseHeight + noiseOffset);
