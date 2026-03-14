@@ -46,6 +46,8 @@ export class UIManager {
     // 初始化创造台服务（延迟到 world 可用时）
     if (this.game && this.game.world) {
       playgroundService.initialize(this.game.world);
+      // 检测是否存在创造台并更新按钮状态
+      this.updatePlaygroundButtonState();
     }
 
     // 打开设置
@@ -238,6 +240,37 @@ export class UIManager {
   }
 
   /**
+   * 更新创造台按钮状态
+   * 根据 playgroundService.isPlaygroundActive 设置按钮显示
+   */
+  updatePlaygroundButtonState() {
+    const btnCreatePlayground = document.getElementById('btn-create-playground');
+    const btnExportModel = document.getElementById('btn-export-model');
+
+    if (!btnCreatePlayground) return;
+
+    if (playgroundService.isPlaygroundActive) {
+      // 创造台已存在，显示"关闭创造台"按钮
+      btnCreatePlayground.disabled = false;
+      btnCreatePlayground.style.background = '#e74c3c';
+      btnCreatePlayground.innerText = '关闭创造台';
+      // 显示导出模型按钮
+      if (btnExportModel) {
+        btnExportModel.style.display = 'block';
+      }
+    } else {
+      // 创造台不存在，显示"打开创造台"按钮
+      btnCreatePlayground.disabled = false;
+      btnCreatePlayground.style.background = '#4a90e2';
+      btnCreatePlayground.innerText = '打开创造台';
+      // 隐藏导出模型按钮
+      if (btnExportModel) {
+        btnExportModel.style.display = 'none';
+      }
+    }
+  }
+
+  /**
    * 更新设置按钮的激活状态样式
    */
   updateActiveButtons() {
@@ -268,14 +301,8 @@ export class UIManager {
       btnZombie50.classList.toggle('active', this.game.maxActiveZombies === 50);
     }
 
-    // 更新创造台按钮状态（仅在服务已初始化时）
-    const btnCreatePlayground = document.getElementById('btn-create-playground');
-    if (btnCreatePlayground && playgroundService.world && playgroundService.isPlaygroundActive) {
-      // 创造台已激活时，显示"关闭创造台"按钮，可点击
-      btnCreatePlayground.disabled = false;
-      btnCreatePlayground.style.background = '#e74c3c'; // 红色表示关闭操作
-      btnCreatePlayground.innerText = '关闭创造台';
-    }
+    // 更新创造台按钮状态
+    this.updatePlaygroundButtonState();
   }
 
   /**

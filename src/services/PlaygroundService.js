@@ -5,6 +5,7 @@
  */
 
 import { materials } from '../core/MaterialManager.js';
+import { persistenceService } from './PersistenceService.js';
 
 /**
  * 创造台服务类 - 单例模式
@@ -39,6 +40,88 @@ export class PlaygroundService {
    */
   initialize(world) {
     this.world = world;
+    // 初始化时检测世界中是否已存在创造台
+    this.detectExistingPlayground();
+  }
+
+  /**
+   * 检测世界中是否已存在创造台
+   * 遍历已加载的区块查找 playground_center_block 或 playground_block
+   * @returns {boolean} 是否存在创造台
+   */
+  detectExistingPlayground() {
+    if (!this.world) return false;
+
+    // 遍历世界中的所有区块
+    for (const [chunkKey, chunk] of this.world.chunks.entries()) {
+      // 检查区块是否有修改过的方块
+      if (chunk.blockData) {
+        for (const [blockKey, blockData] of Object.entries(chunk.blockData)) {
+          if (blockData.type === 'playground_center_block' || blockData.type === 'playground_block') {
+            // 找到创造台方块，解析坐标
+            const [x, y, z] = blockKey.split(',').map(Number);
+
+            // 查找中心方块来确定创造台原点
+            if (blockData.type === 'playground_center_block') {
+              this.playgroundOrigin = { x, y, z };
+              this.isPlaygroundActive = true;
+
+              // 重新构建 playgroundBlocks 集合
+              this.playgroundBlocks.clear();
+              const halfSize = this.playgroundSize / 2;
+              const originX = x - halfSize;
+              const originZ = z - halfSize;
+
+              for (let dx = 0; dx < this.playgroundSize; dx++) {
+                for (let dz = 0; dz < this.playgroundSize; dz++) {
+                  const px = Math.floor(originX + dx);
+                  const pz = Math.floor(originZ + dz);
+                  this.playgroundBlocks.add(`${px},${y},${pz}`);
+                }
+              }
+
+              console.log(`[PlaygroundService] 检测到已存在的创造台 at (${originX}, ${y}, ${originZ})`);
+              return true;
+            }
+          }
+        }
+      }
+    }
+
+    // 如果没找到中心方块，尝试通过 persistenceService 的缓存查找
+    // 注意：persistenceService.cache 的键是区块坐标 "cx,cz"，值是 { blocks: {}, entities: {} }
+    if (persistenceService && persistenceService.cache) {
+      for (const [chunkKey, chunkData] of persistenceService.cache.entries()) {
+        if (chunkData && chunkData.blocks) {
+          for (const [blockKey, blockData] of Object.entries(chunkData.blocks)) {
+            if (blockData && blockData.type === 'playground_center_block') {
+              const [x, y, z] = blockKey.split(',').map(Number);
+              this.playgroundOrigin = { x, y, z };
+              this.isPlaygroundActive = true;
+
+              // 重新构建 playgroundBlocks 集合
+              this.playgroundBlocks.clear();
+              const halfSize = this.playgroundSize / 2;
+              const originX = x - halfSize;
+              const originZ = z - halfSize;
+
+              for (let dx = 0; dx < this.playgroundSize; dx++) {
+                for (let dz = 0; dz < this.playgroundSize; dz++) {
+                  const px = Math.floor(originX + dx);
+                  const pz = Math.floor(originZ + dz);
+                  this.playgroundBlocks.add(`${px},${y},${pz}`);
+                }
+              }
+
+              console.log(`[PlaygroundService] 从缓存检测到已存在的创造台 at (${originX}, ${y}, ${originZ})`);
+              return true;
+            }
+          }
+        }
+      }
+    }
+
+    return false;
   }
 
   /**

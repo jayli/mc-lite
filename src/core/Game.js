@@ -376,8 +376,15 @@ export class Game {
       this.canGunsDestroyBlocks = saveData.settings.canGunsDestroyBlocks !== undefined ? saveData.settings.canGunsDestroyBlocks : true;
       this.maxActiveZombies = saveData.settings.maxActiveZombies !== undefined ? saveData.settings.maxActiveZombies : 10;
       this.enemyManager.maxActiveZombies = this.maxActiveZombies; // 同步到敌人管理器
+    }
+
+    // 4. 检测创造台状态并更新UI
+    if (this.ui) {
+      // 重新检测创造台（存档数据已注入）
+      const { playgroundService } = await import('../services/PlaygroundService.js');
+      playgroundService.detectExistingPlayground();
       // 更新UI按钮状态
-      this.ui.updateActiveButtons();
+      this.ui.updatePlaygroundButtonState();
     }
   }
 
