@@ -165,6 +165,24 @@ const geoPlanksStep = (() => {
 const geoCobblestoneStep = geoPlanksStep;
 
 /**
+ * 鹅卵石上下颠倒台阶几何体 - 与木台阶形状相同但上下颠倒
+ * 底部整体：x: [-0.5, 0.5], y: [0, 0.5], z: [-0.5, 0.5]（上半部分）
+ * 右下部分：x: [0, 0.5], y: [-0.5, 0], z: [-0.5, 0.5]（下半部分右侧）
+ */
+const geoCobblestoneStepUpdown = (() => {
+  const geoms = [];
+  // 上半部分整体：x: [-0.5, 0.5], y: [0, 0.5], z: [-0.5, 0.5]
+  const top = new THREE.BoxGeometry(1, 0.5, 1);
+  top.translate(0, 0.25, 0);
+  geoms.push(top);
+  // 右下部分：x: [0, 0.5], y: [-0.5, 0], z: [-0.5, 0.5]
+  const bottomRight = new THREE.BoxGeometry(0.5, 0.5, 1);
+  bottomRight.translate(0.25, -0.25, 0);
+  geoms.push(bottomRight);
+  return addVertexIdAttribute(BufferGeometryUtils.mergeGeometries(geoms));
+})();
+
+/**
  * 几何体映射表 - 将方块类型映射到对应的几何体
  */
 export const geomMap = {
@@ -182,6 +200,7 @@ export const geomMap = {
   'horizontal_pillar': geoHorizontalPillar,
   'planks_step': geoPlanksStep,
   'cobblestone_step': geoCobblestoneStep,
+  'cobblestone_step_updown': geoCobblestoneStepUpdown,
   'stone_diorite_step': geoCobblestoneStep,
   'default': addVertexIdAttribute(new THREE.BoxGeometry(1, 1, 1))
 };

@@ -237,6 +237,12 @@ export const BLOCK_DATA = {
     geometryType: 'cobblestone_step',
     orientationEnabled: true
   },
+  'cobblestone_step_updown': {
+    isSolid: true,
+    isTransparent: true,  // 不参与 face culling，相邻面都显示
+    geometryType: 'cobblestone_step_updown',
+    orientationEnabled: true
+  },
   'stone_diorite_step': {
     isSolid: true,
     isTransparent: true,  // 不参与 face culling，相邻面都显示

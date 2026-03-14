@@ -18,6 +18,7 @@ export function getCustomIconPath(item) {
     'horizontal_pillar': 'src/assets/textures/pillar_horizontal.png',
     'planks_step': 'src/assets/textures/Oak_Planks_step.png',
     'cobblestone_step': 'src/assets/textures/Cobblestone_step.png',
+    'cobblestone_step_updown': 'src/assets/textures/Cobblestone_step_updown.png',
     'stone_diorite_step': 'src/assets/textures/stone_diorite_step.png'
   };
 

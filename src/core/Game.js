@@ -133,6 +133,7 @@ export class Game {
     this.player.inventory.add('planks', 1500);
     this.player.inventory.add('planks_step', 1500);
     this.player.inventory.add('cobblestone_step', 1500);
+    this.player.inventory.add('cobblestone_step_updown', 1500);
     this.player.inventory.add('stone_diorite_step', 1500);
     this.player.inventory.add('wood', 1500);
     this.player.inventory.add('glass_block', 1500);
