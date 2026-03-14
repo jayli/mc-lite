@@ -166,6 +166,11 @@ export const BLOCK_DATA = {
     geometryType: 'vertical_pillar',
     orientationEnabled: true
   },
+  'horizontal_pillar': {
+    isTransparent: true,
+    geometryType: 'horizontal_pillar',
+    orientationEnabled: true
+  },
   'chimney': {
     geometryType: 'chimney',
     orientationEnabled: false

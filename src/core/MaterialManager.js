@@ -684,6 +684,7 @@ materials.registerMaterial('handrail', mkProceduralMat(handrailBaseColor, handra
 materials.registerMaterial('handrailA', mkProceduralMat(handrailBaseColor, handrailPotColor, handrailPotSize)); // 栏杆 A（带深灰色斑点）
 materials.registerMaterial('handrailB', mkProceduralMat(handrailBaseColor, handrailPotColor, handrailPotSize)); // 栏杆 B（带深灰色斑点）
 materials.registerMaterial('vertical_pillar', mkMat('#b98e5b')); // 柱子
+materials.registerMaterial('horizontal_pillar', mkMat('#b98e5b')); // 水平柱子
 materials.registerMaterial('collider', { transparent: true, opacity: 0 }); // 碰撞体材质
 materials.registerMaterial('playground_block', mkMat('#808080')); // 创造台灰色方块
 materials.registerMaterial('playground_center_block', mkMat('#4a90e2')); // 创造台中心标记（蓝色）

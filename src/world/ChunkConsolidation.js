@@ -133,6 +133,16 @@ const geoPillar = (() => {
 })();
 
 /**
+ * 水平柱子几何体 - 一个横着的长方体（沿X轴），可以旋转
+ */
+const geoHorizontalPillar = (() => {
+  const geoms = [];
+  // 水平放置，长度1，高度和宽度0.3
+  geoms.push(new THREE.BoxGeometry(1, 0.3, 0.3));
+  return addVertexIdAttribute(BufferGeometryUtils.mergeGeometries(geoms));
+})();
+
+/**
  * 木台阶几何体 - 一个缺了右上角四分之一的立方体
  * 从侧面看是一个 L 形，占据左下、右下、左上三个象限
  */
@@ -169,6 +179,7 @@ export const geomMap = {
   'handrailA': geoHandrailA,
   'handrailB': geoHandrailB,
   'vertical_pillar': geoPillar,
+  'horizontal_pillar': geoHorizontalPillar,
   'planks_step': geoPlanksStep,
   'cobblestone_step': geoCobblestoneStep,
   'stone_diorite_step': geoCobblestoneStep,

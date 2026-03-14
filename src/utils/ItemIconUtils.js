@@ -15,6 +15,7 @@ export function getCustomIconPath(item) {
     'handrailA': 'src/assets/textures/handrailA.png',
     'handrailB': 'src/assets/textures/handrailB.png',
     'vertical_pillar': 'src/assets/textures/pillar.png',
+    'horizontal_pillar': 'src/assets/textures/pillar_horizontal.png',
     'planks_step': 'src/assets/textures/Oak_Planks_step.png',
     'cobblestone_step': 'src/assets/textures/Cobblestone_step.png',
     'stone_diorite_step': 'src/assets/textures/stone_diorite_step.png'
