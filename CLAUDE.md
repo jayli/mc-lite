@@ -102,8 +102,8 @@ Always respond in Chinese. 所有解释、说明和对话请使用中文。代�
 - 批量删除方块时使用 `isBatch=false` 参数会复用单次删除逻辑，避免竞态条件导致的 AO 丢失问题
 
 ## Active Technologies
-- JavaScript ES6+ (ES2022) + Three.js 0.160.0, ES Modules (001-workbench-close)
-- N/A (内存状态管理) (001-workbench-close)
+- JavaScript ES6+ (ES2022) + Three.js 0.160.0, ES Modules (019-workbench-close)
+- N/A (内存状态管理) (019-workbench-close)
 
 ## Recent Changes
 - 001-workbench-close: Added JavaScript ES6+ (ES2022) + Three.js 0.160.0, ES Modules

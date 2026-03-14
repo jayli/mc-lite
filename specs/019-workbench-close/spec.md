@@ -1,6 +1,6 @@
 # Feature Specification: 关闭创造台功能
 
-**Feature Branch**: `001-workbench-close`
+**Feature Branch**: `019-workbench-close`
 **Created**: 2026-03-14
 **Status**: Draft
 **Input**: User description: "请增加一个功能，关闭建造台的功能，即当建造台开启的状态下，在设置里的"建造台已打开"按钮变成"关闭创造台"，点击后则关闭建造台的功能，关闭后将建造台的方块都删除掉。同时不要破坏原有游戏功能。"

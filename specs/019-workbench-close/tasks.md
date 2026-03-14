@@ -1,6 +1,6 @@
 # Tasks: 关闭创造台功能
 
-**Input**: Design documents from `/specs/001-workbench-close/`
+**Input**: Design documents from `/specs/019-workbench-close/`
 **Prerequisites**: plan.md, spec.md, data-model.md, research.md
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.

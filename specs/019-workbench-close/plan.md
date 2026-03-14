@@ -1,7 +1,7 @@
 # Implementation Plan: 关闭创造台功能
 
-**Branch**: `001-workbench-close` | **Date**: 2026-03-14 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `/specs/001-workbench-close/spec.md`
+**Branch**: `019-workbench-close` | **Date**: 2026-03-14 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/019-workbench-close/spec.md`
 
 ## Summary
 
@@ -37,7 +37,7 @@
 ### Documentation (this feature)
 
 ```text
-specs/001-workbench-close/
+specs/019-workbench-close/
 ├── plan.md              # This file
 ├── spec.md              # Feature specification
 ├── research.md          # Phase 0 output
@@ -143,10 +143,10 @@ isPlayerInPlayground(playerPos): boolean
 ## Phase 2: Tasks (由 /speckit.tasks 生成)
 
 **待创建文件**:
-- `specs/001-workbench-close/data-model.md`
-- `specs/001-workbench-close/quickstart.md`
-- `specs/001-workbench-close/research.md`
-- `specs/001-workbench-close/tasks.md` (通过 /speckit.tasks 命令)
+- `specs/019-workbench-close/data-model.md`
+- `specs/019-workbench-close/quickstart.md`
+- `specs/019-workbench-close/research.md`
+- `specs/019-workbench-close/tasks.md` (通过 /speckit.tasks 命令)
 
 ## 下一步
 

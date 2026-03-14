@@ -2,7 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-03-14
-**Feature**: [specs/001-workbench-close/spec.md](../spec.md)
+**Feature**: [specs/019-workbench-close/spec.md](../spec.md)
 
 ## Content Quality
 
