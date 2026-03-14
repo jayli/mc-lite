@@ -17,6 +17,11 @@ export class EnemyManager {
     // 启动敌人Worker
     this.worker = new Worker(new URL('../workers/EnemyWorker.js', import.meta.url));
     this.setupWorkerCommunication();
+
+    // Worker 消息节流控制 - 每 3 帧发送一次
+    this._workerUpdateCounter = 0;
+    this._workerUpdateInterval = 3; // 每 3 帧发送一次
+    this._lastSentPlayerPosition = null; // 缓存玩家位置用于插值
   }
 
   setupWorkerCommunication() {
@@ -80,6 +85,12 @@ export class EnemyManager {
 
   // 更新所有敌人
   updateAll(playerPosition, deltaTime) {
+    // 没有敌人时直接返回，避免不必要的 Worker 通信
+    if (this.zombies.size === 0) return;
+
+    // 累积时间用于 Worker 的 AI 计算
+    this._accumulatedDeltaTime = (this._accumulatedDeltaTime || 0) + deltaTime;
+
     // 1. 收集位置更新，准备发送给Worker
     const enemyUpdates = [];
 
@@ -110,18 +121,27 @@ export class EnemyManager {
       this.removeEnemy(id);
     }
 
-    // 更新实例化渲染器
+    // 更新实例化渲染器（这必须每帧执行，保证动画流畅）
     this.renderer.update(this.zombies, deltaTime);
 
-    // 3. 发送给Worker进行AI计算（包含排斥力计算）
-    this.worker.postMessage({
-      action: 'update',
-      payload: {
-        deltaTime: deltaTime,
-        playerPosition: playerPosition,
-        enemyUpdates: enemyUpdates
-      }
-    });
+    // 3. Worker AI 计算节流 - 每 N 帧发送一次
+    this._workerUpdateCounter++;
+    if (this._workerUpdateCounter >= this._workerUpdateInterval) {
+      this._workerUpdateCounter = 0;
+
+      // 发送给Worker进行AI计算（包含排斥力计算）
+      this.worker.postMessage({
+        action: 'update',
+        payload: {
+          deltaTime: this._accumulatedDeltaTime,
+          playerPosition: playerPosition,
+          enemyUpdates: enemyUpdates
+        }
+      });
+
+      // 重置累积时间
+      this._accumulatedDeltaTime = 0;
+    }
   }
 
   // 处理来自Worker的AI更新
