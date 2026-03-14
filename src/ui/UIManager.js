@@ -38,6 +38,9 @@ export class UIManager {
     const btnCreatePlayground = document.getElementById('btn-create-playground');
     const btnExportModel = document.getElementById('btn-export-model');
 
+    // 防重复点击锁
+    let isPlaygroundOperationInProgress = false;
+
     if (!settingsBtn || !settingsModal || !settingsClose) return;
 
     // 初始化创造台服务（延迟到 world 可用时）
@@ -151,36 +154,65 @@ export class UIManager {
 
     // 创造台功能按钮处理
     if (btnCreatePlayground) {
-      btnCreatePlayground.onclick = (e) => {
+      btnCreatePlayground.onclick = async (e) => {
         e.stopPropagation();
+
+        // 防止重复点击
+        if (isPlaygroundOperationInProgress) {
+          return;
+        }
+        isPlaygroundOperationInProgress = true;
 
         // 确保创造台服务已初始化
         if (!playgroundService.world && this.game && this.game.world) {
           playgroundService.initialize(this.game.world);
         }
 
-        // 使用玩家位置，如果玩家不存在则使用相机位置
+        // 获取玩家位置
         const playerPos = this.game.player?.position || this.game.engine.camera.position;
-        const result = playgroundService.createPlayground(playerPos);
-        if (result.success) {
-          this.hud.showMessage('创造台已创建');
-          // 禁用打开创造台按钮
-          btnCreatePlayground.disabled = true;
-          btnCreatePlayground.style.background = '#666';
-          btnCreatePlayground.innerText = '创造台已打开';
-          // 显示导出模型按钮
-          if (btnExportModel) {
-            btnExportModel.style.display = 'block';
+
+        if (playgroundService.isPlaygroundActive) {
+          // 关闭创造台
+          const result = playgroundService.closePlayground(playerPos);
+          if (result.success) {
+            this.hud.showMessage('创造台已关闭');
+            btnCreatePlayground.disabled = false;
+            btnCreatePlayground.style.background = '#4a90e2';
+            btnCreatePlayground.innerText = '打开创造台';
+            // 隐藏导出模型按钮
+            if (btnExportModel) {
+              btnExportModel.style.display = 'none';
+            }
+          } else if (result.error === 'PLAYER_IN_PLAYGROUND') {
+            this.hud.showMessage('请离开创造台区域后再关闭');
+          } else {
+            this.hud.showMessage('关闭失败：' + result.error);
           }
         } else {
-          if (result.error === 'PLAYGROUND_EXISTS') {
-            this.hud.showMessage('创造台已存在');
-          } else if (result.error === 'NO_SPACE') {
-            this.hud.showMessage('无法找到合适的空间，请移动位置');
+          // 创建创造台
+          const result = playgroundService.createPlayground(playerPos);
+          if (result.success) {
+            this.hud.showMessage('创造台已创建');
+            // 更新按钮为关闭状态
+            btnCreatePlayground.style.background = '#e74c3c';
+            btnCreatePlayground.innerText = '关闭创造台';
+            // 显示导出模型按钮
+            if (btnExportModel) {
+              btnExportModel.style.display = 'block';
+            }
           } else {
-            this.hud.showMessage('创建失败：' + result.error);
+            if (result.error === 'PLAYGROUND_EXISTS') {
+              this.hud.showMessage('创造台已存在');
+            } else if (result.error === 'NO_SPACE') {
+              this.hud.showMessage('无法找到合适的空间，请移动位置');
+            } else {
+              this.hud.showMessage('创建失败：' + result.error);
+            }
           }
         }
+
+        // 重置操作锁
+        isPlaygroundOperationInProgress = false;
       };
     }
 
@@ -239,9 +271,10 @@ export class UIManager {
     // 更新创造台按钮状态（仅在服务已初始化时）
     const btnCreatePlayground = document.getElementById('btn-create-playground');
     if (btnCreatePlayground && playgroundService.world && playgroundService.isPlaygroundActive) {
-      btnCreatePlayground.disabled = true;
-      btnCreatePlayground.style.background = '#666';
-      btnCreatePlayground.innerText = '创造台已打开';
+      // 创造台已激活时，显示"关闭创造台"按钮，可点击
+      btnCreatePlayground.disabled = false;
+      btnCreatePlayground.style.background = '#e74c3c'; // 红色表示关闭操作
+      btnCreatePlayground.innerText = '关闭创造台';
     }
   }
 

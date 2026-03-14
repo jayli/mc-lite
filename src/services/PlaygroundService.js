@@ -222,6 +222,62 @@ export class PlaygroundService {
   }
 
   /**
+   * 检查玩家是否在创造台区域内
+   * @param {THREE.Vector3} playerPos - 玩家位置
+   * @returns {boolean} 是否在区域内
+   */
+  isPlayerInPlayground(playerPos) {
+    if (!this.isPlaygroundActive || !this.playgroundOrigin) {
+      return false;
+    }
+
+    const minX = this.playgroundOrigin.x;
+    const maxX = this.playgroundOrigin.x + this.playgroundSize;
+    const minZ = this.playgroundOrigin.z;
+    const maxZ = this.playgroundOrigin.z + this.playgroundSize;
+    const minY = this.playgroundOrigin.y;
+    const maxY = this.playgroundOrigin.y + 20; // 合理的高度范围
+
+    return playerPos.x >= minX && playerPos.x < maxX &&
+           playerPos.y >= minY && playerPos.y < maxY &&
+           playerPos.z >= minZ && playerPos.z < maxZ;
+  }
+
+  /**
+   * 关闭创造台，删除所有相关方块
+   * @param {THREE.Vector3} playerPos - 玩家位置（用于安全检查）
+   * @returns {{ success: boolean, error?: string }}
+   */
+  closePlayground(playerPos) {
+    if (!this.isPlaygroundActive) {
+      return { success: false, error: 'NOT_ACTIVE' };
+    }
+
+    // 检查玩家是否在创造台区域内
+    if (playerPos && this.isPlayerInPlayground(playerPos)) {
+      return { success: false, error: 'PLAYER_IN_PLAYGROUND' };
+    }
+
+    // 删除所有创造台方块
+    if (this.world && this.playgroundBlocks.size > 0) {
+      for (const blockKey of this.playgroundBlocks) {
+        const [x, y, z] = blockKey.split(',').map(Number);
+        this.world.setBlock(x, y, z, 'air');
+      }
+    }
+
+    // 清空方块追踪集合
+    this.playgroundBlocks.clear();
+
+    // 重置状态
+    this.isPlaygroundActive = false;
+    this.playgroundOrigin = null;
+
+    console.log('Playground closed and all blocks removed');
+    return { success: true };
+  }
+
+  /**
    * 获取创造台上所有非 playground_block 的方块
    * @returns {Array} 模型方块数组
    */
