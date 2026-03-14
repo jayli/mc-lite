@@ -1040,21 +1040,21 @@
       "x": -5,
       "y": 3,
       "z": -4,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {
       "x": -5,
       "y": 4,
       "z": -4,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {
       "x": -5,
       "y": 5,
       "z": -4,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {
@@ -1747,7 +1747,7 @@
       "x": -4,
       "y": 8,
       "z": -3,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {
@@ -2146,7 +2146,7 @@
       "x": -4,
       "y": 8,
       "z": 7,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {
@@ -2811,21 +2811,21 @@
       "x": -2,
       "y": 3,
       "z": -4,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {
       "x": -2,
       "y": 4,
       "z": -4,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {
       "x": -2,
       "y": 5,
       "z": -4,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {
@@ -3196,21 +3196,21 @@
       "x": -2,
       "y": 3,
       "z": 9,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {
       "x": -2,
       "y": 4,
       "z": 9,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {
       "x": -2,
       "y": 5,
       "z": 9,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {
@@ -4204,21 +4204,21 @@
       "x": 0,
       "y": 3,
       "z": 9,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {
       "x": 0,
       "y": 4,
       "z": 9,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {
       "x": 0,
       "y": 5,
       "z": 9,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {
@@ -4953,7 +4953,7 @@
       "x": 2,
       "y": 8,
       "z": -2,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {
@@ -5198,7 +5198,7 @@
       "x": 2,
       "y": 8,
       "z": 7,
-      "type": "pillar",
+      "type": "vertical_pillar",
       "direction": 0
     },
     {

@@ -168,7 +168,7 @@ export const geomMap = {
   'handrail': geoHandrail,
   'handrailA': geoHandrailA,
   'handrailB': geoHandrailB,
-  'pillar': geoPillar,
+  'vertical_pillar': geoPillar,
   'planks_step': geoPlanksStep,
   'cobblestone_step': geoCobblestoneStep,
   'stone_diorite_step': geoCobblestoneStep,

@@ -161,9 +161,9 @@ export const BLOCK_DATA = {
     geometryType: 'handrailB',
     orientationEnabled: true
   },
-  'pillar': {
+  'vertical_pillar': {
     isTransparent: true,
-    geometryType: 'pillar',
+    geometryType: 'vertical_pillar',
     orientationEnabled: true
   },
   'chimney': {

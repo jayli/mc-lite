@@ -466,7 +466,7 @@ describe('Chunk 真实类测试', (test) => {
 
     const blockTypes = [
       'stone', 'dirt', 'wood', 'glass_block',
-      'leaves', 'water', 'handrailA', 'pillar'
+      'leaves', 'water', 'handrailA', 'vertical_pillar'
     ];
 
     blockTypes.forEach((type, index) => {
