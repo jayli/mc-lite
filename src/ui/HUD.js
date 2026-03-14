@@ -52,9 +52,10 @@ export class HUD {
     this.longTaskCount = 0;
     this.lastFrameTime = performance.now();
 
-    // 渲染节流控制
+    // 渲染节流控制 - 使用布尔标志位 + 目标时间戳避免每帧创建定时器
     this._lastHotbarRenderTime = 0;
-    this._throttledRenderTimeout = null;
+    this._throttledRenderQueued = false;  // 是否有待执行的渲染请求
+    this._hotbarRenderTargetTime = 0;     // 计划执行的时间戳
 
     // 监听主线程长任务 (Long Tasks)
     if (window.PerformanceObserver) {
@@ -188,26 +189,27 @@ export class HUD {
   renderHotbar() {
     if (!this.hotbarEl) return;
 
-    // --- 渲染节流优化 ---
+    // --- 渲染节流优化 (300ms 节流间隔，UI 非关键路径) ---
     const now = performance.now();
     const timeSinceLastRender = now - this._lastHotbarRenderTime;
 
-    if (timeSinceLastRender < 100) {
+    if (timeSinceLastRender < 300) {
       // 如果已经有一个等待中的渲染，就不再设置
-      if (!this._throttledRenderTimeout) {
-        this._throttledRenderTimeout = setTimeout(() => {
-          this._throttledRenderTimeout = null;
-          this.renderHotbar();
-        }, 100 - timeSinceLastRender);
+      if (!this._throttledRenderQueued) {
+        this._throttledRenderQueued = true;
+        this._hotbarRenderTargetTime = this._lastHotbarRenderTime + 300;
+        requestAnimationFrame(() => {
+          this._throttledRenderQueued = false;
+          // 再次检查时间，确保达到节流间隔
+          if (performance.now() >= this._hotbarRenderTargetTime) {
+            this.renderHotbar();
+          }
+        });
       }
       return;
     }
     this._lastHotbarRenderTime = now;
-    // 如果有正在等待的延迟渲染，取消它
-    if (this._throttledRenderTimeout) {
-      clearTimeout(this._throttledRenderTimeout);
-      this._throttledRenderTimeout = null;
-    }
+    this._throttledRenderQueued = false;
     // --- 节流结束 ---
 
     const inventory = this.game.player.inventory;
