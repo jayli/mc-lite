@@ -100,3 +100,10 @@ Always respond in Chinese. 所有解释、说明和对话请使用中文。代�
 - 项目在线演示：<https://js-perf.cn>
 - 已实现 AO 修复管理器 (`src/core/AORepairManager.js`) 作为兜底机制，处理批量删除后的 AO 阴影不一致问题，当前默认禁用
 - 批量删除方块时使用 `isBatch=false` 参数会复用单次删除逻辑，避免竞态条件导致的 AO 丢失问题
+
+## Active Technologies
+- JavaScript ES6+ (ES2022) + Three.js 0.160.0, ES Modules (001-workbench-close)
+- N/A (内存状态管理) (001-workbench-close)
+
+## Recent Changes
+- 001-workbench-close: Added JavaScript ES6+ (ES2022) + Three.js 0.160.0, ES Modules
