@@ -1477,12 +1477,51 @@ export class Player {
             const islandOffsetZ = Math.floor(islandRandZ * (400 - 100)) + 50;
             let islandCx = rx * 400 + islandOffsetX;
             let islandCz = rz * 400 + islandOffsetZ;
-            // 确保海岛中心不会太靠近区域边界
-            const minMargin = 20 + 5; // halfSize(15) + transitionSize(10) + 5
+
+            // 计算金字塔位置（用于距离检查）
+            const pyramidRandX = Math.abs(Math.sin(seed * 1.5 + rx * 0.1));
+            const pyramidRandZ = Math.abs(Math.sin(seed * 2.5 + rz * 0.1));
+            const pyramidOffsetX = Math.floor(pyramidRandX * 300) + 100;
+            const pyramidOffsetZ = Math.floor(pyramidRandZ * 300) + 100;
+            let pyramidCx = rx * 400 + pyramidOffsetX;
+            let pyramidCz = rz * 400 + pyramidOffsetZ;
+            // 金字塔边界调整
+            const pyramidMinMargin = 20 + 8 + 5;
             const regionLeft = rx * 400;
             const regionRight = (rx + 1) * 400;
             const regionTop = rz * 400;
             const regionBottom = (rz + 1) * 400;
+            if (pyramidCx - pyramidMinMargin < regionLeft) pyramidCx = regionLeft + pyramidMinMargin;
+            else if (pyramidCx + pyramidMinMargin > regionRight) pyramidCx = regionRight - pyramidMinMargin;
+            if (pyramidCz - pyramidMinMargin < regionTop) pyramidCz = regionTop + pyramidMinMargin;
+            else if (pyramidCz + pyramidMinMargin > regionBottom) pyramidCz = regionBottom - pyramidMinMargin;
+
+            // 计算冰封山峰位置（用于距离检查）
+            const frozenMountainCx = pyramidCx - 160;
+            const frozenMountainCz = pyramidCz;
+
+            // 确保海岛远离冰封山峰（最小距离 100 格）
+            const minMountainDistance = 100;
+            const distMountainX = Math.abs(islandCx - frozenMountainCx);
+            const distMountainZ = Math.abs(islandCz - frozenMountainCz);
+            const distFromMountain = Math.max(distMountainX, distMountainZ);
+            if (distFromMountain < minMountainDistance) {
+              islandCx = frozenMountainCx + (islandCx > frozenMountainCx ? -minMountainDistance : minMountainDistance);
+              islandCz = frozenMountainCz + (islandCz > frozenMountainCz ? -minMountainDistance : minMountainDistance);
+            }
+
+            // 确保海岛远离金字塔（最小距离 50 格）
+            const minPyramidDistance = 50;
+            const distPyramidX = Math.abs(islandCx - pyramidCx);
+            const distPyramidZ = Math.abs(islandCz - pyramidCz);
+            const distFromPyramid = Math.max(distPyramidX, distPyramidZ);
+            if (distFromPyramid < minPyramidDistance) {
+              islandCx = pyramidCx + (islandCx > pyramidCx ? -minPyramidDistance : minPyramidDistance);
+              islandCz = pyramidCz + (islandCz > pyramidCz ? -minPyramidDistance : minPyramidDistance);
+            }
+
+            // 确保海岛中心不会太靠近区域边界
+            const minMargin = 20 + 5; // halfSize(15) + transitionSize(10) + 5
             if (islandCx - minMargin < regionLeft) islandCx = regionLeft + minMargin;
             else if (islandCx + minMargin > regionRight) islandCx = regionRight - minMargin;
             if (islandCz - minMargin < regionTop) islandCz = regionTop + minMargin;

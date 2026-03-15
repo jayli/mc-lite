@@ -61,7 +61,7 @@ export function getIslandInfo(wx, wz, seed, terrainGen) {
   const frozenMountainCx = pyramidCx - 160;
   const frozenMountainCz = pyramidCz;
 
-  // 计算海岛中心位置：需要远离冰封山峰
+  // 计算海岛中心位置：需要远离冰封山峰和金字塔
   // 海岛在 Z 轴方向随机偏移，与冰封山峰的 X 轴偏移错开
   const islandRandX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
   const islandRandZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
@@ -81,6 +81,18 @@ export function getIslandInfo(wx, wz, seed, terrainGen) {
     // 如果距离太近，将海岛移到冰封山峰的对面
     islandCx = frozenMountainCx + (islandCx > frozenMountainCx ? -minMountainDistance : minMountainDistance);
     islandCz = frozenMountainCz + (islandCz > frozenMountainCz ? -minMountainDistance : minMountainDistance);
+  }
+
+  // 确保海岛远离金字塔（最小距离 50 格）
+  const minPyramidDistance = 50;
+  const distPyramidX = Math.abs(islandCx - pyramidCx);
+  const distPyramidZ = Math.abs(islandCz - pyramidCz);
+  const distFromPyramid = Math.max(distPyramidX, distPyramidZ);
+
+  if (distFromPyramid < minPyramidDistance) {
+    // 如果距离太近，将海岛移到金字塔的对面
+    islandCx = pyramidCx + (islandCx > pyramidCx ? -minPyramidDistance : minPyramidDistance);
+    islandCz = pyramidCz + (islandCz > pyramidCz ? -minPyramidDistance : minPyramidDistance);
   }
 
   // 确保海岛中心不会太靠近区域边界
