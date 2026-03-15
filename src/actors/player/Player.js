@@ -13,6 +13,7 @@ import { Gun, WEAPON_TYPES } from '../weapon/Gun.js';
 import { getBlockProperties } from '../../constants/BlockData.js';
 import { nextOrientation } from '../../utils/OrientationUtils.js';
 import { IslandMap } from '../../workers/maps/IslandMap.js';
+import { terrainGen } from '../../world/TerrainGen.js';
 
 /**
  * 获取指定区域内的雪地中心位置
@@ -77,7 +78,7 @@ export class Player {
 
     // 在海岛出生
     console.log('[Spawn] 计算海岛出生点，seed:', WORLD_CONFIG.SEED);
-    const islandSpawn = IslandMap.getIslandSpawnPoint(WORLD_CONFIG.SEED, null);
+    const islandSpawn = IslandMap.getIslandSpawnPoint(WORLD_CONFIG.SEED, terrainGen);
     if (islandSpawn) {
       spawnX = islandSpawn.x;
       spawnZ = islandSpawn.z;
