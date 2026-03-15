@@ -175,23 +175,24 @@ onmessage = async function(e) {
         const distanceFromCenter = islandInfo.distFromCenter;
         const waterRingMax = 15 + 4 + 20; // 海岛半径 + 过渡带 + 海水环
 
-        // 在海岛四周强制生成海水（确保与大陆隔离至少 20 格）
+        // 在海岛四周强制生成沙块填充（确保与大陆隔离至少 20 格）
+        // 海水是用大平面模拟的，水下需要沙块填充来避免虚空裂缝
         if (distanceFromCenter > 15 + 4 && distanceFromCenter < waterRingMax) {
-          // 海水环区域：强制生成海水，填充到基岩层确保完全覆盖原有地形
+          // 海水环区域：从海平面下方一直填充沙块到基岩层
           const seaY = -2; // 海平面
           const bedrockY = -64; // 基岩层高度
-          for (let y = seaY; y >= bedrockY; y--) {
-            fakeChunk.add(wx, y, wz, 'water', dPlaceholder);
+          for (let y = seaY - 1; y >= bedrockY; y--) {
+            fakeChunk.add(wx, y, wz, 'sand', dPlaceholder);
           }
         }
 
-        // 如果海岛生成失败（由于形状噪声排除），但在过渡带内，强制生成海水填充
+        // 如果海岛生成失败（由于形状噪声排除），但在过渡带内，用沙块填充
         if (!islandResult && distanceFromCenter <= 15 + 4) {
-          // 过渡带区域：生成海水填充到基岩层
+          // 过渡带区域：从海平面下方用沙块填充到基岩层
           const seaY = -2;
           const bedrockY = -64;
-          for (let y = seaY; y >= bedrockY; y--) {
-            fakeChunk.add(wx, y, wz, 'water', dPlaceholder);
+          for (let y = seaY - 1; y >= bedrockY; y--) {
+            fakeChunk.add(wx, y, wz, 'sand', dPlaceholder);
           }
         }
 
