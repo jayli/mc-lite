@@ -4,18 +4,23 @@ import { InventoryUI } from './Inventory.js';
 import { playgroundService } from '../services/PlaygroundService.js';
 
 /**
- * UI管理器 - 负责协调所有UI组件的初始化和更新
- * 作为UI系统的总控制器，管理HUD和背包界面
+ * UI 管理器 - 负责协调所有 UI 组件的初始化和更新
+ * 作为 UI 系统的总控制器，管理 HUD 和背包界面
  */
 export class UIManager {
   /**
-   * 创建UI管理器实例
+   * 创建 UI 管理器实例
    * @param {Object} game - 游戏主对象，用于访问游戏状态和玩家数据
    */
   constructor(game) {
     this.game = game;
     this.hud = new HUD(game);        // 平视显示器
     this.inventoryUI = new InventoryUI(game); // 背包界面
+    // 玩家原始位置存储（闪现前的位置）
+    this.originalPlayerPosition = null;
+    this.hasTeleported = false;
+    // 手动记录的位置（优先级更高）
+    this.savedPlayerPosition = null;
     this.initSettings();
   }
 
@@ -37,6 +42,12 @@ export class UIManager {
     const btnZombie50 = document.getElementById('btn-zombie-50');
     const btnCreatePlayground = document.getElementById('btn-create-playground');
     const btnExportModel = document.getElementById('btn-export-model');
+    const btnTeleportFrozen = document.getElementById('btn-teleport-frozen');
+    const btnTeleportPyramid = document.getElementById('btn-teleport-pyramid');
+    const btnTeleportIsland = document.getElementById('btn-teleport-island');
+    const btnTeleportSnow = document.getElementById('btn-teleport-snow');
+    const btnReturnOrigin = document.getElementById('btn-return-origin');
+    const btnRecordPosition = document.getElementById('btn-record-position');
 
     // 防重复点击锁
     let isPlaygroundOperationInProgress = false;
@@ -230,6 +241,46 @@ export class UIManager {
       };
     }
 
+    // 闪现到地标按钮处理
+    this.updateReturnButtonState(); // 初始化返回按钮状态
+
+    if (btnTeleportFrozen) {
+      btnTeleportFrozen.onclick = (e) => {
+        e.stopPropagation();
+        this.teleportToLandmark('frozen', settingsModal);
+      };
+    }
+    if (btnTeleportPyramid) {
+      btnTeleportPyramid.onclick = (e) => {
+        e.stopPropagation();
+        this.teleportToLandmark('pyramid', settingsModal);
+      };
+    }
+    if (btnTeleportIsland) {
+      btnTeleportIsland.onclick = (e) => {
+        e.stopPropagation();
+        this.teleportToLandmark('island', settingsModal);
+      };
+    }
+    if (btnTeleportSnow) {
+      btnTeleportSnow.onclick = (e) => {
+        e.stopPropagation();
+        this.teleportToLandmark('snow', settingsModal);
+      };
+    }
+    if (btnReturnOrigin) {
+      btnReturnOrigin.onclick = (e) => {
+        e.stopPropagation();
+        this.returnToOriginalPosition(settingsModal);
+      };
+    }
+    if (btnRecordPosition) {
+      btnRecordPosition.onclick = (e) => {
+        e.stopPropagation();
+        this.recordCurrentPosition(settingsModal);
+      };
+    }
+
     // 点击背景关闭
     settingsModal.onclick = (e) => {
       if (e.target === settingsModal) {
@@ -306,11 +357,115 @@ export class UIManager {
   }
 
   /**
-   * 更新所有UI组件
+   * 更新所有 UI 组件
    * @param {number} dt - 时间增量（秒）
    */
   update(dt) {
-    this.hud.update();  // 更新HUD显示
+    this.hud.update();  // 更新 HUD 显示
     // 注意：背包界面只在打开时更新，由用户交互触发
+  }
+
+  /**
+   * 闪现到地标
+   * @param {string} landmarkType - 地标类型：'frozen' | 'pyramid' | 'island' | 'snow'
+   * @param {HTMLElement} settingsModal - 设置模态框元素
+   */
+  teleportToLandmark(landmarkType, settingsModal) {
+    if (!this.game || !this.game.player) return;
+
+    // 1. 记录当前位置
+    this.originalPlayerPosition = {
+      x: this.game.player.position.x,
+      y: this.game.player.position.y,
+      z: this.game.player.position.z
+    };
+    this.hasTeleported = true;
+
+    // 2. 计算目标位置
+    const target = this.game.player.getNearestLandmarkPosition(landmarkType);
+
+    if (!target) {
+      this.hud.showMessage('未找到该地标，请尝试移动到其他地方再试');
+      return;
+    }
+
+    // 3. 获取地表高度
+    const surfaceY = this.game.player.getSurfaceHeight(target.x, target.z);
+
+    // 4. 关闭设置面板
+    settingsModal.style.display = 'none';
+
+    // 5. 执行闪现（目标 Y 坐标为地表 +10）
+    this.game.player.teleportTo(target.x, surfaceY + 10, target.z);
+
+    // 6. 更新返回按钮状态
+    this.updateReturnButtonState();
+
+    // 7. 显示提示信息
+    const landmarkNames = {
+      'frozen': '冰封山峰',
+      'pyramid': '金字塔',
+      'island': '海岛',
+      'snow': '雪地'
+    };
+    this.hud.showMessage(`已闪现到${landmarkNames[landmarkType] || '目的地'}`);
+  }
+
+  /**
+   * 返回原位置
+   * @param {HTMLElement} settingsModal - 设置模态框元素
+   */
+  returnToOriginalPosition(settingsModal) {
+    // 优先返回手动记录的位置
+    const targetPos = this.savedPlayerPosition || this.originalPlayerPosition;
+    if (!targetPos || !this.game || !this.game.player) return;
+
+    // 关闭设置面板
+    settingsModal.style.display = 'none';
+
+    // 执行返回
+    this.game.player.teleportTo(
+      targetPos.x,
+      targetPos.y,
+      targetPos.z
+    );
+
+    // 清空记录的位置
+    this.savedPlayerPosition = null;
+    this.originalPlayerPosition = null;
+    this.hasTeleported = false;
+    this.updateReturnButtonState();
+
+    this.hud.showMessage('已返回原位置');
+  }
+
+  /**
+   * 记录当前位置
+   * @param {HTMLElement} settingsModal - 设置模态框元素
+   */
+  recordCurrentPosition(settingsModal) {
+    if (!this.game || !this.game.player) return;
+
+    // 记录当前位置
+    this.savedPlayerPosition = {
+      x: this.game.player.position.x,
+      y: this.game.player.position.y,
+      z: this.game.player.position.z
+    };
+
+    this.updateReturnButtonState();
+    this.hud.showMessage('已记录当前位置');
+  }
+
+  /**
+   * 更新返回按钮状态
+   */
+  updateReturnButtonState() {
+    const btnReturn = document.getElementById('btn-return-origin');
+    if (btnReturn) {
+      const hasPosition = this.savedPlayerPosition || this.originalPlayerPosition;
+      btnReturn.disabled = !hasPosition;
+      btnReturn.style.background = hasPosition ? '#4a90e2' : '#999';
+    }
   }
 }

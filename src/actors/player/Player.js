@@ -14,6 +14,9 @@ import { getBlockProperties } from '../../constants/BlockData.js';
 import { nextOrientation } from '../../utils/OrientationUtils.js';
 import { IslandMap } from '../../workers/maps/IslandMap.js';
 import { terrainGen } from '../../world/TerrainGen.js';
+import { FrozenMountain } from '../../workers/maps/FrozenMountain.js';
+import { Pyramid } from '../../workers/maps/Pyramid.js';
+import { SnowLand } from '../../workers/maps/SnowLand.js';
 
 /**
  * 获取指定区域内的雪地中心位置
@@ -1380,5 +1383,163 @@ export class Player {
       this.arm.rotation.x = -0.8 - Math.sin((10 - this.swingTime) / 10 * Math.PI) * 0.87;
       this.swingTime--;
     } else this.arm.rotation.x = -0.8;
+  }
+
+  /**
+   * 传送到指定位置
+   * @param {number} x - X 坐标
+   * @param {number} y - Y 坐标
+   * @param {number} z - Z 坐标
+   */
+  teleportTo(x, y, z) {
+    this.position.set(x, y, z);
+    this.camera.position.copy(this.position);
+    // 重置速度，防止传送后继续移动
+    this.velocity.set(0, 0, 0);
+  }
+
+  /**
+   * 获取最近的地标位置
+   * @param {string} landmarkType - 'frozen' | 'pyramid' | 'island' | 'snow'
+   * @returns {Object|null} - {x, z} 地标中心坐标，如果未找到则返回 null
+   */
+  getNearestLandmarkPosition(landmarkType) {
+    const px = Math.floor(this.position.x);
+    const pz = Math.floor(this.position.z);
+    const seed = WORLD_CONFIG.SEED;
+
+    // 计算当前所在区域
+    const regionX = Math.floor(px / 400);
+    const regionZ = Math.floor(pz / 400);
+
+    // 搜索周围 3x3 的区域，找到最近的地标
+    const searchRadius = 1;
+    let nearestDist = Infinity;
+    let nearestPoint = null;
+
+    for (let rx = regionX - searchRadius; rx <= regionX + searchRadius; rx++) {
+      for (let rz = regionZ - searchRadius; rz <= regionZ + searchRadius; rz++) {
+        let centerX = null;
+        let centerZ = null;
+
+        // 直接计算每个区域的地标中心位置，而不是通过 getInfo 判断
+        switch (landmarkType) {
+          case 'frozen': {
+            // 冰封山峰：金字塔位置 + (-160, 0)
+            const randX = Math.abs(Math.sin(seed * 1.5 + rx * 0.1));
+            const randZ = Math.abs(Math.sin(seed * 2.5 + rz * 0.1));
+            const offsetX = Math.floor(randX * 300) + 100;
+            const offsetZ = Math.floor(randZ * 300) + 100;
+            const pyramidCx = rx * 400 + offsetX;
+            const pyramidCz = rz * 400 + offsetZ;
+            // 确保金字塔中心不会太靠近边界（与 FrozenMountain.js 逻辑一致）
+            const minMargin = 44 + 5; // halfSize(40) + transitionSize(4) + 5
+            const regionLeft = rx * 400;
+            const regionRight = (rx + 1) * 400;
+            const regionTop = rz * 400;
+            const regionBottom = (rz + 1) * 400;
+            let mountainCx = pyramidCx - 160;
+            let mountainCz = pyramidCz;
+            if (mountainCx - minMargin < regionLeft) mountainCx = regionLeft + minMargin;
+            else if (mountainCx + minMargin > regionRight) mountainCx = regionRight - minMargin;
+            if (mountainCz - minMargin < regionTop) mountainCz = regionTop + minMargin;
+            else if (mountainCz + minMargin > regionBottom) mountainCz = regionBottom - minMargin;
+            centerX = mountainCx;
+            centerZ = mountainCz;
+            break;
+          }
+          case 'pyramid': {
+            const randX = Math.abs(Math.sin(seed * 1.5 + rx * 0.1));
+            const randZ = Math.abs(Math.sin(seed * 2.5 + rz * 0.1));
+            const offsetX = Math.floor(randX * 300) + 100;
+            const offsetZ = Math.floor(randZ * 300) + 100;
+            let pyramidCx = rx * 400 + offsetX;
+            let pyramidCz = rz * 400 + offsetZ;
+            // 确保金字塔中心不会太靠近边界（与 Pyramid.js 逻辑一致）
+            const minMargin = 20 + 8 + 5; // halfSize(20) + transitionSize(8) + 5
+            const regionLeft = rx * 400;
+            const regionRight = (rx + 1) * 400;
+            const regionTop = rz * 400;
+            const regionBottom = (rz + 1) * 400;
+            if (pyramidCx - minMargin < regionLeft) pyramidCx = regionLeft + minMargin;
+            else if (pyramidCx + minMargin > regionRight) pyramidCx = regionRight - minMargin;
+            if (pyramidCz - minMargin < regionTop) pyramidCz = regionTop + minMargin;
+            else if (pyramidCz + minMargin > regionBottom) pyramidCz = regionBottom - minMargin;
+            centerX = pyramidCx;
+            centerZ = pyramidCz;
+            break;
+          }
+          case 'island': {
+            // 海岛位置计算与 IslandMap.js 一致
+            const islandRandX = Math.abs(Math.sin(seed * 1.5 + rx * 0.1));
+            const islandRandZ = Math.abs(Math.sin(seed * 2.5 + rz * 0.1));
+            const islandOffsetX = Math.floor(islandRandX * (400 - 100)) + 50;
+            const islandOffsetZ = Math.floor(islandRandZ * (400 - 100)) + 50;
+            let islandCx = rx * 400 + islandOffsetX;
+            let islandCz = rz * 400 + islandOffsetZ;
+            // 确保海岛中心不会太靠近区域边界
+            const minMargin = 20 + 5; // halfSize(15) + transitionSize(10) + 5
+            const regionLeft = rx * 400;
+            const regionRight = (rx + 1) * 400;
+            const regionTop = rz * 400;
+            const regionBottom = (rz + 1) * 400;
+            if (islandCx - minMargin < regionLeft) islandCx = regionLeft + minMargin;
+            else if (islandCx + minMargin > regionRight) islandCx = regionRight - minMargin;
+            if (islandCz - minMargin < regionTop) islandCz = regionTop + minMargin;
+            else if (islandCz + minMargin > regionBottom) islandCz = regionBottom - minMargin;
+            centerX = islandCx;
+            centerZ = islandCz;
+            break;
+          }
+          case 'snow': {
+            // 雪地：金字塔位置 + (160, 0)（SnowLand.js 中没有边界限制调整）
+            const randX = Math.abs(Math.sin(seed * 1.5 + rx * 0.1));
+            const randZ = Math.abs(Math.sin(seed * 2.5 + rz * 0.1));
+            const offsetX = Math.floor(randX * 300) + 100;
+            const offsetZ = Math.floor(randZ * 300) + 100;
+            const pyramidCx = rx * 400 + offsetX;
+            const pyramidCz = rz * 400 + offsetZ;
+            // SnowLand.js 中直接使用金字塔位置 +160，不做边界限制
+            let snowLandCx = pyramidCx + 160;
+            let snowLandCz = pyramidCz;
+            centerX = snowLandCx;
+            centerZ = snowLandCz;
+            break;
+          }
+        }
+
+        if (centerX !== null && centerZ !== null) {
+          const dx = centerX - px;
+          const dz = centerZ - pz;
+          const dist = Math.sqrt(dx * dx + dz * dz);
+          if (dist < nearestDist) {
+            nearestDist = dist;
+            nearestPoint = { x: centerX, z: centerZ };
+          }
+        }
+      }
+    }
+
+    return nearestPoint;
+  }
+
+  /**
+   * 获取指定位置的地表高度
+   * @param {number} x - X 坐标
+   * @param {number} z - Z 坐标
+   * @returns {number} 地表高度，如果无法确定则返回 0
+   */
+  getSurfaceHeight(x, z) {
+    // 使用 world 的 getBlock 方法从高处向下扫描找到地表
+    const startY = 100; // 从高处开始
+    for (let y = startY; y > -20; y--) {
+      const block = this.world.getBlock(Math.floor(x), y, Math.floor(z));
+      if (block && block !== 'water') {
+        // 找到非水方块，返回其上方一格
+        return y + 1;
+      }
+    }
+    // 默认返回海平面高度
+    return -1;
   }
 }
