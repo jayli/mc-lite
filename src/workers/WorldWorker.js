@@ -196,11 +196,11 @@ onmessage = async function(e) {
           }
         }
 
-        // 在海岛主体区域生成树木（1-2 棵）
+        // 在海岛主体区域生成树木（减少概率，每座海岛约 1 棵）
         if (islandResult && islandInfo.zone === 'core' && !islandResult.isBelowSeaLevel) {
           // 使用区块级别的确定性随机来决定是否生成树木
           const treeChance = seededRandom(wx, wz, seed + 100);
-          const treeCount = islandInfo.transitionFactor === 0 ? (treeChance < 0.003 ? 2 : treeChance < 0.006 ? 1 : 0) : 0;
+          const treeCount = islandInfo.transitionFactor === 0 ? (treeChance < 0.0015 ? 2 : treeChance < 0.003 ? 1 : 0) : 0;
 
           if (treeCount > 0) {
             // 生成树木
