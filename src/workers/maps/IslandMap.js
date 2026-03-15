@@ -71,8 +71,8 @@ export function getIslandInfo(wx, wz, seed, terrainGen) {
   let islandCx = regionX * regionSize + islandOffsetX;
   let islandCz = regionZ * regionSize + islandOffsetZ;
 
-  // 确保海岛远离冰封山峰（最小距离 100 格）
-  const minMountainDistance = 100;
+  // 确保海岛远离冰封山峰（最小距离 130 格）
+  const minMountainDistance = 130;
   const distMountainX = Math.abs(islandCx - frozenMountainCx);
   const distMountainZ = Math.abs(islandCz - frozenMountainCz);
   const distFromMountain = Math.max(distMountainX, distMountainZ);

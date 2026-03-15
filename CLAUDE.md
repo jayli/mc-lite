@@ -1,10 +1,9 @@
 # CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
-Always respond in Chinese. 所有解释、说明和对话请使用中文。代码注释也尽量使用中文。
+- Always respond in Chinese. 所有解释、说明和对话请使用中文。代码注释也尽量使用中文。
+- 不管你是什么大模型，都要跟 claude code 做好兼容、打好配合，任务不要意外中断，尽最大努力调用 claude tools 持续执行任务。
 
 ## 项目简介
-这是一个基于 Three.js 的 3D 体素游戏（Minecraft 克隆），基于 ES6+ Modules 开发。这是一个客户端应用，通过自定义 HTTP 服务器进行开发。
+这是一个基于 Three.js 的 3D 体素游戏（Minecraft 克隆），这是一个纯客户端应用，没有后端，自启动一个 HTTP 静态服务器进行开发。
 
 ## 开发命令
 - **启动开发服务器**: `npm run start` (端口 8080)
