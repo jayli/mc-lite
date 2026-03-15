@@ -200,16 +200,27 @@ function getBlockDistribution(wx, wz, islandInfo, seed) {
  * @returns {Object} 生成结果 { surfaceY, isBelowSeaLevel }
  */
 export function generateIsland(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, seed) {
-  const { seaLevel } = ISLAND_CONFIG;
+  const { seaLevel, islandSize } = ISLAND_CONFIG;
+  const halfSize = Math.floor(islandSize / 2);
 
   // 检查是否在海岛范围内
   if (!isInIsland(wx, wz, islandInfo, seed)) {
     return null;
   }
 
-  // 计算地表高度（基于地形高度 + 最多 2 格起伏）
-  const heightVariation = Math.floor(seededRandom(wx, wz, seed + 50) * 2);
-  const surfaceY = h + heightVariation;
+  // 海岛表面高度固定为海平面以上 1-2 格，确保平整
+  // 核心区域高度统一，过渡区域逐渐降低到海平面
+  let surfaceY;
+  if (islandInfo.zone === 'core') {
+    // 核心区域：固定高度（海平面以上 1-2 格，尽量平整）
+    const minorVariation = seededRandom(wx, wz, seed + 50) < 0.3 ? 1 : 0;
+    surfaceY = seaLevel + 1 + minorVariation;
+  } else {
+    // 过渡区域：从核心高度逐渐降到海平面
+    const t = islandInfo.transitionFactor;
+    const baseHeight = seaLevel + 1;
+    surfaceY = Math.floor(baseHeight * (1 - t) + seaLevel * t);
+  }
 
   // 判断是否在海平面以下
   const isBelowSeaLevel = surfaceY <= seaLevel - 1;
@@ -220,17 +231,18 @@ export function generateIsland(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, s
   // 生成地表方块
   fakeChunk.add(wx, surfaceY, wz, blockType, dPlaceholder);
 
-  // 生成地下填充层
-  // dirt 层（3-5 层）
-  const dirtLayers = 3 + Math.floor(seededRandom(wx, wz, seed + 60) * 3);
-  for (let y = surfaceY - 1; y >= surfaceY - dirtLayers; y--) {
-    fakeChunk.add(wx, y, wz, 'dirt', dPlaceholder);
-  }
-
-  // stone 层和 end_stone 基岩层（共 12 层）
-  for (let y = surfaceY - dirtLayers - 1; y >= h - 12; y--) {
-    const blockType = y <= h - 12 ? 'end_stone' : 'stone';
-    fakeChunk.add(wx, y, wz, blockType, dPlaceholder);
+  // 生成地下填充层到海平面以下
+  const bottomY = Math.min(h - 12, seaLevel - 5);
+  for (let y = surfaceY - 1; y >= bottomY; y--) {
+    let fillType;
+    if (y === surfaceY - 1) {
+      fillType = 'dirt'; // 表层下方是 dirt
+    } else if (y > seaLevel) {
+      fillType = y % 3 === 0 ? 'dirt' : 'stone'; // 混合层
+    } else {
+      fillType = 'stone'; // 海平面以下是 stone
+    }
+    fakeChunk.add(wx, y, wz, fillType, dPlaceholder);
   }
 
   return { surfaceY, isBelowSeaLevel };
