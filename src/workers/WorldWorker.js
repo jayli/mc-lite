@@ -173,6 +173,19 @@ onmessage = async function(e) {
         // 海岛生成逻辑
         const islandResult = IslandMap.generate(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, seed);
 
+        // 在海岛四周强制生成海水（确保与大陆隔离至少 20 格）
+        // 海岛半径约 15 格 + 过渡带 4 格 + 海水环 20 格 = 从中心算起约 40 格
+        const distanceFromCenter = islandInfo.distFromCenter;
+        const waterRingMax = 15 + 4 + 20; // 海岛半径 + 过渡带 + 海水环
+
+        if (distanceFromCenter > 15 + 4 && distanceFromCenter < waterRingMax) {
+          // 海水环区域：强制生成海水
+          const seaY = -2; // 海平面
+          for (let y = seaY; y >= seaY - 3; y--) {
+            fakeChunk.add(wx, y, wz, 'water', dPlaceholder);
+          }
+        }
+
         // 在海岛主体区域生成树木（1-2 棵）
         if (islandResult && islandInfo.zone === 'core' && !islandResult.isBelowSeaLevel) {
           // 使用区块级别的确定性随机来决定是否生成树木

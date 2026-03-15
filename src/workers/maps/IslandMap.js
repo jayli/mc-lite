@@ -212,8 +212,8 @@ export function generateIsland(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, s
     return null;
   }
 
-  // 海岛表面高度完全固定（海平面以上 1 格），确保绝对平整
-  const surfaceY = seaLevel + 1;
+  // 海岛表面高度完全固定（海平面以上 0 格，即与海平面齐平）
+  const surfaceY = seaLevel;
 
   // 判断是否在海平面以下
   const isBelowSeaLevel = surfaceY <= seaLevel - 1;
