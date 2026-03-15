@@ -172,16 +172,24 @@ onmessage = async function(e) {
       } else if (inIsland) {
         // 海岛生成逻辑
         const islandResult = IslandMap.generate(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, seed);
-
-        // 在海岛四周强制生成海水（确保与大陆隔离至少 20 格）
-        // 海岛半径约 15 格 + 过渡带 4 格 + 海水环 20 格 = 从中心算起约 40 格
         const distanceFromCenter = islandInfo.distFromCenter;
         const waterRingMax = 15 + 4 + 20; // 海岛半径 + 过渡带 + 海水环
 
+        // 在海岛四周强制生成海水（确保与大陆隔离至少 20 格）
         if (distanceFromCenter > 15 + 4 && distanceFromCenter < waterRingMax) {
           // 海水环区域：强制生成海水，填充到基岩层确保完全覆盖原有地形
           const seaY = -2; // 海平面
           const bedrockY = -64; // 基岩层高度
+          for (let y = seaY; y >= bedrockY; y--) {
+            fakeChunk.add(wx, y, wz, 'water', dPlaceholder);
+          }
+        }
+
+        // 如果海岛生成失败（由于形状噪声排除），但在过渡带内，强制生成海水填充
+        if (!islandResult && distanceFromCenter <= 15 + 4) {
+          // 过渡带区域：生成海水填充到基岩层
+          const seaY = -2;
+          const bedrockY = -64;
           for (let y = seaY; y >= bedrockY; y--) {
             fakeChunk.add(wx, y, wz, 'water', dPlaceholder);
           }
