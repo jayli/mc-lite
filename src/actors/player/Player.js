@@ -12,6 +12,7 @@ import { gunModel, mag7Model, minigunModel } from '../../core/Engine.js';
 import { Gun, WEAPON_TYPES } from '../weapon/Gun.js';
 import { getBlockProperties } from '../../constants/BlockData.js';
 import { nextOrientation } from '../../utils/OrientationUtils.js';
+import { IslandMap } from '../../workers/maps/IslandMap.js';
 
 /**
  * 获取指定区域内的雪地中心位置
@@ -71,14 +72,22 @@ export class Player {
     this.moveCheckFrequency = 1;   // 碰撞检测频率 (每几帧检查一次)
 
     // 初始出生点逻辑
-    // 直接在 snow_land 中心附近出生，100% 保证在雪地附近
-    const slInfo = getSnowLandCenter(0, 0, WORLD_CONFIG.SEED);
+    // 玩家必定出生在海岛（测试模式）
+    let spawnX, spawnZ;
 
-    // 在雪地中心附近选择一个出生点（稍微偏移一点，避免正中心）
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 5 + Math.random() * 5; // 5-10 格偏移
-    const spawnX = slInfo.centerX + Math.cos(angle) * dist;
-    const spawnZ = slInfo.centerZ + Math.sin(angle) * dist;
+    // 在海岛出生
+    const islandSpawn = IslandMap.getIslandSpawnPoint(WORLD_CONFIG.SEED, null);
+    if (islandSpawn) {
+      spawnX = islandSpawn.x;
+      spawnZ = islandSpawn.z;
+      console.log('[Spawn] 出生在海岛:', spawnX, spawnZ, '中心点：', islandSpawn.islandCenterX, islandSpawn.islandCenterZ);
+    } else {
+      // 如果海岛出生点计算失败，回退到雪地出生
+      console.log('[Spawn] 海岛出生点计算失败，回退到雪地');
+      const slInfo = getSnowLandCenter(0, 0, WORLD_CONFIG.SEED);
+      spawnX = slInfo.centerX;
+      spawnZ = slInfo.centerZ;
+    }
 
     // 直接在这个位置出生，不做高度/生物群系检查
     // 玩家初始 y 坐标设为 70，会通过物理系统下落到地面

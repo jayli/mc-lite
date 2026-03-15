@@ -1,5 +1,5 @@
 // src/workers/maps/IslandMap.js
-import { Tree } from '../world/entities/Tree.js';
+// 海岛生成器模块 - 不依赖 Tree，树木生成在 WorldWorker 中处理
 
 // 海岛配置常量
 const ISLAND_CONFIG = {
@@ -236,8 +236,67 @@ export function generateIsland(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, s
   return { surfaceY, isBelowSeaLevel };
 }
 
+/**
+ * 计算海岛出生点位置
+ * @param {number} seed - 世界种子
+ * @param {Object} terrainGen - 地形生成器
+ * @returns {Object|null} 出生点信息 { x, y, z, islandCenterX, islandCenterZ, isBeach, yaw, pitch } 或 null
+ */
+export function getIslandSpawnPoint(seed, terrainGen) {
+  const { regionSize, islandSize, transitionSize, seaLevel } = ISLAND_CONFIG;
+  const halfSize = Math.floor(islandSize / 2);
+  const beachRadius = halfSize - 2; // 沙滩边缘半径
+
+  // 遍历几个区域，找到第一个可用的海岛
+  for (let regionX = -2; regionX <= 2; regionX++) {
+    for (let regionZ = -2; regionZ <= 2; regionZ++) {
+      // 计算海岛中心
+      const randX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
+      const randZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
+      const offsetX = Math.floor(randX * (regionSize - islandSize * 2)) + islandSize;
+      const offsetZ = Math.floor(randZ * (regionSize - islandSize * 2)) + islandSize;
+
+      const islandCx = regionX * regionSize + offsetX;
+      const islandCz = regionZ * regionSize + offsetZ;
+
+      // 在海滩边缘找出生点（四个方向尝试）
+      const directions = [
+        { x: 1, z: 0, yaw: 0 },      // 东
+        { x: -1, z: 0, yaw: Math.PI }, // 西
+        { x: 0, z: 1, yaw: Math.PI / 2 }, // 南
+        { x: 0, z: -1, yaw: -Math.PI / 2 }  // 北
+      ];
+
+      for (const dir of directions) {
+        const spawnX = islandCx + dir.x * beachRadius;
+        const spawnZ = islandCz + dir.z * beachRadius;
+
+        // 检查这个位置是否在海岛范围内
+        const islandInfo = getIslandInfo(spawnX, spawnZ, seed, terrainGen);
+        if (islandInfo && islandInfo.zone === 'transition') {
+          // 使用基础地形高度计算出生点 Y 坐标
+          // 注意：实际的 Y 坐标需要在 WorldWorker 中根据实际地形确定
+          return {
+            x: spawnX,
+            y: seaLevel + 2, // 默认海平面以上
+            z: spawnZ,
+            islandCenterX: islandCx,
+            islandCenterZ: islandCz,
+            isBeach: true,
+            yaw: dir.yaw,
+            pitch: 0
+          };
+        }
+      }
+    }
+  }
+
+  return null;
+}
+
 // 模块导出
 export const IslandMap = {
   getIslandInfo,
-  generate: generateIsland
+  generate: generateIsland,
+  getIslandSpawnPoint
 };
