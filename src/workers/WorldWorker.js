@@ -413,12 +413,10 @@ onmessage = async function(e) {
 
   structureQueueWithCenters.forEach(({ task, centerX, centerY, centerZ, type }) => {
     task();
-    // 如果是大型结构，添加到结构中心列表
-    // 关键修复：只添加中心点在当前 Chunk 内的结构
+    // 记录所有有中心点的结构，不限于当前 Chunk
+    // 这是修复跨 Chunk 截断的关键：相邻 Chunk 需要知道这些结构的信息
     if (type && centerX !== undefined) {
-      if (centerX >= minX && centerX < maxX && centerZ >= minZ && centerZ < maxZ) {
-        structureCenters.push({ type, x: centerX, y: centerY, z: centerZ });
-      }
+      structureCenters.push({ type, x: centerX, y: centerY, z: centerZ });
     }
   });
 
