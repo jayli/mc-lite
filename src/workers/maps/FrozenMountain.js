@@ -34,6 +34,10 @@ export function getFrozenMountainInfo(wx, wz, seed, terrainGen) {
   const transitionSize = 4; // 过渡带大小 4 格
   const regionSize = 400;  // 每 400x400 区域生成一个冰封山峰
 
+  // 椭圆形山体参数：让一个方向更陡峭，增加自然感
+  const steepAxisFactor = 0.65;  // Z 轴方向压缩系数，<1 表示该方向更陡
+  const steepAxis = 'z';          // 陡峭方向：'z' 或 'x'
+
   // 计算当前坐标所在的区域
   const regionX = Math.floor(wx / regionSize);
   const regionZ = Math.floor(wz / regionSize);
@@ -85,11 +89,14 @@ export function getFrozenMountainInfo(wx, wz, seed, terrainGen) {
     return null;
   }
 
-  // 计算相对于冰封山峰中心的距离
+  // 计算相对于冰封山峰中心的距离（使用椭圆剖面，让一个方向更陡峭）
   const dx = wx - mountainCx;
   const dz = wz - mountainCz;
+  // 根据陡峭方向选择压缩轴，使该方向坡度更陡峭
+  const adjustedDx = steepAxis === 'x' ? dx / steepAxisFactor : dx;
+  const adjustedDz = steepAxis === 'z' ? dz / steepAxisFactor : dz;
   const distFromCenter = Math.max(Math.abs(dx), Math.abs(dz));
-  const euclidDist = Math.sqrt(dx * dx + dz * dz);
+  const euclidDist = Math.sqrt(adjustedDx * adjustedDx + adjustedDz * adjustedDz);
 
   // 计算冰封山峰基准高度（中心处的地形高度）
   const centerBiome = terrainGen.getBiome(mountainCx, mountainCz);

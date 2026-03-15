@@ -821,12 +821,12 @@ export class Player {
 
         if (specialEntity.userData.collisionBlocks.length > 0) {
           this.world.removeBlocksBatch(specialEntity.userData.collisionBlocks);
-          console.log(`[Combat] Mag7 击中特殊实体(${specialEntity.userData.type || 'unknown'})，移除 ${specialEntity.userData.collisionBlocks.length} 个碰撞方块`);
+          // console.log(`[Combat] Mag7 击中特殊实体(${specialEntity.userData.type || 'unknown'})，移除 ${specialEntity.userData.collisionBlocks.length} 个碰撞方块`);
         }
 
         if (specialEntity.parent) {
           specialEntity.parent.remove(specialEntity);
-          console.log(`[Combat] Mag7 击中特殊实体(${specialEntity.userData.type || 'unknown'})，模型已移除`);
+          // console.log(`[Combat] Mag7 击中特殊实体(${specialEntity.userData.type || 'unknown'})，模型已移除`);
         }
         break; // 击中一个后停止
       }
@@ -1029,14 +1029,6 @@ export class Player {
   }
 
   /**
-   * 打开宝箱
-   * 处理宝箱的打开动画和奖励发放
-   * @param {THREE.Mesh} mesh - 宝箱网格对象
-   * @param {number} instanceId - 实例ID
-   * @param {THREE.Vector3} pos - 宝箱位置
-   */
-
-  /**
    * 从射线检测击中信息计算放置位置
    * 使用 hit.point 计算点击的面，确保旋转方块的正确性
    * @param {Object} hit - 射线检测击中信息
@@ -1081,6 +1073,13 @@ export class Player {
     };
   }
 
+  /**
+   * 打开宝箱
+   * 处理宝箱的打开动画和奖励发放
+   * @param {THREE.Mesh} mesh - 宝箱网格对象
+   * @param {number} instanceId - 实例ID
+   * @param {THREE.Vector3} pos - 宝箱位置
+   */
   openChest(mesh, instanceId, pos) {
     const info = mesh.userData.chests[instanceId];
     if (!info || info.open) return;
@@ -1090,7 +1089,11 @@ export class Player {
     this._dummyMatrix.scale(this._zeroVector);
     mesh.setMatrixAt(instanceId, this._dummyMatrix);
     mesh.instanceMatrix.needsUpdate = true;
-    const drops = pos.y > 60 ? ['diamond', 'god_sword', 'gold_apple'] : [['diamond', 'gold', 'apple', 'bookbox', 'planks'][Math.floor(Math.random() * 5)]].concat([['diamond', 'gold', 'apple', 'bookbox', 'planks'][Math.floor(Math.random() * 5)]]);
+    const drops = pos.y > 60 ? [
+        'diamond', 'god_sword', 'gold_apple'
+    ] : [['diamond', 'gold', 'apple', 'bookbox', 'planks'][Math.floor(Math.random() * 5)]].concat(
+      [['diamond', 'gold', 'apple', 'bookbox', 'planks'][Math.floor(Math.random() * 5)]]
+    );
     drops.forEach(item => this.inventory.add(item, 1));
   }
 
@@ -1105,7 +1108,12 @@ export class Player {
    */
   tryPlaceBlock(x, y, z, type) {
     if (this.physics.isSolid(x, y, z)) return false;
-    if (this.position.x - 0.3 < x + 1 && this.position.x + 0.3 > x && this.position.y < y + 1 && this.position.y + 1.8 > y && this.position.z - 0.3 < z + 1 && this.position.z + 0.3 > z) return false;
+    if (this.position.x - 0.3 < x + 1 &&
+      this.position.x + 0.3 > x &&
+      this.position.y < y + 1 &&
+      this.position.y + 1.8 > y &&
+      this.position.z - 0.3 < z + 1 &&
+      this.position.z + 0.3 > z) return false;
     // 获取放置朝向（只有在同一位置移除并放置相同方块时才旋转）
     const orientation = this.getPlacementOrientation(x, y, z, type);
     // 放置后清除移除记忆
