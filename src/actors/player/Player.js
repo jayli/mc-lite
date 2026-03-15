@@ -349,13 +349,33 @@ export class Player {
     const pz = Math.floor(this.position.z);
     const py = Math.floor(this.position.y);
 
-    for(let k=0; k<=4; k++) {
+    // 向下检查固体方块（最多 10 格，增加检查深度以应对海底沙块填充）
+    for(let k=0; k<=10; k++) {
       const blockType = this.world.getBlock(px, py - k, pz);
       if(this.physics.isSolid(px, py - k, pz) || blockType === 'cloud') {
         gy = py - k + 1;
         break;
       }
     }
+
+    // 如果没有检测到固体，且玩家在海洋区域（y < -1），使用海平面作为支撑
+    if(gy === -100 && py < -1) {
+      // 检查是否在海岛或海洋区域：使用海平面（y=-2）作为基准
+      // 海底沙块从 y=-3 开始填充，所以地面高度应该是 y=-2
+      const seaLevel = -2;
+      // 检查海平面附近是否有沙块支撑
+      for(let k=0; k<=5; k++) {
+        const checkY = seaLevel - k;
+        const blockType = this.world.getBlock(px, checkY, pz);
+        if(this.physics.isSolid(px, checkY, pz)) {
+          // 找到支撑，地面高度为支撑方块上方
+          gy = checkY + 1;
+          break;
+        }
+      }
+    }
+
+    // 如果仍然没有检测到地面，回退到噪声地形高度
     if(gy === -100) gy = Math.floor(noise(px, pz) * 0.5) + 1;
 
     this.position.y += this.velocity.y * dt;
