@@ -245,7 +245,8 @@ export function generateIsland(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, s
 export function getIslandSpawnPoint(seed, terrainGen) {
   const { regionSize, islandSize, transitionSize, seaLevel } = ISLAND_CONFIG;
   const halfSize = Math.floor(islandSize / 2);
-  const beachRadius = halfSize - 2; // 沙滩边缘半径
+  const totalHalfSize = halfSize + transitionSize;
+  const beachRadius = halfSize - 1; // 沙滩边缘半径（靠近核心区域边缘）
 
   // 遍历几个区域，找到第一个可用的海岛
   for (let regionX = -2; regionX <= 2; regionX++) {
@@ -273,9 +274,8 @@ export function getIslandSpawnPoint(seed, terrainGen) {
 
         // 检查这个位置是否在海岛范围内
         const islandInfo = getIslandInfo(spawnX, spawnZ, seed, terrainGen);
-        if (islandInfo && islandInfo.zone === 'transition') {
-          // 使用基础地形高度计算出生点 Y 坐标
-          // 注意：实际的 Y 坐标需要在 WorldWorker 中根据实际地形确定
+        if (islandInfo) {
+          // 返回出生点（可以是 core 或 transition 区域）
           return {
             x: spawnX,
             y: seaLevel + 2, // 默认海平面以上
@@ -284,7 +284,8 @@ export function getIslandSpawnPoint(seed, terrainGen) {
             islandCenterZ: islandCz,
             isBeach: true,
             yaw: dir.yaw,
-            pitch: 0
+            pitch: 0,
+            zone: islandInfo.zone
           };
         }
       }

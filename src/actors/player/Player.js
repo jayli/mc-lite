@@ -76,11 +76,14 @@ export class Player {
     let spawnX, spawnZ;
 
     // 在海岛出生
+    console.log('[Spawn] 计算海岛出生点，seed:', WORLD_CONFIG.SEED);
     const islandSpawn = IslandMap.getIslandSpawnPoint(WORLD_CONFIG.SEED, null);
     if (islandSpawn) {
       spawnX = islandSpawn.x;
       spawnZ = islandSpawn.z;
-      console.log('[Spawn] 出生在海岛:', spawnX, spawnZ, '中心点：', islandSpawn.islandCenterX, islandSpawn.islandCenterZ);
+      console.log('[Spawn] 出生在海岛:', spawnX, spawnZ);
+      console.log('[Spawn] 海岛中心：', islandSpawn.islandCenterX, islandSpawn.islandCenterZ);
+      console.log('[Spawn] 区域：', islandSpawn.zone);
     } else {
       // 如果海岛出生点计算失败，回退到雪地出生
       console.log('[Spawn] 海岛出生点计算失败，回退到雪地');
@@ -92,6 +95,7 @@ export class Player {
     // 直接在这个位置出生，不做高度/生物群系检查
     // 玩家初始 y 坐标设为 70，会通过物理系统下落到地面
     this.position.set(spawnX, 70, spawnZ);
+    console.log('[Spawn] 玩家最终位置：', spawnX, 70, spawnZ);
 
     // 移动与跳跃属性
     this.velocity = new THREE.Vector3(); // 玩家当前速度向量 (x, y, z)
