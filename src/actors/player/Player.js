@@ -12,6 +12,8 @@ import { gunModel, mag7Model, minigunModel } from '../../core/Engine.js';
 import { Gun, WEAPON_TYPES } from '../weapon/Gun.js';
 import { getBlockProperties } from '../../constants/BlockData.js';
 import { nextOrientation } from '../../utils/OrientationUtils.js';
+import { IslandMap } from '../../workers/maps/IslandMap.js';
+import { terrainGen } from '../../world/TerrainGen.js';
 
 /**
  * 获取指定区域内的雪地中心位置
@@ -71,18 +73,30 @@ export class Player {
     this.moveCheckFrequency = 1;   // 碰撞检测频率 (每几帧检查一次)
 
     // 初始出生点逻辑
-    // 直接在 snow_land 中心附近出生，100% 保证在雪地附近
-    const slInfo = getSnowLandCenter(0, 0, WORLD_CONFIG.SEED);
+    // 玩家必定出生在海岛（测试模式）
+    let spawnX, spawnZ;
 
-    // 在雪地中心附近选择一个出生点（稍微偏移一点，避免正中心）
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 5 + Math.random() * 5; // 5-10 格偏移
-    const spawnX = slInfo.centerX + Math.cos(angle) * dist;
-    const spawnZ = slInfo.centerZ + Math.sin(angle) * dist;
+    // 在海岛出生
+    console.log('[Spawn] 计算海岛出生点，seed:', WORLD_CONFIG.SEED);
+    const islandSpawn = IslandMap.getIslandSpawnPoint(WORLD_CONFIG.SEED, terrainGen);
+    if (islandSpawn) {
+      spawnX = islandSpawn.x;
+      spawnZ = islandSpawn.z;
+      console.log('[Spawn] 出生在海岛:', spawnX, spawnZ);
+      console.log('[Spawn] 海岛中心：', islandSpawn.islandCenterX, islandSpawn.islandCenterZ);
+      console.log('[Spawn] 区域：', islandSpawn.zone);
+    } else {
+      // 如果海岛出生点计算失败，回退到雪地出生
+      console.log('[Spawn] 海岛出生点计算失败，回退到雪地');
+      const slInfo = getSnowLandCenter(0, 0, WORLD_CONFIG.SEED);
+      spawnX = slInfo.centerX;
+      spawnZ = slInfo.centerZ;
+    }
 
     // 直接在这个位置出生，不做高度/生物群系检查
     // 玩家初始 y 坐标设为 70，会通过物理系统下落到地面
     this.position.set(spawnX, 70, spawnZ);
+    console.log('[Spawn] 玩家最终位置：', spawnX, 70, spawnZ);
 
     // 移动与跳跃属性
     this.velocity = new THREE.Vector3(); // 玩家当前速度向量 (x, y, z)
@@ -335,13 +349,33 @@ export class Player {
     const pz = Math.floor(this.position.z);
     const py = Math.floor(this.position.y);
 
-    for(let k=0; k<=4; k++) {
+    // 向下检查固体方块（最多 10 格，增加检查深度以应对海底沙块填充）
+    for(let k=0; k<=10; k++) {
       const blockType = this.world.getBlock(px, py - k, pz);
       if(this.physics.isSolid(px, py - k, pz) || blockType === 'cloud') {
         gy = py - k + 1;
         break;
       }
     }
+
+    // 如果没有检测到固体，且玩家在海洋区域（y < -1），使用海平面作为支撑
+    if(gy === -100 && py < -1) {
+      // 检查是否在海岛或海洋区域：使用海平面（y=-2）作为基准
+      // 海底沙块从 y=-3 开始填充，所以地面高度应该是 y=-2
+      const seaLevel = -2;
+      // 检查海平面附近是否有沙块支撑
+      for(let k=0; k<=5; k++) {
+        const checkY = seaLevel - k;
+        const blockType = this.world.getBlock(px, checkY, pz);
+        if(this.physics.isSolid(px, checkY, pz)) {
+          // 找到支撑，地面高度为支撑方块上方
+          gy = checkY + 1;
+          break;
+        }
+      }
+    }
+
+    // 如果仍然没有检测到地面，回退到噪声地形高度
     if(gy === -100) gy = Math.floor(noise(px, pz) * 0.5) + 1;
 
     this.position.y += this.velocity.y * dt;
