@@ -208,39 +208,30 @@ export function generateIsland(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, s
     return null;
   }
 
-  // 海岛表面高度固定为海平面以上 1-2 格，确保平整
-  // 核心区域高度统一，过渡区域逐渐降低到海平面
-  let surfaceY;
-  if (islandInfo.zone === 'core') {
-    // 核心区域：固定高度（海平面以上 1-2 格，尽量平整）
-    const minorVariation = seededRandom(wx, wz, seed + 50) < 0.3 ? 1 : 0;
-    surfaceY = seaLevel + 1 + minorVariation;
-  } else {
-    // 过渡区域：从核心高度逐渐降到海平面
-    const t = islandInfo.transitionFactor;
-    const baseHeight = seaLevel + 1;
-    surfaceY = Math.floor(baseHeight * (1 - t) + seaLevel * t);
-  }
+  // 海岛表面高度完全固定（海平面以上 1 格），确保绝对平整
+  const surfaceY = seaLevel + 1;
 
   // 判断是否在海平面以下
   const isBelowSeaLevel = surfaceY <= seaLevel - 1;
 
-  // 确定方块类型（使用分片聚集分布）
-  const blockType = getBlockDistribution(wx, wz, islandInfo, seed);
+  // 计算到中心的距离，决定方块类型
+  // 边缘是 sand（沙滩），内部是 stone
+  const distFromCenter = islandInfo.distFromCenter;
+  const beachThreshold = halfSize - 2; // 边缘 2 格是沙滩
+
+  // 表面方块：边缘是 sand，内部是 stone
+  const surfaceBlock = distFromCenter > beachThreshold ? 'sand' : 'stone';
 
   // 生成地表方块
-  fakeChunk.add(wx, surfaceY, wz, blockType, dPlaceholder);
+  fakeChunk.add(wx, surfaceY, wz, surfaceBlock, dPlaceholder);
 
-  // 生成地下填充层到海平面以下
-  const bottomY = Math.min(h - 12, seaLevel - 5);
-  for (let y = surfaceY - 1; y >= bottomY; y--) {
+  // 地下填充：表面下方 2 层 dirt，再下面是 stone
+  for (let y = surfaceY - 1; y >= seaLevel - 4; y--) {
     let fillType;
-    if (y === surfaceY - 1) {
-      fillType = 'dirt'; // 表层下方是 dirt
-    } else if (y > seaLevel) {
-      fillType = y % 3 === 0 ? 'dirt' : 'stone'; // 混合层
+    if (y >= surfaceY - 2) {
+      fillType = 'dirt'; // 表面下方 2 层 dirt
     } else {
-      fillType = 'stone'; // 海平面以下是 stone
+      fillType = 'stone'; // 再下面是 stone
     }
     fakeChunk.add(wx, y, wz, fillType, dPlaceholder);
   }
