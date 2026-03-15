@@ -40,7 +40,7 @@ const seededRandom = (x, z, seed) => {
  * @returns {Object|null} 海岛信息对象或 null
  */
 export function getIslandInfo(wx, wz, seed, terrainGen) {
-  const { regionSize, islandSize, transitionSize } = ISLAND_CONFIG;
+  const { regionSize, islandSize, transitionSize, minDistanceFromLand } = ISLAND_CONFIG;
   const halfSize = Math.floor(islandSize / 2);
   const totalHalfSize = halfSize + transitionSize;
 
@@ -49,10 +49,14 @@ export function getIslandInfo(wx, wz, seed, terrainGen) {
   const regionZ = Math.floor(wz / regionSize);
 
   // 计算海岛中心（确定性随机）
+  // 确保海岛中心距离区域边界至少 minDistanceFromLand + islandSize/2
+  // 这样海岛边缘距离区域边界至少有 minDistanceFromLand 的距离
+  const minOffset = minDistanceFromLand + halfSize;
+  const maxOffset = regionSize - minOffset;
   const randX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
   const randZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
-  const offsetX = Math.floor(randX * (regionSize - islandSize * 2)) + islandSize;
-  const offsetZ = Math.floor(randZ * (regionSize - islandSize * 2)) + islandSize;
+  const offsetX = Math.floor(randX * (maxOffset - minOffset)) + minOffset;
+  const offsetZ = Math.floor(randZ * (maxOffset - minOffset)) + minOffset;
 
   const islandCx = regionX * regionSize + offsetX;
   const islandCz = regionZ * regionSize + offsetZ;
