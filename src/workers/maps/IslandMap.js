@@ -229,8 +229,9 @@ export function generateIsland(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, s
   // 生成地表方块
   fakeChunk.add(wx, surfaceY, wz, surfaceBlock, dPlaceholder);
 
-  // 地下填充：表面下方 2 层 dirt，再下面是 stone
-  for (let y = surfaceY - 1; y >= seaLevel - 4; y--) {
+  // 地下填充：表面下方 2 层 dirt，再下面是 stone，一直填充到基岩层
+  const bedrockY = -64; // 基岩层高度
+  for (let y = surfaceY - 1; y >= bedrockY; y--) {
     let fillType;
     if (y >= surfaceY - 2) {
       fillType = 'dirt'; // 表面下方 2 层 dirt

@@ -179,9 +179,10 @@ onmessage = async function(e) {
         const waterRingMax = 15 + 4 + 20; // 海岛半径 + 过渡带 + 海水环
 
         if (distanceFromCenter > 15 + 4 && distanceFromCenter < waterRingMax) {
-          // 海水环区域：强制生成海水
+          // 海水环区域：强制生成海水，填充到基岩层确保完全覆盖原有地形
           const seaY = -2; // 海平面
-          for (let y = seaY; y >= seaY - 3; y--) {
+          const bedrockY = -64; // 基岩层高度
+          for (let y = seaY; y >= bedrockY; y--) {
             fakeChunk.add(wx, y, wz, 'water', dPlaceholder);
           }
         }
