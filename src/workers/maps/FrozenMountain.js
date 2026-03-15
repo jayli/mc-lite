@@ -5,6 +5,57 @@
  */
 
 /**
+ * 获取指定区域内冰封山峰的中心位置
+ * @param {number} regionX - 区域 X 坐标
+ * @param {number} regionZ - 区域 Z 坐标
+ * @param {number} seed - 世界种子
+ * @returns {Object} 冰封山峰中心位置 {cx, cz}
+ */
+export function getFrozenMountainCenterInRegion(regionX, regionZ, seed) {
+  const regionSize = 400;
+
+  // 计算该区域内金字塔的位置（与 Pyramid.js 相同的算法）
+  const randX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
+  const randZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
+  const offsetX = Math.floor(randX * 300) + 100;
+  const offsetZ = Math.floor(randZ * 300) + 100;
+
+  const pyramidCx = regionX * regionSize + offsetX;
+  const pyramidCz = regionZ * regionSize + offsetZ;
+
+  // 冰封山峰位移 = 金字塔位置 + (-160, 0) 偏移
+  let mountainCx = pyramidCx - 160;
+  let mountainCz = pyramidCz;
+
+  // 应用与 FrozenMountain.js 相同的边界检查逻辑
+  const fmHalfSize = 40;
+  const fmTransitionSize = 4;
+  const fmTotalHalfSize = fmHalfSize + fmTransitionSize;
+  const fmMinMargin = fmTotalHalfSize + 5;
+
+  const regionLeft = regionX * regionSize;
+  const regionRight = (regionX + 1) * regionSize;
+  const regionTop = regionZ * regionSize;
+  const regionBottom = (regionZ + 1) * regionSize;
+
+  // 调整 X 坐标
+  if (mountainCx - fmMinMargin < regionLeft) {
+    mountainCx = regionLeft + fmMinMargin;
+  } else if (mountainCx + fmMinMargin > regionRight) {
+    mountainCx = regionRight - fmMinMargin;
+  }
+
+  // 调整 Z 坐标
+  if (mountainCz - fmMinMargin < regionTop) {
+    mountainCz = regionTop + fmMinMargin;
+  } else if (mountainCz + fmMinMargin > regionBottom) {
+    mountainCz = regionBottom - fmMinMargin;
+  }
+
+  return { cx: mountainCx, cz: mountainCz };
+}
+
+/**
  * 简单的噪声函数，用于生成自然的地形起伏
  * @param {number} x - X 坐标
  * @param {number} z - Z 坐标
@@ -42,42 +93,11 @@ export function getFrozenMountainInfo(wx, wz, seed, terrainGen) {
   const regionX = Math.floor(wx / regionSize);
   const regionZ = Math.floor(wz / regionSize);
 
-  // 首先计算该区域内金字塔的位置（使用与 Pyramid.js 相同的算法）
-  const randX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
-  const randZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
-  const offsetX = Math.floor(randX * 300) + 100;
-  const offsetZ = Math.floor(randZ * 300) + 100;
-
-  const pyramidCx = regionX * regionSize + offsetX;
-  const pyramidCz = regionZ * regionSize + offsetZ;
-
-  // 冰封山峰位移 = 金字塔位置 + (-160, 0) 偏移（与 SnowLand 相反的一侧）
-  let mountainCx = pyramidCx - 160;
-  let mountainCz = pyramidCz;
+  // 使用共享函数获取冰封山峰中心位置
+  const { cx: mountainCx, cz: mountainCz } = getFrozenMountainCenterInRegion(regionX, regionZ, seed);
 
   // 扩展后的冰封山峰总区域（包含过渡带）
   const totalHalfSize = halfSize + transitionSize;
-
-  // 确保山峰中心不会太靠近区域边界（至少保留 totalHalfSize + 5 的缓冲）
-  const minMargin = totalHalfSize + 5;
-  const regionLeft = regionX * regionSize;
-  const regionRight = (regionX + 1) * regionSize;
-  const regionTop = regionZ * regionSize;
-  const regionBottom = (regionZ + 1) * regionSize;
-
-  // 调整 X 坐标
-  if (mountainCx - minMargin < regionLeft) {
-    mountainCx = regionLeft + minMargin;
-  } else if (mountainCx + minMargin > regionRight) {
-    mountainCx = regionRight - minMargin;
-  }
-
-  // 调整 Z 坐标
-  if (mountainCz - minMargin < regionTop) {
-    mountainCz = regionTop + minMargin;
-  } else if (mountainCz + minMargin > regionBottom) {
-    mountainCz = regionBottom - minMargin;
-  }
 
   const mountainMinX = mountainCx - totalHalfSize;
   const mountainMaxX = mountainCx + totalHalfSize;
@@ -306,5 +326,6 @@ export function generateFrozenMountain(wx, wz, h, fmInfo, fakeChunk, dPlaceholde
  */
 export const FrozenMountain = {
   getFrozenMountainInfo,
+  getFrozenMountainCenterInRegion,
   generate: generateFrozenMountain
 };

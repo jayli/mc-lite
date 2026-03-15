@@ -1,6 +1,8 @@
 // src/workers/maps/IslandMap.js
 // 海岛生成器模块 - 不依赖 Tree，树木生成在 WorldWorker 中处理
 
+import { getFrozenMountainCenterInRegion } from './FrozenMountain.js';
+
 // 海岛配置常量
 const ISLAND_CONFIG = {
   regionSize: 400,         // 每 400x400 区域生成一座海岛
@@ -32,64 +34,28 @@ const seededRandom = (x, z, seed) => {
 };
 
 /**
- * 获取海岛信息
- * @param {number} wx - 世界 X 坐标
- * @param {number} wz - 世界 Z 坐标
+ * 获取指定区域内海岛的中心位置
+ * @param {number} regionX - 区域 X 坐标
+ * @param {number} regionZ - 区域 Z 坐标
  * @param {number} seed - 世界种子
- * @param {Object} terrainGen - 地形生成器
- * @returns {Object|null} 海岛信息对象或 null
+ * @returns {Object} 海岛中心位置和其他地标位置 { islandCx, islandCz, pyramidCx, pyramidCz, frozenMountainCx, frozenMountainCz }
  */
-export function getIslandInfo(wx, wz, seed, terrainGen) {
-  const { regionSize, islandSize, transitionSize, minDistanceFromLand, seaLevel } = ISLAND_CONFIG;
-  const halfSize = Math.floor(islandSize / 2);
-  const totalHalfSize = halfSize + transitionSize;
+export function getIslandCenterInRegion(regionX, regionZ, seed) {
+  const regionSize = 400;
 
-  // 计算区域
-  const regionX = Math.floor(wx / regionSize);
-  const regionZ = Math.floor(wz / regionSize);
-
-  // 计算该区域内金字塔的位置（与 FrozenMountain 相同的算法）
+  // 计算金字塔位置
   const randX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
   const randZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
-  const offsetX = Math.floor(randX * 300) + 100;
-  const offsetZ = Math.floor(randZ * 300) + 100;
+  const pyramidOffsetX = Math.floor(randX * 300) + 100;
+  const pyramidOffsetZ = Math.floor(randZ * 300) + 100;
+  const pyramidCx = regionX * regionSize + pyramidOffsetX;
+  const pyramidCz = regionZ * regionSize + pyramidOffsetZ;
 
-  const pyramidCx = regionX * regionSize + offsetX;
-  const pyramidCz = regionZ * regionSize + offsetZ;
+  // 获取冰封山峰位置（复用 FrozenMountain 的函数）
+  const { cx: frozenMountainCx, cz: frozenMountainCz } =
+    getFrozenMountainCenterInRegion(regionX, regionZ, seed);
 
-  // 预计算区域边界（供冰封山峰边界检查使用）
-  const regionLeft = regionX * regionSize;
-  const regionRight = (regionX + 1) * regionSize;
-  const regionTop = regionZ * regionSize;
-  const regionBottom = (regionZ + 1) * regionSize;
-
-  // 冰封山峰位置 = 金字塔位置 + (-160, 0) 偏移
-  let frozenMountainCx = pyramidCx - 160;
-  let frozenMountainCz = pyramidCz;
-
-  // 应用与 FrozenMountain.js 相同的边界检查逻辑
-  // FrozenMountain: mountainSize=80, transitionSize=4, totalHalfSize=44, minMargin=49
-  const fmHalfSize = 40; // 80 / 2
-  const fmTransitionSize = 4;
-  const fmTotalHalfSize = fmHalfSize + fmTransitionSize; // 44
-  const fmMinMargin = fmTotalHalfSize + 5; // 49
-
-  // 调整 X 坐标
-  if (frozenMountainCx - fmMinMargin < regionLeft) {
-    frozenMountainCx = regionLeft + fmMinMargin;
-  } else if (frozenMountainCx + fmMinMargin > regionRight) {
-    frozenMountainCx = regionRight - fmMinMargin;
-  }
-
-  // 调整 Z 坐标
-  if (frozenMountainCz - fmMinMargin < regionTop) {
-    frozenMountainCz = regionTop + fmMinMargin;
-  } else if (frozenMountainCz + fmMinMargin > regionBottom) {
-    frozenMountainCz = regionBottom - fmMinMargin;
-  }
-
-  // 计算海岛中心位置：需要远离冰封山峰和金字塔
-  // 海岛在 Z 轴方向随机偏移，与冰封山峰的 X 轴偏移错开
+  // 计算海岛中心位置
   const islandRandX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
   const islandRandZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
   const islandOffsetX = Math.floor(islandRandX * (regionSize - 100)) + 50;
@@ -98,64 +64,64 @@ export function getIslandInfo(wx, wz, seed, terrainGen) {
   let islandCx = regionX * regionSize + islandOffsetX;
   let islandCz = regionZ * regionSize + islandOffsetZ;
 
-  // 确保海岛远离冰封山峰（最小距离 130 格）
+  // 距离检查：远离冰封山峰（130格）
   const minMountainDistance = 130;
   const distMountainX = Math.abs(islandCx - frozenMountainCx);
   const distMountainZ = Math.abs(islandCz - frozenMountainCz);
   const distFromMountain = Math.max(distMountainX, distMountainZ);
 
   if (distFromMountain < minMountainDistance) {
-    // 如果距离太近，将海岛移到冰封山峰的对面
     islandCx = frozenMountainCx + (islandCx > frozenMountainCx ? -minMountainDistance : minMountainDistance);
     islandCz = frozenMountainCz + (islandCz > frozenMountainCz ? -minMountainDistance : minMountainDistance);
   }
 
-  // 确保海岛远离金字塔（最小距离 50 格）
+  // 距离检查：远离金字塔（50格）
   const minPyramidDistance = 50;
   const distPyramidX = Math.abs(islandCx - pyramidCx);
   const distPyramidZ = Math.abs(islandCz - pyramidCz);
   const distFromPyramid = Math.max(distPyramidX, distPyramidZ);
 
   if (distFromPyramid < minPyramidDistance) {
-    // 如果距离太近，将海岛移到金字塔的对面
     islandCx = pyramidCx + (islandCx > pyramidCx ? -minPyramidDistance : minPyramidDistance);
     islandCz = pyramidCz + (islandCz > pyramidCz ? -minPyramidDistance : minPyramidDistance);
   }
 
-  // 确保海岛中心不会太靠近区域边界
+  // 边界检查
+  const halfSize = 15;
+  const transitionSize = 10;
+  const totalHalfSize = halfSize + transitionSize;
   const minMargin = totalHalfSize + 5;
+
+  const regionLeft = regionX * regionSize;
+  const regionRight = (regionX + 1) * regionSize;
+  const regionTop = regionZ * regionSize;
+  const regionBottom = (regionZ + 1) * regionSize;
 
   if (islandCx - minMargin < regionLeft) {
     islandCx = regionLeft + minMargin;
   } else if (islandCx + minMargin > regionRight) {
     islandCx = regionRight - minMargin;
   }
-
   if (islandCz - minMargin < regionTop) {
     islandCz = regionTop + minMargin;
   } else if (islandCz + minMargin > regionBottom) {
     islandCz = regionBottom - minMargin;
   }
 
-  // 边界调整后，再次确保海岛远离冰封山峰（最小距离 130 格）
-  // 这是因为边界调整可能把海岛又推回到靠近山峰的位置
+  // 边界调整后，再次确保海岛远离冰封山峰
   const distMountainX2 = Math.abs(islandCx - frozenMountainCx);
   const distMountainZ2 = Math.abs(islandCz - frozenMountainCz);
   const distFromMountain2 = Math.max(distMountainX2, distMountainZ2);
 
   if (distFromMountain2 < minMountainDistance) {
-    // 在区域内选择一个远离山峰的位置
-    // 计算四个角落距离山峰的距离，选择最远的
     const candidates = [
       { x: regionLeft + minMargin, z: regionTop + minMargin },
       { x: regionLeft + minMargin, z: regionBottom - minMargin },
       { x: regionRight - minMargin, z: regionTop + minMargin },
       { x: regionRight - minMargin, z: regionBottom - minMargin }
     ];
-
     let bestCandidate = null;
     let bestDist = 0;
-
     for (const candidate of candidates) {
       const dX = Math.abs(candidate.x - frozenMountainCx);
       const dZ = Math.abs(candidate.z - frozenMountainCz);
@@ -165,21 +131,18 @@ export function getIslandInfo(wx, wz, seed, terrainGen) {
         bestCandidate = candidate;
       }
     }
-
     if (bestCandidate && bestDist >= minMountainDistance) {
       islandCx = bestCandidate.x;
       islandCz = bestCandidate.z;
     }
-    // 如果区域内没有满足距离要求的位置，保持当前位置（至少尝试了）
   }
 
-  // 边界和距离调整后，再次检查金字塔距离（最小距离 50 格）
+  // 边界和距离调整后，再次检查金字塔距离
   const distPyramidX2 = Math.abs(islandCx - pyramidCx);
   const distPyramidZ2 = Math.abs(islandCz - pyramidCz);
   const distFromPyramid2 = Math.max(distPyramidX2, distPyramidZ2);
 
   if (distFromPyramid2 < minPyramidDistance) {
-    // 如果离金字塔太近，在远离金字塔的方向上调整
     if (islandCx > pyramidCx) {
       islandCx = Math.min(regionRight - minMargin, pyramidCx + minPyramidDistance);
     } else {
@@ -191,6 +154,29 @@ export function getIslandInfo(wx, wz, seed, terrainGen) {
       islandCz = Math.max(regionTop + minMargin, pyramidCz - minPyramidDistance);
     }
   }
+
+  return { islandCx, islandCz, pyramidCx, pyramidCz, frozenMountainCx, frozenMountainCz };
+}
+
+/**
+ * 获取海岛信息
+ * @param {number} wx - 世界 X 坐标
+ * @param {number} wz - 世界 Z 坐标
+ * @param {number} seed - 世界种子
+ * @param {Object} terrainGen - 地形生成器
+ * @returns {Object|null} 海岛信息对象或 null
+ */
+export function getIslandInfo(wx, wz, seed, terrainGen) {
+  const { regionSize, islandSize, transitionSize, seaLevel } = ISLAND_CONFIG;
+  const halfSize = Math.floor(islandSize / 2);
+  const totalHalfSize = halfSize + transitionSize;
+
+  // 计算区域
+  const regionX = Math.floor(wx / regionSize);
+  const regionZ = Math.floor(wz / regionSize);
+
+  // 使用共享函数获取海岛中心位置
+  const { islandCx, islandCz } = getIslandCenterInRegion(regionX, regionZ, seed);
 
   // 计算距离（使用 Max 距离判断方形范围）
   const dx = Math.abs(wx - islandCx);
@@ -406,137 +392,15 @@ export function generateIsland(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, s
  * @returns {Object|null} 出生点信息 { x, y, z, islandCenterX, islandCenterZ, isBeach, yaw, pitch } 或 null
  */
 export function getIslandSpawnPoint(seed, terrainGen) {
-  const { regionSize, islandSize, transitionSize, seaLevel } = ISLAND_CONFIG;
+  const { islandSize, seaLevel } = ISLAND_CONFIG;
   const halfSize = Math.floor(islandSize / 2);
-  const totalHalfSize = halfSize + transitionSize;
   const beachRadius = halfSize - 1;
 
   // 遍历几个区域，找到第一个可用的海岛
   for (let regionX = -2; regionX <= 2; regionX++) {
     for (let regionZ = -2; regionZ <= 2; regionZ++) {
-      // 预计算区域边界
-      const regionLeft = regionX * regionSize;
-      const regionRight = (regionX + 1) * regionSize;
-      const regionTop = regionZ * regionSize;
-      const regionBottom = (regionZ + 1) * regionSize;
-
-      // 计算该区域内金字塔的位置（与 getIslandInfo 相同的算法）
-      const randX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
-      const randZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
-      const pyramidOffsetX = Math.floor(randX * 300) + 100;
-      const pyramidOffsetZ = Math.floor(randZ * 300) + 100;
-      const pyramidCx = regionX * regionSize + pyramidOffsetX;
-      const pyramidCz = regionZ * regionSize + pyramidOffsetZ;
-
-      // 计算冰封山峰位置（与 getIslandInfo 相同的算法）
-      let frozenMountainCx = pyramidCx - 160;
-      let frozenMountainCz = pyramidCz;
-      const fmHalfSize = 40;
-      const fmTransitionSize = 4;
-      const fmTotalHalfSize = fmHalfSize + fmTransitionSize;
-      const fmMinMargin = fmTotalHalfSize + 5;
-
-      if (frozenMountainCx - fmMinMargin < regionLeft) {
-        frozenMountainCx = regionLeft + fmMinMargin;
-      } else if (frozenMountainCx + fmMinMargin > regionRight) {
-        frozenMountainCx = regionRight - fmMinMargin;
-      }
-      if (frozenMountainCz - fmMinMargin < regionTop) {
-        frozenMountainCz = regionTop + fmMinMargin;
-      } else if (frozenMountainCz + fmMinMargin > regionBottom) {
-        frozenMountainCz = regionBottom - fmMinMargin;
-      }
-
-      // 计算海岛中心位置（与 getIslandInfo 完全相同的算法）
-      const islandRandX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
-      const islandRandZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
-      const islandOffsetX = Math.floor(islandRandX * (regionSize - 100)) + 50;
-      const islandOffsetZ = Math.floor(islandRandZ * (regionSize - 100)) + 50;
-
-      let islandCx = regionX * regionSize + islandOffsetX;
-      let islandCz = regionZ * regionSize + islandOffsetZ;
-
-      // 距离检查：远离冰封山峰（130格）
-      const minMountainDistance = 130;
-      const distMountainX = Math.abs(islandCx - frozenMountainCx);
-      const distMountainZ = Math.abs(islandCz - frozenMountainCz);
-      const distFromMountain = Math.max(distMountainX, distMountainZ);
-
-      if (distFromMountain < minMountainDistance) {
-        islandCx = frozenMountainCx + (islandCx > frozenMountainCx ? -minMountainDistance : minMountainDistance);
-        islandCz = frozenMountainCz + (islandCz > frozenMountainCz ? -minMountainDistance : minMountainDistance);
-      }
-
-      // 距离检查：远离金字塔（50格）
-      const minPyramidDistance = 50;
-      const distPyramidX = Math.abs(islandCx - pyramidCx);
-      const distPyramidZ = Math.abs(islandCz - pyramidCz);
-      const distFromPyramid = Math.max(distPyramidX, distPyramidZ);
-
-      if (distFromPyramid < minPyramidDistance) {
-        islandCx = pyramidCx + (islandCx > pyramidCx ? -minPyramidDistance : minPyramidDistance);
-        islandCz = pyramidCz + (islandCz > pyramidCz ? -minPyramidDistance : minPyramidDistance);
-      }
-
-      // 边界检查
-      const minMargin = totalHalfSize + 5;
-      if (islandCx - minMargin < regionLeft) {
-        islandCx = regionLeft + minMargin;
-      } else if (islandCx + minMargin > regionRight) {
-        islandCx = regionRight - minMargin;
-      }
-      if (islandCz - minMargin < regionTop) {
-        islandCz = regionTop + minMargin;
-      } else if (islandCz + minMargin > regionBottom) {
-        islandCz = regionBottom - minMargin;
-      }
-
-      // 边界调整后，再次检查山峰距离
-      const distMountainX2 = Math.abs(islandCx - frozenMountainCx);
-      const distMountainZ2 = Math.abs(islandCz - frozenMountainCz);
-      const distFromMountain2 = Math.max(distMountainX2, distMountainZ2);
-
-      if (distFromMountain2 < minMountainDistance) {
-        const candidates = [
-          { x: regionLeft + minMargin, z: regionTop + minMargin },
-          { x: regionLeft + minMargin, z: regionBottom - minMargin },
-          { x: regionRight - minMargin, z: regionTop + minMargin },
-          { x: regionRight - minMargin, z: regionBottom - minMargin }
-        ];
-        let bestCandidate = null;
-        let bestDist = 0;
-        for (const candidate of candidates) {
-          const dX = Math.abs(candidate.x - frozenMountainCx);
-          const dZ = Math.abs(candidate.z - frozenMountainCz);
-          const d = Math.max(dX, dZ);
-          if (d > bestDist) {
-            bestDist = d;
-            bestCandidate = candidate;
-          }
-        }
-        if (bestCandidate && bestDist >= minMountainDistance) {
-          islandCx = bestCandidate.x;
-          islandCz = bestCandidate.z;
-        }
-      }
-
-      // 边界和距离调整后，再次检查金字塔距离
-      const distPyramidX2 = Math.abs(islandCx - pyramidCx);
-      const distPyramidZ2 = Math.abs(islandCz - pyramidCz);
-      const distFromPyramid2 = Math.max(distPyramidX2, distPyramidZ2);
-
-      if (distFromPyramid2 < minPyramidDistance) {
-        if (islandCx > pyramidCx) {
-          islandCx = Math.min(regionRight - minMargin, pyramidCx + minPyramidDistance);
-        } else {
-          islandCx = Math.max(regionLeft + minMargin, pyramidCx - minPyramidDistance);
-        }
-        if (islandCz > pyramidCz) {
-          islandCz = Math.min(regionBottom - minMargin, pyramidCz + minPyramidDistance);
-        } else {
-          islandCz = Math.max(regionTop + minMargin, pyramidCz - minPyramidDistance);
-        }
-      }
+      // 使用共享函数获取海岛中心位置
+      const { islandCx, islandCz } = getIslandCenterInRegion(regionX, regionZ, seed);
 
       // 检查基础地形高度：海岛只生成在海里
       const centerBiome = terrainGen ? terrainGen.getBiome(islandCx, islandCz) : 'OCEAN';
@@ -581,6 +445,7 @@ export function getIslandSpawnPoint(seed, terrainGen) {
 // 模块导出
 export const IslandMap = {
   getIslandInfo,
+  getIslandCenterInRegion,
   generate: generateIsland,
   getIslandSpawnPoint
 };
