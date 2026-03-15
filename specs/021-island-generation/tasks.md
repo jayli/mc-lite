@@ -19,8 +19,8 @@
 
 **Purpose**: 项目初始化和基础结构
 
-- [ ] T001 确认项目结构符合 plan.md 中的 Source Code 布局
-- [ ] T002 [P] 确认开发服务器可以正常启动 (`npm run start`)
+- [x] T001 确认项目结构符合 plan.md 中的 Source Code 布局
+- [x] T002 [P] 确认开发服务器可以正常启动 (`npm run start`)
 
 ---
 
@@ -28,9 +28,9 @@
 
 **Purpose**: 核心基础设施，所有用户故事实现前必须完成
 
-- [ ] T003 [P] 创建海岛生成器模块骨架 `src/workers/maps/IslandMap.js`，导出空函数
-- [ ] T004 [P] 在 `src/workers/WorldWorker.js` 中导入 IslandMap 模块（第 11 行附近）
-- [ ] T005 定义海岛配置常量对象（在 IslandMap.js 中）
+- [x] T003 [P] 创建海岛生成器模块骨架 `src/workers/maps/IslandMap.js`，导出空函数
+- [x] T004 [P] 在 `src/workers/WorldWorker.js` 中导入 IslandMap 模块（第 11 行附近）
+- [x] T005 定义海岛配置常量对象（在 IslandMap.js 中）
   - regionSize: 400
   - islandSize: 30
   - transitionSize: 4
@@ -49,27 +49,27 @@
 
 ### Implementation for User Story 1
 
-- [ ] T006 [P] [US1] 实现 `getIslandInfo` 函数 - 计算区域和海岛中心点 `src/workers/maps/IslandMap.js`
+- [x] T006 [P] [US1] 实现 `getIslandInfo` 函数 - 计算区域和海岛中心点 `src/workers/maps/IslandMap.js`
   - 使用确定性随机函数计算每 400x400 区域的海岛中心
   - 返回海岛中心坐标、区域类型、过渡因子
 
-- [ ] T007 [P] [US1] 实现海岛范围判断逻辑 - 判断坐标是否在海岛范围内 `src/workers/maps/IslandMap.js`
+- [x] T007 [P] [US1] 实现海岛范围判断逻辑 - 判断坐标是否在海岛范围内 `src/workers/maps/IslandMap.js`
   - 使用 Max 距离判断方形范围
   - 支持 transitionZone 过渡带判断
 
-- [ ] T008 [P] [US1] 实现海岛形状噪声算法 - 生成不规则海岸线 `src/workers/maps/IslandMap.js`
+- [x] T008 [P] [US1] 实现海岛形状噪声算法 - 生成不规则海岸线 `src/workers/maps/IslandMap.js`
   - 使用两层噪声叠加（主噪声 + 细节噪声）
   - 动态阈值产生不规则边缘
 
-- [ ] T009 [US1] 实现 `generateIsland` 函数 - 生成海岛基本结构 `src/workers/maps/IslandMap.js`
+- [x] T009 [US1] 实现 `generateIsland` 函数 - 生成海岛基本结构 `src/workers/maps/IslandMap.js`
   - 计算地表高度（基于地形高度 + 最多 2 格起伏）
   - 判断是否在海平面以下
 
-- [ ] T010 [US1] 生成海岛地下填充层 `src/workers/maps/IslandMap.js`
+- [x] T010 [US1] 生成海岛地下填充层 `src/workers/maps/IslandMap.js`
   - 地表下方生成 dirt 层（3-5 层）
   - 继续生成 stone 层和 end_stone 基岩层（共 12 层）
 
-- [ ] T011 [US1] 在 WorldWorker 主生成循环中集成海岛检查 `src/workers/WorldWorker.js`
+- [x] T011 [US1] 在 WorldWorker 主生成循环中集成海岛检查 `src/workers/WorldWorker.js`
   - 在第 160 行附近添加 `islandInfo` 检查逻辑
   - 调用 `IslandMap.generate` 生成海岛方块
 
@@ -89,29 +89,29 @@
 
 ### Implementation for User Story 2
 
-- [ ] T013 [P] [US2] 实现方块分片聚集分布算法 - sand 和 stone 各自成片 `src/workers/maps/IslandMap.js`
+- [x] T013 [P] [US2] 实现方块分片聚集分布算法 - sand 和 stone 各自成片 `src/workers/maps/IslandMap.js`
   - 使用 Voronoi 区域 + 噪声扰动方法
   - 生成 3-5 个 sand 种子点和 2-4 个 stone 种子点
   - 根据最近种子点决定方块类型
 
-- [ ] T014 [US2] 实现沙滩区域生成逻辑 - 海岸边缘为 sand 方块 `src/workers/maps/IslandMap.js`
+- [x] T014 [US2] 实现沙滩区域生成逻辑 - 海岸边缘为 sand 方块 `src/workers/maps/IslandMap.js`
   - 根据距离海岛中心的距离判断沙滩区域
   - 沙滩位于海岸边缘（靠近海水）
 
-- [ ] T015 [US2] 实现 stone 区域生成逻辑 - 海岛内部主要为 stone `src/workers/maps/IslandMap.js`
+- [x] T015 [US2] 实现 stone 区域生成逻辑 - 海岛内部主要为 stone `src/workers/maps/IslandMap.js`
   - stone 主要分布在海岛中心区域
   - 与 sand 区域平滑过渡
 
-- [ ] T016 [P] [US2] 实现树木生成逻辑 - 随机生成 1-2 棵橡树 `src/workers/maps/IslandMap.js`
+- [x] T016 [P] [US2] 实现树木生成逻辑 - 随机生成 1-2 棵橡树 `src/workers/maps/IslandMap.js`
   - 在海岛主体区域以适当概率生成树木
   - 使用 `Tree.generate` 函数生成普通橡树
   - 树木生成时确保有足够空间
 
-- [ ] T017 [US2] 确保海岛高度起伏不超过 2 格 `src/workers/maps/IslandMap.js`
+- [x] T017 [US2] 确保海岛高度起伏不超过 2 格 `src/workers/maps/IslandMap.js`
   - 限制地表高度的最大高差
   - 以平地为主，允许少量缓坡
 
-- [ ] T018 [US2] 添加树木到 structureCenters 列表 - 确保跨 Chunk 渲染 `src/workers/maps/IslandMap.js`
+- [x] T018 [US2] 添加树木到 structureCenters 列表 - 确保跨 Chunk 渲染 `src/workers/maps/IslandMap.js`
   - 将生成的树木中心点记录到 structureCenters
   - 确保 reload 后树木不丢失
 

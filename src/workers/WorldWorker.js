@@ -9,6 +9,7 @@ import { structureLoaders } from '../world/entity-system/StructureLoader.js';
 import { Pyramid } from './maps/Pyramid.js';
 import { SnowLand } from './maps/SnowLand.js';
 import { FrozenMountain } from './maps/FrozenMountain.js';
+import { IslandMap } from './maps/IslandMap.js';
 import { belongsToStructure as checkBelongsToStructure } from '../utils/StructureUtils.js';
 
 console.log('WorldWorker.js loaded');
@@ -159,11 +160,47 @@ onmessage = async function(e) {
       const fmInfo = FrozenMountain.getFrozenMountainInfo(wx, wz, seed, terrainGen);
       const inFrozenMountain = fmInfo !== null;
 
+      // 检查当前坐标是否在海岛范围内
+      const islandInfo = IslandMap.getIslandInfo(wx, wz, seed, terrainGen);
+      const inIsland = islandInfo !== null;
+
       if (inPyramid) {
         Pyramid.generate(wx, wz, h, pyInfo, fakeChunk, dPlaceholder);
 
         // 金字塔区域不生成其他结构（树、房屋等），但云需要正常生成
         // 跳过后续的地表装饰生成，继续执行云生成逻辑
+      } else if (inIsland) {
+        // 海岛生成逻辑
+        const islandResult = IslandMap.generate(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, seed);
+
+        // 在海岛主体区域生成树木（1-2 棵）
+        if (islandResult && islandInfo.zone === 'core' && !islandResult.isBelowSeaLevel) {
+          // 使用区块级别的确定性随机来决定是否生成树木
+          const treeChance = seededRandom(wx, wz, seed + 100);
+          const treeCount = islandInfo.transitionFactor === 0 ? (treeChance < 0.003 ? 2 : treeChance < 0.006 ? 1 : 0) : 0;
+
+          if (treeCount > 0) {
+            // 生成树木
+            for (let i = 0; i < treeCount; i++) {
+              const treeOffsetX = Math.floor(seededRandom(i, i + 10, seed + 200) * 10) - 5;
+              const treeOffsetZ = Math.floor(seededRandom(i + 5, i + 15, seed + 201) * 10) - 5;
+              const treeX = wx + treeOffsetX;
+              const treeZ = wz + treeOffsetZ;
+              const treeY = islandResult.surfaceY + 1;
+
+              // 检查树木位置是否在海岛范围内
+              const treeIslandInfo = IslandMap.getIslandInfo(treeX, treeZ, seed, terrainGen);
+              if (treeIslandInfo && treeIslandInfo.zone === 'core') {
+                const task = () => Tree.generate(treeX, treeY, treeZ, fakeChunk, 'default', dPlaceholder);
+                task.centerX = treeX;
+                task.centerY = treeY;
+                task.centerZ = treeZ;
+                task.type = 'static_tree';
+                structureQueue.push(task);
+              }
+            }
+          }
+        }
       } else if (inSnowLand) {
         const snowResult = SnowLand.generate(wx, wz, h, slInfo, fakeChunk, dPlaceholder);
         // 在雪地以 0.002 概率生成带雪白桦树（仅在主体区域且不在海平面以下）
