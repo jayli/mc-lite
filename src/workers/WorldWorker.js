@@ -180,7 +180,7 @@ onmessage = async function(e) {
         if (distanceFromCenter > 15 + 4 && distanceFromCenter < waterRingMax) {
           // 海水环区域：从海平面下方一直填充沙块到基岩层
           const seaY = -2; // 海平面
-          const bedrockY = -64; // 基岩层高度
+          const bedrockY = seaY - 11; // 基岩层在海平面下方 11 格（与普通地形一致）
           for (let y = seaY - 1; y >= bedrockY; y--) {
             fakeChunk.add(wx, y, wz, 'sand', dPlaceholder);
           }
@@ -190,7 +190,7 @@ onmessage = async function(e) {
         if (!islandResult && distanceFromCenter <= 15 + 4) {
           // 过渡带区域：从海平面下方用沙块填充到基岩层
           const seaY = -2;
-          const bedrockY = -64;
+          const bedrockY = seaY - 11; // 基岩层在海平面下方 11 格
           for (let y = seaY - 1; y >= bedrockY; y--) {
             fakeChunk.add(wx, y, wz, 'sand', dPlaceholder);
           }

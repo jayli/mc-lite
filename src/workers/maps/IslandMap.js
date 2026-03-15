@@ -240,7 +240,8 @@ export function generateIsland(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, s
   fakeChunk.add(wx, surfaceY, wz, surfaceBlock, dPlaceholder);
 
   // 地下填充：表面下方 2 层 dirt，再下面是 stone，一直填充到基岩层
-  const bedrockY = -64; // 基岩层高度
+  // 基岩层高度 = 表面高度 - 11（与普通地形保持一致）
+  const bedrockY = surfaceY - 11; // 基岩层在表面下方 11 格
   for (let y = surfaceY - 1; y >= bedrockY; y--) {
     let fillType;
     if (y >= surfaceY - 2) {
