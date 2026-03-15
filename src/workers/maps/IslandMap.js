@@ -5,12 +5,12 @@
 const ISLAND_CONFIG = {
   regionSize: 400,         // 每 400x400 区域生成一座海岛
   islandSize: 30,          // 海岛主体边长
-  transitionSize: 4,       // 过渡带大小
+  transitionSize: 10,       // 过渡带大小（增加到 8，让海岸线更平缓）
   spawnProbability: 0.08,  // 生成概率 (8%)
   seaLevel: -2,            // 海平面高度
   minDistanceFromLand: 20, // 与大陆的最小距离
-  shapeNoiseScale: 0.1,    // 形状噪声尺度
-  edgeNoiseScale: 0.2,     // 边缘噪声尺度
+  shapeNoiseScale: 0.30,   // 形状噪声尺度（增加，让轮廓更不规则）
+  edgeNoiseScale: 0.25,    // 边缘噪声尺度（增加，让海岸线更破碎）
   sandPatchCount: 4,       // sand 区域种子点数量
   stonePatchCount: 3,      // stone 区域种子点数量
   patchNoiseScale: 0.15,   // 分布噪声尺度
@@ -48,18 +48,59 @@ export function getIslandInfo(wx, wz, seed, terrainGen) {
   const regionX = Math.floor(wx / regionSize);
   const regionZ = Math.floor(wz / regionSize);
 
-  // 计算海岛中心（确定性随机）
-  // 确保海岛中心距离区域边界至少 minDistanceFromLand + islandSize/2
-  // 这样海岛边缘距离区域边界至少有 minDistanceFromLand 的距离
-  const minOffset = minDistanceFromLand + halfSize;
-  const maxOffset = regionSize - minOffset;
+  // 计算该区域内金字塔的位置（与 FrozenMountain 相同的算法）
   const randX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
   const randZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
-  const offsetX = Math.floor(randX * (maxOffset - minOffset)) + minOffset;
-  const offsetZ = Math.floor(randZ * (maxOffset - minOffset)) + minOffset;
+  const offsetX = Math.floor(randX * 300) + 100;
+  const offsetZ = Math.floor(randZ * 300) + 100;
 
-  const islandCx = regionX * regionSize + offsetX;
-  const islandCz = regionZ * regionSize + offsetZ;
+  const pyramidCx = regionX * regionSize + offsetX;
+  const pyramidCz = regionZ * regionSize + offsetZ;
+
+  // 冰封山峰位置 = 金字塔位置 + (-160, 0) 偏移
+  const frozenMountainCx = pyramidCx - 160;
+  const frozenMountainCz = pyramidCz;
+
+  // 计算海岛中心位置：需要远离冰封山峰
+  // 海岛在 Z 轴方向随机偏移，与冰封山峰的 X 轴偏移错开
+  const islandRandX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
+  const islandRandZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
+  const islandOffsetX = Math.floor(islandRandX * (regionSize - 100)) + 50;
+  const islandOffsetZ = Math.floor(islandRandZ * (regionSize - 100)) + 50;
+
+  let islandCx = regionX * regionSize + islandOffsetX;
+  let islandCz = regionZ * regionSize + islandOffsetZ;
+
+  // 确保海岛远离冰封山峰（最小距离 100 格）
+  const minMountainDistance = 100;
+  const distMountainX = Math.abs(islandCx - frozenMountainCx);
+  const distMountainZ = Math.abs(islandCz - frozenMountainCz);
+  const distFromMountain = Math.max(distMountainX, distMountainZ);
+
+  if (distFromMountain < minMountainDistance) {
+    // 如果距离太近，将海岛移到冰封山峰的对面
+    islandCx = frozenMountainCx + (islandCx > frozenMountainCx ? -minMountainDistance : minMountainDistance);
+    islandCz = frozenMountainCz + (islandCz > frozenMountainCz ? -minMountainDistance : minMountainDistance);
+  }
+
+  // 确保海岛中心不会太靠近区域边界
+  const minMargin = totalHalfSize + 5;
+  const regionLeft = regionX * regionSize;
+  const regionRight = (regionX + 1) * regionSize;
+  const regionTop = regionZ * regionSize;
+  const regionBottom = (regionZ + 1) * regionSize;
+
+  if (islandCx - minMargin < regionLeft) {
+    islandCx = regionLeft + minMargin;
+  } else if (islandCx + minMargin > regionRight) {
+    islandCx = regionRight - minMargin;
+  }
+
+  if (islandCz - minMargin < regionTop) {
+    islandCz = regionTop + minMargin;
+  } else if (islandCz + minMargin > regionBottom) {
+    islandCz = regionBottom - minMargin;
+  }
 
   // 计算距离（使用 Max 距离判断方形范围）
   const dx = Math.abs(wx - islandCx);
@@ -105,14 +146,20 @@ export function getIslandInfo(wx, wz, seed, terrainGen) {
 function getIslandShapeNoise(wx, wz, seed, islandInfo) {
   const { shapeNoiseScale, edgeNoiseScale } = ISLAND_CONFIG;
 
-  // 主噪声：决定海岛主体轮廓
+  // 主噪声：决定海岛主体轮廓（低频大波浪）
   const baseNoise = Math.sin(wx * shapeNoiseScale + seed) * Math.cos(wz * shapeNoiseScale + seed);
 
-  // 细节噪声：添加海岸线不规则性
+  // 中频噪声：添加中等尺度的不规则性
+  const midNoise = Math.sin(wx * shapeNoiseScale * 2 + seed * 1.5) * Math.cos(wz * shapeNoiseScale * 2 + seed * 1.5) * 0.5;
+
+  // 细节噪声：添加海岸线破碎感（高频小波浪）
   const detailNoise = Math.sin(wx * edgeNoiseScale + seed * 2) * Math.cos(wz * edgeNoiseScale + seed * 2) * 0.5;
 
-  // 组合噪声
-  return baseNoise * shapeNoiseScale + detailNoise * edgeNoiseScale;
+  // 额外的高频噪声：增加更细的破碎感
+  const fineNoise = Math.sin(wx * edgeNoiseScale * 2 + seed * 3) * Math.cos(wz * edgeNoiseScale * 2 + seed * 3) * 0.25;
+
+  // 组合噪声：多层叠加产生自然的不规则效果
+  return baseNoise * shapeNoiseScale + midNoise * shapeNoiseScale * 0.5 + detailNoise * edgeNoiseScale + fineNoise * edgeNoiseScale * 0.5;
 }
 
 /**
@@ -125,7 +172,8 @@ function getIslandShapeNoise(wx, wz, seed, islandInfo) {
  */
 function isInIsland(wx, wz, islandInfo, seed) {
   const shapeNoise = getIslandShapeNoise(wx, wz, seed, islandInfo);
-  const effectiveDist = islandInfo.distFromCenter - shapeNoise * 5;
+  // 增加形状噪声的影响力度，让海岸线更不规则
+  const effectiveDist = islandInfo.distFromCenter - shapeNoise * 8;
   const { islandSize, transitionSize } = ISLAND_CONFIG;
   const halfSize = Math.floor(islandSize / 2);
   const totalHalfSize = halfSize + transitionSize;
@@ -214,7 +262,7 @@ function getBlockDistribution(wx, wz, islandInfo, seed) {
  * @returns {Object} 生成结果 { surfaceY, isBelowSeaLevel }
  */
 export function generateIsland(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, seed) {
-  const { seaLevel, islandSize } = ISLAND_CONFIG;
+  const { seaLevel, islandSize, transitionSize } = ISLAND_CONFIG;
   const halfSize = Math.floor(islandSize / 2);
 
   // 检查是否在海岛范围内
@@ -231,9 +279,15 @@ export function generateIsland(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, s
   // 计算到中心的距离，决定方块类型
   // 边缘是 sand（沙滩），内部是 stone
   const distFromCenter = islandInfo.distFromCenter;
-  const beachThreshold = halfSize - 2; // 边缘 2 格是沙滩
 
-  // 表面方块：边缘是 sand，内部是 stone
+  // 使用形状噪声来扰动沙滩边界，让沙滩和石头的分界更自然
+  const shapeNoise = getIslandShapeNoise(wx, wz, seed, islandInfo);
+  // 沙滩阈值随噪声动态变化，产生不规则的 sand/stone 边界
+  const baseBeachThreshold = halfSize - 3;
+  const noiseOffset = shapeNoise * 3;
+  const beachThreshold = baseBeachThreshold + noiseOffset;
+
+  // 表面方块：边缘是 sand，内部是 stone（边界受噪声影响）
   const surfaceBlock = distFromCenter > beachThreshold ? 'sand' : 'stone';
 
   // 生成地表方块
