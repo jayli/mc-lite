@@ -1478,13 +1478,11 @@ export class Player {
             break;
           }
           case 'island': {
-            // 海岛位置计算与 IslandMap.js 一致
-            const islandRandX = Math.abs(Math.sin(seed * 1.5 + rx * 0.1));
-            const islandRandZ = Math.abs(Math.sin(seed * 2.5 + rz * 0.1));
-            const islandOffsetX = Math.floor(islandRandX * (400 - 100)) + 50;
-            const islandOffsetZ = Math.floor(islandRandZ * (400 - 100)) + 50;
-            let islandCx = rx * 400 + islandOffsetX;
-            let islandCz = rz * 400 + islandOffsetZ;
+            // 预计算区域边界
+            const regionLeft = rx * 400;
+            const regionRight = (rx + 1) * 400;
+            const regionTop = rz * 400;
+            const regionBottom = (rz + 1) * 400;
 
             // 计算金字塔位置（用于距离检查）
             const pyramidRandX = Math.abs(Math.sin(seed * 1.5 + rx * 0.1));
@@ -1495,21 +1493,39 @@ export class Player {
             let pyramidCz = rz * 400 + pyramidOffsetZ;
             // 金字塔边界调整
             const pyramidMinMargin = 20 + 8 + 5;
-            const regionLeft = rx * 400;
-            const regionRight = (rx + 1) * 400;
-            const regionTop = rz * 400;
-            const regionBottom = (rz + 1) * 400;
             if (pyramidCx - pyramidMinMargin < regionLeft) pyramidCx = regionLeft + pyramidMinMargin;
             else if (pyramidCx + pyramidMinMargin > regionRight) pyramidCx = regionRight - pyramidMinMargin;
             if (pyramidCz - pyramidMinMargin < regionTop) pyramidCz = regionTop + pyramidMinMargin;
             else if (pyramidCz + pyramidMinMargin > regionBottom) pyramidCz = regionBottom - pyramidMinMargin;
 
-            // 计算冰封山峰位置（用于距离检查）
-            const frozenMountainCx = pyramidCx - 160;
-            const frozenMountainCz = pyramidCz;
+            // 计算冰封山峰位置（应用与 FrozenMountain.js 相同的边界检查）
+            let frozenMountainCx = pyramidCx - 160;
+            let frozenMountainCz = pyramidCz;
+            const fmHalfSize = 40;
+            const fmTransitionSize = 4;
+            const fmTotalHalfSize = fmHalfSize + fmTransitionSize;
+            const fmMinMargin = fmTotalHalfSize + 5;
+            if (frozenMountainCx - fmMinMargin < regionLeft) {
+              frozenMountainCx = regionLeft + fmMinMargin;
+            } else if (frozenMountainCx + fmMinMargin > regionRight) {
+              frozenMountainCx = regionRight - fmMinMargin;
+            }
+            if (frozenMountainCz - fmMinMargin < regionTop) {
+              frozenMountainCz = regionTop + fmMinMargin;
+            } else if (frozenMountainCz + fmMinMargin > regionBottom) {
+              frozenMountainCz = regionBottom - fmMinMargin;
+            }
 
-            // 确保海岛远离冰封山峰（最小距离 100 格）
-            const minMountainDistance = 100;
+            // 计算海岛位置（与 IslandMap.js 一致）
+            const islandRandX = Math.abs(Math.sin(seed * 1.5 + rx * 0.1));
+            const islandRandZ = Math.abs(Math.sin(seed * 2.5 + rz * 0.1));
+            const islandOffsetX = Math.floor(islandRandX * (400 - 100)) + 50;
+            const islandOffsetZ = Math.floor(islandRandZ * (400 - 100)) + 50;
+            let islandCx = rx * 400 + islandOffsetX;
+            let islandCz = rz * 400 + islandOffsetZ;
+
+            // 确保海岛远离冰封山峰（最小距离 130 格）
+            const minMountainDistance = 130;
             const distMountainX = Math.abs(islandCx - frozenMountainCx);
             const distMountainZ = Math.abs(islandCz - frozenMountainCz);
             const distFromMountain = Math.max(distMountainX, distMountainZ);
@@ -1529,28 +1545,101 @@ export class Player {
             }
 
             // 确保海岛中心不会太靠近区域边界
-            const minMargin = 20 + 5; // halfSize(15) + transitionSize(10) + 5
+            const minMargin = 15 + 10 + 5; // halfSize(15) + transitionSize(10) + 5
             if (islandCx - minMargin < regionLeft) islandCx = regionLeft + minMargin;
             else if (islandCx + minMargin > regionRight) islandCx = regionRight - minMargin;
             if (islandCz - minMargin < regionTop) islandCz = regionTop + minMargin;
             else if (islandCz + minMargin > regionBottom) islandCz = regionBottom - minMargin;
+
+            // 边界调整后，再次检查山峰距离（与 IslandMap.js 一致）
+            const distMountainX2 = Math.abs(islandCx - frozenMountainCx);
+            const distMountainZ2 = Math.abs(islandCz - frozenMountainCz);
+            const distFromMountain2 = Math.max(distMountainX2, distMountainZ2);
+            if (distFromMountain2 < minMountainDistance) {
+              const candidates = [
+                { x: regionLeft + minMargin, z: regionTop + minMargin },
+                { x: regionLeft + minMargin, z: regionBottom - minMargin },
+                { x: regionRight - minMargin, z: regionTop + minMargin },
+                { x: regionRight - minMargin, z: regionBottom - minMargin }
+              ];
+              let bestCandidate = null;
+              let bestDist = 0;
+              for (const candidate of candidates) {
+                const dX = Math.abs(candidate.x - frozenMountainCx);
+                const dZ = Math.abs(candidate.z - frozenMountainCz);
+                const d = Math.max(dX, dZ);
+                if (d > bestDist) {
+                  bestDist = d;
+                  bestCandidate = candidate;
+                }
+              }
+              if (bestCandidate && bestDist >= minMountainDistance) {
+                islandCx = bestCandidate.x;
+                islandCz = bestCandidate.z;
+              }
+            }
+
+            // 边界和距离调整后，再次检查金字塔距离
+            const distPyramidX2 = Math.abs(islandCx - pyramidCx);
+            const distPyramidZ2 = Math.abs(islandCz - pyramidCz);
+            const distFromPyramid2 = Math.max(distPyramidX2, distPyramidZ2);
+            if (distFromPyramid2 < minPyramidDistance) {
+              if (islandCx > pyramidCx) {
+                islandCx = Math.min(regionRight - minMargin, pyramidCx + minPyramidDistance);
+              } else {
+                islandCx = Math.max(regionLeft + minMargin, pyramidCx - minPyramidDistance);
+              }
+              if (islandCz > pyramidCz) {
+                islandCz = Math.min(regionBottom - minMargin, pyramidCz + minPyramidDistance);
+              } else {
+                islandCz = Math.max(regionTop + minMargin, pyramidCz - minPyramidDistance);
+              }
+            }
+
             centerX = islandCx;
             centerZ = islandCz;
             break;
           }
           case 'snow': {
-            // 雪地：金字塔位置 + (160, 0)（SnowLand.js 中没有边界限制调整）
+            // 雪地：金字塔位置 + (160, 0)
+            // SnowLand.js 逻辑：用当前坐标所在区域计算金字塔，然后 +160
+            // 注意：雪地可能跨越区域边界，需要同时考虑相邻区域的金字塔产生的雪地
+            const regionSize = 400;
+
+            // 计算当前遍历区域的金字塔位置（这是生成雪地的基础）
             const randX = Math.abs(Math.sin(seed * 1.5 + rx * 0.1));
             const randZ = Math.abs(Math.sin(seed * 2.5 + rz * 0.1));
             const offsetX = Math.floor(randX * 300) + 100;
             const offsetZ = Math.floor(randZ * 300) + 100;
-            const pyramidCx = rx * 400 + offsetX;
-            const pyramidCz = rz * 400 + offsetZ;
-            // SnowLand.js 中直接使用金字塔位置 +160，不做边界限制
-            let snowLandCx = pyramidCx + 160;
-            let snowLandCz = pyramidCz;
-            centerX = snowLandCx;
-            centerZ = snowLandCz;
+            const pyramidCx = rx * regionSize + offsetX;
+            const pyramidCz = rz * regionSize + offsetZ;
+
+            // 该区域产生的雪地中心
+            const snowLandCx = pyramidCx + 160;
+            const snowLandCz = pyramidCz;
+
+            // 雪地主体半宽 20 + 过渡带 8 = 28
+            const totalHalfSize = 20 + 8;
+
+            // 检查雪地是否延伸到当前搜索区域（考虑玩家可能在相邻区域）
+            // 雪地影响范围是以 snowLandCx, snowLandCz 为中心的正方形
+            const snowMinX = snowLandCx - totalHalfSize;
+            const snowMaxX = snowLandCx + totalHalfSize;
+            const snowMinZ = snowLandCz - totalHalfSize;
+            const snowMaxZ = snowLandCz + totalHalfSize;
+
+            // 当前搜索区域的范围
+            const searchMinX = rx * regionSize;
+            const searchMaxX = (rx + 1) * regionSize;
+            const searchMinZ = rz * regionSize;
+            const searchMaxZ = (rz + 1) * regionSize;
+
+            // 如果该雪地与当前搜索区域有重叠，则这是一个有效的雪地位置
+            if (snowMaxX >= searchMinX && snowMinX <= searchMaxX &&
+                snowMaxZ >= searchMinZ && snowMinZ <= searchMaxZ) {
+              centerX = snowLandCx;
+              centerZ = snowLandCz;
+            }
             break;
           }
         }
