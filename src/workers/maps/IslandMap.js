@@ -40,7 +40,7 @@ const seededRandom = (x, z, seed) => {
  * @returns {Object|null} 海岛信息对象或 null
  */
 export function getIslandInfo(wx, wz, seed, terrainGen) {
-  const { regionSize, islandSize, transitionSize, minDistanceFromLand } = ISLAND_CONFIG;
+  const { regionSize, islandSize, transitionSize, minDistanceFromLand, seaLevel } = ISLAND_CONFIG;
   const halfSize = Math.floor(islandSize / 2);
   const totalHalfSize = halfSize + transitionSize;
 
@@ -68,6 +68,16 @@ export function getIslandInfo(wx, wz, seed, terrainGen) {
 
   // 检查是否在范围内
   if (dx > totalHalfSize || dz > totalHalfSize) {
+    return null;
+  }
+
+  // 检查基础地形高度：海岛只生成在海里（基础地形高度低于海平面）
+  // 使用海岛中心位置的高度作为参考
+  const centerBiome = terrainGen ? terrainGen.getBiome(islandCx, islandCz) : 'OCEAN';
+  const centerHeight = terrainGen ? terrainGen.generateHeight(islandCx, islandCz, centerBiome) : -10;
+
+  // 如果中心位置的基础地形高度高于或等于海平面，说明这里不是海洋，不生成海岛
+  if (centerHeight >= seaLevel) {
     return null;
   }
 
