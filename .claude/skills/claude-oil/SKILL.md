@@ -1,6 +1,6 @@
 ---
 name: claude-oil
-description: 为 CLAUDE.md 注入"润滑油"，让第三方大模型（如 kimi、gpt-codex）与 Claude Code 的配合达到丝滑流畅、不中断的效果。适用于 API 形式接入 Claude Code 的非 Claude 官方模型。
+description: 为 CLAUDE.md 注入"润滑油"，让第三方大模型（如 kimi、qwen ）与 Claude Code 的配合达到丝滑流畅、不中断的效果。适用于 API 形式接入 Claude Code 的非 Claude 官方模型。
 user-invocable: true
 ---
 
@@ -11,9 +11,7 @@ user-invocable: true
 ## 使用场景
 
 当你使用以下方式接入 Claude Code 时：
-- **kimi** API 接入
-- **gpt-5.3-codex** 或其他 OpenAI 模型接入
-- 任何非 Claude 官方模型的 API 接入
+- kimi/qwen/glm API 接入
 
 遇到这些问题：
 - 任务执行到一半突然中断等待确认
@@ -130,7 +128,7 @@ Next: <下一步>
 
 ## 工作原理
 
-本 skill 向 CLAUDE.md 注入 6 条执行契约，核心思想来自 `use-codex-llm` skill，但更加精简：
+本 skill 向 CLAUDE.md 注入 6 条执行契约：
 
 | 契约 | 作用 |
 |------|------|
@@ -143,4 +141,4 @@ Next: <下一步>
 
 ---
 
-*灵感来源：use-codex-llm skill | 目标：让 kimi 也能像 Claude Opus 一样丝滑*
+*目标：让 kimi/qwen/glm 也能像 Claude Opus 一样丝滑*
