@@ -2,6 +2,7 @@
 // AO（环境光遮蔽）计算辅助函数
 
 import { getBlockProperties } from '../constants/BlockData.js';
+import { AO_VERTICES_COUNT } from '../constants/GameConfig.js';
 
 /**
  * 预计算的邻居偏移量（按面和角索引）
@@ -102,7 +103,7 @@ export function getAOForFace(x, y, z, faceIdx, isOccludingFn) {
 }
 
 /**
- * 计算方块所有 6 个面的 AO 值（共 24 个顶点）
+ * 计算方块所有 6 个面的 AO 值（共 AO_VERTICES_COUNT 个顶点）
  * @param {number} x - 方块世界 X 坐标
  * @param {number} y - 方块世界 Y 坐标
  * @param {number} z - 方块世界 Z 坐标
@@ -161,19 +162,19 @@ export function buildAODataForBlocks(blocks, isOccludingFn) {
 }
 
 /**
- * 打包 24 个 AO 值为两个 32 位整数
- * @param {Uint8Array} aos - 24 个 AO 值数组 (每个值 0-3)
+ * 打包 AO_VERTICES_COUNT 个 AO 值为两个 32 位整数
+ * @param {Uint8Array} aos - AO_VERTICES_COUNT 个 AO 值数组 (每个值 0-3)
  * @returns {Object} { aoLow: number, aoHigh: number }
  */
 export function packAOData(aos) {
-  if (aos.length !== 24) {
-    throw new Error('AO array must have exactly 24 values');
+  if (aos.length !== AO_VERTICES_COUNT) {
+    throw new Error(`AO array must have exactly ${AO_VERTICES_COUNT} values`);
   }
 
   let aoLow = 0;
   let aoHigh = 0;
 
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < AO_VERTICES_COUNT; i++) {
     const aoVal = aos[i] & 0x03; // 确保值在 0-3 范围内
 
     if (i < 12) {
@@ -206,14 +207,14 @@ export function unpackAOValue(aoLow, aoHigh, vertexIdx) {
 }
 
 /**
- * 解包所有 24 个顶点的 AO 值
+ * 解包所有 AO_VERTICES_COUNT 个顶点的 AO 值
  * @param {number} aoLow - 低 12 个顶点的打包 AO 数据
  * @param {number} aoHigh - 高 12 个顶点的打包 AO 数据
- * @returns {number[]} 24 个 AO 值数组
+ * @returns {number[]} AO_VERTICES_COUNT 个 AO 值数组
  */
 export function unpackAllAO(aoLow, aoHigh) {
-  const aos = new Array(24);
-  for (let i = 0; i < 24; i++) {
+  const aos = new Array(AO_VERTICES_COUNT);
+  for (let i = 0; i < AO_VERTICES_COUNT; i++) {
     aos[i] = unpackAOValue(aoLow, aoHigh, i);
   }
   return aos;
@@ -267,7 +268,7 @@ export function validateAOValue(ao) {
  * @returns {boolean} 是否合法
  */
 export function validatePackedAO(aoLow, aoHigh) {
-  for (let i = 0; i < 24; i++) {
+  for (let i = 0; i < AO_VERTICES_COUNT; i++) {
     const ao = unpackAOValue(aoLow, aoHigh, i);
     if (!validateAOValue(ao)) return false;
   }

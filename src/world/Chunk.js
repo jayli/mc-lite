@@ -16,6 +16,7 @@ import { extendChunk as extendWithConsolidation, CHUNK_SIZE, geomMap } from './C
 import { extendChunk as extendWithGenerator } from './ChunkGenerator.js';
 import { extendChunk as extendWithPersistence } from './ChunkPersistence.js';
 import { extendChunk as extendWithRenderUtils } from './ChunkRenderUtils.js';
+import { FACE_MASK_ALL } from '../constants/GameConfig.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
@@ -453,7 +454,7 @@ export class Chunk {
       return { type: parsed.type, orientation: parsed.orientation };
     });
 
-    let mask = 63;
+    let mask = FACE_MASK_ALL;
     const fcSystem = getFaceCullingSystem();
     if (fcSystem && fcSystem.isEnabled() && type !== 'air' && type !== 'collider' && type !== 'chest') {
       const block = { type };

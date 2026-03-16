@@ -171,11 +171,11 @@ export class Physics {
 
     for (let h = 1; h <= maxStep; h++) {
       const stepY = currentFloorY + h;
-      const halfW_check = 0.3;
+      const halfWCheck = 0.3;
       const ty = Math.floor(stepY - 1);
       let foundHandrail = false;
-      for (const ox of [-halfW_check, 0, halfW_check]) {
-        for (const oz of [-halfW_check, 0, halfW_check]) {
+      for (const ox of [-halfWCheck, 0, halfWCheck]) {
+        for (const oz of [-halfWCheck, 0, halfWCheck]) {
           const bType = this.world.getBlock(Math.floor(nx + ox), ty, Math.floor(nz + oz));
           if (bType === 'handrail' || bType === 'handrailA' || bType === 'handrailB') {
             foundHandrail = true;

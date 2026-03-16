@@ -5,9 +5,14 @@
   "main": "index.js",
   "scripts": {
     "start": "node server-script/start-server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo 'Open http://localhost:8080/src/tests/index.html to run tests'",
+    "lint": "eslint src/**/*.js",
+    "lint:fix": "eslint src/**/*.js --fix"
   },
   "author": "jayli",
   "repository": "git@github.com:jayli/mc-lite.git",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "eslint": "^9.39.4"
+  }
 }

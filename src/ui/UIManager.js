@@ -2,6 +2,7 @@
 import { HUD } from './HUD.js';
 import { InventoryUI } from './Inventory.js';
 import { playgroundService } from '../services/PlaygroundService.js';
+import { ZOMBIE_LIMIT_LOW, ZOMBIE_LIMIT_MED, ZOMBIE_LIMIT_HIGH } from '../constants/GameConfig.js';
 
 /**
  * UI 管理器 - 负责协调所有 UI 组件的初始化和更新
@@ -124,23 +125,23 @@ export class UIManager {
     if (btnZombie20 && btnZombie30 && btnZombie50) {
       btnZombie20.onclick = (e) => {
         e.stopPropagation();
-        this.game.maxActiveZombies = 20;
-        this.game.enemyManager.maxActiveZombies = 20;
-        this.hud.showMessage('已设置丧尸数量上限为 20 个');
+        this.game.maxActiveZombies = ZOMBIE_LIMIT_LOW;
+        this.game.enemyManager.maxActiveZombies = ZOMBIE_LIMIT_LOW;
+        this.hud.showMessage(`已设置丧尸数量上限为 ${ZOMBIE_LIMIT_LOW} 个`);
         this.updateActiveButtons();
       };
       btnZombie30.onclick = (e) => {
         e.stopPropagation();
-        this.game.maxActiveZombies = 30;
-        this.game.enemyManager.maxActiveZombies = 30;
-        this.hud.showMessage('已设置丧尸数量上限为 30 个');
+        this.game.maxActiveZombies = ZOMBIE_LIMIT_MED;
+        this.game.enemyManager.maxActiveZombies = ZOMBIE_LIMIT_MED;
+        this.hud.showMessage(`已设置丧尸数量上限为 ${ZOMBIE_LIMIT_MED} 个`);
         this.updateActiveButtons();
       };
       btnZombie50.onclick = (e) => {
         e.stopPropagation();
-        this.game.maxActiveZombies = 50;
-        this.game.enemyManager.maxActiveZombies = 50;
-        this.hud.showMessage('已设置丧尸数量上限为 50 个');
+        this.game.maxActiveZombies = ZOMBIE_LIMIT_HIGH;
+        this.game.enemyManager.maxActiveZombies = ZOMBIE_LIMIT_HIGH;
+        this.hud.showMessage(`已设置丧尸数量上限为 ${ZOMBIE_LIMIT_HIGH} 个`);
         this.updateActiveButtons();
       };
     }
@@ -347,9 +348,9 @@ export class UIManager {
     }
 
     if (btnZombie20 && btnZombie30 && btnZombie50) {
-      btnZombie20.classList.toggle('active', this.game.maxActiveZombies === 20);
-      btnZombie30.classList.toggle('active', this.game.maxActiveZombies === 30);
-      btnZombie50.classList.toggle('active', this.game.maxActiveZombies === 50);
+      btnZombie20.classList.toggle('active', this.game.maxActiveZombies === ZOMBIE_LIMIT_LOW);
+      btnZombie30.classList.toggle('active', this.game.maxActiveZombies === ZOMBIE_LIMIT_MED);
+      btnZombie50.classList.toggle('active', this.game.maxActiveZombies === ZOMBIE_LIMIT_HIGH);
     }
 
     // 更新创造台按钮状态

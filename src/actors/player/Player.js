@@ -125,10 +125,10 @@ export class Player {
     this.center = new THREE.Vector2(0, 0);  // 屏幕中心点坐标
 
     // 镜头晃动（Head Bobbing）相关
-    this.bobbing_timer = 0;        // 晃动周期计时器
-    this.bobbing_intensity = 0.05; // 基础晃动强度
-    this.bobbing_speed = 0.2;      // 基础晃动速度
-    this.bob_offset = new THREE.Vector2(); // 最终应用到相机的偏移量
+    this.bobbingTimer = 0;        // 晃动周期计时器
+    this.bobbingIntensity = 0.05; // 基础晃动强度
+    this.bobbingSpeed = 0.2;      // 基础晃动速度
+    this.bobOffset = new THREE.Vector2(); // 最终应用到相机的偏移量
 
     // 初始化爆炸 Worker
     this.explosionWorker = new Worker(new URL('../../workers/ExplosionWorker.js', import.meta.url), { type: 'module' });
@@ -910,23 +910,23 @@ export class Player {
     const shouldBob = isMoving && isFullSpeed && !this.jumping && !isObstructed;
 
     if (shouldBob) {
-      this.bobbing_timer += this.bobbing_speed;
-      this.bobAmount = THREE.MathUtils.lerp(this.bobAmount, this.bobbing_intensity, 0.1);
+      this.bobbingTimer += this.bobbingSpeed;
+      this.bobAmount = THREE.MathUtils.lerp(this.bobAmount, this.bobbingIntensity, 0.1);
       this.playFootstepSound();
     } else {
-      this.bobbing_timer = 0;
+      this.bobbingTimer = 0;
       this.bobAmount = THREE.MathUtils.lerp(this.bobAmount, 0, 0.2);
       audioManager.stopSound('running_land');
       audioManager.stopSound('running_water');
     }
 
-    const bobX = Math.sin(this.bobbing_timer) * this.bobAmount;
-    const bobY = Math.cos(this.bobbing_timer * 2) * this.bobAmount * 0.5;
-    this.bob_offset.x = THREE.MathUtils.lerp(this.bob_offset.x, bobX, 0.3);
-    this.bob_offset.y = THREE.MathUtils.lerp(this.bob_offset.y, bobY, 0.3);
+    const bobX = Math.sin(this.bobbingTimer) * this.bobAmount;
+    const bobY = Math.cos(this.bobbingTimer * 2) * this.bobAmount * 0.5;
+    this.bobOffset.x = THREE.MathUtils.lerp(this.bobOffset.x, bobX, 0.3);
+    this.bobOffset.y = THREE.MathUtils.lerp(this.bobOffset.y, bobY, 0.3);
 
-    this.camera.position.x += this.bob_offset.x;
-    this.camera.position.y += this.bob_offset.y;
+    this.camera.position.x += this.bobOffset.x;
+    this.camera.position.y += this.bobOffset.y;
   }
 
   /**
