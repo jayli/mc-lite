@@ -11,6 +11,7 @@ import { getBlockProperties } from '../constants/BlockData.js';
 import { getRotationAngle, parseBlockEntry } from '../utils/OrientationUtils.js';
 import { getStructureRenderDist, belongsToStructure } from '../utils/StructureUtils.js';
 import { createOcclusionChecker, computeBlockAOPacked } from '../utils/AOUtils.js';
+import { createChunkNeighborSampler } from './ChunkNeighborUtils.js';
 import { extendChunk as extendWithConsolidation, CHUNK_SIZE, geomMap } from './ChunkConsolidation.js';
 import { extendChunk as extendWithGenerator } from './ChunkGenerator.js';
 import { extendChunk as extendWithPersistence } from './ChunkPersistence.js';
@@ -446,25 +447,10 @@ export class Chunk {
     this.saveDebounced();
 
     // 6. 计算 Face Culling 掩码
-    const getNeighborBlock = (nx, ny, nz) => {
-      const cx = Math.floor(nx / 16);
-      const cz = Math.floor(nz / 16);
-      const chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(`${cx},${cz}`);
-      if (!chunk || !chunk.isReady) return null;
-      const nKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-      const nEntry = chunk.blockData[nKey];
-      if (!nEntry) return null;
-      const parsed = parseBlockEntry(nEntry);
+    const { getNeighborBlock, getNeighborsOf } = createChunkNeighborSampler(this, (entry) => {
+      if (!entry) return null;
+      const parsed = parseBlockEntry(entry);
       return { type: parsed.type, orientation: parsed.orientation };
-    };
-
-    const getNeighborsOf = (nx, ny, nz) => ({
-      top: getNeighborBlock(nx, ny + 1, nz),
-      bottom: getNeighborBlock(nx, ny - 1, nz),
-      north: getNeighborBlock(nx, ny, nz - 1),
-      south: getNeighborBlock(nx, ny, nz + 1),
-      west: getNeighborBlock(nx - 1, ny, nz),
-      east: getNeighborBlock(nx + 1, ny, nz)
     });
 
     let mask = 63;

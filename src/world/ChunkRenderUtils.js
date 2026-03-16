@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { getBlockProperties } from '../constants/BlockData.js';
 import { getStructureRenderDist } from '../utils/StructureUtils.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
+import { createChunkNeighborSampler } from './ChunkNeighborUtils.js';
 import { CONSOLIDATION_DELAY } from './ChunkConsolidation.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
@@ -114,23 +115,8 @@ export function extendChunk(Chunk) {
       const position = new THREE.Vector3(x, y, z);
       const block = { type };
 
-      const getNeighborBlock = (nx, ny, nz) => {
-        const cx = Math.floor(nx / 16);
-        const cz = Math.floor(nz / 16);
-        let chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(`${cx},${cz}`);
-        if (!chunk || !chunk.isReady) return null;
-        const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-        const t = chunk.blockData[key];
-        return t ? { type: t } : null;
-      };
-
-      const getNeighborsOf = (nx, ny, nz) => ({
-        top: getNeighborBlock(nx, ny + 1, nz),
-        bottom: getNeighborBlock(nx, ny - 1, nz),
-        north: getNeighborBlock(nx, ny, nz - 1),
-        south: getNeighborBlock(nx, ny, nz + 1),
-        west: getNeighborBlock(nx - 1, ny, nz),
-        east: getNeighborBlock(nx + 1, ny, nz)
+      const { getNeighborsOf } = createChunkNeighborSampler(this, (entry) => {
+        return entry ? { type: entry } : null;
       });
 
       fcSystem.updateBlock(position, block, getNeighborsOf(x, y, z));
