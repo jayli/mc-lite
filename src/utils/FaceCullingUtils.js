@@ -6,24 +6,26 @@
 
 import * as THREE from 'three';
 
-/**
- * 面方向位掩码常量
- */
-export const faceMask = {
-  // 单个面
-  TOP:    0b00000001,    // 1 - 上面 (Y+)
-  BOTTOM: 0b00000010,    // 2 - 下面 (Y-)
-  NORTH:  0b00000100,    // 4 - 北面 (Z-)
-  SOUTH:  0b00001000,    // 8 - 南面 (Z+)
-  WEST:   0b00010000,    // 16 - 西面 (X-)
-  EAST:   0b00100000,    // 32 - 东面 (X+)
+// 从核心模块导入纯逻辑函数，然后统一导出
+import {
+  faceMask,
+  FACE_DIRECTIONS,
+  computeFaceVisibilityMask,
+  createBlockDataNeighborQuery,
+  createBlockMapNeighborQuery,
+  createNeighborsObjectQuery,
+  createCrossChunkNeighborQuery
+} from './FaceCullingCore.js';
 
-  // 组合面
-  ALL:    0b00111111,    // 63 - 所有面
-  NONE:   0b00000000,    // 0 - 无面
-  SIDES:  0b00111100,    // 60 - 所有侧面（上下除外）
-  VERTICAL: 0b00000011,  // 3 - 上下两面
-  HORIZONTAL: 0b00111100 // 60 - 所有水平面
+// 重新导出（供外部使用）
+export {
+  faceMask,
+  FACE_DIRECTIONS,
+  computeFaceVisibilityMask,
+  createBlockDataNeighborQuery,
+  createBlockMapNeighborQuery,
+  createNeighborsObjectQuery,
+  createCrossChunkNeighborQuery
 };
 
 /**
@@ -191,7 +193,7 @@ export function getFaceDirection(face) {
 
 /**
  * 根据方向向量获取面位掩码
- * @param {THREE.Vector3} direction - 方向向量
+ * @param {Vector3} direction - 方向向量
  * @returns {number} 面位掩码
  */
 export function getFaceFromDirection(direction) {

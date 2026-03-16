@@ -27,7 +27,14 @@
  */
 
 import * as THREE from 'three';
-import { faceMask, countVisibleFaces } from '../utils/FaceCullingUtils.js';
+import {
+  faceMask,
+  countVisibleFaces
+} from '../utils/FaceCullingUtils.js';
+import {
+  computeFaceVisibilityMask,
+  createNeighborsObjectQuery
+} from '../utils/FaceCullingCore.js';
 import { getBlockProperties, getTransparentTypes } from '../constants/BlockData.js';
 
 /**
@@ -204,22 +211,13 @@ export class FaceCullingSystem {
   calculateFaceVisibility(block, neighbors) {
     if (!this.enabled) return faceMask.ALL; // 系统禁用时，默认所有面都可见
 
-    // 宝箱或透明方块的所有面都可见
-    if (block.type === 'chest' || this.isTransparent(block.type)) {
-      return faceMask.ALL;
-    }
-
-    let mask = 0;
-
-    // 检查六个方向，如果相邻方向没有遮挡（或是透明方块），则设置对应位的掩码为可见
-    if (this.shouldShowFace(block, neighbors.top)) mask |= faceMask.TOP;
-    if (this.shouldShowFace(block, neighbors.bottom)) mask |= faceMask.BOTTOM;
-    if (this.shouldShowFace(block, neighbors.north)) mask |= faceMask.NORTH;
-    if (this.shouldShowFace(block, neighbors.south)) mask |= faceMask.SOUTH;
-    if (this.shouldShowFace(block, neighbors.west)) mask |= faceMask.WEST;
-    if (this.shouldShowFace(block, neighbors.east)) mask |= faceMask.EAST;
-
-    return mask;
+    const getNeighborType = createNeighborsObjectQuery(neighbors);
+    return computeFaceVisibilityMask(
+      block.type,
+      getNeighborType,
+      (type) => this.isTransparent(type),
+      (type) => type === 'chest'
+    );
   }
 
   /**

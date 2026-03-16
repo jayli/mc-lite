@@ -11,6 +11,10 @@ import { SnowLand } from './maps/SnowLand.js';
 import { FrozenMountain } from './maps/FrozenMountain.js';
 import { IslandMap } from './maps/IslandMap.js';
 import { belongsToStructure as checkBelongsToStructure } from '../utils/StructureUtils.js';
+import {
+  computeFaceVisibilityMask,
+  createBlockMapNeighborQuery
+} from '../utils/FaceCullingCore.js';
 
 console.log('WorldWorker.js loaded');
 
@@ -703,13 +707,6 @@ onmessage = async function(e) {
   });
 };
 
-// 用于隐藏面剔除的辅助函数
-const getBlockType = (x, y, z, blockMap) => {
-  const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-  const block = blockMap.get(key);
-  return block ? block.type : null;
-};
-
 const isTransparent = (type) => {
   if (!type) return false;
   // 根据BLOCK_DATA判断透明性
@@ -728,26 +725,13 @@ const isTransparent = (type) => {
  * @returns {number} 面掩码
  */
 function calculateFaceVisibility(block, blockMap) {
-  if (block.type === 'chest' || block.type === 'collider') {
-    return 63; // 所有面都可见
-  }
-
-  if (isTransparent(block.type)) {
-    return 63; // 透明方块所有面可见
-  }
-
-  let mask = 0;
-  const { x, y, z } = block;
-
-  // 检查六个方向
-  if (!getBlockType(x, y + 1, z, blockMap) || isTransparent(getBlockType(x, y + 1, z, blockMap))) mask |= 1; // TOP
-  if (!getBlockType(x, y - 1, z, blockMap) || isTransparent(getBlockType(x, y - 1, z, blockMap))) mask |= 2; // BOTTOM
-  if (!getBlockType(x, y, z - 1, blockMap) || isTransparent(getBlockType(x, y, z - 1, blockMap))) mask |= 4; // NORTH
-  if (!getBlockType(x, y, z + 1, blockMap) || isTransparent(getBlockType(x, y, z + 1, blockMap))) mask |= 8; // SOUTH
-  if (!getBlockType(x - 1, y, z, blockMap) || isTransparent(getBlockType(x - 1, y, z, blockMap))) mask |= 16; // WEST
-  if (!getBlockType(x + 1, y, z, blockMap) || isTransparent(getBlockType(x + 1, y, z, blockMap))) mask |= 32; // EAST
-
-  return mask;
+  const getNeighborType = createBlockMapNeighborQuery(blockMap, block.x, block.y, block.z);
+  return computeFaceVisibilityMask(
+    block.type,
+    getNeighborType,
+    isTransparent,
+    (type) => type === 'chest' || type === 'collider'
+  );
 }
 
 /**

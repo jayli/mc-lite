@@ -3,12 +3,11 @@
 
 import { getBlockProperties } from '../constants/BlockData.js';
 import { buildAODataForBlocks, calculateAOForBlock, isAOApplicable } from '../utils/AOUtils.js';
-
-// 用于隐藏面剔除的辅助函数
-const getBlockType = (x, y, z, blockData) => {
-  const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-  return blockData[key] || null;
-};
+import {
+  computeFaceVisibilityMask,
+  createBlockDataNeighborQuery,
+  createCrossChunkNeighborQuery
+} from '../utils/FaceCullingCore.js';
 
 const isTransparent = (type) => {
   if (!type) return false;
@@ -59,26 +58,13 @@ function createOccludingChecker(blockData, worldChunks, currentCx, currentCz) {
  * @returns {number} 面掩码
  */
 function calculateFaceVisibility(block, blockData) {
-  if (block.type === 'chest' || block.type === 'collider') {
-    return 63; // 宝箱和碰撞体的所有面都可见
-  }
-
-  if (isTransparent(block.type)) {
-    return 63; // 透明方块所有面可见
-  }
-
-  let mask = 0;
-  const { x, y, z } = block;
-
-  // 检查六个方向
-  if (!getBlockType(x, y + 1, z, blockData) || isTransparent(getBlockType(x, y + 1, z, blockData))) mask |= 1; // TOP
-  if (!getBlockType(x, y - 1, z, blockData) || isTransparent(getBlockType(x, y - 1, z, blockData))) mask |= 2; // BOTTOM
-  if (!getBlockType(x, y, z - 1, blockData) || isTransparent(getBlockType(x, y, z - 1, blockData))) mask |= 4; // NORTH
-  if (!getBlockType(x, y, z + 1, blockData) || isTransparent(getBlockType(x, y, z + 1, blockData))) mask |= 8; // SOUTH
-  if (!getBlockType(x - 1, y, z, blockData) || isTransparent(getBlockType(x - 1, y, z, blockData))) mask |= 16; // WEST
-  if (!getBlockType(x + 1, y, z, blockData) || isTransparent(getBlockType(x + 1, y, z, blockData))) mask |= 32; // EAST
-
-  return mask;
+  const getNeighborType = createBlockDataNeighborQuery(blockData, block.x, block.y, block.z);
+  return computeFaceVisibilityMask(
+    block.type,
+    getNeighborType,
+    isTransparent,
+    (type) => type === 'chest' || type === 'collider'
+  );
 }
 
 /**
@@ -207,60 +193,23 @@ function calculateChunkFaceVisibility(blockData, cx, cz, worldChunks = null) {
 
 /**
  * 带世界边界的方块可见性计算
+ * @param {Object} block - 方块信息 {x, y, z, type}
+ * @param {Object} blockData - 当前区块的完整方块数据
+ * @param {Map} worldChunks - 世界区块映射
+ * @param {number} currentCx - 当前区块 X 坐标
+ * @param {number} currentCz - 当前区块 Z 坐标
+ * @returns {number} 面掩码
  */
 function calculateFaceVisibilityWithWorld(block, blockData, worldChunks, currentCx, currentCz) {
-  if (block.type === 'chest' || block.type === 'collider') {
-    return 63; // 宝箱和碰撞体的所有面都可见
-  }
-
-  if (isTransparent(block.type)) {
-    return 63; // 透明方块所有面可见
-  }
-
-  let mask = 0;
-  const { x, y, z } = block;
-
-  // 检查六个方向
-  const directions = [
-    { dx: 0, dy: 1, dz: 0, bit: 1 },   // TOP
-    { dx: 0, dy: -1, dz: 0, bit: 2 },  // BOTTOM
-    { dx: 0, dy: 0, dz: -1, bit: 4 },  // NORTH
-    { dx: 0, dy: 0, dz: 1, bit: 8 },   // SOUTH
-    { dx: -1, dy: 0, dz: 0, bit: 16 }, // WEST
-    { dx: 1, dy: 0, dz: 0, bit: 32 }   // EAST
-  ];
-
-  for (const dir of directions) {
-    const nx = x + dir.dx;
-    const ny = y + dir.dy;
-    const nz = z + dir.dz;
-
-    // 检查是否在同一区块内
-    const nxChunk = Math.floor(nx / 16);
-    const nzChunk = Math.floor(nz / 16);
-
-    let neighborType = null;
-    if (nxChunk === currentCx && nzChunk === currentCz) {
-      // 在同一区块内，直接从blockData获取
-      const neighborKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-      neighborType = blockData[neighborKey];
-    } else {
-      // 跨区块，从worldChunks获取
-      const chunkKey = `${nxChunk},${nzChunk}`;
-      const neighborChunk = worldChunks.get(chunkKey);
-      if (neighborChunk && neighborChunk.blockData) {
-        const neighborKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-        neighborType = neighborChunk.blockData[neighborKey];
-      }
-    }
-
-    // 如果没有邻居方块（空气）或者邻居是透明的，则该面可见
-    if (!neighborType || isTransparent(neighborType)) {
-      mask |= dir.bit;
-    }
-  }
-
-  return mask;
+  const getNeighborType = createCrossChunkNeighborQuery(
+    blockData, worldChunks, currentCx, currentCz, block.x, block.y, block.z
+  );
+  return computeFaceVisibilityMask(
+    block.type,
+    getNeighborType,
+    isTransparent,
+    (type) => type === 'chest' || type === 'collider'
+  );
 }
 
 /**
