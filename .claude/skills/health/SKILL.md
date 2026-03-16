@@ -74,6 +74,28 @@ Rust: Cargo.toml 存在
 
 ```bash
 mkdir -p ./health_check
+
+# 生成带自增编号的报告文件名
+generate_report_filename() {
+  local date_str=$(date +%Y-%m-%d)  # 2026-03-16
+  local max_num=0
+
+  # 检查当天已存在的报告
+  for file in ./health_check/${date_str}-*-health-check.md 2>/dev/null; do
+    if [ -f "$file" ]; then
+      local num=$(basename "$file" | grep -oE '^[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}-[0-9]{3}' | tail -1 | cut -d'-' -f4)
+      if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -gt "$max_num" ]; then
+        max_num="$num"
+      fi
+    fi
+  done
+
+  local next_num=$(printf "%03d" $((max_num + 1)))
+  echo "./health_check/${date_str}-${next_num}-health-check.md"
+}
+
+REPORT_FILE=$(generate_report_filename)
+echo "报告将保存至: $REPORT_FILE"
 ```
 
 ### 3. 执行检查
@@ -135,7 +157,38 @@ coverage_report=$(find . -name "coverage.*" -o -name ".nyc_output" -o -name "htm
 
 ### 4. 生成报告
 
-报告路径格式: `./health_check/YYYY-M-D-NNN-health-check.md`
+**报告路径格式:** `./health_check/YYYY-M-D-NNN-health-check.md`
+
+**编号规则（自动累加）:**
+
+```bash
+# 获取今日日期
+date_str=$(date +%Y-%m-%d)  # 例如: 2026-03-16
+
+# 查找当天已存在的报告，获取下一个可用编号
+get_next_number() {
+  local date_prefix="$1"
+  local max_num=0
+
+  # 查找当天所有报告文件
+  for file in ./health_check/${date_prefix}-*-health-check.md; do
+    if [ -f "$file" ]; then
+      # 提取编号 (YYYY-M-D-NNN-health-check.md -> NNN)
+      num=$(echo "$file" | grep -oE '[0-9]{3}-health-check\.md$' | cut -d'-' -f1)
+      if [ "$num" -gt "$max_num" ] 2>/dev/null; then
+        max_num="$num"
+      fi
+    fi
+  done
+
+  # 下一个编号 = 最大值 + 1，格式化为3位数字
+  printf "%03d" $((max_num + 1))
+}
+
+# 生成文件名
+number=$(get_next_number "$date_str")
+report_file="./health_check/${date_str}-${number}-health-check.md"
+```
 
 **报告结构:**
 
@@ -194,7 +247,10 @@ coverage_report=$(find . -name "coverage.*" -o -name ".nyc_output" -o -name "htm
 ### 输出文件
 
 - 路径: `./health_check/YYYY-M-D-NNN-health-check.md`
-- NNN: 当日第 N 份报告（001 起始）
+- **编号规则**:
+  - 从 `001` 起始，自动累加
+  - 如果当天已存在 `001`，则使用 `002`，以此类推
+  - 编号格式：3位数字，不足补零（001, 002, ..., 999）
 
 ### 评分标准
 
