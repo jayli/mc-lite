@@ -1,5 +1,7 @@
 # Logs
 **/.DS_Store
+.agents/
+skills-lock.json
 logs
 logs/*
 *.DS_Store
