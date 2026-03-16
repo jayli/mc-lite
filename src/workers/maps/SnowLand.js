@@ -4,6 +4,8 @@
  * 负责雪地的位置计算和方块生成
  */
 
+import { getRegionSeededCenter } from './RegionCenterUtils.js';
+
 /**
  * 检查坐标是否在雪地范围内，并返回雪地相关信息
  * 每 400x400 的区域生成一个雪地，位置在金字塔附近偏移 100 格
@@ -23,14 +25,13 @@ export function getSnowLandInfo(wx, wz, seed, terrainGen) {
   const regionX = Math.floor(wx / regionSize);
   const regionZ = Math.floor(wz / regionSize);
 
-  // 首先计算该区域内金字塔的位置（使用与 Pyramid.js 相同的算法）
-  const randX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
-  const randZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
-  const offsetX = Math.floor(randX * 300) + 100;
-  const offsetZ = Math.floor(randZ * 300) + 100;
-
-  const pyramidCx = regionX * regionSize + offsetX;
-  const pyramidCz = regionZ * regionSize + offsetZ;
+  const { centerX: pyramidCx, centerZ: pyramidCz } = getRegionSeededCenter(regionX, regionZ, seed, {
+    regionSize,
+    offsetScaleX: 300,
+    offsetScaleZ: 300,
+    offsetBaseX: 100,
+    offsetBaseZ: 100
+  });
 
   // 雪地位移 = 金字塔位置 + (160, 0) 偏移
   // 金字塔半宽 28 + 间隔 100 + 雪地半宽 28 = 156，使用 160 确保有足够间隔

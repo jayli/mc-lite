@@ -2,6 +2,7 @@
 // 海岛生成器模块 - 不依赖 Tree，树木生成在 WorldWorker 中处理
 
 import { getFrozenMountainCenterInRegion } from './FrozenMountain.js';
+import { getRegionSeededCenter } from './RegionCenterUtils.js';
 
 // 海岛配置常量
 const ISLAND_CONFIG = {
@@ -43,26 +44,29 @@ const seededRandom = (x, z, seed) => {
 export function getIslandCenterInRegion(regionX, regionZ, seed) {
   const regionSize = 400;
 
-  // 计算金字塔位置
-  const randX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
-  const randZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
-  const pyramidOffsetX = Math.floor(randX * 300) + 100;
-  const pyramidOffsetZ = Math.floor(randZ * 300) + 100;
-  const pyramidCx = regionX * regionSize + pyramidOffsetX;
-  const pyramidCz = regionZ * regionSize + pyramidOffsetZ;
+  const { centerX: pyramidCx, centerZ: pyramidCz } = getRegionSeededCenter(regionX, regionZ, seed, {
+    regionSize,
+    offsetScaleX: 300,
+    offsetScaleZ: 300,
+    offsetBaseX: 100,
+    offsetBaseZ: 100
+  });
 
   // 获取冰封山峰位置（复用 FrozenMountain 的函数）
   const { cx: frozenMountainCx, cz: frozenMountainCz } =
     getFrozenMountainCenterInRegion(regionX, regionZ, seed);
 
   // 计算海岛中心位置
-  const islandRandX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
-  const islandRandZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
-  const islandOffsetX = Math.floor(islandRandX * (regionSize - 100)) + 50;
-  const islandOffsetZ = Math.floor(islandRandZ * (regionSize - 100)) + 50;
+  const { centerX: initialIslandCx, centerZ: initialIslandCz } = getRegionSeededCenter(regionX, regionZ, seed, {
+    regionSize,
+    offsetScaleX: regionSize - 100,
+    offsetScaleZ: regionSize - 100,
+    offsetBaseX: 50,
+    offsetBaseZ: 50
+  });
 
-  let islandCx = regionX * regionSize + islandOffsetX;
-  let islandCz = regionZ * regionSize + islandOffsetZ;
+  let islandCx = initialIslandCx;
+  let islandCz = initialIslandCz;
 
   // 距离检查：远离冰封山峰（130格）
   const minMountainDistance = 130;

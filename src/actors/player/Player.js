@@ -17,6 +17,7 @@ import { terrainGen } from '../../world/TerrainGen.js';
 import { FrozenMountain } from '../../workers/maps/FrozenMountain.js';
 import { Pyramid } from '../../workers/maps/Pyramid.js';
 import { SnowLand } from '../../workers/maps/SnowLand.js';
+import { getRegionSeededCenter } from '../../workers/maps/RegionCenterUtils.js';
 
 /**
  * 获取指定区域内的雪地中心位置
@@ -26,16 +27,13 @@ import { SnowLand } from '../../workers/maps/SnowLand.js';
  * @returns {Object} 雪地中心位置 {centerX, centerZ}
  */
 function getSnowLandCenter(regionX, regionZ, seed) {
-  const regionSize = 400;
-
-  // 计算该区域的金字塔中心（使用与 Pyramid.js 相同的算法）
-  const randX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
-  const randZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
-  const offsetX = Math.floor(randX * 300) + 100;
-  const offsetZ = Math.floor(randZ * 300) + 100;
-
-  const pyramidCx = regionX * regionSize + offsetX;
-  const pyramidCz = regionZ * regionSize + offsetZ;
+  const { centerX: pyramidCx, centerZ: pyramidCz } = getRegionSeededCenter(regionX, regionZ, seed, {
+    regionSize: 400,
+    offsetScaleX: 300,
+    offsetScaleZ: 300,
+    offsetBaseX: 100,
+    offsetBaseZ: 100
+  });
 
   // 雪地位移 = 金字塔位置 + (160, 0) 偏移
   // 金字塔半宽 28 + 间隔 100 + 雪地半宽 28 = 156，使用 160 确保有足够间隔
@@ -1433,48 +1431,15 @@ export class Player {
         // 直接计算每个区域的地标中心位置，而不是通过 getInfo 判断
         switch (landmarkType) {
           case 'frozen': {
-            // 冰封山峰：金字塔位置 + (-160, 0)
-            const randX = Math.abs(Math.sin(seed * 1.5 + rx * 0.1));
-            const randZ = Math.abs(Math.sin(seed * 2.5 + rz * 0.1));
-            const offsetX = Math.floor(randX * 300) + 100;
-            const offsetZ = Math.floor(randZ * 300) + 100;
-            const pyramidCx = rx * 400 + offsetX;
-            const pyramidCz = rz * 400 + offsetZ;
-            // 确保金字塔中心不会太靠近边界（与 FrozenMountain.js 逻辑一致）
-            const minMargin = 44 + 5; // halfSize(40) + transitionSize(4) + 5
-            const regionLeft = rx * 400;
-            const regionRight = (rx + 1) * 400;
-            const regionTop = rz * 400;
-            const regionBottom = (rz + 1) * 400;
-            let mountainCx = pyramidCx - 160;
-            let mountainCz = pyramidCz;
-            if (mountainCx - minMargin < regionLeft) mountainCx = regionLeft + minMargin;
-            else if (mountainCx + minMargin > regionRight) mountainCx = regionRight - minMargin;
-            if (mountainCz - minMargin < regionTop) mountainCz = regionTop + minMargin;
-            else if (mountainCz + minMargin > regionBottom) mountainCz = regionBottom - minMargin;
-            centerX = mountainCx;
-            centerZ = mountainCz;
+            const { cx, cz } = FrozenMountain.getFrozenMountainCenterInRegion(rx, rz, seed);
+            centerX = cx;
+            centerZ = cz;
             break;
           }
           case 'pyramid': {
-            const randX = Math.abs(Math.sin(seed * 1.5 + rx * 0.1));
-            const randZ = Math.abs(Math.sin(seed * 2.5 + rz * 0.1));
-            const offsetX = Math.floor(randX * 300) + 100;
-            const offsetZ = Math.floor(randZ * 300) + 100;
-            let pyramidCx = rx * 400 + offsetX;
-            let pyramidCz = rz * 400 + offsetZ;
-            // 确保金字塔中心不会太靠近边界（与 Pyramid.js 逻辑一致）
-            const minMargin = 20 + 8 + 5; // halfSize(20) + transitionSize(8) + 5
-            const regionLeft = rx * 400;
-            const regionRight = (rx + 1) * 400;
-            const regionTop = rz * 400;
-            const regionBottom = (rz + 1) * 400;
-            if (pyramidCx - minMargin < regionLeft) pyramidCx = regionLeft + minMargin;
-            else if (pyramidCx + minMargin > regionRight) pyramidCx = regionRight - minMargin;
-            if (pyramidCz - minMargin < regionTop) pyramidCz = regionTop + minMargin;
-            else if (pyramidCz + minMargin > regionBottom) pyramidCz = regionBottom - minMargin;
-            centerX = pyramidCx;
-            centerZ = pyramidCz;
+            const { cx, cz } = Pyramid.getPyramidCenterInRegion(rx, rz, seed);
+            centerX = cx;
+            centerZ = cz;
             break;
           }
           case 'island': {
@@ -1490,17 +1455,7 @@ export class Player {
             // 注意：雪地可能跨越区域边界，需要同时考虑相邻区域的金字塔产生的雪地
             const regionSize = 400;
 
-            // 计算当前遍历区域的金字塔位置（这是生成雪地的基础）
-            const randX = Math.abs(Math.sin(seed * 1.5 + rx * 0.1));
-            const randZ = Math.abs(Math.sin(seed * 2.5 + rz * 0.1));
-            const offsetX = Math.floor(randX * 300) + 100;
-            const offsetZ = Math.floor(randZ * 300) + 100;
-            const pyramidCx = rx * regionSize + offsetX;
-            const pyramidCz = rz * regionSize + offsetZ;
-
-            // 该区域产生的雪地中心
-            const snowLandCx = pyramidCx + 160;
-            const snowLandCz = pyramidCz;
+            const { centerX: snowLandCx, centerZ: snowLandCz } = getSnowLandCenter(rx, rz, seed);
 
             // 雪地主体半宽 20 + 过渡带 8 = 28
             const totalHalfSize = 20 + 8;

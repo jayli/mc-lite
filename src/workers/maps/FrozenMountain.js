@@ -4,6 +4,8 @@
  * 负责冰封山峰的位置计算和方块生成
  */
 
+import { getRegionSeededCenter } from './RegionCenterUtils.js';
+
 /**
  * 获取指定区域内冰封山峰的中心位置
  * @param {number} regionX - 区域 X 坐标
@@ -14,14 +16,13 @@
 export function getFrozenMountainCenterInRegion(regionX, regionZ, seed) {
   const regionSize = 400;
 
-  // 计算该区域内金字塔的位置（与 Pyramid.js 相同的算法）
-  const randX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
-  const randZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
-  const offsetX = Math.floor(randX * 300) + 100;
-  const offsetZ = Math.floor(randZ * 300) + 100;
-
-  const pyramidCx = regionX * regionSize + offsetX;
-  const pyramidCz = regionZ * regionSize + offsetZ;
+  const { centerX: pyramidCx, centerZ: pyramidCz } = getRegionSeededCenter(regionX, regionZ, seed, {
+    regionSize,
+    offsetScaleX: 300,
+    offsetScaleZ: 300,
+    offsetBaseX: 100,
+    offsetBaseZ: 100
+  });
 
   // 冰封山峰位移 = 金字塔位置 + (-160, 0) 偏移
   let mountainCx = pyramidCx - 160;

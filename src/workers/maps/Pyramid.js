@@ -4,6 +4,54 @@
  * 负责金字塔的位置计算和方块生成
  */
 
+import { getRegionSeededCenter } from './RegionCenterUtils.js';
+
+/**
+ * 获取指定区域内金字塔中心位置（含边界约束）
+ * @param {number} regionX - 区域 X 坐标
+ * @param {number} regionZ - 区域 Z 坐标
+ * @param {number} seed - 世界种子
+ * @returns {Object} 金字塔中心位置 {cx, cz}
+ */
+export function getPyramidCenterInRegion(regionX, regionZ, seed) {
+  const regionSize = 400;
+  const pyramidSize = 40;
+  const transitionSize = 8;
+  const halfSize = Math.floor(pyramidSize / 2);
+  const totalHalfSize = halfSize + transitionSize;
+  const minMargin = totalHalfSize + 5;
+
+  const { centerX, centerZ } = getRegionSeededCenter(regionX, regionZ, seed, {
+    regionSize,
+    offsetScaleX: 300,
+    offsetScaleZ: 300,
+    offsetBaseX: 100,
+    offsetBaseZ: 100
+  });
+
+  let pyramidCx = centerX;
+  let pyramidCz = centerZ;
+
+  const regionLeft = regionX * regionSize;
+  const regionRight = (regionX + 1) * regionSize;
+  const regionTop = regionZ * regionSize;
+  const regionBottom = (regionZ + 1) * regionSize;
+
+  if (pyramidCx - minMargin < regionLeft) {
+    pyramidCx = regionLeft + minMargin;
+  } else if (pyramidCx + minMargin > regionRight) {
+    pyramidCx = regionRight - minMargin;
+  }
+
+  if (pyramidCz - minMargin < regionTop) {
+    pyramidCz = regionTop + minMargin;
+  } else if (pyramidCz + minMargin > regionBottom) {
+    pyramidCz = regionBottom - minMargin;
+  }
+
+  return { cx: pyramidCx, cz: pyramidCz };
+}
+
 /**
  * 检查坐标是否在金字塔范围内，并返回金字塔相关信息
  * 每 500x500 的区域生成一个金字塔
@@ -25,38 +73,8 @@ export function getPyramidInfo(wx, wz, seed, terrainGen) {
   const regionX = Math.floor(wx / regionSize);
   const regionZ = Math.floor(wz / regionSize);
 
-  // 每个区域的金字塔中心点，使用种子添加固定偏移
-  const randX = Math.abs(Math.sin(seed * 1.5 + regionX * 0.1));
-  const randZ = Math.abs(Math.sin(seed * 2.5 + regionZ * 0.1));
-  const offsetX = Math.floor(randX * 300) + 100;  // 区域内偏移 100-400
-  const offsetZ = Math.floor(randZ * 300) + 100;
-
-  let pyramidCx = regionX * regionSize + offsetX;
-  let pyramidCz = regionZ * regionSize + offsetZ;
-
-  // 扩展后的金字塔总区域（包含过渡带）
+  const { cx: pyramidCx, cz: pyramidCz } = getPyramidCenterInRegion(regionX, regionZ, seed);
   const totalHalfSize = halfSize + transitionSize;
-
-  // 确保金字塔中心不会太靠近区域边界（至少保留 totalHalfSize + 5 的缓冲）
-  const minMargin = totalHalfSize + 5;
-  const regionLeft = regionX * regionSize;
-  const regionRight = (regionX + 1) * regionSize;
-  const regionTop = regionZ * regionSize;
-  const regionBottom = (regionZ + 1) * regionSize;
-
-  // 调整 X 坐标
-  if (pyramidCx - minMargin < regionLeft) {
-    pyramidCx = regionLeft + minMargin;
-  } else if (pyramidCx + minMargin > regionRight) {
-    pyramidCx = regionRight - minMargin;
-  }
-
-  // 调整 Z 坐标
-  if (pyramidCz - minMargin < regionTop) {
-    pyramidCz = regionTop + minMargin;
-  } else if (pyramidCz + minMargin > regionBottom) {
-    pyramidCz = regionBottom - minMargin;
-  }
 
   const pyramidMinX = pyramidCx - totalHalfSize;
   const pyramidMaxX = pyramidCx + totalHalfSize;
@@ -184,5 +202,6 @@ export function generatePyramid(wx, wz, h, pyInfo, fakeChunk, dPlaceholder) {
  */
 export const Pyramid = {
   getPyramidInfo,
+  getPyramidCenterInRegion,
   generate: generatePyramid
 };
