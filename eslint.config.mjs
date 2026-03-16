@@ -39,6 +39,8 @@ export default [
         FileReader: 'readonly',
         URL: 'readonly',
         performance: 'readonly',
+        Performance: 'readonly',
+        PerformanceObserver: 'readonly',
         // Three.js 全局 (如果通过 script 标签引入时使用)
         THREE: 'readonly',
         // 测试全局
