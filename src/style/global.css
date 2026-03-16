@@ -100,6 +100,7 @@ body { margin: 0; overflow: hidden; background-color: #87CEEB; user-select: none
 }
 .btn-group { display: flex; gap: 8px; width: 100%; }
 .btn-group button { flex: 1; padding: 10px 5px; }
+.btn-group button.btn-small { padding: 6px 4px; font-size: 12px; }
 button {
   padding: 8px 16px; background: #8b8b8b; border: 2px solid #fff;
   border-right-color: #373737; border-bottom-color: #373737;
