@@ -2,7 +2,7 @@
 // 统一 AO（环境光遮蔽）计算与管理系统
 
 import * as THREE from 'three';
-import { calculateAOForBlock, isAOApplicable, packAOData, unpackAllAO } from '../utils/AOUtils.js';
+import { buildAODataForBlocks, calculateAOForBlock, isAOApplicable, packAOData, unpackAllAO } from '../utils/AOUtils.js';
 import { getBlockProperties } from '../constants/BlockData.js';
 
 /**
@@ -412,7 +412,6 @@ export class AOSystem {
    */
   _computeAOInMainThread(blocks, blockData) {
     const startTime = performance.now();
-    const aoData = [];
     const affectedNeighbors = [];
 
     // 创建 isOccluding 函数
@@ -424,19 +423,7 @@ export class AOSystem {
       return !props.isTransparent;
     };
 
-    for (const block of blocks) {
-      if (isAOApplicable(block.type)) {
-        const { aoLow, aoHigh } = calculateAOForBlock(block.x, block.y, block.z, isOccluding);
-        aoData.push({
-          x: block.x,
-          y: block.y,
-          z: block.z,
-          type: block.type,
-          aoLow,
-          aoHigh
-        });
-      }
-    }
+    const aoData = buildAODataForBlocks(blocks, isOccluding);
 
     return {
       aoData,

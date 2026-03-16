@@ -2,7 +2,7 @@
 // 专门处理隐藏面剔除计算的Worker
 
 import { getBlockProperties } from '../constants/BlockData.js';
-import { calculateAOForBlock, isAOApplicable } from '../utils/AOUtils.js';
+import { buildAODataForBlocks, calculateAOForBlock, isAOApplicable } from '../utils/AOUtils.js';
 
 // 用于隐藏面剔除的辅助函数
 const getBlockType = (x, y, z, blockData) => {
@@ -272,25 +272,12 @@ function calculateFaceVisibilityWithWorld(block, blockData, worldChunks, current
  */
 function computeBatchAO(blocks, blockData, cx, cz, worldChunks = []) {
   const startTime = performance.now();
-  const aoData = [];
   const affectedNeighbors = [];
 
   // 创建跨区块 occluding 检查器
   const isOccluding = createOccludingChecker(blockData, worldChunks, cx, cz);
 
-  for (const block of blocks) {
-    if (isAOApplicable(block.type)) {
-      const { aoLow, aoHigh } = calculateAOForBlock(block.x, block.y, block.z, isOccluding);
-      aoData.push({
-        x: block.x,
-        y: block.y,
-        z: block.z,
-        type: block.type,
-        aoLow,
-        aoHigh
-      });
-    }
-  }
+  const aoData = buildAODataForBlocks(blocks, isOccluding);
 
   return {
     aoData,

@@ -135,6 +135,32 @@ export function calculateAOForBlock(x, y, z, isOccludingFn) {
 }
 
 /**
+ * 批量计算方块 AO 数据列表
+ * @param {Array} blocks - 方块数组 [{x, y, z, type}]
+ * @param {Function} isOccludingFn - 判断方块是否遮挡的函数 (x,y,z) => boolean
+ * @returns {Array} AO 数据数组 [{x, y, z, type, aoLow, aoHigh}]
+ */
+export function buildAODataForBlocks(blocks, isOccludingFn) {
+  const aoData = [];
+
+  for (const block of blocks) {
+    if (!isAOApplicable(block.type)) continue;
+
+    const { aoLow, aoHigh } = calculateAOForBlock(block.x, block.y, block.z, isOccludingFn);
+    aoData.push({
+      x: block.x,
+      y: block.y,
+      z: block.z,
+      type: block.type,
+      aoLow,
+      aoHigh
+    });
+  }
+
+  return aoData;
+}
+
+/**
  * 打包 24 个 AO 值为两个 32 位整数
  * @param {Uint8Array} aos - 24 个 AO 值数组 (每个值 0-3)
  * @returns {Object} { aoLow: number, aoHigh: number }
