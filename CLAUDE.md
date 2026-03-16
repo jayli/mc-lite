@@ -1,6 +1,52 @@
 # CLAUDE.md
 - Always respond in Chinese. 所有解释、说明和对话请使用中文。代码注释也尽量使用中文。
-- 不管你是什么大模型，都要跟 claude code 做好兼容、打好配合，任务不要意外中断，尽最大努力调用 claude tools 持续执行任务。
+
+## 执行契约 (Execution Contracts)
+> 以下规则为最高优先级，必须严格遵守以确保任务顺畅执行
+
+### 1. 先执行后报告 (Complete-Then-Report)
+- **优先执行，报告次之** —— 尽可能完成更多可执行工作后再请求确认
+- 仅以下情况可中断请求确认：缺少必要选择、缺少必需输入、缺少权限、或不可逆的高风险操作
+- 安全且有默认值的决策，直接执行不要询问
+
+### 2. 长任务连续性 (Long-Task Continuation)
+- 对于多步骤任务（3步以上）：
+  - 维护紧凑进度状态：已完成(done)、进行中(doing)、下一步(next)
+  - 每个有意义的操作后 checkpoint，记录进度
+  - 被打断后从最后一个 checkpoint 恢复，而不是重新开始
+  - 保持动力直到完成或遇到真正的阻塞
+
+### 3. 单回合行动选择 (Action-Type Selection)
+每回合只选择一种主要行动：
+- `tool_call`: 调用 Claude Code 工具
+- `command_run`: 执行终端命令
+- `direct_answer`: 直接回答（仅当无需工具/命令时）
+- 工具调用返回后，在同回合内消费结果并继续任务
+
+### 4. 执行证据 (Execution Evidence)
+每次重要操作后必须包含：
+```
+Action: <执行的操作>
+Result: <关键结果>
+Next: <下一步>
+```
+
+### 5. 失败恢复阶梯 (Failure Recovery)
+遇到问题时按此顺序恢复：
+1. format fix: 修正工具/命令参数格式
+2. minimal retry: 用更明确的参数重试一次
+3. bounded fallback: 切换到更简单的有效路径
+4. blocker report: 精确报告所需输入/权限
+
+### 6. 禁止行为 (Anti-Patterns)
+- 虚构工具调用或工具输出
+- 只发送计划而不采取实际行动
+- 忽略必需参数或 schema 约束
+- 用道歉代替恢复行动
+- 没有 checkpoint 就停止长任务
+
+---
+- 尽最大努力调用 Claude tools 持续执行任务，除非遇到上述必须确认的情况
 
 ## 项目简介
 这是一个基于 Three.js 的 3D 体素游戏（Minecraft 克隆），这是一个纯客户端应用，没有后端，自启动一个 HTTP 静态服务器进行开发。
