@@ -18,6 +18,7 @@ import { FrozenMountain } from '../../workers/maps/FrozenMountain.js';
 import { Pyramid } from '../../workers/maps/Pyramid.js';
 import { SnowLand } from '../../workers/maps/SnowLand.js';
 import { getRegionSeededCenter } from '../../workers/maps/RegionCenterUtils.js';
+import { PlayerInteraction } from './PlayerInteraction.js';
 
 /**
  * 获取指定区域内的雪地中心位置
@@ -181,6 +182,9 @@ export class Player {
     });
 
     this.mag7Timeouts = [];
+
+    // 初始化交互系统
+    this.interaction = new PlayerInteraction(this);
   }
 
   /**
@@ -432,30 +436,7 @@ export class Player {
    * @returns {Array} 交互目标对象数组
    */
   getInteractionTargets() {
-    const targets = [];
-    for (const chunk of this.world.chunks.values()) targets.push(chunk.group);
-
-    // 添加丧尸作为交互目标（如果游戏有敌人管理器）
-    if (this.game && this.game.enemyManager) {
-      // 从EnemyManager获取渲染网格（InstancedMesh）
-      if (typeof this.game.enemyManager.getRenderMeshes === 'function') {
-        const renderMeshes = this.game.enemyManager.getRenderMeshes();
-        targets.push(...renderMeshes);
-      }
-
-      // 从EnemyManager获取所有敌人实例
-      const enemies = this.game.enemyManager.getAllEnemies();
-      for (const enemy of enemies) {
-        if (enemy.mesh) {
-          targets.push(enemy.mesh);
-        }
-      }
-    }
-
-    chestManager.chestAnimations.forEach(anim => {
-      if (anim.mesh) targets.push(anim.mesh);
-    });
-    return targets;
+    return this.interaction.getInteractionTargets();
   }
 
   /**
@@ -464,14 +445,7 @@ export class Player {
    * @returns {THREE.Object3D|null} 特殊实体对象
    */
   findSpecialEntityFromHit(obj) {
-    let current = obj;
-    while (current && current.type !== 'Scene') {
-      if (current.userData?.isEntity && Array.isArray(current.userData?.collisionBlocks)) {
-        return current;
-      }
-      current = current.parent;
-    }
-    return null;
+    return this.interaction.findSpecialEntityFromHit(obj);
   }
 
   /**
@@ -480,13 +454,7 @@ export class Player {
    * @param {number} dt - 时间步长
    */
   handleShooting(dt) {
-    if (this.shootCooldown > 0) this.shootCooldown -= dt;
-    if (this.weapon && this.isShooting && this.shootCooldown <= 0) {
-      if (this.weaponMode === WEAPON_TYPES.GUN || this.weaponMode === WEAPON_TYPES.MINIGUN) {
-        this.executeShot(this.getInteractionTargets());
-        this.shootCooldown = this.weapon.config.fireRate;
-      }
-    }
+    this.interaction.handleShooting(dt);
   }
 
   /**
@@ -495,22 +463,7 @@ export class Player {
    * @param {number} dt - 时间步长
    */
   updateWeapon(dt) {
-    const targetModel = this.weaponMode === WEAPON_TYPES.GUN ? gunModel :
-                      (this.weaponMode === WEAPON_TYPES.MAG7 ? mag7Model :
-                      (this.weaponMode === WEAPON_TYPES.MINIGUN ? minigunModel : null));
-
-    if (this.weapon && (this.weapon.type !== this.weaponMode || !targetModel)) {
-      this.weapon.destroy();
-      this.weapon = null;
-    }
-
-    if (!this.weapon && targetModel) {
-      this.weapon = new Gun(this.weaponMode, targetModel, this.camera, this.world);
-    }
-
-    if (this.weapon) {
-      this.weapon.update(dt, this.isShooting);
-    }
+    this.interaction.updateWeapon(dt);
   }
 
   /**
@@ -519,134 +472,7 @@ export class Player {
    * @param {Array} targets - 交互目标对象数组
    */
   executeShot(targets) {
-    this.raycaster.far = 40;
-    this.raycaster.setFromCamera(this.center, this.camera);
-    const hits = this.raycaster.intersectObjects(targets, true);
-    this.raycaster.far = Infinity;
-
-    // Debug logging for raycasting
-    if (this.game && this.game.showDebugInfo) {
-      console.log(`[Raycast] targets: ${targets.length}, hits: ${hits.length}`);
-      if (hits.length > 0) {
-        const hit = hits[0];
-        console.log(`[Raycast] Hit[0]:`, hit.object.userData, hit.object.isInstancedMesh, hit.instanceId);
-      }
-    }
-
-    // 当枪械不能破坏方块时，实心方块可以阻挡子弹
-    const canGunsDestroyBlocks = this.game?.canGunsDestroyBlocks !== false;
-
-    let finalHit = null; // The actual hit point for tracer
-    let hasHitSolid = false;
-
-    // Iterate through hits to find the first solid object (Zombie or Block)
-    for (let i = 0; i < hits.length; i++) {
-      const hit = hits[i];
-      const obj = hit.object;
-
-      // 1. Check if Zombie
-      let isZombie = false;
-      if (obj.userData?.renderer || obj.userData?.isZombie || obj.parent?.userData?.isZombie) {
-        isZombie = true;
-      }
-
-      if (isZombie) {
-        // Hit a zombie!
-        finalHit = hit;
-        hasHitSolid = true;
-
-        if (this.game && this.game.enemyManager) {
-          const damage = this.weaponMode === WEAPON_TYPES.MINIGUN ? 35 : 25;
-          let enemyUuid;
-
-          if (obj.userData?.renderer) {
-             const zombie = obj.userData.renderer.getZombieAt(hit.instanceId);
-             if (zombie) enemyUuid = zombie.id;
-          } else {
-             enemyUuid = obj.uuid;
-             if (!obj.userData?.isZombie && obj.parent?.userData?.isZombie) {
-               enemyUuid = obj.parent.uuid;
-             }
-             if (obj.parent?.userData?.zombieId) enemyUuid = obj.parent.userData.zombieId;
-             if (obj.userData?.zombieId) enemyUuid = obj.userData.zombieId;
-          }
-
-          if (enemyUuid) {
-            this.game.enemyManager.applyDamageToEnemy(enemyUuid, damage);
-            console.log(`[Combat] 击中丧尸，造成 ${damage} 点伤害！`);
-          }
-        }
-        break; // Bullet stops at zombie
-      }
-
-      // 2. Check if Block (Terrain/Other)
-      // 统一用世界坐标反查方块，避免 InstancedMesh 旋转后 face.normal 偏差导致误判
-      const blockHit = this._resolveBlockHitFromRaycast(hit);
-      const blockType = blockHit?.type;
-
-      if (blockType && blockType !== 'air') {
-        // 优先检查是否是 TNT 方块，无论是否是实心都触发爆炸
-        if (blockType === 'tnt') {
-          finalHit = hit;
-          hasHitSolid = true;
-          const key = `${blockHit.bx},${blockHit.by},${blockHit.bz}`;
-          if (!this.ignitingTNTs.has(key)) {
-            this.ignitingTNTs.add(key);
-            this.explode(blockHit.bx, blockHit.by, blockHit.bz);
-          }
-          break;
-        }
-
-        const props = getBlockProperties(blockType);
-        // 花和草可以被枪械摧毁
-        const isDestructiblePlant = blockType === 'flower' || blockType === 'short_grass' || blockType === 'allium';
-
-        if (props.isSolid || blockType === 'cloud') {
-          // Hit a solid block or cloud block (not TNT)
-          finalHit = hit;
-          hasHitSolid = true;
-
-          if (canGunsDestroyBlocks) {
-            this.removeBlock(hit);
-          }
-          // If not canGunsDestroyBlocks, we just stop here (blocked)
-          break;
-        } else if (isDestructiblePlant && canGunsDestroyBlocks) {
-          // 花和草可以被枪械摧毁，但射线继续穿透
-          this.removeBlock(hit);
-        }
-        // If not solid and not cloud and not destructible plant (e.g. water), continue ray to find what's behind
-      } else {
-        // Hit something else (chest, TNT, etc.)?
-        // TNT and Chests are meshes but usually handled via removeBlock logic or specialized logic
-        // If it's a mesh entity, we treat it as solid for now
-        const type = obj.userData.type || 'unknown';
-        if (type === 'tnt' || type === 'chest') {
-           finalHit = hit;
-           hasHitSolid = true;
-           if (type === 'tnt') {
-              // Ignite TNT logic (copied from original)
-              if (obj.isInstancedMesh) {
-                obj.getMatrixAt(hit.instanceId, this._dummyMatrix);
-                this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
-              } else {
-                this._tempVector.copy(obj.position);
-              }
-              const key = `${Math.floor(this._tempVector.x)},${Math.floor(this._tempVector.y)},${Math.floor(this._tempVector.z)}`;
-              if (!this.ignitingTNTs.has(key)) {
-                this.ignitingTNTs.add(key);
-                this.explode(this._tempVector.x, this._tempVector.y, this._tempVector.z);
-              }
-           } else if (canGunsDestroyBlocks) {
-              this.removeBlock(hit);
-           }
-           break;
-        }
-      }
-    }
-
-    const effect = this.weapon.onFire(finalHit ? finalHit.point : null);
-    this.spawnTracer(effect.start, effect.end, effect.config);
+    this.interaction.executeShot(targets);
   }
 
   /**
@@ -656,36 +482,7 @@ export class Player {
    * @returns {{ bx: number, by: number, bz: number, type: string|null }|null}
    */
   _resolveBlockHitFromRaycast(hit) {
-    if (!hit || !hit.object) return null;
-
-    const obj = hit.object;
-    let bx;
-    let by;
-    let bz;
-
-    if (obj.isInstancedMesh && hit.instanceId !== undefined) {
-      obj.getMatrixAt(hit.instanceId, this._dummyMatrix);
-      this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
-      bx = Math.floor(this._tempVector.x);
-      by = Math.floor(this._tempVector.y);
-      bz = Math.floor(this._tempVector.z);
-    } else if (obj.position) {
-      bx = Math.floor(obj.position.x);
-      by = Math.floor(obj.position.y);
-      bz = Math.floor(obj.position.z);
-    } else {
-      this._tempVector.copy(hit.point).addScaledVector(this.raycaster.ray.direction, -0.01);
-      bx = Math.floor(this._tempVector.x);
-      by = Math.floor(this._tempVector.y);
-      bz = Math.floor(this._tempVector.z);
-    }
-
-    return {
-      bx,
-      by,
-      bz,
-      type: this.world.getBlock(bx, by, bz)
-    };
+    return this.interaction._resolveBlockHitFromRaycast(hit);
   }
 
   /**
@@ -843,29 +640,7 @@ export class Player {
    * @param {Object} config - 配置对象
    */
   spawnTracer(start, end, config) {
-    const distance = start.distanceTo(end);
-    let mesh;
-    if (this.tracerPool.length > 0) {
-      mesh = this.tracerPool.pop();
-      mesh.visible = true;
-    } else {
-      mesh = new THREE.Mesh(this.tracerGeometry, this.tracerMaterial);
-    }
-
-    mesh.material = config.isShotgun ? this.mag7TracerMaterial : this.tracerMaterial;
-    mesh.scale.set(config.tracerThickness, config.tracerThickness, distance);
-    mesh.position.copy(start);
-    mesh.lookAt(end);
-    this.world.scene.add(mesh);
-
-    let info = this.tracerInfoPool.length > 0 ? this.tracerInfoPool.pop() : { mesh: null, worldEnd: new THREE.Vector3() };
-    info.mesh = mesh;
-    info.lifetime = config.tracerLifetime;
-    info.maxLifetime = info.lifetime;
-    info.localStart = config.localStart;
-    info.worldEnd.copy(end);
-    info.thickness = config.tracerThickness;
-    this.tracers.push(info);
+    this.interaction.spawnTracer(start, end, config);
   }
 
   /**
@@ -874,23 +649,7 @@ export class Player {
    * @param {number} dt - 时间步长
    */
   updateTracers(dt) {
-    for (let i = this.tracers.length - 1; i >= 0; i--) {
-      const tracer = this.tracers[i];
-      tracer.lifetime -= dt;
-      if (tracer.lifetime <= 0) {
-        this.world.scene.remove(tracer.mesh);
-        tracer.mesh.visible = false;
-        this.tracerPool.push(tracer.mesh);
-        this.tracerInfoPool.push(tracer);
-        this.tracers.splice(i, 1);
-      } else {
-        this._tempVector.copy(tracer.localStart).applyQuaternion(this.camera.quaternion).add(this.camera.position);
-        tracer.mesh.position.copy(this._tempVector);
-        tracer.mesh.lookAt(tracer.worldEnd);
-        tracer.mesh.scale.set(tracer.thickness, tracer.thickness, this._tempVector.distanceTo(tracer.worldEnd));
-        tracer.mesh.material.opacity = (tracer.lifetime / tracer.maxLifetime);
-      }
-    }
+    this.interaction.updateTracers(dt);
   }
 
   /**
@@ -902,31 +661,7 @@ export class Player {
    * @param {boolean} isObstructed - 是否受阻
    */
   updateCameraBob(dx, dz, dt, isObstructed) {
-    const inputSpeed = Math.sqrt(this.velocity.x ** 2 + this.velocity.z ** 2);
-    const expectedDist = inputSpeed * dt;
-    const actualDist = Math.sqrt(dx * dx + dz * dz);
-    const isMoving = actualDist > 0.001;
-    const isFullSpeed = inputSpeed > 0 && actualDist > expectedDist * 0.95;
-    const shouldBob = isMoving && isFullSpeed && !this.jumping && !isObstructed;
-
-    if (shouldBob) {
-      this.bobbingTimer += this.bobbingSpeed;
-      this.bobAmount = THREE.MathUtils.lerp(this.bobAmount, this.bobbingIntensity, 0.1);
-      this.playFootstepSound();
-    } else {
-      this.bobbingTimer = 0;
-      this.bobAmount = THREE.MathUtils.lerp(this.bobAmount, 0, 0.2);
-      audioManager.stopSound('running_land');
-      audioManager.stopSound('running_water');
-    }
-
-    const bobX = Math.sin(this.bobbingTimer) * this.bobAmount;
-    const bobY = Math.cos(this.bobbingTimer * 2) * this.bobAmount * 0.5;
-    this.bobOffset.x = THREE.MathUtils.lerp(this.bobOffset.x, bobX, 0.3);
-    this.bobOffset.y = THREE.MathUtils.lerp(this.bobOffset.y, bobY, 0.3);
-
-    this.camera.position.x += this.bobOffset.x;
-    this.camera.position.y += this.bobOffset.y;
+    this.interaction.updateCameraBob(dx, dz, dt, isObstructed);
   }
 
   /**
@@ -934,14 +669,7 @@ export class Player {
    * 根据当前所在方块类型播放相应的脚步声
    */
   playFootstepSound() {
-    const blockType = this.world.getBlock(Math.floor(this.position.x), Math.floor(this.position.y), Math.floor(this.position.z));
-    if (blockType === 'water') {
-      audioManager.stopSound('running_land');
-      audioManager.playSound('running_water', 0.25, true);
-    } else {
-      audioManager.stopSound('running_water');
-      audioManager.playSound('running_land', 0.2, true);
-    }
+    this.interaction.playFootstepSound();
   }
 
   /**
@@ -950,80 +678,7 @@ export class Player {
    * @param {Event} e - 鼠标事件
    */
   interact(e) {
-    if (document.pointerLockElement !== document.body) return;
-    const button = e.button;
-    this.raycaster.setFromCamera(this.center, this.camera);
-    const targets = this.getInteractionTargets();
-    const hits = this.raycaster.intersectObjects(targets, true);
-
-    if (button === 2) {
-      const heldItem = this.inventory.getSelected()?.item;
-      if (hits.length > 0 && hits[0].distance < 9) {
-        const hit = hits[0], m = hit.object, instanceId = hit.instanceId;
-        if (m.userData.type === 'chest' && m.isInstancedMesh) {
-          m.getMatrixAt(instanceId, this._dummyMatrix);
-          this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
-          if (!m.userData.chests[instanceId].open) {
-            this.openChest(m, instanceId, this._tempVector);
-            this.swing();
-            return;
-          }
-        }
-        if (heldItem && this.inventory.has(heldItem)) {
-          // 统一使用 hit.point 计算点击的面，确保旋转方块的正确性
-          const blockPos = this._getBlockPositionFromHit(hit);
-          if (this.tryPlaceBlock(blockPos.x, blockPos.y, blockPos.z, heldItem)) this.swing();
-        }
-      } else if (heldItem && this.inventory.has(heldItem)) {
-        this.doSkyPlace(heldItem);
-      }
-    } else if (button === 0) {
-      if (this.weaponMode !== WEAPON_TYPES.ARM) {
-        this.isShooting = true;
-        if (this.shootCooldown <= 0) {
-          if (this.weaponMode === WEAPON_TYPES.MAG7) {
-            this.executeMag7Shot();
-            this.shootCooldown = 1.5;
-          } else {
-            this.executeShot(targets);
-            this.shootCooldown = this.weapon.config.fireRate;
-          }
-        }
-        return;
-      }
-      if (hits.length > 0 && hits[0].distance < 9) {
-        const hit = hits[0], m = hit.object, type = m.userData.type || 'unknown';
-        if (e.ctrlKey) {
-          if (type === 'tnt') {
-            if (m.isInstancedMesh) {
-              m.getMatrixAt(hit.instanceId, this._dummyMatrix);
-              this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
-            } else {
-              this._tempVector.copy(m.position);
-            }
-            if (!this.ignitingTNTs.has(`${this._tempVector.x},${this._tempVector.y},${this._tempVector.z}`)) {
-              this.ignitingTNTs.add(`${this._tempVector.x},${this._tempVector.y},${this._tempVector.z}`);
-              this.explode(this._tempVector.x, this._tempVector.y, this._tempVector.z);
-              this.swing();
-            }
-          }
-          return;
-        }
-        if (type === 'chest' && m.isInstancedMesh) {
-          m.getMatrixAt(hit.instanceId, this._dummyMatrix);
-          this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
-          if (!m.userData.chests[hit.instanceId].open) {
-            this.openChest(m, hit.instanceId, this._tempVector);
-            this.swing();
-            return;
-          }
-        }
-        this.removeBlock(hit, true);
-        this.swing();
-      } else {
-        this.swing();
-      }
-    }
+    this.interaction.interact(e);
   }
 
   /**
@@ -1033,42 +688,7 @@ export class Player {
    * @returns {{ x: number, y: number, z: number }} 放置位置
    */
   _getBlockPositionFromHit(hit) {
-    const m = hit.object;
-    // 获取方块的世界空间位置
-    let blockWorldPos;
-    if (m.isInstancedMesh) {
-      m.getMatrixAt(hit.instanceId, this._dummyMatrix);
-      this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
-      blockWorldPos = this._tempVector;
-    } else {
-      blockWorldPos = m.position;
-    }
-
-    const blockX = Math.floor(blockWorldPos.x);
-    const blockY = Math.floor(blockWorldPos.y);
-    const blockZ = Math.floor(blockWorldPos.z);
-
-    // 计算击中点相对于方块中心 (块中心 +0.5) 的偏移
-    const dx = hit.point.x - (blockX + 0.5);
-    const dy = hit.point.y - (blockY + 0.5);
-    const dz = hit.point.z - (blockZ + 0.5);
-
-    // 找到绝对值最大的轴，确定点击的面
-    const absX = Math.abs(dx), absY = Math.abs(dy), absZ = Math.abs(dz);
-    let nx = 0, ny = 0, nz = 0;
-    if (absX >= absY && absX >= absZ) {
-      nx = dx > 0 ? 1 : -1;
-    } else if (absY >= absX && absY >= absZ) {
-      ny = dy > 0 ? 1 : -1;
-    } else {
-      nz = dz > 0 ? 1 : -1;
-    }
-
-    return {
-      x: Math.floor(blockWorldPos.x + nx),
-      y: Math.floor(blockWorldPos.y + ny),
-      z: Math.floor(blockWorldPos.z + nz)
-    };
+    return this.interaction._getBlockPositionFromHit(hit);
   }
 
   /**
@@ -1079,20 +699,7 @@ export class Player {
    * @param {THREE.Vector3} pos - 宝箱位置
    */
   openChest(mesh, instanceId, pos) {
-    const info = mesh.userData.chests[instanceId];
-    if (!info || info.open) return;
-    info.open = true;
-    chestManager.spawnChestAnimation(pos, this.world.scene);
-    mesh.getMatrixAt(instanceId, this._dummyMatrix);
-    this._dummyMatrix.scale(this._zeroVector);
-    mesh.setMatrixAt(instanceId, this._dummyMatrix);
-    mesh.instanceMatrix.needsUpdate = true;
-    const drops = pos.y > 60 ? [
-        'diamond', 'god_sword', 'gold_apple'
-    ] : [['diamond', 'gold', 'apple', 'bookbox', 'planks'][Math.floor(Math.random() * 5)]].concat(
-      [['diamond', 'gold', 'apple', 'bookbox', 'planks'][Math.floor(Math.random() * 5)]]
-    );
-    drops.forEach(item => this.inventory.add(item, 1));
+    this.interaction.openChest(mesh, instanceId, pos);
   }
 
   /**
@@ -1105,21 +712,7 @@ export class Player {
    * @returns {boolean} 是否成功放置
    */
   tryPlaceBlock(x, y, z, type) {
-    if (this.physics.isSolid(x, y, z)) return false;
-    if (this.position.x - 0.3 < x + 1 &&
-      this.position.x + 0.3 > x &&
-      this.position.y < y + 1 &&
-      this.position.y + 1.8 > y &&
-      this.position.z - 0.3 < z + 1 &&
-      this.position.z + 0.3 > z) return false;
-    // 获取放置朝向（只有在同一位置移除并放置相同方块时才旋转）
-    const orientation = this.getPlacementOrientation(x, y, z, type);
-    // 放置后清除移除记忆
-    this.clearRemovedBlock();
-    this.world.setBlock(x, y, z, type, orientation);
-    this.inventory.remove(type, 1);
-    audioManager.playSound('put', 0.3);
-    return true;
+    return this.interaction.tryPlaceBlock(x, y, z, type);
   }
 
   /**
@@ -1131,14 +724,14 @@ export class Player {
    * @param {number} orientation - 朝向 (0-3)
    */
   recordRemovedBlock(x, y, z, type, orientation) {
-    this.lastRemovedBlock = { x, y, z, type, orientation };
+    this.interaction.recordRemovedBlock(x, y, z, type, orientation);
   }
 
   /**
    * 清除移除方块的记忆（在放置方块后或非同一位置放置时调用）
    */
   clearRemovedBlock() {
-    this.lastRemovedBlock = null;
+    this.interaction.clearRemovedBlock();
   }
 
   /**
@@ -1152,37 +745,7 @@ export class Player {
    * @returns {number} 放置的朝向 (0-3)
    */
   getPlacementOrientation(x, y, z, type) {
-    const props = getBlockProperties(type);
-    if (!props.orientationEnabled) {
-      return 0;
-    }
-
-    // 检查是否在同一位置放置相同类型的方块（用于旋转）
-    const isRebuildingSameBlock = this.lastRemovedBlock &&
-        this.lastRemovedBlock.x === x &&
-        this.lastRemovedBlock.y === y &&
-        this.lastRemovedBlock.z === z &&
-        this.lastRemovedBlock.type === type;
-
-    // 获取该物品类型上次记住的朝向
-    const lastOrientation = this.placementOrientationMemory.get(type);
-
-    let newOrientation;
-
-    if (isRebuildingSameBlock) {
-      // 同一位置、相同类型，顺时针旋转 90 度
-      newOrientation = nextOrientation(this.lastRemovedBlock.orientation);
-      // 更新记忆
-      this.placementOrientationMemory.set(type, newOrientation);
-    } else if (lastOrientation !== undefined) {
-      // 有记忆，沿用记忆的朝向
-      newOrientation = lastOrientation;
-    } else {
-      // 没有记忆，使用默认朝东
-      newOrientation = 0;
-    }
-
-    return newOrientation;
+    return this.interaction.getPlacementOrientation(x, y, z, type);
   }
 
   /**
@@ -1192,70 +755,7 @@ export class Player {
    * @param {boolean} isHandBreak - 是否是徒手破坏（用于播放不同特效）
    */
   removeBlock(hit, isHandBreak = false) {
-    let m = hit.object;
-    while (m && !m.userData.isEntity && !m.userData.type && m.parent && !m.isInstancedMesh && m.type !== 'Scene') m = m.parent;
-    const type = m.userData.type || 'unknown';
-
-    // 检查是否为不可破坏方块
-    if (type === 'end_stone' || type === 'playground_block' || type === 'playground_center_block') return;
-
-    if (m.isInstancedMesh) {
-      m.getMatrixAt(hit.instanceId, this._dummyMatrix);
-      this._dummyMatrix.decompose(this._tempVector, this._dummyQuaternion, this._dummyScale);
-      // 记录方块位置和朝向到放置记忆
-      const bx = Math.floor(this._tempVector.x), by = Math.floor(this._tempVector.y), bz = Math.floor(this._tempVector.z);
-      const entry = this.world.getBlockEntry(bx, by, bz);
-      if (entry) {
-        this.recordRemovedBlock(bx, by, bz, entry.type, entry.orientation);
-      }
-      this._dummyMatrix.scale(this._zeroVector);
-      m.setMatrixAt(hit.instanceId, this._dummyMatrix);
-      m.instanceMatrix.needsUpdate = true;
-      // 徒手破坏时使用新的破碎特效，否则使用原有粒子特效
-      if (isHandBreak) {
-        this.world.spawnBlockCrashParticles(this._tempVector);
-      } else {
-        this.spawnParticles(this._tempVector, type);
-      }
-      this.world.removeBlock(bx, by, bz);
-      audioManager.playSound('delete_get', 0.3);
-      if (type !== 'water' && type !== 'cloud') this.inventory.add(type === 'grass' ? 'dirt' : type, 1);
-    } else {
-      if (m.userData.isEntity) {
-        if (m.userData.collisionBlocks) m.userData.collisionBlocks.forEach(p => this.world.removeBlockCollider(p.x, p.y, p.z));
-        if (m.parent) m.parent.remove(m);
-        // 徒手破坏时使用新的破碎特效，否则使用原有粒子特效
-        if (isHandBreak) {
-          this.world.spawnBlockCrashParticles(m.position);
-        } else {
-          this.spawnParticles(m.position, type || 'stone');
-        }
-        if (type === 'chest') {
-          this.world.removeBlock(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z));
-          this.inventory.add('chest', 1);
-          audioManager.playSound('delete_get', 0.3);
-        }
-      } else {
-        const bx = Math.floor(m.position.x), by = Math.floor(m.position.y), bz = Math.floor(m.position.z);
-        // 记录方块位置和朝向到放置记忆
-        const entry = this.world.getBlockEntry(bx, by, bz);
-        if (entry) {
-          this.recordRemovedBlock(bx, by, bz, entry.type, entry.orientation);
-        }
-        this.world.removeBlock(bx, by, bz);
-        audioManager.playSound('delete_get', 0.3);
-        // 徒手破坏时使用新的破碎特效，否则使用原有粒子特效
-        if (isHandBreak) {
-          this.world.spawnBlockCrashParticles(m.position);
-        } else {
-          this.spawnParticles(m.position, type);
-        }
-        if (m.parent) m.parent.remove(m);
-        if (type === 'realistic_trunk') this.inventory.add('wood', 1);
-        else if (type === 'realistic_leaves') { if (Math.random() < 0.8) this.inventory.add('leaves', 1); }
-        else this.inventory.add(type, 1);
-      }
-    }
+    this.interaction.removeBlock(hit, isHandBreak);
   }
 
   /**
@@ -1264,49 +764,7 @@ export class Player {
    * @param {Object} data - 爆炸结果数据
    */
   handleExplosionResult(data) {
-    if (data.action === 'explosionResult') {
-      const { blocksToDestroy, tntToIgnite, center } = data.payload;
-      const ignitingKeys = new Set(this.ignitingTNTs);
-      tntToIgnite.forEach(tnt => ignitingKeys.add(`${tnt.x},${tnt.y},${tnt.z}`));
-      this.world.removeBlocksBatch(blocksToDestroy.filter(p => {
-        if (ignitingKeys.has(`${p.x},${p.y},${p.z}`)) return false;
-        const type = this.world.getBlock(p.x, p.y, p.z);
-        return type && (type !== 'end_stone' || this.world.getBlock(p.x, p.y - 1, p.z));
-      }));
-      tntToIgnite.forEach(tnt => {
-        const key = `${tnt.x},${tnt.y},${tnt.z}`;
-        if (this.ignitingTNTs.has(key)) return;
-        this.ignitingTNTs.add(key);
-        setTimeout(() => {
-          this.world.removeBlock(tnt.x, tnt.y, tnt.z);
-          this.ignitingTNTs.delete(key);
-          this.explode(tnt.x, tnt.y, tnt.z);
-        }, tnt.delay);
-      });
-
-      // 新增：TNT爆炸伤害范围内的丧尸
-      if (this.game && this.game.enemyManager) {
-        const explosionCenter = new THREE.Vector3(center.x + 0.5, center.y + 0.5, center.z + 0.5);
-        const explosionRadius = 4; // 爆炸伤害范围（方块单位）
-        const explosionDamage = 50; // 爆炸伤害值
-
-        const allZombies = this.game.enemyManager.getAllEnemies();
-        for (const zombie of allZombies) {
-          const zombiePos = new THREE.Vector3(zombie.position.x, zombie.position.y + zombie.height / 2, zombie.position.z);
-          const distance = explosionCenter.distanceTo(zombiePos);
-
-          if (distance <= explosionRadius) {
-            // 使用 EnemyManager 的 applyDamageToEnemy 方法，同时更新本地和 Worker 中的血量
-            this.game.enemyManager.applyDamageToEnemy(zombie.id, explosionDamage);
-            console.log(`[Explosion] 丧尸在爆炸范围内，造成 ${explosionDamage} 点伤害！`);
-          }
-        }
-      }
-
-      this._tempVector.set(center.x + 0.5, center.y + 0.5, center.z + 0.5);
-      if (this.world.spawnExplosionParticles) this.world.spawnExplosionParticles(this._tempVector);
-      audioManager.playSound('explosion', 0.4);
-    }
+    this.interaction.handleExplosionResult(data);
   }
 
   /**
@@ -1317,20 +775,7 @@ export class Player {
    * @param {number} z - Z坐标
    */
   explode(x, y, z) {
-    const bx = Math.floor(x), by = Math.floor(y), bz = Math.floor(z);
-    if (this.world.getBlock(bx, by, bz) === 'tnt') {
-      this.world.removeBlock(bx, by, bz);
-      this.ignitingTNTs.delete(`${bx},${by},${bz}`);
-    }
-    const nearbyDeltas = {};
-    for (let dx = -3; dx <= 3; dx++)
-      for (let dy = -3; dy <= 3; dy++)
-        for (let dz = -3; dz <= 3; dz++) {
-          const tx = bx + dx, ty = by + dy, tz = bz + dz;
-          const type = this.world.getBlock(tx, ty, tz);
-          if (type) nearbyDeltas[`${tx},${ty},${tz}`] = type;
-        }
-    this.explosionWorker.postMessage({ action: 'calculateExplosion', payload: { x, y, z, nearbyDeltas } });
+    this.interaction.explode(x, y, z);
   }
 
   /**
@@ -1339,7 +784,7 @@ export class Player {
    * @param {THREE.Vector3} pos - 位置
    * @param {string} type - 粒子类型
    */
-  spawnParticles(pos, type) { if (this.world.spawnParticles) this.world.spawnParticles(pos, type); }
+  spawnParticles(pos, type) { this.interaction.spawnParticles(pos, type); }
 
   /**
    * 执行天空放置
@@ -1347,32 +792,14 @@ export class Player {
    * @param {string} type - 方块类型
    */
   doSkyPlace(type) {
-    const origin = this.camera.position;
-    this.camera.getWorldDirection(this._direction);
-    const step = 0.1, maxDist = 9;
-    this._tempVector.copy(origin);
-    const neighborOffsets = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
-    for(let d=0; d<maxDist; d+=step) {
-      this._tempVector.addScaledVector(this._direction, step);
-      const rx = Math.floor(this._tempVector.x), ry = Math.floor(this._tempVector.y), rz = Math.floor(this._tempVector.z);
-      if (!this.physics.isSolid(rx, ry, rz)) {
-        let hasSolidNeighbor = false, allInvisible = true;
-        for (const [dx, dy, dz] of neighborOffsets) {
-          if (this.physics.isSolid(rx + dx, ry + dy, rz + dz)) {
-            hasSolidNeighbor = true;
-            if (this._direction.dot(new THREE.Vector3(dx, dy, dz).normalize()) > 0.01) { allInvisible = false; break; }
-          }
-        }
-        if (hasSolidNeighbor && allInvisible) { if (this.tryPlaceBlock(rx, ry, rz, type)) { this.swing(); return; } }
-      } else break;
-    }
+    this.interaction.doSkyPlace(type);
   }
 
   /**
    * 执行挥臂动作
    * 播放挥臂动画
    */
-  swing() { this.swingTime = 10; }
+  swing() { this.interaction.swing(); }
 
   /**
    * 更新手臂状态
@@ -1380,15 +807,7 @@ export class Player {
    * @param {number} dt - 时间步长
    */
   updateArm(dt) {
-    if (this.weaponMode !== WEAPON_TYPES.ARM) { this.arm.visible = false; return; }
-    this.arm.visible = true;
-    if (this.drawProgress < 1) this.drawProgress = Math.min(1, this.drawProgress + dt * 4);
-    this.arm.position.set(0.07, -0.10 - Math.pow(1 - this.drawProgress, 2) * 0.5, -0.12);
-    this.arm.scale.set(0.1, 0.1, 0.1);
-    if (this.swingTime > 0) {
-      this.arm.rotation.x = -0.8 - Math.sin((10 - this.swingTime) / 10 * Math.PI) * 0.87;
-      this.swingTime--;
-    } else this.arm.rotation.x = -0.8;
+    this.interaction.updateArm(dt);
   }
 
   /**

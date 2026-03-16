@@ -117,4 +117,12 @@ export class Inventory {
   getSelected() {
     return this.slots[this.selectedSlot];
   }
+
+  /**
+   * 选择指定槽位
+   * @param {number} index - 槽位索引
+   */
+  selectSlot(index) {
+    this.selectedSlot = index;
+  }
 }
