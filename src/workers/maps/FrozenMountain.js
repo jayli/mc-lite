@@ -83,7 +83,7 @@ function mountainNoise(x, z, seed, scale) {
 export function getFrozenMountainInfo(wx, wz, seed, terrainGen) {
   const mountainSize = 80;  // 冰封山峰主体边长 80 格
   const halfSize = Math.floor(mountainSize / 2);
-  const transitionSize = 4; // 过渡带大小 4 格
+  const transitionSize = 8; // 过渡带大小增加到 8 格，让边缘更自然
   const regionSize = 400;  // 每 400x400 区域生成一个冰封山峰
 
   // 椭圆形山体参数：让一个方向更陡峭，增加自然感
@@ -110,88 +110,135 @@ export function getFrozenMountainInfo(wx, wz, seed, terrainGen) {
     return null;
   }
 
-  // 计算相对于冰封山峰中心的距离（使用椭圆剖面，让一个方向更陡峭）
+  // 计算相对于冰封山峰中心的距离
   const dx = wx - mountainCx;
   const dz = wz - mountainCz;
+
+  // === 山形轮廓噪声：给山的水平轮廓增加低频噪声，让山形不再规整 ===
+  // 使用角度和距离来扰动山的边界，创造不规则的轮廓
+  const angle = Math.atan2(dz, dx);
+
+  // 低频轮廓噪声：让山的整体形状像自然山体一样不规则
+  const shapeNoise1 = mountainNoise(wx, wz, seed + 1000, 0.008);
+  const shapeNoise2 = mountainNoise(wx, wz, seed + 2000, 0.015) * 0.5;
+  const shapeNoise3 = mountainNoise(wx, wz, seed + 3000, 0.025) * 0.25;
+  const shapeNoise = (shapeNoise1 + shapeNoise2 + shapeNoise3) * 0.5 + 0.5; // 归一化到 0-1
+
+  // 基于角度的轮廓变化：让不同方向的山坡有不同的"凸出"
+  const angleVariation = Math.sin(angle * 3 + seed * 0.1) * 4 +
+                         Math.sin(angle * 5 + seed * 0.2) * 2 +
+                         Math.sin(angle * 7 + seed * 0.3) * 1;
+
+  // 动态调整的山体半径：不同方向有不同的半径
+  const effectiveRadius = halfSize + angleVariation + (shapeNoise - 0.5) * 8;
+
   // 根据陡峭方向选择压缩轴，使该方向坡度更陡峭
   const adjustedDx = steepAxis === 'x' ? dx / steepAxisFactor : dx;
   const adjustedDz = steepAxis === 'z' ? dz / steepAxisFactor : dz;
-  const distFromCenter = Math.max(Math.abs(dx), Math.abs(dz));
+
+  // 使用扰动后的距离计算，让山坡不是完美的几何形状
   const euclidDist = Math.sqrt(adjustedDx * adjustedDx + adjustedDz * adjustedDz);
+
+  // 归一化距离：考虑轮廓噪声后的相对距离
+  const normalizedDist = euclidDist / Math.max(1, effectiveRadius);
 
   // 计算冰封山峰基准高度（中心处的地形高度）
   const centerBiome = terrainGen.getBiome(mountainCx, mountainCz);
   const mountainBaseHeight = terrainGen.generateHeight(mountainCx, mountainCz, centerBiome);
 
-  // 判断区域类型
+  // 判断区域类型：使用扰动后的归一化距离
   let zone, transitionFactor;
 
-  if (distFromCenter <= halfSize) {
+  if (normalizedDist <= 1.0) {
     // 冰封山峰主体：完整山峰形态，不进行混合
     zone = 'core';
     transitionFactor = 0;
   } else {
     // 过渡带：在冰封山峰主体边缘外进行平滑混合
     zone = 'transition';
-    const t = (distFromCenter - halfSize) / transitionSize;
-    transitionFactor = t;
+    const t = (normalizedDist - 1.0) / (transitionSize / halfSize);
+    transitionFactor = Math.max(0, Math.min(1, t));
   }
 
-  // 基础高度：使用平滑曲线并通过确定性抖动取整，减少“等高线台阶感”
-  // 平顶效果：在中心区域保持相对平坦
-  const flatRadius = 10; // 平顶半径
+  // 平顶半径也加入一些随机变化
+  const flatRadiusNoise = mountainNoise(wx, wz, seed + 4000, 0.02) * 3;
+  const flatRadius = Math.max(5, 10 + flatRadiusNoise); // 平顶半径 7-13
+
   let baseHeightFloat;
 
-  const summitHeight = (halfSize - flatRadius) / 1.3;
+  const summitHeight = (halfSize - 10) / 1.3; // 使用固定的平均平顶半径计算峰顶高度
 
-  if (euclidDist < flatRadius) {
-    // 平顶区域：高度基本一致
-    baseHeightFloat = summitHeight;
+  // === 山坡高度噪声：使用更自然的高度剖面 ===
+  if (normalizedDist < flatRadius / halfSize) {
+    // 平顶区域：高度不是完全平坦，而是有轻微起伏
+    const summitNoise = mountainNoise(wx, wz, seed + 5000, 0.03) * 0.8;
+    baseHeightFloat = summitHeight + summitNoise;
   } else {
     // 从平顶边缘开始下降
-    const slopeRange = Math.max(1, halfSize - flatRadius);
-    const t = Math.max(0, Math.min(1, (euclidDist - flatRadius) / slopeRange));
+    const slopeT = Math.max(0, Math.min(1,
+      (normalizedDist - flatRadius / halfSize) / (1 - flatRadius / halfSize)));
 
-    // 山腰局部陡坡：使用低频噪声选择“更陡区域”，避免整体都像台阶。
-    const localSteepNoise =
-      mountainNoise(wx, wz, seed + 411, 0.012) * 0.7 +
-      mountainNoise(wx, wz, seed + 503, 0.020) * 0.3;
-    const localSteep01 = Math.max(0, Math.min(1, localSteepNoise * 0.5 + 0.5));
-    const steepZoneMask = Math.sin(Math.PI * t); // 山腰最明显，顶/脚最弱
-    // 下调“墙感”强度，避免陡坡变成整面直立墙
-    const steepFactor = 1 + steepZoneMask * (0.08 + 0.14 * localSteep01);
-    const effectiveT = Math.max(0, Math.min(1, t * steepFactor));
+    // === 山坡剖面噪声：创造不规则的坡度变化 ===
+    // 低频噪声控制整体坡度：有的地方陡，有的地方缓
+    const slopeNoise1 = mountainNoise(wx, wz, seed + 6000, 0.006);
+    const slopeNoise2 = mountainNoise(wx, wz, seed + 7000, 0.012) * 0.5;
+    const slopeNoise = (slopeNoise1 + slopeNoise2) * 0.5 + 0.5;
 
-    // 略偏陡的剖面曲线，搭配局部 steepFactor 增加自然陡坡感
-    const profile = 1 - Math.pow(effectiveT, 1.18);
-    baseHeightFloat = summitHeight * profile;
+    // 根据噪声调整剖面曲线指数：1.1-1.8 之间变化
+    // 指数越小，坡度越陡；指数越大，坡度越缓
+    const profileExponent = 1.1 + slopeNoise * 0.7;
 
-    // 给陡坡增加“嶙峋感”：中高频噪声形成岩面起伏，不再像一整面直墙
-    const ruggedMask = steepZoneMask * Math.max(0, (localSteep01 - 0.35) / 0.65);
-    const ruggedSigned =
-      mountainNoise(wx, wz, seed + 619, 0.050) * 0.7 +
-      mountainNoise(wx, wz, seed + 701, 0.085) * 0.3;
-    const ruggedCrag = (Math.abs(mountainNoise(wx, wz, seed + 733, 0.072)) - 0.55) * 1.1;
-    const ruggedOffsetRaw = (ruggedSigned * 0.75 + ruggedCrag) * ruggedMask;
-    const ruggedOffset = Math.max(-0.6, Math.min(1.1, ruggedOffsetRaw));
-    baseHeightFloat += ruggedOffset;
+    // 基础剖面高度
+    let profile = 1 - Math.pow(slopeT, profileExponent);
+
+    // === 山坡凹凸噪声：创造山坡上下的凹凸感 ===
+    // 中频噪声：创造山坡上的小凹凸（小山脊和小山谷）
+    const bumpNoise1 = mountainNoise(wx, wz, seed + 8000, 0.025);
+    const bumpNoise2 = mountainNoise(wx, wz, seed + 9000, 0.045) * 0.5;
+    const bumpNoise3 = mountainNoise(wx, wz, seed + 10000, 0.08) * 0.25;
+    const bumpNoise = bumpNoise1 + bumpNoise2 + bumpNoise3;
+
+    // 凹凸强度在山腰最大，山顶和山脚较小
+    const bumpMask = Math.sin(Math.PI * slopeT);
+    const bumpAmplitude = 2.5; // 凹凸幅度
+    const bumpOffset = bumpNoise * bumpAmplitude * bumpMask;
+
+    // === 山脊线扰动：沿着特定方向的凸起 ===
+    // 创建从山顶向外辐射的”山脊”
+    const ridgeAngle1 = angle * 3 + mountainNoise(wx, wz, seed + 11000, 0.01) * 0.5;
+    const ridgeNoise1 = Math.sin(ridgeAngle1) * (1 - slopeT); // 山顶强，山脚弱
+    const ridgeOffset = ridgeNoise1 * 1.5 * (1 - slopeT);
+
+    // 综合所有高度贡献
+    baseHeightFloat = summitHeight * profile + bumpOffset + ridgeOffset;
+
+    // === 岩石嶙峋感：高频噪声创造细节 ===
+    const ruggedNoise =
+      mountainNoise(wx, wz, seed + 12000, 0.06) * 0.6 +
+      mountainNoise(wx, wz, seed + 13000, 0.1) * 0.3 +
+      mountainNoise(wx, wz, seed + 14000, 0.15) * 0.1;
+    const ruggedMask = bumpMask * 0.7; // 只在山腰添加嶙峋感
+    baseHeightFloat += ruggedNoise * ruggedMask;
   }
 
-  // 在山腰注入超低频起伏，打散过直的坡线，山顶/山脚影响较小
-  const baseSlopeRange = Math.max(1, halfSize - flatRadius);
-  const baseSlopeT = Math.max(0, Math.min(1, (euclidDist - flatRadius) / baseSlopeRange));
-  const baseSlopeMask = Math.sin(Math.PI * baseSlopeT);
-  const broadUndulation = mountainNoise(wx, wz, seed + 151, 0.010) * 1.2 * baseSlopeMask;
-  baseHeightFloat += broadUndulation;
+  // === 整体山体起伏：超低频噪声让山的整体高低不平 ===
+  const broadUndulation =
+    mountainNoise(wx, wz, seed + 15000, 0.005) * 1.5 +
+    mountainNoise(wx, wz, seed + 16000, 0.01) * 0.8;
+  // 在山的中心区域影响较小，边缘影响较大
+  const undulationMask = Math.min(1, normalizedDist * 1.2);
+  baseHeightFloat += broadUndulation * undulationMask;
 
-  // 确定性抖动取整：避免同一高度线过长形成“人工台阶”
+  // 确保高度不为负
+  baseHeightFloat = Math.max(0, baseHeightFloat);
+
+  // 确定性抖动取整：避免同一高度线过长形成”人工台阶”
   const baseFloor = Math.floor(baseHeightFloat);
   const frac = Math.max(0, Math.min(1, baseHeightFloat - baseFloor));
   const dither = mountainNoise(wx, wz, seed + 777, 0.09) * 0.5 + 0.5;
   const baseHeight = baseFloor + (dither < frac ? 1 : 0);
 
-  // 低频平滑扰动：去掉高频山脊，避免地表出现“窟窿/毛刺”
-  // 使用十字采样平滑噪声，保证相邻列的高度变化更连续。
+  // 低频平滑扰动：使用十字采样平滑噪声
   const sampleOffsets = [
     [0, 0],
     [1.5, 0],
@@ -208,11 +255,11 @@ export function getFrozenMountainInfo(wx, wz, seed, terrainGen) {
   smoothNoise /= sampleOffsets.length;
 
   // 山顶与山脚都降低扰动，只在山腰保留轻微变化
-  const slopeRange = Math.max(1, halfSize - flatRadius);
-  const slopeT = Math.max(0, Math.min(1, (euclidDist - flatRadius) / slopeRange));
+  const slopeT = Math.max(0, Math.min(1, (normalizedDist - flatRadius / halfSize) /
+    Math.max(0.01, 1 - flatRadius / halfSize)));
   const slopeMask = Math.sin(Math.PI * slopeT);
 
-  // 振幅严格限制在 [-1, 1]，避免相邻列出现突兀的坑
+  // 振幅严格限制在 [-1, 1]
   const noiseOffsetRaw = Math.round(smoothNoise * slopeMask * 1.1);
   const noiseOffset = Math.max(-1, Math.min(1, noiseOffsetRaw));
 
