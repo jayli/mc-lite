@@ -2,27 +2,12 @@
 
 ## 执行摘要
 
-| 项目 | 详情 |
-|------|------|
-| **检查时间** | 2026-03-16 |
-| **项目类型** | Node.js (纯客户端 3D 体素游戏) |
-| **项目路径** | /Users/bachi/jaylli/mc-lite |
-| **文件总数** | 72 个 JS 文件 |
-| **代码行数** | ~8,500 行 |
-| **测试文件** | 11 个 (约 3,556 行测试代码) |
-| **总体评分** | 72/100 (良好) |
-| **问题统计** | 0 高 | 15 中 | 25 低 |
-
-### 评分分布
-
-```
-代码结构  : ████████░░ 75/100
-命名规范  : ████████░░ 78/100
-代码质量  : ███████░░░ 68/100
-安全性    : █████████░ 90/100
-测试质量  : ███████░░░ 70/100
-文档可维护: ████████░░ 75/100
-```
+- **检查时间**: 2026-03-16
+- **项目类型**: Node.js (纯前端 Three.js 3D 体素游戏)
+- **文件总数**: 73 个 JS 文件
+- **代码行数**: 约 22,337 行
+- **总体评分**: 68/100 🟠
+- **问题统计**: 2 高 | 18 中 | 45+ 低
 
 ---
 
@@ -32,58 +17,41 @@
 
 | 检查项 | 状态 | 严重程度 | 详情 | 建议 |
 |--------|------|----------|------|------|
-| 重复代码 | ⚠️ 警告 | 中 | 发现 5 类重复模式 (makeScale、setMatrixAt、dispose 等) | 提取公共工具函数 |
-| 大文件 | ⚠️ 警告 | 中 | 12 个文件 >500 行 | 考虑拆分职责 |
-| 长函数 | ✅ 通过 | - | 未发现严重超长函数 | - |
-| 类复杂度 | ⚠️ 警告 | 中 | 3 个类 >100 方法 | 拆分职责 |
-| 循环依赖 | ✅ 通过 | - | 未发现循环依赖 | - |
+| 大文件 | ❌ 发现问题 | 高 | 9 个文件超过 500 行，Player.js (1520行)、FaceCullingSystem.js (1454行) | 按职责拆分为多个模块 |
+| 长函数 | ⚠️ 警告 | 中 | Player.js 构造函数含 102 行条件逻辑块 | 提取为独立方法 |
+| 类复杂度 | ❌ 发现问题 | 高 | Player 类 143 个方法，FaceCullingSystem 110 个方法 | 应用单一职责原则拆分 |
+| 重复代码 | ⚠️ 警告 | 中 | 模型加载逻辑重复 90+ 行，材质注册模式重复 | 提取公共函数/配置 |
+| 循环依赖 | ⚠️ 警告 | 中 | Chunk<->Consolidation、World<->Chunk 等潜在循环 | 考虑引入事件总线或依赖注入 |
 
-#### 大文件列表 (>500行)
+**大文件列表 (Top 5):**
 
 | 文件路径 | 行数 | 说明 |
-|----------|------|------|
-| `src/actors/player/Player.js` | 1,520 | 包含输入、物理、武器、地图生成等 |
-| `src/core/FaceCullingSystem.js` | 1,454 | 包含调试、性能监控、核心逻辑 |
-| `src/tests/test-chunk.js` | 1,046 | 测试文件 |
-| `src/tests/test-face-culling.js` | 901 | 测试文件 |
-| `src/workers/WorldWorker.js` | 872 | 地形生成逻辑复杂 |
-| `src/world/Chunk.js` | 866 | 渲染、数据管理、邻居更新 |
-| `src/core/MaterialManager.js` | 787 | 材质管理 |
-| `src/actors/enemy/ZombieInstancedRenderer.js` | 682 | 丧尸渲染 |
-| `src/core/Engine.js` | 652 | 渲染引擎 |
-| `src/actors/enemy/Zombie.js` | 586 | 丧尸逻辑 |
-
-#### 复杂类列表
-
-| 类名 | 方法数 | 文件 |
-|------|--------|------|
-| Player | ~199 | `src/actors/player/Player.js` |
-| FaceCullingSystem | ~149 | `src/core/FaceCullingSystem.js` |
-| Chunk | ~114 | `src/world/Chunk.js` |
-| Zombie | ~44 | `src/actors/enemy/Zombie.js` |
-| EntityManager | ~50 | `src/world/entity-system/EntityManager.js` |
+|---------|------|------|
+| `src/actors/player/Player.js` | 1520 | 玩家类，职责过多 |
+| `src/core/FaceCullingSystem.js` | 1454 | 隐藏面剔除系统 |
+| `src/workers/WorldWorker.js` | 872 | 世界生成 Worker |
+| `src/world/Chunk.js` | 867 | 区块管理 |
+| `src/core/MaterialManager.js` | 787 | 材质管理器 |
 
 ---
 
 ### 2. 命名规范
 
-| 检查项 | 状态 | 严重程度 | 详情 |
-|--------|------|----------|------|
-| 变量命名一致性 | ⚠️ 警告 | 低 | 5 处 snake_case 变量 |
-| 类名命名 | ✅ 通过 | - | 全部使用 PascalCase |
-| 常量命名 | ✅ 通过 | - | 全部使用 UPPER_SNAKE_CASE |
-| 函数命名 | ✅ 通过 | - | 全部使用 camelCase |
-| 文件命名 | ⚠️ 警告 | 低 | PascalCase/camelCase/kebab-case 混合 |
+| 检查项 | 状态 | 严重程度 | 详情 | 建议 |
+|--------|------|----------|------|------|
+| 类命名 | ✅ 通过 | - | 所有类使用 PascalCase | - |
+| 常量命名 | ⚠️ 警告 | 低 | 少数对象常量使用 camelCase | 统一使用 UPPER_SNAKE_CASE |
+| 变量/函数命名 | ✅ 通过 | - | 统一使用 camelCase | - |
+| 缩写使用 | ✅ 通过 | - | 主要缩写 (AO) 含义明确 | - |
 
-#### 不规范命名
+**需要改进的命名:**
 
-| 位置 | 当前命名 | 建议修改 |
-|------|----------|----------|
-| `src/actors/player/Player.js:128` | `bobbing_timer` | `bobbingTimer` |
-| `src/actors/player/Player.js:129` | `bobbing_intensity` | `bobbingIntensity` |
-| `src/actors/player/Player.js:130` | `bobbing_speed` | `bobbingSpeed` |
-| `src/actors/player/Player.js:131` | `bob_offset` | `bobOffset` |
-| `src/actors/player/Physics.js:174` | `halfW_check` | `halfWCheck` |
+| 文件路径 | 当前命名 | 建议命名 |
+|---------|---------|---------|
+| `src/world/ChunkConsolidation.js:188` | `geomMap` | `GEOMETRY_MAP` |
+| `src/utils/FaceCullingCore.js:10` | `faceMask` | `FACE_MASK` |
+| `src/actors/player/Physics.js:254` | `bumperDist` | `bumperDistance` |
+| `src/workers/WorldWorker.js:63` | `modGunMan` | `gunManModelPositions` |
 
 ---
 
@@ -91,279 +59,229 @@
 
 | 检查项 | 状态 | 严重程度 | 详情 | 建议 |
 |--------|------|----------|------|------|
-| Magic Number | ⚠️ 警告 | 中 | 1500(47次)、20/30/50(各6次)等 | 提取为命名常量 |
-| 嵌套层级 | ✅ 通过 | - | 最深 4 层，可接受 | 可使用早期返回优化 |
-| 死代码 | ⚠️ 警告 | 低 | 6 处可能未使用的变量 | 清理或确认使用 |
-| 注释覆盖率 | ⚠️ 警告 | 低 | 核心类约 40-60% | 提升至 80% |
-| TODO/FIXME | ✅ 通过 | - | 0 个待办标记 | 维护良好 |
+| 嵌套层级 | ❌ 发现问题 | 高 | 434 处超过 4 层嵌套，最大 10 层 | 提前返回、提取函数 |
+| Magic Number | ⚠️ 警告 | 中 | 644 处未命名数字 | 提取为命名常量 |
+| Magic String | ⚠️ 警告 | 中 | 1628 处未命名字符串 | 使用常量定义 |
+| TODO/FIXME | ✅ 通过 | - | 未发现 | - |
+| 注释覆盖率 | ⚠️ 警告 | 中 | 整体 25.89%，核心文件偏低 | 增加关键逻辑注释 |
 
-#### 高频 Magic Number
+**嵌套层级最严重文件:**
 
-| 数字 | 出现次数 | 主要位置 | 建议常量名 |
-|------|----------|----------|------------|
-| 1500 | 47次 | Game.js | `DEFAULT_INVENTORY_COUNT` |
-| 20, 30, 50 | 各6次 | UIManager.js | `ZOMBIE_LIMIT_LOW/MED/HIGH` |
-| 300 | 多次 | UIManager.js, maps/ | `MAP_OFFSET_X/Z` |
-| 24 | 多次 | AOUtils.js | `AO_VERTICES_COUNT` |
-| 63 | 多次 | Chunk.js | `FACE_MASK_ALL_VISIBLE` |
+| 文件路径 | 问题数量 | 最大层级 |
+|---------|---------|---------|
+| `src/actors/player/Player.js` | 60+ | 8层 |
+| `src/workers/WorldWorker.js` | 50+ | 8层 |
+| `src/world/Chunk.js` | 30+ | 8层 |
 
-#### 可能未使用变量
+**Magic Number 高频文件:**
 
-| 文件 | 变量 | 行号 |
-|------|------|------|
-| `src/core/Game.js` | `worldDeltas` | 334 |
-| `src/core/EnemyManager.js` | `enemyUpdates` | 95 |
-| `src/core/EnemyManager.js` | `zombiesToRemove` | 99 |
-| `src/core/FaceCullingSystem.js` | `results` | 240 |
-| `src/core/AOSystem.js` | `localBlockData` | 341 |
+| 文件路径 | 数量 |
+|---------|------|
+| `src/core/Engine.js` | 79 |
+| `src/workers/WorldWorker.js` | 70 |
+| `src/actors/player/Player.js` | 53 |
+| `src/actors/weapon/Gun.js` | 41 |
 
 ---
 
 ### 4. 安全性
 
-| 检查项 | 状态 | 严重程度 | 详情 |
-|--------|------|----------|------|
-| 硬编码密钥 | ✅ 通过 | - | 未发现敏感信息 |
-| 危险函数(eval) | ✅ 通过 | - | 未发现使用 |
-| XSS 风险 | ⚠️ 注意 | 低 | 3 处 innerHTML 使用(风险较低) |
-| 输入校验 | ✅ 通过 | - | 纯客户端游戏，无用户输入风险 |
+| 检查项 | 状态 | 严重程度 | 详情 | 建议 |
+|--------|------|----------|------|------|
+| 硬编码密钥 | ✅ 通过 | - | 未发现 | - |
+| XSS 漏洞 | ✅ 通过 | - | 4 处 innerHTML 使用均为安全场景 | - |
+| 输入验证 | ✅ 通过 | - | 输入来源受浏览器限制 | - |
+| 危险代码执行 | ✅ 通过 | - | 未发现 eval/Function 使用 | - |
 
-#### 安全性细节
-
-- **项目类型**: 纯客户端游戏，无 API 密钥/认证需求
-- **innerHTML 使用**: 共 3 处，均为硬编码字符串或已转义
-  - `FaceCullingSystem.js:1188, 1266` - 性能统计显示
-  - `tests/runner.js:304` - 测试报告，已使用 escapeHtml 保护
+**安全性评估**: 项目安全风险较低，所有潜在风险点均在可控范围内。
 
 ---
 
 ### 5. 依赖管理
 
-| 检查项 | 状态 | 严重程度 | 详情 |
-|--------|------|----------|------|
-| 依赖数量 | ✅ 良好 | - | 仅 3 个运行时依赖 (three, simplex-noise, seedrandom) |
-| 安全漏洞 | ⚠️ 无法检查 | - | 缺少 package-lock.json |
-| 过期依赖 | ✅ 通过 | - | 手动检查无严重过期 |
-
-**依赖列表**:
-```json
-{
-  "three": "^0.160.0",
-  "simplex-noise": "^4.0.1",
-  "seedrandom": "^3.0.5"
-}
-```
+| 检查项 | 状态 | 严重程度 | 详情 | 建议 |
+|--------|------|----------|------|------|
+| 安全漏洞 | ⚠️ 警告 | 中 | npm audit 无法执行 (镜像源限制) | 切换官方源后重新检查 |
+| 过期依赖 | ⏭️ 未检查 | - | 需要手动检查 | 运行 `npm outdated` |
+| 未使用依赖 | ⏭️ 未检查 | - | 需要手动分析 | 使用 depcheck 工具 |
 
 ---
 
-### 6. 测试质量
+### 6. 工程规范
 
-| 检查项 | 状态 | 严重程度 | 详情 |
-|--------|------|----------|------|
-| 测试覆盖率 | ⚠️ 警告 | 中 | 11 个测试文件，但无覆盖率报告 |
-| 测试框架 | ✅ 通过 | - | 自定义轻量级框架 |
-| 测试配置 | ❌ 缺失 | 中 | package.json test 脚本未配置 |
-| 测试入口 | ✅ 通过 | - | `src/tests/index.html` |
+| 检查项 | 状态 | 严重程度 | 详情 | 建议 |
+|--------|------|----------|------|------|
+| ESLint | ❌ 发现问题 | 高 | 1 个错误，42 个警告 | 修复错误，逐步减少警告 |
+| Git 提交 | ✅ 通过 | - | 使用 Conventional Commits | - |
+| CI/CD | ✅ 通过 | - | GitHub Actions 配置完整 | - |
 
-#### 测试文件列表
+**ESLint 错误详情:**
 
-| 文件 | 行数 | 用途 |
-|------|------|------|
-| `src/tests/test-chunk.js` | 1,046 | 区块系统测试 |
-| `src/tests/test-face-culling.js` | 901 | 面剔除测试 |
-| `src/tests/test-world.js` | 523 | 世界系统测试 |
-| `src/tests/test-entity-system.js` | 376 | 实体系统测试 |
-| `src/tests/test-persistence.js` | 356 | 持久化测试 |
-| `src/tests/runner.js` | 327 | 测试运行器 |
+| 文件路径 | 行号 | 问题 |
+|---------|------|------|
+| `src/ui/HUD.js` | 62 | `PerformanceObserver` 未定义 |
+
+**ESLint 警告分类:**
+
+| 类型 | 数量 |
+|------|------|
+| 未使用的变量/参数 | 26 |
+| 应使用 let/const 而非 var | 5 |
+| 尾随空格 | 2 |
+| 非驼峰命名 | 1 |
+| 测试文件被忽略 | 8 |
 
 ---
 
-### 7. 工程规范
+### 7. 测试质量
 
-| 检查项 | 状态 | 严重程度 | 详情 |
-|--------|------|----------|------|
-| Lint/Format | ⚠️ 缺失 | 中 | 未配置 ESLint/Prettier |
-| Git 提交规范 | ✅ 通过 | - | 使用 Conventional Commits |
-| CI/CD | ⚠️ 缺失 | 低 | 无 CI/CD 配置 |
+| 检查项 | 状态 | 严重程度 | 详情 | 建议 |
+|--------|------|----------|------|------|
+| 测试覆盖率 | ⏭️ 未检查 | - | 未配置覆盖率报告 | 添加覆盖率统计 |
+| 测试文件 | ✅ 通过 | - | 8 个测试文件 | - |
+| 测试有效性 | ⏭️ 未检查 | - | 需要手动验证 | - |
+
+**测试文件列表:**
+
+- `src/tests/assert.js`
+- `src/tests/runner.js`
+- `src/tests/test-block-data.js`
+- `src/tests/test-chunk.js`
+- `src/tests/test-entity-system.js`
+- `src/tests/test-face-culling.js`
+- `src/tests/test-mocks.js`
+- `src/tests/test-orientation.js`
+- `src/tests/test-persistence.js`
+- `src/tests/test-world.js`
 
 ---
 
 ### 8. 文档可维护性
 
-| 检查项 | 状态 | 严重程度 | 详情 |
-|--------|------|----------|------|
-| README.md | ⚠️ 基础 | 低 | 存在但内容简略 |
-| CLAUDE.md | ✅ 详细 | - | 完整的架构和开发规范 |
-| API 文档 | ⚠️ 缺失 | 中 | 无 JSDoc 生成 |
-| 规格文档 | ✅ 完善 | - | 21 个功能规格 (specs/) |
-| CHANGELOG | ❌ 缺失 | 低 | 无变更记录 |
-
-#### 规格文档
-
-| 规格 | 状态 |
-|------|------|
-| 000-fps-optimization | FPS优化 |
-| 001-world-persistence | 世界持久化 |
-| 003-land-caves | 地形与洞穴 |
-| 004-hidden-face-culling | 隐藏面剔除 |
-| 013-zombie-enemy | 丧尸敌人 |
-| 017-frozen-mountain | 冰冻山脉地图 |
-| 021-island-generation | 岛屿生成 |
-| ... | 共 21 个规格 |
+| 检查项 | 状态 | 严重程度 | 详情 | 建议 |
+|--------|------|----------|------|------|
+| README | ✅ 通过 | - | 基本项目说明 | - |
+| CHANGELOG | ✅ 通过 | - | 已创建，记录 21 项功能 | - |
+| CLAUDE.md | ✅ 通过 | - | 详细的开发文档 | - |
+| 规格文档 | ✅ 通过 | - | 21 个功能规格说明 | - |
+| 架构文档 | ✅ 通过 | - | Entity System 有独立文档 | - |
 
 ---
 
 ## 优先级问题列表
 
-### P0 - 高优先级 (0 项)
+### P0 - 必须修复
 
-无 P0 级别问题。
+1. **[代码结构]** `src/actors/player/Player.js` (1520行，143个方法) - 严重违反单一职责原则
+2. **[代码结构]** `src/core/FaceCullingSystem.js` (1454行，110个方法) - 需要拆分
+3. **[工程规范]** `src/ui/HUD.js:62` - ESLint 错误 `PerformanceObserver` 未定义
 
-### P1 - 中优先级 (15 项)
+### P1 - 建议修复
 
-1. **[code-structure]** `src/actors/player/Player.js` - 1520行，包含过多职责，建议拆分为 InputHandler、WeaponManager 等
-2. **[code-structure]** `src/core/FaceCullingSystem.js` - 1454行，调试/性能代码与核心逻辑耦合
-3. **[code-quality]** Magic Number `1500` 出现 47 次，应提取为 `DEFAULT_INVENTORY_COUNT`
-4. **[code-quality]** Magic Number `20/30/50` 各出现 6 次，应提取为丧尸数量配置
-5. **[naming]** `Player.js:128-131` - 5 处 snake_case 变量命名不一致
-6. **[naming]** 文件名命名风格不统一 (PascalCase/camelCase/kebab-case)
-7. **[testing]** package.json 缺少 test 脚本配置
-8. **[testing]** 无代码覆盖率报告
-9. **[engineering]** 未配置 ESLint/Prettier
-10. **[docs]** README.md 内容较简略，缺少详细功能说明
-11. **[docs]** 无 CHANGELOG 变更记录
-12. **[code-structure]** `Player` 类约 199 个方法，职责过重
-13. **[code-structure]** `FaceCullingSystem` 类约 149 个方法
-14. **[code-quality]** `Chunk.js` 和 `ZombieInstancedRenderer.js` 存在 InstancedMesh 操作重复代码
-15. **[security]** 建议运行 `npm i --package-lock-only` 生成 lockfile 进行安全审计
+4. **[代码质量]** 434 处嵌套层级超过 4 层 - 影响可读性
+5. **[代码质量]** 644 处 Magic Number - 建议提取为常量
+6. **[代码质量]** 1628 处 Magic String - 建议使用常量定义
+7. **[代码结构]** 9 个大文件 (>500行) - 考虑拆分模块
+8. **[命名规范]** 6 处命名不规范 - 见上文详细列表
+9. **[代码结构]** 模型加载代码重复 90+ 行 - 提取公共函数
+10. **[工程规范]** 42 个 ESLint 警告 - 逐步修复
+11. **[依赖管理]** npm audit 无法执行 - 切换镜像源检查
+12. **[代码质量]** 核心文件注释覆盖率偏低 (<20%) - 增加注释
 
-### P2 - 低优先级 (25 项)
+### P2 - 可选改进
 
-1. **[code-quality]** 6 处可能未使用的变量声明
-2. **[code-quality]** 函数注释覆盖率偏低 (40-60%)
-3. **[code-quality]** `Game.js:56-61` 4 层嵌套，可用早期返回优化
-4. **[security]** `FaceCullingSystem.js` 两处 innerHTML 可改为 innerText
-5. **[docs]** 类 JSDoc 注释覆盖率提升目标 80%
-6. **[engineering]** 考虑添加 CI/CD 配置
-7. **[code-quality]** 其他 Magic Number 治理
-8. **[code-structure]** 重复代码模式提取为工具函数
-9. **[testing]** 考虑添加单元测试覆盖率检查
-10. **[docs]** 添加 API 文档生成配置
-11-25. 其他细节优化项...
+13. **[代码结构]** 循环依赖问题 - 考虑架构调整
+14. **[代码结构]** 材质注册模式重复 - 使用配置化
+15. **[测试质量]** 未配置测试覆盖率 - 添加覆盖率统计
+16. **[文档]** 部分核心文件缺少 JSDoc 注释
 
 ---
 
 ## 修复建议
 
-### 立即修复 (本周)
+### 立即行动 (本周)
 
-1. **配置测试脚本**
-   ```json
-   {
-     "scripts": {
-       "test": "echo 'Open http://localhost:8080/src/tests/index.html'"
-     }
-   }
-   ```
-
-2. **统一命名风格**
-   - 将 `Player.js` 中的 snake_case 变量改为 camelCase
-   - 建议统一使用 PascalCase 作为文件名规范
-
-3. **生成 lockfile**
-   ```bash
-   npm i --package-lock-only
-   ```
-
-### 短期修复 (本月)
-
-1. **Magic Number 治理**
+1. **修复 ESLint 错误**
    ```javascript
-   // 创建 src/constants/GameConfig.js
-   export const GameConfig = {
-     DEFAULT_INVENTORY_COUNT: 1500,
-     ZOMBIE_LIMIT_LOW: 20,
-     ZOMBIE_LIMIT_MED: 30,
-     ZOMBIE_LIMIT_HIGH: 50,
-     MAP_OFFSET: 300,
-     AO_VERTICES_COUNT: 24,
-     FACE_MASK_ALL: 63,
-   };
+   // 在 .eslintrc.js 中添加全局声明
+   globals: {
+     PerformanceObserver: 'readonly'
+   }
    ```
 
 2. **拆分 Player.js**
-   ```
-   src/actors/player/
-   ├── Player.js           # 核心玩家逻辑
-   ├── InputHandler.js     # 输入处理
-   ├── WeaponManager.js    # 武器管理
-   └── MapGenerator.js     # 地图生成
-   ```
+   - 提取 `InputManager` 处理键盘/鼠标输入
+   - 提取 `WeaponSystem` 处理武器逻辑
+   - 提取 `TeleportManager` 处理传送功能
 
-3. **配置 ESLint**
+### 短期计划 (本月)
+
+3. **提取常量**
    ```javascript
-   // .eslintrc.js
-   module.exports = {
-     env: { browser: true, es2021: true },
-     extends: 'eslint:recommended',
-     parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
-     rules: {
-       'camelcase': 'warn',
-       'no-unused-vars': 'warn',
-     },
+   // 创建 constants/GameValues.js
+   export const DAMAGE = {
+     DEFAULT: 25,
+     EXPLOSION: 50,
+     MAG7: 40
+   };
+
+   export const POSITION_OFFSET = {
+     GUN_X: -0.85,
+     GUN_Y: -0.4,
+     GUN_Z: -0.82
    };
    ```
 
-### 中期优化 (下月)
+4. **优化嵌套层级**
+   - 使用提前返回 (early return)
+   - 提取复杂条件为命名函数
+   - 使用卫语句 (guard clauses)
 
-1. **提取重复代码**
-   ```javascript
-   // src/utils/InstancedMeshUtils.js
-   export function hideInstance(mesh, index) {
-     dummy.makeScale(0, 0, 0);
-     mesh.setMatrixAt(index, dummy.matrix);
-     mesh.instanceMatrix.needsUpdate = true;
-   }
-   ```
+### 中期计划 (本季度)
 
-2. **完善文档**
-   - 补充 README.md 详细功能说明
-   - 创建 CHANGELOG.md
-   - 提升 JSDoc 覆盖率至 80%
+5. **架构重构**
+   - 创建 `BaseMapGenerator` 基类统一地图生成器
+   - 引入事件总线解耦循环依赖
+   - 配置化材质注册
+
+6. **完善测试**
+   - 配置测试覆盖率报告
+   - 为核心模块添加单元测试
 
 ---
 
-## 总结
+## 评分细则
 
-### 项目优势
+| 维度 | 权重 | 得分 | 加权得分 |
+|------|------|------|---------|
+| 代码结构 | 20% | 55 | 11 |
+| 命名规范 | 15% | 85 | 12.75 |
+| 代码质量 | 20% | 60 | 12 |
+| 安全性 | 15% | 90 | 13.5 |
+| 依赖管理 | 10% | 70 | 7 |
+| 工程规范 | 10% | 75 | 7.5 |
+| 测试质量 | 5% | 60 | 3 |
+| 文档可维护性 | 5% | 90 | 4.5 |
+| **总分** | **100%** | - | **68** |
 
-1. **架构清晰** - 三层架构（表现/业务/数据）划分明确
-2. **文档完善** - CLAUDE.md 详细，21个规格文档齐全
-3. **安全性好** - 无硬编码密钥，XSS风险低
-4. **测试覆盖** - 自定义测试框架，11个测试文件
-5. **Worker分离** - 计算密集型任务已异步化
+---
 
-### 主要改进点
+## 结论
 
-1. **代码结构** - 3个大文件需要拆分，3个复杂类需要减负
-2. **Magic Number** - 高频数字需要提取为命名常量
-3. **工程规范** - 缺少 ESLint/Prettier/CI 配置
-4. **测试配置** - package.json 需要配置 test 脚本
+该项目是一个功能丰富的 Three.js 3D 体素游戏，代码量较大 (22K+ 行)。整体架构设计合理，采用 Web Workers、InstancedMesh 等技术优化性能，文档完善（有 CLAUDE.md、CHANGELOG、规格文档）。
 
-### 趋势建议
+**主要问题:**
+1. 部分文件过大，特别是 `Player.js` 和 `FaceCullingSystem.js` 需要拆分
+2. 代码嵌套层级较深，Magic Number/String 较多
+3. ESLint 有一个错误需要立即修复
 
-```
-当前状态: 72/100 (良好)
-目标状态: 85/100 (优秀)
-
-关键路径:
-1. 大文件拆分 → +5分
-2. Magic Number治理 → +3分
-3. ESLint配置 → +3分
-4. 测试覆盖率 → +2分
-```
+**建议:**
+- 优先处理 P0 级别问题
+- 制定代码重构计划，逐步改善代码结构
+- 考虑引入代码审查流程，防止新问题积累
 
 ---
 
 *报告生成时间: 2026-03-16*
-*检查工具: Health Skill v1.0*
+*检查工具: Claude Code Health Skill*
+*报告路径: `./health_check/2026-3-16-001-health-check.md`*
