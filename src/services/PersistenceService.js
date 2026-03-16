@@ -5,27 +5,14 @@
  */
 import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 import { serializeBlockEntry } from '../utils/OrientationUtils.js';
+import { WorkerRpcClient } from './WorkerRpcClient.js';
 
 export class PersistenceService {
   constructor() {
-    this.worker = new Worker(new URL('../workers/PersistenceWorker.js', import.meta.url), { type: 'module' });
+    this.rpc = new WorkerRpcClient(new URL('../workers/PersistenceWorker.js', import.meta.url));
+    this.worker = this.rpc.worker;
     this.cache = new Map(); // Key: "cx,cz" -> { blocks: {}, entities: {} }
-    this.messageId = 0;
-    this.callbacks = new Map();
     this.initPromise = this.init();
-
-    this.worker.onmessage = (event) => {
-      const { success, result, error, messageId } = event.data;
-      if (this.callbacks.has(messageId)) {
-        const { resolve, reject } = this.callbacks.get(messageId);
-        if (success) {
-          resolve(result);
-        } else {
-          reject(new Error(error));
-        }
-        this.callbacks.delete(messageId);
-      }
-    };
   }
 
   /**
@@ -35,11 +22,7 @@ export class PersistenceService {
    * @returns {Promise<any>}
    */
   postMessage(action, payload) {
-    return new Promise((resolve, reject) => {
-      const messageId = this.messageId++;
-      this.callbacks.set(messageId, { resolve, reject });
-      this.worker.postMessage({ action, payload, messageId });
-    });
+    return this.rpc.postMessage(action, payload);
   }
 
   /**

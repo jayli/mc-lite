@@ -10,6 +10,7 @@ import { describe, test } from './runner.js';
 import { assertEqual, assertTrue, assertFalse, assertNotNull } from './assert.js';
 import * as THREE from 'three';
 import { Chunk } from '../world/Chunk.js';
+import { mockFaceCullingSystem, mockMaterials, mockBlockData } from './test-mocks.js';
 
 // 模拟 WorldWorker
 class MockWorldWorker {
@@ -53,41 +54,6 @@ const mockPersistenceService = {
   saveChunkData: () => Promise.resolve(),
   saveDebounced: () => {},
   getChunkData: () => Promise.resolve(null)
-};
-
-// 模拟 faceCullingSystem
-const mockFaceCullingSystem = {
-  isEnabled: () => false,
-  isTransparent: (type) => ['glass_block', 'leaves', 'water', 'air'].includes(type),
-  calculateFaceVisibility: (block, neighbors) => 63,
-  updateBlock: () => {},
-  updateNeighbors: () => {}
-};
-
-// 模拟 materials - 返回带有 dispose 方法的材质对象
-const mockMaterials = {
-  getMaterial: (type) => {
-    const material = {
-      clone: () => ({ ...material }),
-      dispose: () => {}
-    };
-    return material;
-  },
-  dispose: () => {}
-};
-
-// 模拟 BlockData
-const mockBlockData = {
-  getBlockProperties: (type) => {
-    const solidTypes = ['stone', 'dirt', 'wood', 'collider', 'realistic_trunk_collider'];
-    return {
-      isSolid: solidTypes.includes(type),
-      isTransparent: ['glass_block', 'leaves', 'water', 'air'].includes(type),
-      isRendered: type !== 'air' && type !== 'collider',
-      isAOEnabled: true,
-      geometryType: 'default'
-    };
-  }
 };
 
 // 创建模拟的 World 对象
