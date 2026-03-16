@@ -2,7 +2,7 @@
 // 统一 AO（环境光遮蔽）计算与管理系统
 
 import * as THREE from 'three';
-import { buildAODataForBlocks, calculateAOForBlock, isAOApplicable, packAOData, unpackAllAO } from '../utils/AOUtils.js';
+import { buildAODataForBlocks, calculateAOForBlock, isAOApplicable, packAOData, unpackAllAO, createBlockDataOcclusionChecker } from '../utils/AOUtils.js';
 import { getBlockProperties } from '../constants/BlockData.js';
 
 /**
@@ -414,14 +414,8 @@ export class AOSystem {
     const startTime = performance.now();
     const affectedNeighbors = [];
 
-    // 创建 isOccluding 函数
-    const isOccluding = (x, y, z) => {
-      const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-      const type = blockData[key];
-      if (!type) return false;
-      const props = getBlockProperties(type);
-      return !props.isTransparent;
-    };
+    // 使用工具函数创建 isOccluding 函数
+    const isOccluding = createBlockDataOcclusionChecker(blockData, getBlockProperties);
 
     const aoData = buildAODataForBlocks(blocks, isOccluding);
 
@@ -441,13 +435,8 @@ export class AOSystem {
     const aoData = [];
     const affectedNeighbors = [];
 
-    const isOccluding = (x, y, z) => {
-      const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-      const type = blockData[key];
-      if (!type) return false;
-      const props = getBlockProperties(type);
-      return !props.isTransparent;
-    };
+    // 使用工具函数创建 isOccluding 函数
+    const isOccluding = createBlockDataOcclusionChecker(blockData, getBlockProperties);
 
     // 计算受影响的位置
     const affected = new Set();

@@ -18,6 +18,8 @@ const isTransparent = (type) => {
 
 /**
  * 构建跨区块查询的 isOccluding 函数
+ * 注意：此函数支持跨区块查询，与 AOUtils.createBlockDataOcclusionChecker 不同
+ * 后者仅支持单 blockData，适用于不跨区块的场景
  * @param {Object} blockData - 当前区块数据
  * @param {Array} worldChunks - 相邻区块数据
  * @param {number} currentCx - 当前区块 X 坐标

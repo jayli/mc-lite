@@ -333,3 +333,27 @@ export function createOcclusionChecker(world, CHUNK_SIZE, getBlockPropsFn) {
 export function computeBlockAOPacked(x, y, z, isOccludingFn) {
   return calculateAOForBlock(x, y, z, isOccludingFn);
 }
+
+/**
+ * 创建基于 blockData 的简易遮挡检测函数
+ * 适用于单区块或纯数据场景（如 Worker 或 AOSystem）
+ * @param {Object} blockData - 方块数据对象 {"x,y,z": "type"}
+ * @param {Function} getBlockPropsFn - 获取方块属性的函数
+ * @param {Object} options - 配置选项
+ * @param {boolean} options.requireSolid - 是否要求方块为实心（默认 false，只检查是否透明）
+ * @returns {Function} isOccluding(x, y, z) => boolean
+ */
+export function createBlockDataOcclusionChecker(blockData, getBlockPropsFn, options = {}) {
+  const { requireSolid = false } = options;
+
+  return function isOccluding(x, y, z) {
+    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const type = blockData[key];
+    if (!type) return false;
+
+    const props = getBlockPropsFn(type);
+    return requireSolid
+      ? props.isSolid && !props.isTransparent
+      : !props.isTransparent;
+  };
+}
