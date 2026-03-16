@@ -1,5 +1,6 @@
 // src/workers/WorldWorker.js
 import { setSeed } from '../utils/MathUtils.js';
+import { parseBlockEntry } from '../utils/OrientationUtils.js';
 import { terrainGen } from '../world/TerrainGen.js';
 import { Tree } from '../world/entities/Tree.js';
 import { Cloud } from '../world/entities/Cloud.js';
@@ -26,33 +27,10 @@ self.onerror = (e) => {
 // 结构数据加载器实例
 const { uglyHouse, birchTree, birchTreeWithSnow, tank } = structureLoaders;
 
-// 线性插值
-function lerp(a, b, t) {
-  return a + (b - a) * t;
-}
-
 // Smoothstep 平滑插值
 function smoothstep(edge0, edge1, x) {
   const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
   return t * t * (3 - 2 * t);
-}
-
-/**
- * 解析方块数据条目，兼容新旧格式
- * @param {string|object} value - 存储值
- * @returns {{ type: string, orientation: number }} 标准化条目
- */
-function parseBlockEntry(value) {
-  if (typeof value === 'string') {
-    return { type: value, orientation: 0 };
-  }
-  if (typeof value === 'object' && value !== null) {
-    return {
-      type: value.type || 'air',
-      orientation: value.orientation ?? value.direction ?? 0
-    };
-  }
-  return { type: 'air', orientation: 0 };
 }
 
 const CHUNK_SIZE = 16;
@@ -482,7 +460,18 @@ onmessage = async function(e) {
       }
 
       for (const key in savedSnapshot.blocks) {
-        const entry = parseBlockEntry(savedSnapshot.blocks[key]);
+        const rawEntry = savedSnapshot.blocks[key];
+        const entry = parseBlockEntry(rawEntry);
+        // 保持 WorldWorker 旧行为：兼容 legacy `direction` 字段。
+        if (
+          rawEntry &&
+          typeof rawEntry === 'object' &&
+          entry.orientation === 0 &&
+          rawEntry.orientation == null &&
+          rawEntry.direction != null
+        ) {
+          entry.orientation = rawEntry.direction;
+        }
         const [bx, by, bz] = key.split(',').map(Number);
         const solid = getBlockProperties(entry.type).isSolid;
         blockMap.set(key, { x: bx, y: by, z: bz, type: entry.type, solid, orientation: entry.orientation });
