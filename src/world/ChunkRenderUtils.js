@@ -4,10 +4,10 @@
  */
 import * as THREE from 'three';
 import { getBlockProperties } from '../constants/BlockData.js';
-import { getStructureRenderDist } from '../utils/StructureUtils.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
 import { createChunkNeighborSampler } from './ChunkNeighborUtils.js';
 import { CONSOLIDATION_DELAY } from './ChunkConsolidation.js';
+import { createOcclusionChecker, calculateAOForBlock } from '../utils/AOUtils.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getFaceCullingSystem = () => globalThis._faceCullingSystem || faceCullingSystem;
@@ -191,6 +191,13 @@ export function extendChunk(Chunk) {
    */
   Chunk.prototype._updateNeighborsAOInBatch = function(positions) {
     const updateAO = () => {
+      // 创建统一的遮挡检测函数（复用 AOUtils 中的逻辑）
+      const isOccluding = createOcclusionChecker(
+        { chunk: this, chunks: this.world.chunks },
+        16,
+        getBlockProps
+      );
+
       for (const pos of positions) {
         const key = `${pos.x},${pos.y},${pos.z}`;
         const mesh = this.dynamicMeshes?.get(key);
@@ -203,96 +210,13 @@ export function extendChunk(Chunk) {
         const props = getBlockProps(typeStr);
         if (!props.isSolid || props.isTransparent) continue;
 
-        // 重新计算这个方块的 AO（使用与 _createDynamicBlockMesh 中完全一致的逻辑）
+        // 使用 AOUtils 中的函数计算 AO 数据
+        const { aoLow, aoHigh } = calculateAOForBlock(pos.x, pos.y, pos.z, isOccluding);
+
+        // 应用到 mesh
         const count = mesh.geometry.attributes.position.count;
         const aoLowArray = new Float32Array(count);
         const aoHighArray = new Float32Array(count);
-
-        // 辅助函数：判断是否遮挡（与 _createDynamicBlockMesh 中完全一致）
-        const isOccluding = (ox, oy, oz) => {
-          const cx = Math.floor(ox / 16);
-          const cz = Math.floor(oz / 16);
-          let chunk = (cx === this.cx && cz === this.cz) ? this : this.world.chunks.get(`${cx},${cz}`);
-
-          if (!chunk) return true;
-
-          const oKey = `${Math.floor(ox)},${Math.floor(oy)},${Math.floor(oz)}`;
-          const entry = chunk.blockData[oKey];
-
-          if (entry) {
-            const t = typeof entry === 'string' ? entry : entry.type;
-            const p = getBlockProps(t);
-            return p.isSolid && !p.isTransparent;
-          }
-
-          if (chunk.isReady) {
-            return false;
-          } else {
-            return true;
-          }
-        };
-
-        // 辅助函数：计算 AO 值（与 _createDynamicBlockMesh 中完全一致）
-        const getAOValue = (side1, side2, corner) => {
-          const s1 = side1 ? 1 : 0;
-          const s2 = side2 ? 1 : 0;
-          const c = (side1 || side2) ? (corner ? 1 : 0) : 0;
-          if (s1 && s2) return 0;
-          return 3 - (s1 + s2 + c);
-        };
-
-        // 计算每个面的 AO
-        const getAO = (faceIdx) => {
-          const ix = Math.floor(pos.x);
-          const iy = Math.floor(pos.y);
-          const iz = Math.floor(pos.z);
-          const aos = new Uint8Array(4).fill(3);
-
-          if (faceIdx === 0) { // px (+X side)
-            aos[0] = getAOValue(isOccluding(ix+1, iy+1, iz), isOccluding(ix+1, iy, iz+1), isOccluding(ix+1, iy+1, iz+1));
-            aos[1] = getAOValue(isOccluding(ix+1, iy+1, iz), isOccluding(ix+1, iy, iz-1), isOccluding(ix+1, iy+1, iz-1));
-            aos[2] = getAOValue(isOccluding(ix+1, iy-1, iz), isOccluding(ix+1, iy, iz+1), isOccluding(ix+1, iy-1, iz+1));
-            aos[3] = getAOValue(isOccluding(ix+1, iy-1, iz), isOccluding(ix+1, iy, iz-1), isOccluding(ix+1, iy-1, iz-1));
-          } else if (faceIdx === 1) { // nx (-X side)
-            aos[0] = getAOValue(isOccluding(ix-1, iy+1, iz), isOccluding(ix-1, iy, iz-1), isOccluding(ix-1, iy+1, iz-1));
-            aos[1] = getAOValue(isOccluding(ix-1, iy+1, iz), isOccluding(ix-1, iy, iz+1), isOccluding(ix-1, iy+1, iz+1));
-            aos[2] = getAOValue(isOccluding(ix-1, iy-1, iz), isOccluding(ix-1, iy, iz-1), isOccluding(ix-1, iy-1, iz-1));
-            aos[3] = getAOValue(isOccluding(ix-1, iy-1, iz), isOccluding(ix-1, iy, iz+1), isOccluding(ix-1, iy-1, iz+1));
-          } else if (faceIdx === 2) { // py (+Y top)
-            aos[0] = getAOValue(isOccluding(ix-1, iy+1, iz), isOccluding(ix, iy+1, iz-1), isOccluding(ix-1, iy+1, iz-1));
-            aos[1] = getAOValue(isOccluding(ix+1, iy+1, iz), isOccluding(ix, iy+1, iz-1), isOccluding(ix+1, iy+1, iz-1));
-            aos[2] = getAOValue(isOccluding(ix-1, iy+1, iz), isOccluding(ix, iy+1, iz+1), isOccluding(ix-1, iy+1, iz+1));
-            aos[3] = getAOValue(isOccluding(ix+1, iy+1, iz), isOccluding(ix, iy+1, iz+1), isOccluding(ix+1, iy+1, iz+1));
-          } else if (faceIdx === 3) { // ny (-Y bottom)
-            aos[0] = getAOValue(isOccluding(ix-1, iy-1, iz), isOccluding(ix, iy-1, iz+1), isOccluding(ix-1, iy-1, iz+1));
-            aos[1] = getAOValue(isOccluding(ix+1, iy-1, iz), isOccluding(ix, iy-1, iz+1), isOccluding(ix+1, iy-1, iz+1));
-            aos[2] = getAOValue(isOccluding(ix-1, iy-1, iz), isOccluding(ix, iy-1, iz-1), isOccluding(ix-1, iy-1, iz-1));
-            aos[3] = getAOValue(isOccluding(ix+1, iy-1, iz), isOccluding(ix, iy-1, iz-1), isOccluding(ix+1, iy-1, iz-1));
-          } else if (faceIdx === 4) { // pz (+Z side)
-            aos[0] = getAOValue(isOccluding(ix-1, iy, iz+1), isOccluding(ix, iy+1, iz+1), isOccluding(ix-1, iy+1, iz+1));
-            aos[1] = getAOValue(isOccluding(ix+1, iy, iz+1), isOccluding(ix, iy+1, iz+1), isOccluding(ix+1, iy+1, iz+1));
-            aos[2] = getAOValue(isOccluding(ix-1, iy, iz+1), isOccluding(ix, iy-1, iz+1), isOccluding(ix-1, iy-1, iz+1));
-            aos[3] = getAOValue(isOccluding(ix+1, iy, iz+1), isOccluding(ix, iy-1, iz+1), isOccluding(ix+1, iy-1, iz+1));
-          } else if (faceIdx === 5) { // nz (-Z side)
-            aos[0] = getAOValue(isOccluding(ix+1, iy, iz-1), isOccluding(ix, iy+1, iz-1), isOccluding(ix+1, iy+1, iz-1));
-            aos[1] = getAOValue(isOccluding(ix-1, iy, iz-1), isOccluding(ix, iy+1, iz-1), isOccluding(ix-1, iy+1, iz-1));
-            aos[2] = getAOValue(isOccluding(ix+1, iy, iz-1), isOccluding(ix, iy-1, iz-1), isOccluding(ix+1, iy-1, iz-1));
-            aos[3] = getAOValue(isOccluding(ix-1, iy, iz-1), isOccluding(ix, iy-1, iz-1), isOccluding(ix-1, iy-1, iz-1));
-          }
-          return aos;
-        };
-
-        let aoLow = 0;
-        let aoHigh = 0;
-        for (let f = 0; f < 6; f++) {
-          const aos = getAO(f);
-          for (let v = 0; v < 4; v++) {
-            const vertexIdx = f * 4 + v;
-            const aoVal = aos[v];
-            if (vertexIdx < 12) aoLow |= (aoVal << (vertexIdx * 2));
-            else aoHigh |= (aoVal << ((vertexIdx - 12) * 2));
-          }
-        }
 
         aoLowArray.fill(aoLow);
         aoHighArray.fill(aoHigh);
