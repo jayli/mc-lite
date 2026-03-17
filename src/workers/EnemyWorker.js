@@ -41,7 +41,10 @@ function initEnemy(id, data) {
     maxHealth: data.health || 100,
     speed: data.speed || 0.02,
     perceptionRange: data.perceptionRange || 10,
-    lastUpdated: Date.now()
+    lastUpdated: Date.now(),
+    // S路线新增参数
+    offsetAngle: 0,           // 当前偏移角度（弧度）
+    targetOffsetAngle: 0      // 目标偏移角度（弧度）
   };
 }
 
