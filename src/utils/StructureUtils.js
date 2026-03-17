@@ -25,7 +25,8 @@ export const STRUCTURE_RENDER_DIST = {
   house: 5,           // 普通小屋约 5x5
   tank: 20,           // Tank 尺寸约 35x70x40 (X/Z: ±20, Y: 根据实际结构调整)
   rover: 3,           // 火星车
-  gunman: 3           // 模型人
+  gunman: 3,          // 模型人
+  island: 16          // 空岛跨Chunk渲染距离
 };
 
 /**

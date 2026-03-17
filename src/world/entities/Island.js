@@ -17,6 +17,16 @@ export class Island {
    * @param {Object} [dObj=null] - 可选的数据对象
    */
   static generate(cx, cy, cz, chunk, dObj = null) {
+    // 注册空岛结构中心（用于跨Chunk渲染责任判断）
+    if (chunk.structureCenters) {
+      chunk.structureCenters.push({
+        type: 'island',
+        x: cx,
+        y: cy,
+        z: cz
+      });
+    }
+
     // 随机生成岛屿半径和高度
     const radius = 5 + Math.floor(Math.random() * 5);
     const height = 5 + Math.floor(Math.random() * 3);
