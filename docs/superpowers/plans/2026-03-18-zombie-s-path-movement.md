@@ -55,7 +55,7 @@ function initEnemy(id, data) {
 
 ```bash
 git add src/workers/EnemyWorker.js
-git commit -m "feat(turret): 为丧尸添加 S 路线状态参数"
+git commit -m "feat(enemy): 为丧尸添加 S 路线状态参数"
 ```
 
 ---
@@ -67,7 +67,7 @@ git commit -m "feat(turret): 为丧尸添加 S 路线状态参数"
 
 - [ ] **Step 1: 修改 `updateAI` 函数，替换原有的直线移动逻辑**
 
-将原有的速度计算逻辑（第 179-183 行）替换为 S 路线逻辑：
+将原有的速度计算逻辑（第 180-183 行）替换为 S 路线逻辑：
 
 ```javascript
 function updateAI(enemy, playerPosition, allEnemies) {
@@ -156,7 +156,7 @@ npm run lint
 
 ```bash
 git add src/workers/EnemyWorker.js
-git commit -m "feat(turret): 实现丧尸 S 路线移动逻辑
+git commit -m "feat(enemy): 实现丧尸 S 路线移动逻辑
 
 - 添加概率触发的随机偏移（2%概率/帧，±45°范围）
 - 使用线性插值实现平滑转向（lerpFactor=0.03）

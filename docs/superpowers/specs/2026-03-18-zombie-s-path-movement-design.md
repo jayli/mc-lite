@@ -22,8 +22,7 @@
 {
   // 现有参数...
   offsetAngle: 0,           // 当前偏移角度（弧度，-π/4 到 +π/4）
-  targetOffsetAngle: 0,     // 目标偏移角度
-  lastOffsetUpdate: 0       // 上次更新时间戳（毫秒）
+  targetOffsetAngle: 0      // 目标偏移角度
 }
 ```
 
