@@ -3,24 +3,20 @@
 
 import { getFrozenMountainCenterInRegion } from './FrozenMountain.js';
 import { getRegionSeededCenter } from './RegionCenterUtils.js';
-
-// 海岛配置常量
-const ISLAND_CONFIG = {
-  regionSize: 400,         // 每 400x400 区域生成一座海岛
-  islandSize: 30,          // 海岛主体边长
-  transitionSize: 10,       // 过渡带大小（增加到 8，让海岸线更平缓）
-  spawnProbability: 0.08,  // 生成概率 (8%)
-  seaLevel: -2,            // 海平面高度
-  minDistanceFromLand: 20, // 与大陆的最小距离
-  shapeNoiseScale: 0.30,   // 形状噪声尺度（增加，让轮廓更不规则）
-  edgeNoiseScale: 0.25,    // 边缘噪声尺度（增加，让海岸线更破碎）
-  sandPatchCount: 4,       // sand 区域种子点数量
-  stonePatchCount: 3,      // stone 区域种子点数量
-  patchNoiseScale: 0.15,   // 分布噪声尺度
-  minTrees: 1,             // 最小树木数量
-  maxTrees: 2,             // 最大树木数量
-  treeSpawnYOffset: 1      // 树木生成 Y 偏移
-};
+import {
+  REGION_SIZE,
+  REGION_MIN_MARGIN,
+  ISLAND_SIZE,
+  TRANSITION_SIZE,
+  LANDMARK_MIN_DISTANCE,
+  ISLAND_SEA_LEVEL,
+  ISLAND_SHAPE_NOISE_SCALE,
+  ISLAND_EDGE_NOISE_SCALE,
+  ISLAND_SAND_PATCH_COUNT,
+  ISLAND_STONE_PATCH_COUNT,
+  ISLAND_PATCH_NOISE_SCALE,
+  CENTER_OFFSET
+} from '../../constants/RegionMapConfig.js';
 
 /**
  * 确定性随机函数
@@ -42,14 +38,11 @@ const seededRandom = (x, z, seed) => {
  * @returns {Object} 海岛中心位置和其他地标位置 { islandCx, islandCz, pyramidCx, pyramidCz, frozenMountainCx, frozenMountainCz }
  */
 export function getIslandCenterInRegion(regionX, regionZ, seed) {
-  const regionSize = 400;
-
   const { centerX: pyramidCx, centerZ: pyramidCz } = getRegionSeededCenter(regionX, regionZ, seed, {
-    regionSize,
-    offsetScaleX: 300,
-    offsetScaleZ: 300,
-    offsetBaseX: 100,
-    offsetBaseZ: 100
+    offsetScaleX: CENTER_OFFSET.SCALE_X,
+    offsetScaleZ: CENTER_OFFSET.SCALE_Z,
+    offsetBaseX: CENTER_OFFSET.BASE_X,
+    offsetBaseZ: CENTER_OFFSET.BASE_Z
   });
 
   // 获取冰封山峰位置（复用 FrozenMountain 的函数）
@@ -58,9 +51,8 @@ export function getIslandCenterInRegion(regionX, regionZ, seed) {
 
   // 计算海岛中心位置
   const { centerX: initialIslandCx, centerZ: initialIslandCz } = getRegionSeededCenter(regionX, regionZ, seed, {
-    regionSize,
-    offsetScaleX: regionSize - 100,
-    offsetScaleZ: regionSize - 100,
+    offsetScaleX: REGION_SIZE - 100,
+    offsetScaleZ: REGION_SIZE - 100,
     offsetBaseX: 50,
     offsetBaseZ: 50
   });
@@ -68,8 +60,8 @@ export function getIslandCenterInRegion(regionX, regionZ, seed) {
   let islandCx = initialIslandCx;
   let islandCz = initialIslandCz;
 
-  // 距离检查：远离冰封山峰（130格）
-  const minMountainDistance = 130;
+  // 距离检查：远离冰封山峰
+  const minMountainDistance = LANDMARK_MIN_DISTANCE.ISLAND_FROM_MOUNTAIN;
   const distMountainX = Math.abs(islandCx - frozenMountainCx);
   const distMountainZ = Math.abs(islandCz - frozenMountainCz);
   const distFromMountain = Math.max(distMountainX, distMountainZ);
@@ -79,8 +71,8 @@ export function getIslandCenterInRegion(regionX, regionZ, seed) {
     islandCz = frozenMountainCz + (islandCz > frozenMountainCz ? -minMountainDistance : minMountainDistance);
   }
 
-  // 距离检查：远离金字塔（50格）
-  const minPyramidDistance = 50;
+  // 距离检查：远离金字塔
+  const minPyramidDistance = LANDMARK_MIN_DISTANCE.ISLAND_FROM_PYRAMID;
   const distPyramidX = Math.abs(islandCx - pyramidCx);
   const distPyramidZ = Math.abs(islandCz - pyramidCz);
   const distFromPyramid = Math.max(distPyramidX, distPyramidZ);
@@ -91,15 +83,15 @@ export function getIslandCenterInRegion(regionX, regionZ, seed) {
   }
 
   // 边界检查
-  const halfSize = 15;
-  const transitionSize = 10;
+  const halfSize = Math.floor(ISLAND_SIZE / 2);
+  const transitionSize = TRANSITION_SIZE.ISLAND;
   const totalHalfSize = halfSize + transitionSize;
-  const minMargin = totalHalfSize + 5;
+  const minMargin = totalHalfSize + REGION_MIN_MARGIN;
 
-  const regionLeft = regionX * regionSize;
-  const regionRight = (regionX + 1) * regionSize;
-  const regionTop = regionZ * regionSize;
-  const regionBottom = (regionZ + 1) * regionSize;
+  const regionLeft = regionX * REGION_SIZE;
+  const regionRight = (regionX + 1) * REGION_SIZE;
+  const regionTop = regionZ * REGION_SIZE;
+  const regionBottom = (regionZ + 1) * REGION_SIZE;
 
   if (islandCx - minMargin < regionLeft) {
     islandCx = regionLeft + minMargin;
@@ -171,13 +163,15 @@ export function getIslandCenterInRegion(regionX, regionZ, seed) {
  * @returns {Object|null} 海岛信息对象或 null
  */
 export function getIslandInfo(wx, wz, seed, terrainGen) {
-  const { regionSize, islandSize, transitionSize, seaLevel } = ISLAND_CONFIG;
+  const seaLevel = ISLAND_SEA_LEVEL;
+  const islandSize = ISLAND_SIZE;
+  const transitionSize = TRANSITION_SIZE.ISLAND;
   const halfSize = Math.floor(islandSize / 2);
   const totalHalfSize = halfSize + transitionSize;
 
   // 计算区域
-  const regionX = Math.floor(wx / regionSize);
-  const regionZ = Math.floor(wz / regionSize);
+  const regionX = Math.floor(wx / REGION_SIZE);
+  const regionZ = Math.floor(wz / REGION_SIZE);
 
   // 使用共享函数获取海岛中心位置
   const { islandCx, islandCz } = getIslandCenterInRegion(regionX, regionZ, seed);
@@ -220,11 +214,12 @@ export function getIslandInfo(wx, wz, seed, terrainGen) {
  * @param {number} wx - 世界 X 坐标
  * @param {number} wz - 世界 Z 坐标
  * @param {number} seed - 世界种子
- * @param {Object} islandInfo - 海岛信息
+ * @param {Object} _islandInfo - 海岛信息（预留）
  * @returns {number} 形状噪声值
  */
-function getIslandShapeNoise(wx, wz, seed, islandInfo) {
-  const { shapeNoiseScale, edgeNoiseScale } = ISLAND_CONFIG;
+function getIslandShapeNoise(wx, wz, seed, _islandInfo) {
+  const shapeNoiseScale = ISLAND_SHAPE_NOISE_SCALE;
+  const edgeNoiseScale = ISLAND_EDGE_NOISE_SCALE;
 
   // 主噪声：决定海岛主体轮廓（低频大波浪）
   const baseNoise = Math.sin(wx * shapeNoiseScale + seed) * Math.cos(wz * shapeNoiseScale + seed);
@@ -254,7 +249,8 @@ function isInIsland(wx, wz, islandInfo, seed) {
   const shapeNoise = getIslandShapeNoise(wx, wz, seed, islandInfo);
   // 增加形状噪声的影响力度，让海岸线更不规则
   const effectiveDist = islandInfo.distFromCenter - shapeNoise * 8;
-  const { islandSize, transitionSize } = ISLAND_CONFIG;
+  const islandSize = ISLAND_SIZE;
+  const transitionSize = TRANSITION_SIZE.ISLAND;
   const halfSize = Math.floor(islandSize / 2);
   const totalHalfSize = halfSize + transitionSize;
 
@@ -270,7 +266,9 @@ function isInIsland(wx, wz, islandInfo, seed) {
  * @returns {'sand'|'stone'} 方块类型
  */
 function getBlockDistribution(wx, wz, islandInfo, seed) {
-  const { sandPatchCount, stonePatchCount, patchNoiseScale } = ISLAND_CONFIG;
+  const sandPatchCount = ISLAND_SAND_PATCH_COUNT;
+  const stonePatchCount = ISLAND_STONE_PATCH_COUNT;
+  const patchNoiseScale = ISLAND_PATCH_NOISE_SCALE;
   const { centerX, centerZ, distFromCenter } = islandInfo;
 
   // 计算相对于海岛中心的坐标
@@ -318,7 +316,7 @@ function getBlockDistribution(wx, wz, islandInfo, seed) {
 
   // 根据距离和噪声决定类型
   // 沙滩区域（边缘）优先是 sand，内部区域优先是 stone
-  const beachThreshold = ISLAND_CONFIG.islandSize / 2 - 3;
+  const beachThreshold = ISLAND_SIZE / 2 - 3;
 
   if (distFromCenter > beachThreshold) {
     // 沙滩区域：sand 为主
@@ -335,14 +333,15 @@ function getBlockDistribution(wx, wz, islandInfo, seed) {
  * 生成海岛方块
  * @param {number} wx - 世界 X 坐标
  * @param {number} wz - 世界 Z 坐标
- * @param {number} h - 基础地形高度
+ * @param {number} _h - 基础地形高度（预留）
  * @param {Object} islandInfo - 海岛信息
  * @param {Object} fakeChunk - 模拟 Chunk 对象
  * @param {Object} dPlaceholder - 占位符对象
  * @returns {Object} 生成结果 { surfaceY, isBelowSeaLevel }
  */
-export function generateIsland(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, seed) {
-  const { seaLevel, islandSize, transitionSize } = ISLAND_CONFIG;
+export function generateIsland(wx, wz, _h, islandInfo, fakeChunk, dPlaceholder, seed) {
+  const seaLevel = ISLAND_SEA_LEVEL;
+  const islandSize = ISLAND_SIZE;
   const halfSize = Math.floor(islandSize / 2);
 
   // 检查是否在海岛范围内
@@ -396,7 +395,8 @@ export function generateIsland(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, s
  * @returns {Object|null} 出生点信息 { x, y, z, islandCenterX, islandCenterZ, isBeach, yaw, pitch } 或 null
  */
 export function getIslandSpawnPoint(seed, terrainGen) {
-  const { islandSize, seaLevel } = ISLAND_CONFIG;
+  const islandSize = ISLAND_SIZE;
+  const seaLevel = ISLAND_SEA_LEVEL;
   const halfSize = Math.floor(islandSize / 2);
   const beachRadius = halfSize - 1;
 

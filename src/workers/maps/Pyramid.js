@@ -5,6 +5,13 @@
  */
 
 import { getRegionSeededCenter } from './RegionCenterUtils.js';
+import {
+  REGION_SIZE,
+  PYRAMID_SIZE,
+  TRANSITION_SIZE,
+  REGION_MIN_MARGIN,
+  CENTER_OFFSET
+} from '../../constants/RegionMapConfig.js';
 
 /**
  * 获取指定区域内金字塔中心位置（含边界约束）
@@ -14,19 +21,19 @@ import { getRegionSeededCenter } from './RegionCenterUtils.js';
  * @returns {Object} 金字塔中心位置 {cx, cz}
  */
 export function getPyramidCenterInRegion(regionX, regionZ, seed) {
-  const regionSize = 400;
-  const pyramidSize = 40;
-  const transitionSize = 8;
+  const regionSize = REGION_SIZE;
+  const pyramidSize = PYRAMID_SIZE;
+  const transitionSize = TRANSITION_SIZE.PYRAMID;
   const halfSize = Math.floor(pyramidSize / 2);
   const totalHalfSize = halfSize + transitionSize;
-  const minMargin = totalHalfSize + 5;
+  const minMargin = totalHalfSize + REGION_MIN_MARGIN;
 
   const { centerX, centerZ } = getRegionSeededCenter(regionX, regionZ, seed, {
     regionSize,
-    offsetScaleX: 300,
-    offsetScaleZ: 300,
-    offsetBaseX: 100,
-    offsetBaseZ: 100
+    offsetScaleX: CENTER_OFFSET.SCALE_X,
+    offsetScaleZ: CENTER_OFFSET.SCALE_Z,
+    offsetBaseX: CENTER_OFFSET.BASE_X,
+    offsetBaseZ: CENTER_OFFSET.BASE_Z
   });
 
   let pyramidCx = centerX;
@@ -62,12 +69,11 @@ export function getPyramidCenterInRegion(regionX, regionZ, seed) {
  * @returns {Object|null} 金字塔信息对象或 null
  */
 export function getPyramidInfo(wx, wz, seed, terrainGen) {
-  const pyramidSize = 40;  // 金字塔主体边长 40 格
+  const pyramidSize = PYRAMID_SIZE;  // 金字塔主体边长 40 格
   const halfSize = Math.floor(pyramidSize / 2);
   const coreSize = 20;     // 核心保护区边长 20 格
-  const halfCore = Math.floor(coreSize / 2);
-  const transitionSize = 8; // 过渡带大小 8 格
-  const regionSize = 400;  // 每 400x400 区域生成一个金字塔
+  const transitionSize = TRANSITION_SIZE.PYRAMID; // 过渡带大小 8 格
+  const regionSize = REGION_SIZE;  // 每 400x400 区域生成一个金字塔
 
   // 计算当前坐标所在的区域
   const regionX = Math.floor(wx / regionSize);

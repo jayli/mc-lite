@@ -1,82 +1,57 @@
 import { SAVE_CONFIG } from '../constants/SaveConfig.js';
+import { openDatabase, performTransaction } from '../utils/IndexedDBUtils.js';
 
 let db = null;
 
 /**
  * 初始化 IndexedDB 数据库
  */
-function init() {
-  return new Promise((resolve, reject) => {
-    if (db) return resolve();
+async function init() {
+  if (db) return;
 
-    const request = indexedDB.open(SAVE_CONFIG.DB_NAME, SAVE_CONFIG.DB_VERSION);
-
-    request.onupgradeneeded = (event) => {
-      const dbInstance = event.target.result;
+  db = await openDatabase(
+    SAVE_CONFIG.DB_NAME,
+    SAVE_CONFIG.DB_VERSION,
+    (dbInstance) => {
       if (!dbInstance.objectStoreNames.contains(SAVE_CONFIG.STORE_NAME)) {
         dbInstance.createObjectStore(SAVE_CONFIG.STORE_NAME, { keyPath: 'id' });
       }
-    };
-
-    request.onsuccess = (event) => {
-      db = event.target.result;
-      resolve();
-    };
-
-    request.onerror = (event) => {
-      console.error('ManualSave IndexedDB error:', event.target.error);
-      reject(event.target.error);
-    };
-  });
+    }
+  );
 }
 
 /**
  * 检查是否存在存档
  */
 function checkSave() {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([SAVE_CONFIG.STORE_NAME], 'readonly');
-    const store = transaction.objectStore(SAVE_CONFIG.STORE_NAME);
-    const request = store.count(SAVE_CONFIG.SAVE_KEY);
-
-    request.onsuccess = () => resolve(request.result > 0);
-    request.onerror = (event) => reject(event.target.error);
-  });
+  return performTransaction(db, SAVE_CONFIG.STORE_NAME, 'readonly', (store) =>
+    store.count(SAVE_CONFIG.SAVE_KEY)
+  ).then((count) => count > 0);
 }
 
 /**
  * 保存存档快照
  */
 function saveSnapshot(payload) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([SAVE_CONFIG.STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(SAVE_CONFIG.STORE_NAME);
-    const request = store.put({
+  return performTransaction(db, SAVE_CONFIG.STORE_NAME, 'readwrite', (store) =>
+    store.put({
       id: SAVE_CONFIG.SAVE_KEY,
       timestamp: Date.now(),
       player: payload.player,
       worldDeltas: payload.worldDeltas,
       seed: payload.seed,
       settings: payload.settings
-    });
-
-    request.onsuccess = () => resolve();
-    request.onerror = (event) => reject(event.target.error);
-  });
+    })
+  );
 }
 
 /**
  * 加载存档快照
  */
 function loadSnapshot() {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([SAVE_CONFIG.STORE_NAME], 'readonly');
-    const store = transaction.objectStore(SAVE_CONFIG.STORE_NAME);
-    const request = store.get(SAVE_CONFIG.SAVE_KEY);
-
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = (event) => reject(event.target.error);
-  });
+  return performTransaction(db, SAVE_CONFIG.STORE_NAME, 'readonly', (store) =>
+    store.get(SAVE_CONFIG.SAVE_KEY)
+  );
 }
 
 // Worker 消息处理器

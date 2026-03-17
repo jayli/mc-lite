@@ -5,6 +5,14 @@
  */
 
 import { getRegionSeededCenter } from './RegionCenterUtils.js';
+import {
+  REGION_SIZE,
+  SNOW_LAND_SIZE,
+  TRANSITION_SIZE,
+  LANDMARK_OFFSET,
+  SNOW_LAND_CENTER_BOOST_RADIUS,
+  CENTER_OFFSET
+} from '../../constants/RegionMapConfig.js';
 
 /**
  * 检查坐标是否在雪地范围内，并返回雪地相关信息
@@ -16,10 +24,10 @@ import { getRegionSeededCenter } from './RegionCenterUtils.js';
  * @returns {Object|null} 雪地信息对象或 null
  */
 export function getSnowLandInfo(wx, wz, seed, terrainGen) {
-  const snowLandSize = 40;  // 雪地主体边长 40 格
+  const snowLandSize = SNOW_LAND_SIZE;  // 雪地主体边长 40 格
   const halfSize = Math.floor(snowLandSize / 2);
-  const transitionSize = 8; // 过渡带大小 8 格
-  const regionSize = 400;  // 每 400x400 区域生成一个雪地
+  const transitionSize = TRANSITION_SIZE.SNOW_LAND; // 过渡带大小 8 格
+  const regionSize = REGION_SIZE;  // 每 400x400 区域生成一个雪地
 
   // 计算当前坐标所在的区域
   const regionX = Math.floor(wx / regionSize);
@@ -27,16 +35,15 @@ export function getSnowLandInfo(wx, wz, seed, terrainGen) {
 
   const { centerX: pyramidCx, centerZ: pyramidCz } = getRegionSeededCenter(regionX, regionZ, seed, {
     regionSize,
-    offsetScaleX: 300,
-    offsetScaleZ: 300,
-    offsetBaseX: 100,
-    offsetBaseZ: 100
+    offsetScaleX: CENTER_OFFSET.SCALE_X,
+    offsetScaleZ: CENTER_OFFSET.SCALE_Z,
+    offsetBaseX: CENTER_OFFSET.BASE_X,
+    offsetBaseZ: CENTER_OFFSET.BASE_Z
   });
 
-  // 雪地位移 = 金字塔位置 + (160, 0) 偏移
-  // 金字塔半宽 28 + 间隔 100 + 雪地半宽 28 = 156，使用 160 确保有足够间隔
-  const snowLandCx = pyramidCx + 160;
-  const snowLandCz = pyramidCz;
+  // 雪地位移 = 金字塔位置 + 偏移
+  const snowLandCx = pyramidCx + LANDMARK_OFFSET.SNOW_LAND_X;
+  const snowLandCz = pyramidCz + LANDMARK_OFFSET.SNOW_LAND_Z;
 
   // 扩展后的雪地总区域（包含过渡带）
   const totalHalfSize = halfSize + transitionSize;
@@ -82,7 +89,7 @@ export function getSnowLandInfo(wx, wz, seed, terrainGen) {
   const noise2 = Math.sin(wx * 0.15 + seed * 1.2) * Math.cos(wz * 0.15 + seed * 0.7) * 0.5;
 
   // 中心区域升高
-  const centerBoost = Math.max(0, 2 - distFromCenterEuclid / 15); // 中心最高+2，向外逐渐衰减
+  const centerBoost = Math.max(0, 2 - distFromCenterEuclid / SNOW_LAND_CENTER_BOOST_RADIUS); // 中心最高+2，向外逐渐衰减
 
   const heightOffset = Math.floor((noise1 + noise2) * 1.5 + centerBoost); // 限制在 -2 到 +2 之间
 

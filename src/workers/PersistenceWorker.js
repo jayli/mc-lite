@@ -1,40 +1,28 @@
 // src/workers/PersistenceWorker.js
 import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
+import { openDatabase, performTransaction } from '../utils/IndexedDBUtils.js';
 
 let db = null;
 
 /**
  * 初始化 IndexedDB 数据库
  */
-function init() {
-  return new Promise((resolve, reject) => {
-    if (db) {
-      return resolve();
-    }
+async function init() {
+  if (db) return;
 
-    const request = indexedDB.open(PERSISTENCE_CONFIG.DB_NAME, PERSISTENCE_CONFIG.DB_VERSION);
-
-    request.onupgradeneeded = (event) => {
-      const dbInstance = event.target.result;
+  db = await openDatabase(
+    PERSISTENCE_CONFIG.DB_NAME,
+    PERSISTENCE_CONFIG.DB_VERSION,
+    (dbInstance) => {
       if (!dbInstance.objectStoreNames.contains(PERSISTENCE_CONFIG.STORE_NAME)) {
         dbInstance.createObjectStore(PERSISTENCE_CONFIG.STORE_NAME, { keyPath: 'id' });
       }
-    };
+    }
+  );
 
-    request.onsuccess = (event) => {
-      db = event.target.result;
-      if (PERSISTENCE_CONFIG.SESSION_ONLY) {
-        clearAllData().then(resolve).catch(reject);
-      } else {
-        resolve();
-      }
-    };
-
-    request.onerror = (event) => {
-      console.error('IndexedDB error in worker:', event.target.error);
-      reject(event.target.error);
-    };
-  });
+  if (PERSISTENCE_CONFIG.SESSION_ONLY) {
+    await clearAllData();
+  }
 }
 
 /**
@@ -42,18 +30,9 @@ function init() {
  * @param {string} key - "cx,cz"
  */
 function getChunkData(key) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([PERSISTENCE_CONFIG.STORE_NAME], 'readonly');
-    const store = transaction.objectStore(PERSISTENCE_CONFIG.STORE_NAME);
-    const request = store.get(key);
-
-    request.onsuccess = (event) => {
-      const data = event.target.result ? event.target.result.data : null;
-      resolve(data);
-    };
-
-    request.onerror = (event) => reject(event.target.error);
-  });
+  return performTransaction(db, PERSISTENCE_CONFIG.STORE_NAME, 'readonly', (store) =>
+    store.get(key)
+  ).then((result) => result ? result.data : null);
 }
 
 /**
@@ -62,36 +41,25 @@ function getChunkData(key) {
  * @param {object} data - { blocks: {}, entities: {} }
  */
 function saveChunkData(key, data) {
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([PERSISTENCE_CONFIG.STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(PERSISTENCE_CONFIG.STORE_NAME);
-    const request = store.put({
+  return performTransaction(db, PERSISTENCE_CONFIG.STORE_NAME, 'readwrite', (store) =>
+    store.put({
       id: key,
       data: data,
       lastModified: Date.now()
-    });
-
-    request.onsuccess = () => resolve();
-    request.onerror = (event) => reject(event.target.error);
-  });
+    })
+  );
 }
 
 /**
  * 清空所有数据
  */
 function clearAllData() {
-  return new Promise((resolve, reject) => {
-    if (!db) {
-        // 如果数据库还没初始化，就没有东西可清除
-        return resolve();
-    }
-    const transaction = db.transaction([PERSISTENCE_CONFIG.STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(PERSISTENCE_CONFIG.STORE_NAME);
-    const request = store.clear();
-
-    request.onsuccess = () => resolve();
-    request.onerror = (event) => reject(event.target.error);
-  });
+  if (!db) {
+    return Promise.resolve();
+  }
+  return performTransaction(db, PERSISTENCE_CONFIG.STORE_NAME, 'readwrite', (store) =>
+    store.clear()
+  );
 }
 
 // Worker 消息处理器
@@ -99,7 +67,7 @@ self.onmessage = async (event) => {
   const { action, payload, messageId } = event.data;
 
   try {
-    await init(); // 确保数据库已初始化
+    await init();
     let result;
 
     switch (action) {

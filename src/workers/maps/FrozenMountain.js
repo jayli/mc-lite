@@ -5,6 +5,17 @@
  */
 
 import { getRegionSeededCenter } from './RegionCenterUtils.js';
+import {
+  REGION_SIZE,
+  FROZEN_MOUNTAIN_SIZE,
+  TRANSITION_SIZE,
+  LANDMARK_OFFSET,
+  REGION_MIN_MARGIN,
+  FROZEN_MOUNTAIN_STEEP_AXIS,
+  FROZEN_MOUNTAIN_STEEP_FACTOR,
+  FROZEN_MOUNTAIN_HEIGHT_FACTOR,
+  CENTER_OFFSET
+} from '../../constants/RegionMapConfig.js';
 
 /**
  * 获取指定区域内冰封山峰的中心位置
@@ -14,25 +25,25 @@ import { getRegionSeededCenter } from './RegionCenterUtils.js';
  * @returns {Object} 冰封山峰中心位置 {cx, cz}
  */
 export function getFrozenMountainCenterInRegion(regionX, regionZ, seed) {
-  const regionSize = 400;
+  const regionSize = REGION_SIZE;
 
   const { centerX: pyramidCx, centerZ: pyramidCz } = getRegionSeededCenter(regionX, regionZ, seed, {
     regionSize,
-    offsetScaleX: 300,
-    offsetScaleZ: 300,
-    offsetBaseX: 100,
-    offsetBaseZ: 100
+    offsetScaleX: CENTER_OFFSET.SCALE_X,
+    offsetScaleZ: CENTER_OFFSET.SCALE_Z,
+    offsetBaseX: CENTER_OFFSET.BASE_X,
+    offsetBaseZ: CENTER_OFFSET.BASE_Z
   });
 
-  // 冰封山峰位移 = 金字塔位置 + (-160, 0) 偏移
-  let mountainCx = pyramidCx - 160;
-  let mountainCz = pyramidCz;
+  // 冰封山峰位移 = 金字塔位置 + 偏移
+  let mountainCx = pyramidCx + LANDMARK_OFFSET.FROZEN_MOUNTAIN_X;
+  let mountainCz = pyramidCz + LANDMARK_OFFSET.FROZEN_MOUNTAIN_Z;
 
   // 应用与 FrozenMountain.js 相同的边界检查逻辑
-  const fmHalfSize = 40;
-  const fmTransitionSize = 4;
+  const fmHalfSize = Math.floor(FROZEN_MOUNTAIN_SIZE / 2);
+  const fmTransitionSize = TRANSITION_SIZE.FROZEN_MOUNTAIN_CORE;
   const fmTotalHalfSize = fmHalfSize + fmTransitionSize;
-  const fmMinMargin = fmTotalHalfSize + 5;
+  const fmMinMargin = fmTotalHalfSize + REGION_MIN_MARGIN;
 
   const regionLeft = regionX * regionSize;
   const regionRight = (regionX + 1) * regionSize;
@@ -81,14 +92,14 @@ function mountainNoise(x, z, seed, scale) {
  * @returns {Object|null} 冰封山峰信息对象或 null
  */
 export function getFrozenMountainInfo(wx, wz, seed, terrainGen) {
-  const mountainSize = 80;  // 冰封山峰主体边长 80 格
+  const mountainSize = FROZEN_MOUNTAIN_SIZE;  // 冰封山峰主体边长 80 格
   const halfSize = Math.floor(mountainSize / 2);
-  const transitionSize = 8; // 过渡带大小增加到 8 格，让边缘更自然
-  const regionSize = 400;  // 每 400x400 区域生成一个冰封山峰
+  const transitionSize = TRANSITION_SIZE.FROZEN_MOUNTAIN; // 过渡带大小增加到 8 格，让边缘更自然
+  const regionSize = REGION_SIZE;  // 每 400x400 区域生成一个冰封山峰
 
   // 椭圆形山体参数：让一个方向更陡峭，增加自然感
-  const steepAxisFactor = 0.65;  // Z 轴方向压缩系数，<1 表示该方向更陡
-  const steepAxis = 'z';          // 陡峭方向：'z' 或 'x'
+  const steepAxisFactor = FROZEN_MOUNTAIN_STEEP_FACTOR;  // Z 轴方向压缩系数，<1 表示该方向更陡
+  const steepAxis = FROZEN_MOUNTAIN_STEEP_AXIS;          // 陡峭方向：'z' 或 'x'
 
   // 计算当前坐标所在的区域
   const regionX = Math.floor(wx / regionSize);
@@ -166,7 +177,7 @@ export function getFrozenMountainInfo(wx, wz, seed, terrainGen) {
 
   let baseHeightFloat;
 
-  const summitHeight = (halfSize - 10) / 1.3; // 使用固定的平均平顶半径计算峰顶高度
+  const summitHeight = (halfSize - 10) / FROZEN_MOUNTAIN_HEIGHT_FACTOR; // 使用固定的平均平顶半径计算峰顶高度
 
   // === 山坡高度噪声：使用更自然的高度剖面 ===
   if (normalizedDist < flatRadius / halfSize) {
