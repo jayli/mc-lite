@@ -1,6 +1,6 @@
 /**
  * Projectile.js
- * 炮弹类 - 表示炮塔发射的飞行炮弹
+ * 炮弹类 - 表示炮塔发射的飞行炮弹（InstancedMesh 版本）
  */
 
 import * as THREE from 'three';
@@ -8,7 +8,7 @@ import * as THREE from 'three';
 export class Projectile {
   constructor() {
     // 标识
-    this.id = Math.random().toString(36).substr(2, 9);
+    this.id = Math.random().toString(36).slice(2, 11);
 
     // 状态
     this.isActive = false;
@@ -16,15 +16,15 @@ export class Projectile {
     // 位置和运动
     this.position = new THREE.Vector3();
     this.direction = new THREE.Vector3();
-    this.speed = 40; // 格/秒（提高一倍）
+    this.speed = 40; // 格/秒
     this.maxDistance = 50; // 最大飞行距离
     this.distanceTraveled = 0;
 
     // 伤害
     this.damage = 1;
 
-    // 视觉表现
-    this.mesh = null;
+    // InstancedMesh 索引
+    this.instanceIndex = -1;
 
     // 回调引用
     this.onHit = null;
@@ -36,6 +36,7 @@ export class Projectile {
    * @param {Object} params - 初始化参数
    * @param {THREE.Vector3} params.position - 起始位置
    * @param {THREE.Vector3} params.direction - 飞行方向（单位向量）
+   * @param {number} params.instanceIndex - InstancedMesh 实例索引
    * @param {Function} params.onHit - 命中回调 (enemy) => void
    * @param {Function} params.onMaxDistance - 超距回调 () => void
    */
@@ -47,55 +48,19 @@ export class Projectile {
     this.distanceTraveled = 0;
     this.damage = 1;
     this.isActive = true;
+    this.instanceIndex = params.instanceIndex ?? -1;
     this.onHit = params.onHit || null;
     this.onMaxDistance = params.onMaxDistance || null;
-
-    // 创建/更新视觉表现
-    this.createMesh();
-  }
-
-  /**
-   * 创建炮弹的视觉网格 - 激光形状
-   */
-  createMesh() {
-    if (!this.mesh) {
-      // 使用细长的圆柱体表示激光
-      const geometry = new THREE.CylinderGeometry(0.05, 0.05, 1.5, 8);
-      // 圆柱体默认是垂直的(Y轴)，需要旋转到Z轴方向
-      geometry.rotateX(Math.PI / 2);
-
-      const material = new THREE.MeshBasicMaterial({
-        color: 0xffff00,
-        transparent: true,
-        opacity: 0.9
-      });
-      this.mesh = new THREE.Mesh(geometry, material);
-      this.mesh.name = 'projectile';
-    }
-
-    this.mesh.position.copy(this.position);
-    this.updateMeshRotation();
-    this.mesh.visible = true;
-  }
-
-  /**
-   * 更新激光网格的旋转方向
-   */
-  updateMeshRotation() {
-    if (!this.mesh) return;
-
-    // 让激光朝向飞行方向
-    const target = this.position.clone().add(this.direction);
-    this.mesh.lookAt(target);
   }
 
   /**
    * 更新炮弹状态
    * @param {number} deltaTime - 时间增量（秒）
    * @param {Array} enemies - 丧尸列表，用于碰撞检测
+   * @returns {boolean} 返回 true 表示炮弹仍活跃，false 表示已停用
    */
   update(deltaTime, enemies = []) {
-    if (!this.isActive) return;
+    if (!this.isActive) return false;
 
     // 计算移动距离
     const moveDistance = this.speed * deltaTime;
@@ -108,23 +73,23 @@ export class Projectile {
     this.position.add(moveVector);
     this.distanceTraveled += moveDistance;
 
-    // 更新视觉位置和旋转
-    if (this.mesh) {
-      this.mesh.position.copy(this.position);
-      this.updateMeshRotation();
-    }
-
     // 检查是否超出最大距离
     if (this.distanceTraveled >= this.maxDistance) {
       this.deactivate();
       if (this.onMaxDistance) {
         this.onMaxDistance();
       }
-      return;
+      return false;
     }
 
     // 碰撞检测（使用线段检测避免跳过目标）
-    this.checkCollisionWithSegment(oldPosition, this.position, enemies);
+    const hit = this.checkCollisionWithSegment(oldPosition, this.position, enemies);
+    if (hit) {
+      this.onHitEnemy(hit);
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -132,6 +97,7 @@ export class Projectile {
    * @param {THREE.Vector3} startPos - 起始位置
    * @param {THREE.Vector3} endPos - 结束位置
    * @param {Array} enemies - 丧尸列表
+   * @returns {Object|null} 返回命中的敌人或 null
    */
   checkCollisionWithSegment(startPos, endPos, enemies) {
     const projectileRadius = 0.3;
@@ -154,10 +120,11 @@ export class Projectile {
 
       if (dist < projectileRadius + enemyRadius) {
         // 命中！
-        this.onHitEnemy(enemy);
-        return;
+        return enemy;
       }
     }
+
+    return null;
   }
 
   /**
@@ -223,9 +190,6 @@ export class Projectile {
    */
   deactivate() {
     this.isActive = false;
-    if (this.mesh) {
-      this.mesh.visible = false;
-    }
   }
 
   /**
@@ -233,11 +197,7 @@ export class Projectile {
    */
   destroy() {
     this.deactivate();
-    if (this.mesh) {
-      this.mesh.geometry.dispose();
-      this.mesh.material.dispose();
-      this.mesh = null;
-    }
+    this.instanceIndex = -1;
   }
 
   /**

@@ -1,20 +1,24 @@
 /**
  * ProjectilePool.js
- * 炮弹对象池 - 管理炮弹的创建和回收，避免频繁GC
+ * 炮弹对象池 - 管理炮弹的创建和回收，配合 InstancedMesh 渲染
  */
 
 import { Projectile } from './Projectile.js';
+import { InstancedProjectileRenderer } from './InstancedProjectileRenderer.js';
 
 export class ProjectilePool {
   constructor(scene, maxSize = 100) {
     this.scene = scene;
     this.maxSize = maxSize;
 
-    // 可用炮弹（未激活）
-    this.available = [];
+    // 炮弹实例池（预创建）
+    this.pool = [];
 
-    // 活跃炮弹
-    this.active = [];
+    // 活跃炮弹 Map<projectile, instanceIndex>
+    this.active = new Map();
+
+    // InstancedMesh 渲染器
+    this.renderer = new InstancedProjectileRenderer(scene, maxSize);
 
     // 预创建炮弹对象
     this.preallocate();
@@ -25,8 +29,7 @@ export class ProjectilePool {
    */
   preallocate() {
     for (let i = 0; i < this.maxSize; i++) {
-      const projectile = new Projectile();
-      this.available.push(projectile);
+      this.pool.push(new Projectile());
     }
   }
 
@@ -36,31 +39,33 @@ export class ProjectilePool {
    * @returns {Projectile|null} 炮弹实例或null（如果池已满）
    */
   acquire(params) {
-    // 查找可用的炮弹
-    let projectile = null;
-
-    if (this.available.length > 0) {
-      // 从可用列表取出
-      projectile = this.available.pop();
-    } else if (this.active.length < this.maxSize) {
-      // 创建新炮弹（未超过上限）
-      projectile = new Projectile();
-    } else {
-      // 池已满，无法获取
+    // 检查是否有可用索引
+    const instanceIndex = this.renderer.acquireIndex();
+    if (instanceIndex === null) {
       console.warn('[ProjectilePool] Pool exhausted, cannot acquire projectile');
       return null;
     }
 
-    // 初始化炮弹
-    projectile.initialize(params);
-
-    // 添加到场景（如果是第一次使用）
-    if (projectile.mesh && !projectile.mesh.parent) {
-      this.scene.add(projectile.mesh);
+    // 获取炮弹对象
+    let projectile;
+    if (this.pool.length > 0) {
+      projectile = this.pool.pop();
+    } else {
+      // 池已空，创建新炮弹（不应该发生，因为索引已经用完了）
+      projectile = new Projectile();
     }
 
-    // 添加到活跃列表
-    this.active.push(projectile);
+    // 初始化炮弹
+    projectile.initialize({
+      ...params,
+      instanceIndex
+    });
+
+    // 记录活跃炮弹
+    this.active.set(projectile, instanceIndex);
+
+    // 立即更新一次渲染
+    this.renderer.updateProjectile(instanceIndex, projectile.position, projectile.direction);
 
     return projectile;
   }
@@ -72,17 +77,24 @@ export class ProjectilePool {
   release(projectile) {
     if (!projectile) return;
 
-    // 从活跃列表移除
-    const index = this.active.indexOf(projectile);
-    if (index > -1) {
-      this.active.splice(index, 1);
+    const instanceIndex = this.active.get(projectile);
+    if (instanceIndex === undefined) {
+      console.warn('[ProjectilePool] 尝试回收未激活的炮弹');
+      return;
     }
+
+    // 从活跃列表移除
+    this.active.delete(projectile);
+
+    // 释放 InstancedMesh 索引
+    this.renderer.releaseIndex(instanceIndex);
 
     // 停用炮弹
     projectile.deactivate();
+    projectile.instanceIndex = -1;
 
-    // 添加到可用列表
-    this.available.push(projectile);
+    // 回收进池
+    this.pool.push(projectile);
   }
 
   /**
@@ -91,16 +103,33 @@ export class ProjectilePool {
    * @param {Array} enemies - 丧尸列表
    */
   update(deltaTime, enemies) {
-    // 逆序遍历，允许在循环中移除元素
-    for (let i = this.active.length - 1; i >= 0; i--) {
-      const projectile = this.active[i];
+    // 收集需要更新的炮弹
+    const updates = new Map();
+    const toRelease = [];
 
-      projectile.update(deltaTime, enemies);
+    for (const [projectile, instanceIndex] of this.active) {
+      const stillActive = projectile.update(deltaTime, enemies);
 
-      // 如果炮弹已停用（命中或超距），回收它
-      if (!projectile.isActive) {
-        this.release(projectile);
+      if (stillActive) {
+        // 仍在活跃，更新渲染
+        updates.set(instanceIndex, {
+          position: projectile.position,
+          direction: projectile.direction
+        });
+      } else {
+        // 已停用，准备回收
+        toRelease.push(projectile);
       }
+    }
+
+    // 批量更新渲染（只需一次 needsUpdate）
+    if (updates.size > 0) {
+      this.renderer.updateBatch(updates);
+    }
+
+    // 回收已停用的炮弹
+    for (const projectile of toRelease) {
+      this.release(projectile);
     }
   }
 
@@ -109,7 +138,7 @@ export class ProjectilePool {
    * @returns {number}
    */
   getActiveCount() {
-    return this.active.length;
+    return this.active.size;
   }
 
   /**
@@ -117,33 +146,36 @@ export class ProjectilePool {
    * @returns {number}
    */
   getAvailableCount() {
-    return this.available.length;
+    return this.pool.length;
   }
 
   /**
    * 清理所有炮弹
    */
   clear() {
-    // 清理活跃炮弹
-    for (const projectile of this.active) {
+    // 回收所有活跃炮弹
+    for (const projectile of this.active.keys()) {
       projectile.deactivate();
-      this.available.push(projectile);
+      projectile.instanceIndex = -1;
+      this.pool.push(projectile);
     }
-    this.active.length = 0;
+    this.active.clear();
+
+    // 清理渲染器
+    this.renderer.clear();
   }
 
   /**
    * 销毁对象池
    */
   destroy() {
-    // 清理活跃炮弹
     this.clear();
 
-    // 销毁所有炮弹
-    for (const projectile of this.available) {
-      projectile.destroy();
-    }
-    this.available.length = 0;
+    // 销毁渲染器
+    this.renderer.destroy();
+
+    // 清空池
+    this.pool = [];
 
     this.scene = null;
   }
