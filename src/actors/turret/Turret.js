@@ -173,12 +173,6 @@ export class Turret {
 
     // 尝试射击
     this.tryFire();
-
-    // 调试：每60帧输出一次状态
-    this._debugFrame = (this._debugFrame || 0) + 1;
-    if (this._debugFrame % 60 === 0) {
-      console.log(`[Turret ${this.id}] 敌人数量: ${enemies?.length || 0}, 目标: ${this.targetEnemy ? '有' : '无'}, 旋转: ${this.currentRotation.toFixed(2)}`);
-    }
   }
 
   /**
