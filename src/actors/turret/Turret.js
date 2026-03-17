@@ -53,7 +53,7 @@ export class Turret {
     // obsidian 上 (0,3,0): worldX = position.x + 0, worldY = position.y + (3-1), worldZ = position.z + 0
     this.pivotPosition = new THREE.Vector3(
       this.position.x + 0.5,      // jsonX=0 → +0
-      this.position.y + 3,  // jsonY=3 → +2 (bottomY=1)
+      this.position.y + 3.2,  // jsonY=3 → +2 (bottomY=1)
       this.position.z + 0.5       // jsonZ=0 → +0
     );
 
