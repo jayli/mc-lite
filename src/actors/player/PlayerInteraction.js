@@ -232,6 +232,11 @@ export class PlayerInteraction {
    * @returns {boolean} 是否成功放置
    */
   tryPlaceBlock(x, y, z, type) {
+    // 特殊处理：炮塔方块放置时生成炮塔而非放置方块
+    if (type === 'turret_alias_block') {
+      return this.tryPlaceTurret(x, y, z);
+    }
+
     if (this.player.physics.isSolid(x, y, z)) return false;
     if (this.player.position.x - 0.3 < x + 1 &&
       this.player.position.x + 0.3 > x &&
@@ -246,6 +251,87 @@ export class PlayerInteraction {
     this.player.world.setBlock(x, y, z, type, orientation);
     this.player.inventory.remove(type, 1);
     audioManager.playSound('put', 0.3);
+    return true;
+  }
+
+  /**
+   * 尝试放置炮塔
+   * @param {number} x - X坐标
+   * @param {number} y - Y坐标
+   * @param {number} z - Z坐标
+   * @returns {boolean} 是否成功放置
+   */
+  tryPlaceTurret(x, y, z) {
+    // 检查基础位置是否被占用
+    if (this.player.physics.isSolid(x, y, z)) return false;
+
+    // 检查底座和上方空间是否可用
+    // position.y 是底座下方一格的位置
+    // iron_ore 底座在 y+1，obsidian 柱子在 y+2 和 y+3
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        if (this.player.physics.isSolid(x + dx, y + 1, z + dz)) {
+          console.warn(`[PlayerInteraction] 底座位置 (${x + dx}, ${y + 1}, ${z + dz}) 被占用，无法放置炮塔`);
+          return false;
+        }
+      }
+    }
+    // obsidian 柱子位置
+    if (this.player.physics.isSolid(x, y + 2, z) || this.player.physics.isSolid(x, y + 3, z)) {
+      console.warn('[PlayerInteraction] 上方空间被占用，无法放置炮塔');
+      return false;
+    }
+
+    // 检查是否与玩家碰撞（检查整个炮塔占据的3格高度）
+    if (this.player.position.x - 0.3 < x + 1 &&
+        this.player.position.x + 0.3 > x &&
+        this.player.position.y < y + 3 &&
+        this.player.position.y + 1.8 > y &&
+        this.player.position.z - 0.3 < z + 1 &&
+        this.player.position.z + 0.3 > z) return false;
+
+    // 获取 Game 实例中的 TurretManager
+    const game = this.player.game;
+    if (!game || !game.turretManager) {
+      console.warn('[PlayerInteraction] TurretManager 不可用');
+      return false;
+    }
+
+    // 放置 3x3 iron_ore 底座（y+1 层）
+    // position.y 是底座下方一格的位置，所以底座在 y+1
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -1; dz <= 1; dz++) {
+        this.player.world.setBlock(x + dx, y + 1, z + dz, 'iron_ore', 0);
+      }
+    }
+    // 放置 obsidian 柱子（中心位置，y+2 和 y+3）
+    this.player.world.setBlock(x, y + 2, z, 'obsidian', 0);
+    this.player.world.setBlock(x, y + 3, z, 'obsidian', 0);
+
+    // 创建炮塔位置（使用方块坐标）
+    const position = new THREE.Vector3(x, y, z);
+
+    // 调用 TurretManager 创建炮塔
+    const turret = game.turretManager.createTurret(position);
+
+    if (!turret) {
+      console.warn('[PlayerInteraction] 炮塔创建失败，可能已达数量上限');
+      // 如果炮塔创建失败，移除已放置的底座和 obsidian
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          this.player.world.removeBlock(x + dx, y + 1, z + dz);
+        }
+      }
+      this.player.world.removeBlock(x, y + 2, z);
+      this.player.world.removeBlock(x, y + 3, z);
+      return false;
+    }
+
+    // 消耗物品并播放音效
+    this.player.inventory.remove('turret_alias_block', 1);
+    audioManager.playSound('put', 0.3);
+
+    console.log(`[PlayerInteraction] 炮塔放置成功 at (${x}, ${y}, ${z})`);
     return true;
   }
 

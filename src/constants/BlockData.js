@@ -271,7 +271,16 @@ export const BLOCK_DATA = {
   'amethyst': { orientationEnabled: false },
   'iron_ore': { orientationEnabled: false },
   'debris': { orientationEnabled: false },
-  'tnt': { orientationEnabled: false }
+  'tnt': { orientationEnabled: false },
+  'turret_alias_block': {
+    isSolid: true,
+    isTransparent: false,
+    isRendered: true,
+    isAOEnabled: false,
+    orientationEnabled: false,  // 炮塔不需要旋转朝向
+    isShadowEnabled: true,
+    geometryType: 'box'
+  }
 };
 
 /**

@@ -51,14 +51,15 @@ export class Turret {
     this.structureBlocks = this.calculateStructureBlocks();
 
     // 旋转中心（pivot）位置 - obsidian 柱子顶端
-    // 根据 turret.json 结构，最上层 obsidian 在相对坐标 (0, 3, 0)
-    // StructureLoader.generateBlocks: worldX = x + block.x (block.x 已归一化)
-    // turret.json 中 x/z 范围是 -1,0,1，y 归一化后范围是 1,2,3
-    // obsidian 上 (0,3,0): worldX = position.x + 0, worldY = position.y + (3-1), worldZ = position.z + 0
+    // position.y 是底座下方一格的位置（即放置炮塔的地面层）
+    // turret.json 中方块的 worldY = position.y + block.y:
+    //   - iron_ore 底座 (y=1): worldY = position.y + 1
+    //   - obsidian 下 (y=2): worldY = position.y + 2
+    //   - obsidian 上 (y=3): worldY = position.y + 3
     this.pivotPosition = new THREE.Vector3(
-      this.position.x + 0.5,      // jsonX=0 → +0
-      this.position.y + 3.2,  // jsonY=3 → +2 (bottomY=1)
-      this.position.z + 0.5       // jsonZ=0 → +0
+      this.position.x + 0.5,
+      this.position.y + 3.3,  // obsidian 上在 y+3，稍微往上一点作为旋转中心
+      this.position.z + 0.5
     );
 
     // Three.js 对象
@@ -76,13 +77,13 @@ export class Turret {
    */
   calculateStructureBlocks() {
     const blocks = [];
-    // 底座 3x3 iron_ore (y=1, x/z: -1,0,1)
+    // 底座 3x3 iron_ore (json y=1, world y=position.y + 1)
     for (let x = -1; x <= 1; x++) {
       for (let z = -1; z <= 1; z++) {
         blocks.push(new THREE.Vector3(x, 1, z));
       }
     }
-    // obsidian 柱子 (y=2,3, x=0, z=0)
+    // obsidian 柱子 (json y=2,3 -> world y=position.y+2, position.y+3)
     blocks.push(new THREE.Vector3(0, 2, 0));
     blocks.push(new THREE.Vector3(0, 3, 0));
 
@@ -185,17 +186,16 @@ export class Turret {
    * @returns {boolean}
    */
   checkIntegrity() {
-    // obsidian 柱子在 JSON 中是 (0, 2, 0) 和 (0, 3, 0)
-    // block.x=0, block.z=0，所以 worldX = position.x, worldZ = position.z
-    // worldY = position.y + block.y - 1
-    //   - block.y=2 (obsidian下): worldY = position.y + 1
-    //   - block.y=3 (obsidian上): worldY = position.y + 2
+    // position.y 是底座下方一格的位置
+    // turret.json 中方块的 worldY = position.y + block.y:
+    //   - obsidian 下 (block.y=2): worldY = position.y + 2
+    //   - obsidian 上 (block.y=3): worldY = position.y + 3
     const obsidianWorldX = this.position.x;
     const obsidianWorldZ = this.position.z;
 
     const criticalBlocks = [
-      { x: obsidianWorldX, y: this.position.y + 1, z: obsidianWorldZ, label: 'obsidian下' },
-      { x: obsidianWorldX, y: this.position.y + 2, z: obsidianWorldZ, label: 'obsidian上' }
+      { x: obsidianWorldX, y: this.position.y + 2, z: obsidianWorldZ, label: 'obsidian下' },
+      { x: obsidianWorldX, y: this.position.y + 3, z: obsidianWorldZ, label: 'obsidian上' }
     ];
 
     for (const worldPos of criticalBlocks) {
