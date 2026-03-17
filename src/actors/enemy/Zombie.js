@@ -150,6 +150,18 @@ export class Zombie {
     /** 存活标记 */
     this.isAlive = true;
 
+    /** 活跃标记（用于炮塔系统检测） */
+    this.isActive = true;
+
+    /** 死亡标记（用于炮塔系统） */
+    this.isDead = false;
+
+    /** 受击计数（用于炮塔系统，被击中3次死亡） */
+    this.hitCount = 0;
+
+    /** 最大受击次数 */
+    this.maxHits = 3;
+
     /** 唯一标识符 */
     this.id = THREE.MathUtils.generateUUID();
 
@@ -527,6 +539,25 @@ export class Zombie {
   }
 
   /**
+   * 被炮塔炮弹击中
+   * 增加受击计数，达到3次时死亡
+   * @returns {boolean} 是否死亡
+   */
+  takeHit() {
+    if (!this.isAlive || this.isDead) return false;
+
+    this.hitCount++;
+    this.flashDamage();
+
+    // 检查是否达到最大受击次数
+    if (this.hitCount >= this.maxHits) {
+      this.die();
+      return true;
+    }
+    return false;
+  }
+
+  /**
    * 伤害视觉反馈
    *
    * 设置闪烁状态，由 ZombieInstancedRenderer 渲染为红色。
@@ -550,6 +581,7 @@ export class Zombie {
    */
   die() {
     this.isAlive = false;
+    this.isDead = true;
     this.state = ZOMBIE_STATES.DEAD;
 
     // 清理定时器

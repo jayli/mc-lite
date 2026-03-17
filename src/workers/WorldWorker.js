@@ -207,18 +207,6 @@ onmessage = async function(e) {
             }
           }
 
-          // 在海岛中心附近生成炮塔（每座海岛一座）
-          // 使用 IslandMap.calculateBatteryPosition 计算确定性位置
-          const batteryPos = IslandMap.calculateBatteryPosition(islandInfo.centerX, islandInfo.centerZ, seed);
-          if (batteryPos && wx === batteryPos.x && wz === batteryPos.z) {
-            const batteryY = islandResult.surfaceY + 1;
-            const batteryTask = () => battery.generate(batteryPos.x, batteryY, batteryPos.z, fakeChunk, dPlaceholder, true);
-            batteryTask.centerX = batteryPos.x;
-            batteryTask.centerY = batteryY;
-            batteryTask.centerZ = batteryPos.z;
-            batteryTask.type = 'battery';
-            structureQueue.push(batteryTask);
-          }
         }
       } else if (inSnowLand) {
         const snowResult = SnowLand.generate(wx, wz, h, slInfo, fakeChunk, dPlaceholder);

@@ -19,7 +19,8 @@ export function getCustomIconPath(item) {
     'planks_step': 'src/assets/textures/Oak_Planks_step.png',
     'cobblestone_step': 'src/assets/textures/Cobblestone_step.png',
     'cobblestone_step_updown': 'src/assets/textures/Cobblestone_step_updown.png',
-    'stone_diorite_step': 'src/assets/textures/stone_diorite_step.png'
+    'stone_diorite_step': 'src/assets/textures/stone_diorite_step.png',
+    'turret_alias_block': 'src/assets/textures/turret.png'
   };
 
   return customIcons[item] || null;

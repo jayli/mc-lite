@@ -154,7 +154,9 @@ export async function initializeAudio() {
     './src/assets/sound/gun_fire.mp3',
     './src/assets/sound/gun_load.mp3',
     './src/assets/sound/mag7_fire.mp3',
-    './src/assets/sound/minigun_fire.mp3'
+    './src/assets/sound/minigun_fire.mp3',
+    './src/assets/sound/turret_gun_fire.mp3',
+    './src/assets/sound/z_die.mp3'
   ];
   await audioManager.preloadSounds(soundUrls);
 }

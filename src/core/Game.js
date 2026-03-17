@@ -11,6 +11,7 @@ import { realisticTreeManager } from '../world/entity-system/RealisticTreeManage
 import { faceCullingSystem } from './FaceCullingSystem.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { EnemyManager } from './EnemyManager.js'; // 替换为新的敌人管理器
+import { TurretManager } from '../actors/turret/TurretManager.js';
 import { preloadAllStructures } from '../world/entity-system/StructureLoader.js';
 import { DEFAULT_INVENTORY_COUNT } from '../constants/GameConfig.js';
 import Stats from 'stats';
@@ -34,6 +35,9 @@ export class Game {
 
     // 初始化敌人管理器（替代原来的丧尸管理器）
     this.enemyManager = new EnemyManager(this.engine.scene, this.world);
+
+    // 初始化炮塔管理器
+    this.turretManager = new TurretManager(this.engine.scene, this.world, this.enemyManager);
 
     // 初始化 Stats 监控
     this.stats = new Stats();
@@ -185,6 +189,7 @@ export class Game {
     this.player.inventory.add('snow_grass', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('ice', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('snow_leaves', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('turret_alias_block', DEFAULT_INVENTORY_COUNT);
     // this.player.inventory.add('cloud', DEFAULT_INVENTORY_COUNT);
 
     // 预加载 JSON 结构数据
@@ -269,6 +274,11 @@ export class Game {
     // 更新敌人管理器（替代原来的丧尸管理器）
     if (this.enemyManager && this.player) {
       this.enemyManager.updateAll(this.player.position, dt);
+    }
+
+    // 更新炮塔管理器
+    if (this.turretManager) {
+      this.turretManager.update(dt);
     }
 
     if (this.ui) this.ui.update(dt); // 更新UI

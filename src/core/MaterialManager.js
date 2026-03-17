@@ -689,6 +689,11 @@ materials.registerMaterial('horizontal_pillar', mkMat('#b98e5b')); // 水平柱�
 materials.registerMaterial('collider', { transparent: true, opacity: 0 }); // 碰撞体材质
 materials.registerMaterial('playground_block', mkMat('#808080')); // 创造台灰色方块
 materials.registerMaterial('playground_center_block', mkMat('#4a90e2')); // 创造台中心标记（蓝色）
+materials.registerMaterial('turret_alias_block', {
+  color: 0x808080,  // 中灰色
+  roughness: 0.7,
+  metalness: 0.3
+}); // 炮塔方块
 
 
 // 新增金属与宝石方块
