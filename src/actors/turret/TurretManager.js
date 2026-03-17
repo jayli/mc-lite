@@ -5,6 +5,7 @@
 
 import { Turret } from './Turret.js';
 import { ProjectilePool } from './ProjectilePool.js';
+import { audioManager } from '../../core/AudioManager.js';
 
 export class TurretManager {
   /**
@@ -68,6 +69,9 @@ export class TurretManager {
    */
   handleTurretFire(fireData) {
     const { position, direction, turretId } = fireData;
+
+    // 播放射击音效
+    audioManager.playSound('turret_gun_fire', 0.25);
 
     // 从对象池获取炮弹
     const projectile = this.projectilePool.acquire({
