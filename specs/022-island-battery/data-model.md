@@ -1,6 +1,6 @@
 # Data Model: 海岛炮塔实体
 
-**Feature**: 海岛炮塔实体 (001-island-battery)
+**Feature**: 海岛炮塔实体 (022-island-battery)
 **Date**: 2026-03-17
 
 ## 实体定义

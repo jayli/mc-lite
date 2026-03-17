@@ -1,6 +1,6 @@
 # Feature Specification: 海岛炮塔实体
 
-**Feature Branch**: `001-island-battery`
+**Feature Branch**: `022-island-battery`
 **Created**: 2026-03-17
 **Status**: Draft
 **Input**: User description: "参照 tank.json 的实现，实现一个新的实体"炮塔"（battery.json），模型数据来自src/world/structers/battery.json，将炮塔生成在海岛上，一个海岛上随机生成一座炮塔。"

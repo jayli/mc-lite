@@ -2,7 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-03-17
-**Feature**: [/Users/bachi/jaylli/mc-lite/specs/001-island-battery/spec.md](../spec.md)
+**Feature**: [/Users/bachi/jaylli/mc-lite/specs/022-island-battery/spec.md](../spec.md)
 
 ## Content Quality
 

@@ -1,7 +1,7 @@
 # Tasks: 海岛炮塔实体
 
-**Feature**: 海岛炮塔实体 (001-island-battery)
-**Branch**: `001-island-battery`
+**Feature**: 海岛炮塔实体 (022-island-battery)
+**Branch**: `022-island-battery`
 **Created**: 2026-03-17
 **Template Version**: 1.0
 
