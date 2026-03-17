@@ -1,5 +1,5 @@
 // src/workers/WorldWorker.js
-import { setSeed } from '../utils/MathUtils.js';
+import { setSeed, seededRandom } from '../utils/MathUtils.js';
 import { parseBlockEntry } from '../utils/OrientationUtils.js';
 import { terrainGen } from '../world/TerrainGen.js';
 import { Tree } from '../world/entities/Tree.js';
@@ -25,7 +25,7 @@ self.onerror = (e) => {
 };
 
 // 结构数据加载器实例
-const { uglyHouse, birchTree, birchTreeWithSnow, tank, battery } = structureLoaders;
+const { uglyHouse, birchTree, birchTreeWithSnow, tank } = structureLoaders;
 
 // Smoothstep 平滑插值
 function smoothstep(edge0, edge1, x) {
@@ -48,8 +48,7 @@ onmessage = async function(e) {
     uglyHouse.load(),
     birchTree.load(),
     birchTreeWithSnow.load(),
-    tank.load(),
-    battery.load()
+    tank.load()
   ]).catch(err => console.error('Failed to load structure data:', err));
 
   // 计算当前区块的范围 - 提前定义，供 snapshot 模式使用
@@ -116,12 +115,6 @@ onmessage = async function(e) {
 
   const centerBiome = terrainGen.getBiome(cx * CHUNK_SIZE, cz * CHUNK_SIZE);
   const dPlaceholder = {};
-
-  // 确定性随机函数
-  const seededRandom = (x, z, s) => {
-    const val = Math.sin(x * 12.9898 + z * 78.233 + s) * 43758.5453123;
-    return val - Math.floor(val);
-  };
 
   for (let x = 0; x < CHUNK_SIZE; x++) {
     for (let z = 0; z < CHUNK_SIZE; z++) {

@@ -3,6 +3,7 @@
 
 import { getFrozenMountainCenterInRegion } from './FrozenMountain.js';
 import { getRegionSeededCenter } from './RegionCenterUtils.js';
+import { seededRandom } from '../../utils/MathUtils.js';
 import {
   REGION_SIZE,
   REGION_MIN_MARGIN,
@@ -18,17 +19,6 @@ import {
   CENTER_OFFSET
 } from '../../constants/RegionMapConfig.js';
 
-/**
- * 确定性随机函数
- * @param {number} x - X 坐标
- * @param {number} z - Z 坐标
- * @param {number} seed - 种子
- * @returns {number} 0-1 之间的随机数
- */
-const seededRandom = (x, z, seed) => {
-  const val = Math.sin(x * 12.9898 + z * 78.233 + seed) * 43758.5453123;
-  return val - Math.floor(val);
-};
 
 /**
  * 获取指定区域内海岛的中心位置
@@ -446,84 +436,10 @@ export function getIslandSpawnPoint(seed, terrainGen) {
   return null;
 }
 
-/**
- * 计算炮塔在海岛上的生成位置
- *
- * 算法说明：
- * - 使用确定性随机算法（seededRandom），确保相同世界种子下每次生成的位置完全一致
- * - 随机种子由海岛中心坐标 + 固定偏移量 + 世界种子组成
- * - 这保证了：1）相同海岛（相同中心坐标）在相同世界种子下炮塔位置不变
- *           2）不同世界种子下炮塔位置随机分布
- *           3）同一世界中的不同海岛炮塔位置各自独立
- *
- * @param {number} islandCx - 海岛中心 X 坐标
- * @param {number} islandCz - 海岛中心 Z 坐标
- * @param {number} seed - 世界种子
- * @returns {Object|null} 炮塔位置 { x, z } 或 null
- */
-export function calculateBatteryPosition(islandCx, islandCz, seed) {
-  const halfSize = Math.floor(ISLAND_SIZE / 2);
-
-  // 石头区域范围：距离中心 2 到 halfSize - 2
-  // 避免生成在中心（可能被其他结构占用）和边缘（沙滩区域）
-  // 降低最小距离到 2，确保即使较小的海岛也有足够空间放置炮塔
-  const minDist = 2;
-  // 确保 maxDist 至少比 minDist 大 2，给小海岛留出放置空间
-  const maxDist = Math.max(minDist + 2, halfSize - 2);
-
-  // 如果可用空间太小，直接返回中心附近位置
-  if (maxDist <= minDist) {
-    return { x: islandCx, z: islandCz };
-  }
-
-  // 使用确定性随机计算角度和距离
-  // 偏移量 1000/2000 确保角度和距离使用不同的随机序列
-  const angle = seededRandom(islandCx + 1000, islandCz + 1000, seed) * Math.PI * 2;
-  const distRange = maxDist - minDist;
-  const dist = minDist + seededRandom(islandCx + 2000, islandCz + 2000, seed) * distRange;
-
-  // 基于极坐标计算最终位置
-  const x = Math.floor(islandCx + Math.cos(angle) * dist);
-  const z = Math.floor(islandCz + Math.sin(angle) * dist);
-
-  return { x, z };
-}
-
-/**
- * 为海岛生成炮塔
- * @param {number} islandCx - 海岛中心 X 坐标
- * @param {number} islandCz - 海岛中心 Z 坐标
- * @param {number} seed - 世界种子
- * @param {Object} fakeChunk - 模拟 Chunk 对象
- * @param {Object} dPlaceholder - 占位符对象
- * @param {Object} batteryLoader - Battery 结构加载器
- */
-export function generateBatteryForIsland(islandCx, islandCz, seed, fakeChunk, dPlaceholder, batteryLoader) {
-  if (!batteryLoader) {
-    console.warn('generateBatteryForIsland: batteryLoader is not provided');
-    return;
-  }
-
-  const position = calculateBatteryPosition(islandCx, islandCz, seed);
-  if (!position) {
-    return;
-  }
-
-  const { x, z } = position;
-  const y = ISLAND_SEA_LEVEL + 1; // 海平面上一格
-
-  // 使用 StructureLoader 生成炮塔
-  batteryLoader.generate(x, y, z, fakeChunk, dPlaceholder, true);
-
-  console.log(`Battery generated at island (${islandCx}, ${islandCz}): position (${x}, ${y}, ${z})`);
-}
-
 // 模块导出
 export const IslandMap = {
   getIslandInfo,
   getIslandCenterInRegion,
   generate: generateIsland,
-  getIslandSpawnPoint,
-  calculateBatteryPosition,
-  generateBatteryForIsland
+  getIslandSpawnPoint
 };

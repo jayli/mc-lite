@@ -322,15 +322,6 @@ class EntityManagerClass {
       categories: ['structure', 'vehicle', 'desert']
     }));
 
-    // 炮塔（JSON 加载）- 海岛专用
-    this.register('battery', new JsonEntity({
-      id: 'battery',
-      biomes: ['OCEAN'],
-      probability: 0,  // 不由 shouldSpawn 生成，由海岛生成逻辑直接调用
-      loader: null,  // 将在 initSpecial 中设置
-      crossChunkDist: 8,
-      categories: ['structure', 'island', 'battery']
-    }));
   }
 
   /**

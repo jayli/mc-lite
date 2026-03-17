@@ -107,6 +107,10 @@ npm run lint
 | Game | `src/core/Game.js` | 游戏主循环、状态管理、性能监控 |
 | Player | `src/actors/player/` | 玩家物理 (`Physics.js`)、背包 (`Slots.js`)、输入处理 |
 | Weapon | `src/actors/weapon/Gun.js` | 武器渲染与射击逻辑 |
+| Turret | `src/actors/turret/Turret.js` | 炮塔检测、瞄准和射击逻辑 |
+| Turret Manager | `src/actors/turret/TurretManager.js` | 炮塔创建、更新和销毁管理 |
+| Projectile | `src/actors/turret/Projectile.js` | 炮弹实体逻辑 |
+| Projectile Pool | `src/actors/turret/ProjectilePool.js` | 炮弹对象池管理 |
 | Enemy | `src/core/EnemyManager.js` | 敌人生命周期与 Worker 通信 |
 | Enemy Render | `src/actors/enemy/ZombieInstancedRenderer.js` | 丧尸实例化渲染 |
 | Enemy AI | `src/workers/EnemyWorker.js` | 异步 AI 决策 |
@@ -158,12 +162,3 @@ npm run lint
 ## 重要提示
 - 已实现 AO 修复管理器 (`src/core/AORepairManager.js`) 作为兜底机制，处理批量删除后的 AO 阴影不一致问题，当前默认禁用
 - 批量删除方块时使用 `isBatch=false` 参数会复用单次删除逻辑，避免竞态条件导致的 AO 丢失问题
-
-## Active Technologies
-- JavaScript (ES6+ Modules) + Three.js (WebGL rendering), Custom Entity System (001-island-battery)
-- IndexedDB (world persistence), JSON files (structure definitions) (001-island-battery)
-- JavaScript ES6+ + Three.js (r128+), Custom Entity System (023-turret-auto-fire)
-- N/A (纯内存状态管理) (023-turret-auto-fire)
-
-## Recent Changes
-- 001-island-battery: Added JavaScript (ES6+ Modules) + Three.js (WebGL rendering), Custom Entity System

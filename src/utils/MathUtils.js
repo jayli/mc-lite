@@ -8,6 +8,19 @@ export function setSeed(s) {
   WORLD_CONFIG.SEED = s;
 }
 
+/**
+ * 确定性随机函数 - 基于坐标和种子的伪随机数生成
+ * 确保相同输入总是产生相同的输出（用于地形生成等需要确定性的场景）
+ * @param {number} x - X 坐标
+ * @param {number} z - Z 坐标
+ * @param {number} seed - 随机种子
+ * @returns {number} 0-1 之间的随机数
+ */
+export function seededRandom(x, z, seed) {
+  const val = Math.sin(x * 12.9898 + z * 78.233 + seed) * 43758.5453123;
+  return val - Math.floor(val);
+}
+
 export function noise(x, z, scale = 0.05) {
   const nx = x + WORLD_CONFIG.SEED, nz = z + WORLD_CONFIG.SEED;
   return Math.sin(nx * scale) * 2 + Math.cos(nz * scale) * 2;
