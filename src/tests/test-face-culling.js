@@ -1,5 +1,10 @@
 // src/tests/test-face-culling.js
 /**
+ * 面剔除系统测试套件
+ * 测试 FaceCullingSystem 隐藏面剔除的核心功能
+ */
+
+/**
  * FaceCullingSystem 测试套件
  * 测试隐藏面剔除系统的核心功能
  */

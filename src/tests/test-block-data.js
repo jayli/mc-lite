@@ -1,5 +1,10 @@
 // src/tests/test-block-data.js
 /**
+ * 方块数据测试套件
+ * 测试 BlockData 方块配置数据的属性获取和继承逻辑
+ */
+
+/**
  * BlockData 测试套件
  * 测试方块配置数据的属性获取和继承逻辑
  */

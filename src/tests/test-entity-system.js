@@ -1,5 +1,10 @@
 // src/tests/test-entity-system.js
 /**
+ * 实体系统测试套件
+ * 测试 EntityDefinition, CodeEntity, JsonEntity 和 EntityManager
+ */
+
+/**
  * 实体系统重构测试套件
  * 测试 EntityDefinition, CodeEntity, JsonEntity 和 EntityManager
  */

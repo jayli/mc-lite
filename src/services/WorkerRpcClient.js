@@ -1,6 +1,7 @@
+// src/services/WorkerRpcClient.js
 /**
- * WorkerRpcClient - 封装 Worker 请求/响应的通用消息流程
- * 保持 action/payload/messageId 协议不变
+ * Worker RPC 客户端
+ * 封装 Worker 请求/响应的通用消息流程，保持 action/payload/messageId 协议
  */
 export class WorkerRpcClient {
   /**

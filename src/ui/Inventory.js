@@ -1,4 +1,9 @@
 // src/ui/Inventory.js
+/**
+ * 背包界面管理器
+ * 负责背包的打开/关闭、渲染和交互处理
+ */
+
 import { HUD } from './HUD.js';
 import { createItemIcon } from '../utils/ItemIconUtils.js';
 

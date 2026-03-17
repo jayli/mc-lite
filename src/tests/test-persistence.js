@@ -1,5 +1,10 @@
 // src/tests/test-persistence.js
 /**
+ * 持久化服务测试套件
+ * 测试 PersistenceService 核心逻辑和 IndexedDB 操作
+ */
+
+/**
  * PersistenceService 测试套件
  * 测试持久化服务的核心逻辑
  *

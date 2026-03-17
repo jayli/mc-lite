@@ -678,9 +678,9 @@ materials.registerMaterial('allium', {
 });
 
 materials.registerMaterial('chimney', mkMat('#7f5b37')); // 深棕色烟囱
-var handrailBaseColor = "#b98e5b";
-var handrailPotColor = "#8e6148";
-var handrailPotSize = 10;
+const handrailBaseColor = "#b98e5b";
+const handrailPotColor = "#8e6148";
+const handrailPotSize = 10;
 materials.registerMaterial('handrail', mkProceduralMat(handrailBaseColor, handrailPotColor, 4)); // 栏杆（带深灰色斑点）
 materials.registerMaterial('handrailA', mkProceduralMat(handrailBaseColor, handrailPotColor, handrailPotSize)); // 栏杆 A（带深灰色斑点）
 materials.registerMaterial('handrailB', mkProceduralMat(handrailBaseColor, handrailPotColor, handrailPotSize)); // 栏杆 B（带深灰色斑点）

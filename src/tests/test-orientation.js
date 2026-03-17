@@ -1,5 +1,10 @@
 // src/tests/test-orientation.js
 /**
+ * 方块朝向系统测试套件
+ * 测试 OrientationUtils 中方块朝向相关的工具函数
+ */
+
+/**
  * OrientationUtils 测试套件
  * 测试方块朝向相关的工具函数
  */

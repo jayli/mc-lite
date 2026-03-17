@@ -1,3 +1,9 @@
+// src/tests/test-mocks.js
+/**
+ * 测试模拟对象
+ * 提供 FaceCullingSystem、Materials 和 BlockData 的模拟实现
+ */
+
 const transparentTypes = ['glass_block', 'leaves', 'water', 'air'];
 const solidTypes = ['stone', 'dirt', 'wood', 'collider', 'realistic_trunk_collider'];
 
