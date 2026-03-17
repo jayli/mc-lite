@@ -179,15 +179,40 @@ function updateAI(enemy, playerPosition, allEnemies) {
     enemy.state = 'chasing';
     enemy.target = {...playerPosition};
 
-    // 计算移动方向
+    // 计算移动方向（S路线逻辑）
     if (distance > 0.5) { // 避免除零
-      aiVelocityX = (dx / distance) * enemy.speed;
-      aiVelocityZ = (dz / distance) * enemy.speed;
+      // 近距离时（< 2格）取消偏移，确保能准确接近玩家
+      if (distance < 2) {
+        enemy.targetOffsetAngle = 0;
+      } else {
+        // 概率更新目标偏移角度（2% 概率每帧）
+        if (Math.random() < 0.02) {
+          // 随机生成 -45° 到 +45° 的偏移角度
+          enemy.targetOffsetAngle = (Math.random() - 0.5) * Math.PI / 2;
+        }
+      }
+
+      // 平滑过渡当前偏移角度（lerpFactor = 0.03，约1秒完成转向）
+      const lerpFactor = 0.03;
+      enemy.offsetAngle += (enemy.targetOffsetAngle - enemy.offsetAngle) * lerpFactor;
+
+      // 计算基础方向角度（朝向玩家）
+      const baseAngle = Math.atan2(dz, dx);
+
+      // 应用偏移后的最终方向
+      const finalAngle = baseAngle + enemy.offsetAngle;
+
+      // 计算最终速度
+      aiVelocityX = Math.cos(finalAngle) * enemy.speed;
+      aiVelocityZ = Math.sin(finalAngle) * enemy.speed;
     }
   } else if (distance > enemy.perceptionRange + 2) {
     // 距离太远，回到闲置状态
     enemy.state = 'idle';
     enemy.target = null;
+    // 重置偏移角度
+    enemy.offsetAngle = 0;
+    enemy.targetOffsetAngle = 0;
   }
 
   // 计算排斥力（在Worker中批量计算）
