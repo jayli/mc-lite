@@ -162,6 +162,8 @@ npm run lint
 ## Active Technologies
 - JavaScript (ES6+ Modules) + Three.js (WebGL rendering), Custom Entity System (001-island-battery)
 - IndexedDB (world persistence), JSON files (structure definitions) (001-island-battery)
+- JavaScript ES6+ + Three.js (r128+), Custom Entity System (023-turret-auto-fire)
+- N/A (纯内存状态管理) (023-turret-auto-fire)
 
 ## Recent Changes
 - 001-island-battery: Added JavaScript (ES6+ Modules) + Three.js (WebGL rendering), Custom Entity System

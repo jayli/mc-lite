@@ -6,7 +6,7 @@ import { Tree } from '../world/entities/Tree.js';
 import { Cloud } from '../world/entities/Cloud.js';
 import { Island } from '../world/entities/Island.js';
 import { getBlockProperties, BLOCK_DATA } from '../constants/BlockData.js';
-import { structureLoaders } from '../world/entity-system/StructureLoader.js';
+import { structureLoaders, StructureLoader } from '../world/entity-system/StructureLoader.js';
 import { Pyramid } from './maps/Pyramid.js';
 import { SnowLand } from './maps/SnowLand.js';
 import { FrozenMountain } from './maps/FrozenMountain.js';
@@ -26,6 +26,9 @@ self.onerror = (e) => {
 
 // 结构数据加载器实例
 const { uglyHouse, birchTree, birchTreeWithSnow, tank, battery } = structureLoaders;
+
+// 加载 turret 结构（用于海岛炮塔）
+const turretLoader = new StructureLoader('turret', new URL('../world/structures/turret.json', import.meta.url).href);
 
 // Smoothstep 平滑插值
 function smoothstep(edge0, edge1, x) {
@@ -49,7 +52,8 @@ onmessage = async function(e) {
     birchTree.load(),
     birchTreeWithSnow.load(),
     tank.load(),
-    battery.load()
+    battery.load(),
+    turretLoader.load()
   ]).catch(err => console.error('Failed to load structure data:', err));
 
   // 计算当前区块的范围 - 提前定义，供 snapshot 模式使用
@@ -212,11 +216,12 @@ onmessage = async function(e) {
           const batteryPos = IslandMap.calculateBatteryPosition(islandInfo.centerX, islandInfo.centerZ, seed);
           if (batteryPos && wx === batteryPos.x && wz === batteryPos.z) {
             const batteryY = islandResult.surfaceY + 1;
-            const batteryTask = () => battery.generate(batteryPos.x, batteryY, batteryPos.z, fakeChunk, dPlaceholder, true);
+            // 使用 turret JSON 结构生成炮塔方块
+            const batteryTask = () => turretLoader.generate(batteryPos.x, batteryY, batteryPos.z, fakeChunk, dPlaceholder, true);
             batteryTask.centerX = batteryPos.x;
             batteryTask.centerY = batteryY;
             batteryTask.centerZ = batteryPos.z;
-            batteryTask.type = 'battery';
+            batteryTask.type = 'turret'; // 标记为 turret 类型，主线程会创建 Turret 实例
             structureQueue.push(batteryTask);
           }
         }

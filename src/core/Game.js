@@ -1,6 +1,7 @@
 // src/core/Game.js
 // 游戏主类，负责协调游戏引擎、世界、玩家和UI的初始化与运行循环
 
+import * as THREE from 'three';
 import { manualSaveService } from '../services/ManualSaveService.js';
 import { persistenceService } from '../services/PersistenceService.js';
 import { Engine } from './Engine.js';
@@ -11,6 +12,7 @@ import { realisticTreeManager } from '../world/entity-system/RealisticTreeManage
 import { faceCullingSystem } from './FaceCullingSystem.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { EnemyManager } from './EnemyManager.js'; // 替换为新的敌人管理器
+import { TurretManager } from '../actors/turret/TurretManager.js';
 import { preloadAllStructures } from '../world/entity-system/StructureLoader.js';
 import { DEFAULT_INVENTORY_COUNT } from '../constants/GameConfig.js';
 import Stats from 'stats';
@@ -34,6 +36,12 @@ export class Game {
 
     // 初始化敌人管理器（替代原来的丧尸管理器）
     this.enemyManager = new EnemyManager(this.engine.scene, this.world);
+
+    // 初始化炮塔管理器
+    this.turretManager = new TurretManager(this.engine.scene, this.world, this.enemyManager);
+
+    // 记录已创建炮塔的位置（避免重复创建）
+    this.spawnedTurrets = new Set();
 
     // 初始化 Stats 监控
     this.stats = new Stats();
@@ -220,6 +228,44 @@ export class Game {
   }
 
   /**
+   * 从已加载的 chunk 中扫描并创建炮塔
+   * 检查每个 chunk 的 structureCenters，当发现类型为 'turret' 时创建炮塔实例
+   */
+  spawnTurretsFromChunks() {
+    if (!this.world || !this.world.chunks) return;
+
+    for (const [, chunk] of this.world.chunks) {
+      // 跳过未准备好的 chunk
+      if (!chunk.isReady) continue;
+
+      // 检查 structureCenters
+      if (chunk.structureCenters && chunk.structureCenters.length > 0) {
+        for (const center of chunk.structureCenters) {
+          // 只处理类型为 'turret' 的结构
+          if (center.type === 'turret') {
+            // 创建唯一键避免重复创建
+            const turretKey = `turret_${center.x},${center.y},${center.z}`;
+
+            if (!this.spawnedTurrets.has(turretKey)) {
+              this.spawnedTurrets.add(turretKey);
+
+              // 创建炮塔实例
+              console.log(`[Game] structureCenter 原始坐标:`, center);
+              const position = new THREE.Vector3(center.x, center.y, center.z);
+              console.log(`[Game] 创建 Turret 使用 position:`, position);
+              const turret = this.turretManager.createTurret(position);
+
+              if (turret) {
+                console.log(`[Game] 在海岛创建炮塔: ${turretKey} at (${center.x}, ${center.y}, ${center.z})`);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
   * 游戏主循环，使用 requestAnimationFrame 实现循环调用
   * 计算时间差并调用更新和渲染方法
   */
@@ -266,9 +312,19 @@ export class Game {
     if (this.world && this.player) this.world.update(this.player.position, dt); // 更新世界状态（区块加载等）
     const t3 = performance.now();
 
+    // 检查新加载的 chunk 中的炮塔位置并创建 Turret 实例
+    if (this.world && this.turretManager) {
+      this.spawnTurretsFromChunks();
+    }
+
     // 更新敌人管理器（替代原来的丧尸管理器）
     if (this.enemyManager && this.player) {
       this.enemyManager.updateAll(this.player.position, dt);
+    }
+
+    // 更新炮塔管理器
+    if (this.turretManager) {
+      this.turretManager.update(dt);
     }
 
     if (this.ui) this.ui.update(dt); // 更新UI
