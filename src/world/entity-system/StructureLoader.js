@@ -161,7 +161,8 @@ export const structureLoaders = {
   uglyHouse: new StructureLoader('ugly_house', new URL('../structures/ugly_house.json', moduleBase).href),
   birchTree: new StructureLoader('brich_tree', new URL('../structures/brich_tree.json', moduleBase).href),
   birchTreeWithSnow: new StructureLoader('brich_tree_with_snow', new URL('../structures/brich_tree_with_snow.json', moduleBase).href),
-  tank: new StructureLoader('tank', new URL('../structures/tank.json', moduleBase).href)
+  tank: new StructureLoader('tank', new URL('../structures/tank.json', moduleBase).href),
+  battery: new StructureLoader('battery', new URL('../structures/battery.json', moduleBase).href)
 };
 
 /**
@@ -173,7 +174,8 @@ export async function preloadAllStructures() {
     structureLoaders.uglyHouse.load(),
     structureLoaders.birchTree.load(),
     structureLoaders.birchTreeWithSnow.load(),
-    structureLoaders.tank.load()
+    structureLoaders.tank.load(),
+    structureLoaders.battery.load()
   ]);
   console.log('All structures preloaded');
 }

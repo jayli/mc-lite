@@ -25,7 +25,7 @@ self.onerror = (e) => {
 };
 
 // 结构数据加载器实例
-const { uglyHouse, birchTree, birchTreeWithSnow, tank } = structureLoaders;
+const { uglyHouse, birchTree, birchTreeWithSnow, tank, battery } = structureLoaders;
 
 // Smoothstep 平滑插值
 function smoothstep(edge0, edge1, x) {
@@ -48,7 +48,8 @@ onmessage = async function(e) {
     uglyHouse.load(),
     birchTree.load(),
     birchTreeWithSnow.load(),
-    tank.load()
+    tank.load(),
+    battery.load()
   ]).catch(err => console.error('Failed to load structure data:', err));
 
   // 计算当前区块的范围 - 提前定义，供 snapshot 模式使用
@@ -204,6 +205,19 @@ onmessage = async function(e) {
                 structureQueue.push(task);
               }
             }
+          }
+
+          // 在海岛中心附近生成炮塔（每座海岛一座）
+          // 使用 IslandMap.calculateBatteryPosition 计算确定性位置
+          const batteryPos = IslandMap.calculateBatteryPosition(islandInfo.centerX, islandInfo.centerZ, seed);
+          if (batteryPos && wx === batteryPos.x && wz === batteryPos.z) {
+            const batteryY = islandResult.surfaceY + 1;
+            const batteryTask = () => battery.generate(batteryPos.x, batteryY, batteryPos.z, fakeChunk, dPlaceholder, true);
+            batteryTask.centerX = batteryPos.x;
+            batteryTask.centerY = batteryY;
+            batteryTask.centerZ = batteryPos.z;
+            batteryTask.type = 'battery';
+            structureQueue.push(batteryTask);
           }
         }
       } else if (inSnowLand) {

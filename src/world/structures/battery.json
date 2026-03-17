@@ -1,0 +1,117 @@
+{
+  "blocks": [
+    {
+      "x": -1,
+      "y": 1,
+      "z": -1,
+      "type": "iron_ore",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 0,
+      "type": "iron_ore",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 1,
+      "type": "iron_ore",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -1,
+      "type": "iron_ore",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": -1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 0,
+      "type": "iron_ore",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 0,
+      "type": "obsidian",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 0,
+      "type": "obsidian",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 0,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 1,
+      "type": "iron_ore",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 1,
+      "type": "horizontal_pillar",
+      "direction": 1
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 2,
+      "type": "horizontal_pillar",
+      "direction": 1
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -1,
+      "type": "iron_ore",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 0,
+      "type": "iron_ore",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 1,
+      "type": "iron_ore",
+      "direction": 0
+    }
+  ],
+  "metadata": {
+    "created": "2026-03-17T13:22:03.394Z",
+    "dimensions": {
+      "width": 21,
+      "height": 61,
+      "depth": 39
+    }
+  }
+}

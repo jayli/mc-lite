@@ -158,3 +158,10 @@ npm run lint
 ## 重要提示
 - 已实现 AO 修复管理器 (`src/core/AORepairManager.js`) 作为兜底机制，处理批量删除后的 AO 阴影不一致问题，当前默认禁用
 - 批量删除方块时使用 `isBatch=false` 参数会复用单次删除逻辑，避免竞态条件导致的 AO 丢失问题
+
+## Active Technologies
+- JavaScript (ES6+ Modules) + Three.js (WebGL rendering), Custom Entity System (001-island-battery)
+- IndexedDB (world persistence), JSON files (structure definitions) (001-island-battery)
+
+## Recent Changes
+- 001-island-battery: Added JavaScript (ES6+ Modules) + Three.js (WebGL rendering), Custom Entity System
