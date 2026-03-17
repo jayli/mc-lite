@@ -141,6 +141,9 @@ export class TurretManager {
       this.enemyManager.removeZombie(enemy.id);
     }
 
+    // 播放死亡音效
+    audioManager.playSound('z_die', 0.3);
+
     // 播放死亡效果
     this.playDeathEffect(enemy.position);
 
