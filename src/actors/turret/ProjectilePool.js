@@ -101,14 +101,15 @@ export class ProjectilePool {
    * 更新所有活跃炮弹
    * @param {number} deltaTime - 时间增量（秒）
    * @param {Array} enemies - 丧尸列表
+   * @param {World} world - 世界引用，用于方块碰撞检测
    */
-  update(deltaTime, enemies) {
+  update(deltaTime, enemies, world) {
     // 收集需要更新的炮弹
     const updates = new Map();
     const toRelease = [];
 
     for (const [projectile, instanceIndex] of this.active) {
-      const stillActive = projectile.update(deltaTime, enemies);
+      const stillActive = projectile.update(deltaTime, enemies, world);
 
       if (stillActive) {
         // 仍在活跃，更新渲染

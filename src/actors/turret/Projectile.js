@@ -4,6 +4,7 @@
  */
 
 import * as THREE from 'three';
+import { getBlockProperties } from '../../constants/BlockData.js';
 
 export class Projectile {
   constructor() {
@@ -57,9 +58,10 @@ export class Projectile {
    * 更新炮弹状态
    * @param {number} deltaTime - 时间增量（秒）
    * @param {Array} enemies - 丧尸列表，用于碰撞检测
+   * @param {World} world - 世界引用，用于方块碰撞检测
    * @returns {boolean} 返回 true 表示炮弹仍活跃，false 表示已停用
    */
-  update(deltaTime, enemies = []) {
+  update(deltaTime, enemies = [], world = null) {
     if (!this.isActive) return false;
 
     // 计算移动距离
@@ -82,6 +84,15 @@ export class Projectile {
       return false;
     }
 
+    // 方块碰撞检测（双点检测：起点和终点）
+    if (world) {
+      const blockHit = this.checkCollisionWithBlocks(oldPosition, this.position, world);
+      if (blockHit) {
+        this.deactivate();
+        return false;
+      }
+    }
+
     // 碰撞检测（使用线段检测避免跳过目标）
     const hit = this.checkCollisionWithSegment(oldPosition, this.position, enemies);
     if (hit) {
@@ -90,6 +101,44 @@ export class Projectile {
     }
 
     return true;
+  }
+
+  /**
+   * 检查与方块的碰撞（双点检测：起点和终点）
+   * 炮弹不能穿透实心不透明方块，但可以穿透透明方块
+   * @param {THREE.Vector3} startPos - 起始位置
+   * @param {THREE.Vector3} endPos - 结束位置
+   * @param {World} world - 世界引用
+   * @returns {boolean} 是否发生碰撞
+   */
+  checkCollisionWithBlocks(startPos, endPos, world) {
+    if (!world || !world.getBlock) return false;
+
+    // 检测两个点：起点和终点
+    const checkPoints = [startPos, endPos];
+
+    for (const point of checkPoints) {
+      const x = Math.floor(point.x);
+      const y = Math.floor(point.y);
+      const z = Math.floor(point.z);
+
+      const block = world.getBlock(x, y, z);
+
+      // 如果没有方块（空气），继续
+      if (!block || block === 'air') continue;
+
+      // 获取方块属性
+      const props = getBlockProperties(block);
+
+      // 实心不透明方块会阻挡炮弹
+      if (props.isSolid && !props.isTransparent) {
+        return true; // 发生碰撞
+      }
+
+      // 非实心或透明方块（玻璃、树叶等）可以穿透
+    }
+
+    return false; // 未发生碰撞
   }
 
   /**

@@ -172,8 +172,8 @@ export class TurretManager {
       turret.update(deltaTime, enemies);
     }
 
-    // 更新炮弹池
-    this.projectilePool.update(deltaTime, enemies);
+    // 更新炮弹池（传入 world 用于方块碰撞检测）
+    this.projectilePool.update(deltaTime, enemies, this.world);
   }
 
   /**
