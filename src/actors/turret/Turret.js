@@ -35,11 +35,13 @@ export class Turret {
     // 状态
     this.state = 'ACTIVE'; // 'ACTIVE' | 'DESTROYED'
 
-    // 旋转相关
-    this.currentRotation = 0; // 当前 Y 轴旋转角度（偏航角，弧度）
-    this.targetRotation = 0;  // 目标 Y 轴旋转角度（偏航角，弧度）
-    this.currentPitch = 0;    // 当前 X 轴旋转角度（俯仰角，弧度）
-    this.targetPitch = 0;     // 目标 X 轴旋转角度（俯仰角，弧度）
+    // 旋转相关 - 使用传入的初始朝向
+    const initialRotation = params.initialRotation || 0;
+    this.defaultRotation = initialRotation; // 默认朝向（没有目标时的朝向，由放置位置决定）
+    this.currentRotation = initialRotation; // 当前 Y 轴旋转角度（偏航角，弧度）
+    this.targetRotation = initialRotation;  // 目标 Y 轴旋转角度（偏航角，弧度）
+    this.currentPitch = 0;                  // 当前 X 轴旋转角度（俯仰角，弧度）
+    this.targetPitch = 0;                   // 目标 X 轴旋转角度（俯仰角，弧度）
 
     // 目标
     this.targetEnemy = null;
@@ -263,8 +265,8 @@ export class Turret {
       pitch = Math.max(-TURRET_CONFIG.MAX_PITCH_ANGLE, Math.min(TURRET_CONFIG.MAX_PITCH_ANGLE, pitch));
       this.targetPitch = pitch;
     } else {
-      // 没有目标时恢复到默认朝向（0度）
-      this.targetRotation = 0;
+      // 没有目标时恢复到默认朝向（由放置位置决定）
+      this.targetRotation = this.defaultRotation;
       this.targetPitch = 0;
     }
   }

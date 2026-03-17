@@ -30,9 +30,10 @@ export class TurretManager {
   /**
    * 创建新炮塔
    * @param {THREE.Vector3} position - 炮塔位置
+   * @param {number} initialRotation - 初始朝向（弧度，可选，默认为0）
    * @returns {Turret|null} 创建的炮塔或null
    */
-  createTurret(position) {
+  createTurret(position, initialRotation = 0) {
     // 检查是否超过最大数量
     if (this.turrets.size >= this.maxTurrets) {
       console.warn('[TurretManager] 已达到最大炮塔数量限制');
@@ -48,7 +49,8 @@ export class TurretManager {
       position,
       world: this.world,
       scene: this.scene,
-      onFire: (fireData) => this.handleTurretFire(fireData)
+      onFire: (fireData) => this.handleTurretFire(fireData),
+      initialRotation  // 传递初始朝向
     });
 
     // 存储

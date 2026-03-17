@@ -308,11 +308,34 @@ export class PlayerInteraction {
     this.player.world.setBlock(x, y + 1, z, 'obsidian', 0);
     this.player.world.setBlock(x, y + 2, z, 'obsidian', 0);
 
+    // 计算玩家相对于炮塔的方向，选择最接近的四个方向之一
+    const playerPos = this.player.position;
+    const dx = playerPos.x - (x + 0.5);  // 炮塔中心X
+    const dz = playerPos.z - (z + 0.5);  // 炮塔中心Z
+
+    // 四个方向的弧度值
+    const DIRECTIONS = {
+      NORTH: 0,           // +Z
+      EAST: Math.PI / 2,  // +X
+      SOUTH: Math.PI,     // -Z
+      WEST: -Math.PI / 2  // -X (或 3π/2)
+    };
+
+    // 根据玩家位置选择最接近的方向（使炮塔朝向玩家）
+    let initialRotation;
+    if (Math.abs(dx) > Math.abs(dz)) {
+      // 玩家在东西方向更远
+      initialRotation = dx > 0 ? DIRECTIONS.EAST : DIRECTIONS.WEST;
+    } else {
+      // 玩家在南北方向更远（或相等，默认南北）
+      initialRotation = dz > 0 ? DIRECTIONS.NORTH : DIRECTIONS.SOUTH;
+    }
+
     // 创建炮塔位置（使用方块坐标）
     const position = new THREE.Vector3(x, y, z);
 
-    // 调用 TurretManager 创建炮塔
-    const turret = game.turretManager.createTurret(position);
+    // 调用 TurretManager 创建炮塔，传入初始朝向
+    const turret = game.turretManager.createTurret(position, initialRotation);
 
     if (!turret) {
       console.warn('[PlayerInteraction] 炮塔创建失败，可能已达数量上限');
