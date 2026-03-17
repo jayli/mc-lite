@@ -85,6 +85,9 @@ export class Projectile {
     // 计算移动距离
     const moveDistance = this.speed * deltaTime;
 
+    // 保存旧位置用于线段碰撞检测
+    const oldPosition = this.position.clone();
+
     // 更新位置
     const moveVector = this.direction.clone().multiplyScalar(moveDistance);
     this.position.add(moveVector);
@@ -104,36 +107,88 @@ export class Projectile {
       return;
     }
 
-    // 碰撞检测
-    this.checkCollision(enemies);
+    // 碰撞检测（使用线段检测避免跳过目标）
+    this.checkCollisionWithSegment(oldPosition, this.position, enemies);
   }
 
   /**
-   * 检查与丧尸的碰撞
+   * 检查与丧尸的线段碰撞检测（避免炮弹跳过目标）
+   * @param {THREE.Vector3} startPos - 起始位置
+   * @param {THREE.Vector3} endPos - 结束位置
    * @param {Array} enemies - 丧尸列表
    */
-  checkCollision(enemies) {
+  checkCollisionWithSegment(startPos, endPos, enemies) {
     const projectileRadius = 0.3;
 
     for (const enemy of enemies) {
       if (!enemy.isActive || enemy.isDead) continue;
 
-      // 计算与丧尸的距离
-      const enemyPos = enemy.position;
-      const dx = this.position.x - enemyPos.x;
-      const dy = this.position.y - enemyPos.y;
-      const dz = this.position.z - enemyPos.z;
-      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      // 瞄准丧尸上半身（胸部位置，脚底 + 1.2）
+      const enemyCenter = {
+        x: enemy.position.x,
+        y: enemy.position.y + 1.2,
+        z: enemy.position.z
+      };
 
-      // 丧尸碰撞半径（假设丧尸宽度约0.8格）
-      const enemyRadius = 0.4;
+      // 丧尸碰撞半径（宽0.6，考虑整体范围）
+      const enemyRadius = 0.5;
 
-      if (distance < projectileRadius + enemyRadius) {
+      // 计算线段到丧尸中心的最短距离
+      const dist = this.distanceFromPointToSegment(enemyCenter, startPos, endPos);
+
+      if (dist < projectileRadius + enemyRadius) {
         // 命中！
         this.onHitEnemy(enemy);
         return;
       }
     }
+  }
+
+  /**
+   * 计算点到线段的最短距离
+   * @param {Object} point - 点坐标 {x, y, z}
+   * @param {THREE.Vector3} segStart - 线段起点
+   * @param {THREE.Vector3} segEnd - 线段终点
+   * @returns {number} 最短距离
+   */
+  distanceFromPointToSegment(point, segStart, segEnd) {
+    const px = point.x;
+    const py = point.y;
+    const pz = point.z;
+
+    const x1 = segStart.x, y1 = segStart.y, z1 = segStart.z;
+    const x2 = segEnd.x, y2 = segEnd.y, z2 = segEnd.z;
+
+    // 线段向量
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const dz = z2 - z1;
+
+    // 线段长度的平方
+    const lenSq = dx * dx + dy * dy + dz * dz;
+
+    if (lenSq === 0) {
+      // 线段退化为点
+      const ddx = px - x1;
+      const ddy = py - y1;
+      const ddz = pz - z1;
+      return Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
+    }
+
+    // 计算投影参数 t（0到1之间表示在线段内）
+    const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy + (pz - z1) * dz) / lenSq));
+
+    // 最近点坐标
+    const closestX = x1 + t * dx;
+    const closestY = y1 + t * dy;
+    const closestZ = z1 + t * dz;
+
+    // 计算距离
+    const distX = px - closestX;
+    const distY = py - closestY;
+    const distZ = pz - closestZ;
+
+    return Math.sqrt(distX * distX + distY * distY + distZ * distZ);
   }
 
   /**

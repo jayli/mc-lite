@@ -10,8 +10,10 @@ import { shortestAngleDiff, lerpAngle, angleTo, distance, normalizeAngle } from 
 const TURRET_CONFIG = {
   DETECTION_RANGE: 50,      // 检测范围（格）
   ROTATION_SPEED: Math.PI / 2, // 旋转速度（90度/秒 = π/2 弧度/秒）
+  PITCH_SPEED: Math.PI / 3,    // 俯仰角速度（60度/秒）
   FIRE_COOLDOWN: 500,       // 射击冷却时间（毫秒）
   FIRE_ANGLE_THRESHOLD: 0.26, // 射击角度阈值（15度 ≈ 0.26弧度）
+  MAX_PITCH_ANGLE: Math.PI / 4, // 最大俯仰角（45度 = π/4 弧度）
 };
 
 export class Turret {
@@ -34,8 +36,10 @@ export class Turret {
     this.state = 'ACTIVE'; // 'ACTIVE' | 'DESTROYED'
 
     // 旋转相关
-    this.currentRotation = 0; // 当前 Y 轴旋转角度（弧度）
-    this.targetRotation = 0;  // 目标旋转角度（弧度）
+    this.currentRotation = 0; // 当前 Y 轴旋转角度（偏航角，弧度）
+    this.targetRotation = 0;  // 目标 Y 轴旋转角度（偏航角，弧度）
+    this.currentPitch = 0;    // 当前 X 轴旋转角度（俯仰角，弧度）
+    this.targetPitch = 0;     // 目标 X 轴旋转角度（俯仰角，弧度）
 
     // 目标
     this.targetEnemy = null;
@@ -58,7 +62,8 @@ export class Turret {
     );
 
     // Three.js 对象
-    this.pivotObject = null; // 旋转节点
+    this.pivotObject = null; // 旋转节点（Y轴 - 偏航角）
+    this.pitchObject = null; // 俯仰节点（X轴 - 俯仰角）
     this.turretMeshes = [];  // 炮塔顶部的4个方块 Mesh
 
     // 初始化视觉表现
@@ -90,10 +95,14 @@ export class Turret {
   createVisuals() {
     console.log(`[Turret ${this.id}] 创建视觉表现，pivot位置:`, this.pivotPosition);
 
-    // 创建旋转节点（pivot）
+    // 创建外部旋转节点（pivot）- 负责 Y 轴偏航角旋转
     this.pivotObject = new THREE.Object3D();
     this.pivotObject.position.copy(this.pivotPosition);
     this.scene.add(this.pivotObject);
+
+    // 创建内部俯仰节点（pitch）- 负责 X 轴俯仰角旋转
+    this.pitchObject = new THREE.Object3D();
+    this.pivotObject.add(this.pitchObject);
 
     // 创建炮塔顶部的枪
     this.createTurretTopBlocks();
@@ -114,7 +123,7 @@ export class Turret {
 
     const handle = new THREE.Mesh(handleGeometry, handleMaterial);
     handle.position.set(0, 0, -0.5); // 后方延伸
-    this.pivotObject.add(handle);
+    this.pitchObject.add(handle);
     this.turretMeshes.push(handle);
 
     // 枪管（前方）- 更细长的枪管
@@ -123,7 +132,7 @@ export class Turret {
 
     const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
     barrel.position.set(0, 0, 1.75); // 前方延伸
-    this.pivotObject.add(barrel);
+    this.pitchObject.add(barrel);
     this.turretMeshes.push(barrel);
 
     // 枪口装饰
@@ -132,7 +141,7 @@ export class Turret {
 
     const muzzle = new THREE.Mesh(muzzleGeometry, muzzleMaterial);
     muzzle.position.set(0, 0, 3.1); // 枪口
-    this.pivotObject.add(muzzle);
+    this.pitchObject.add(muzzle);
     this.turretMeshes.push(muzzle);
 
     console.log(`[Turret ${this.id}] 枪创建完成: 枪把+枪管+枪口`);
@@ -230,12 +239,33 @@ export class Turret {
 
     this.targetEnemy = nearestEnemy;
 
-    // 计算目标旋转角度
+    // 计算目标旋转角度（偏航角和俯仰角）
     if (this.targetEnemy) {
-      this.targetRotation = angleTo(this.pivotPosition, this.targetEnemy.position);
+      // 瞄准丧尸的上半身（胸部位置），而不是脚底
+      // 丧尸 height=1.8，上半身中心大约在 y + 1.2 处
+      const targetPos = {
+        x: this.targetEnemy.position.x,
+        y: this.targetEnemy.position.y + 1.2,
+        z: this.targetEnemy.position.z
+      };
+
+      // 计算水平方向的偏航角（Y轴旋转）
+      this.targetRotation = angleTo(this.pivotPosition, targetPos);
+
+      // 计算垂直方向的俯仰角（X轴旋转）
+      const dx = targetPos.x - this.pivotPosition.x;
+      const dy = targetPos.y - this.pivotPosition.y;
+      const dz = targetPos.z - this.pivotPosition.z;
+      const horizontalDist = Math.sqrt(dx * dx + dz * dz);
+
+      // 计算俯仰角并限制在 ±45° 范围内
+      let pitch = Math.atan2(dy, horizontalDist);
+      pitch = Math.max(-TURRET_CONFIG.MAX_PITCH_ANGLE, Math.min(TURRET_CONFIG.MAX_PITCH_ANGLE, pitch));
+      this.targetPitch = pitch;
     } else {
       // 没有目标时恢复到默认朝向（0度）
       this.targetRotation = 0;
+      this.targetPitch = 0;
     }
   }
 
@@ -244,22 +274,29 @@ export class Turret {
    * @param {number} deltaTime - 时间增量（秒）
    */
   updateRotation(deltaTime) {
-    // 计算需要旋转的角度差
+    // ---- 更新偏航角（Y轴旋转）----
     const angleDiff = shortestAngleDiff(this.currentRotation, this.targetRotation);
-
-    // 计算这一帧可以旋转的角度
     const maxRotation = TURRET_CONFIG.ROTATION_SPEED * deltaTime;
-
-    // 限制旋转不超过最大值
     const rotationStep = Math.max(-maxRotation, Math.min(maxRotation, angleDiff));
 
-    // 更新当前旋转
     this.currentRotation += rotationStep;
     this.currentRotation = normalizeAngle(this.currentRotation);
 
-    // 更新视觉表现
+    // ---- 更新俯仰角（X轴旋转）----
+    const pitchDiff = this.targetPitch - this.currentPitch;
+    const maxPitch = TURRET_CONFIG.PITCH_SPEED * deltaTime;
+    const pitchStep = Math.max(-maxPitch, Math.min(maxPitch, pitchDiff));
+
+    this.currentPitch += pitchStep;
+    // 限制俯仰角在范围内（双重保险）
+    this.currentPitch = Math.max(-TURRET_CONFIG.MAX_PITCH_ANGLE, Math.min(TURRET_CONFIG.MAX_PITCH_ANGLE, this.currentPitch));
+
+    // 更新视觉表现（注意：取反俯仰角，因为Three.js旋转方向与atan2结果相反）
     if (this.pivotObject) {
       this.pivotObject.rotation.y = this.currentRotation;
+    }
+    if (this.pitchObject) {
+      this.pitchObject.rotation.x = -this.currentPitch;
     }
   }
 
@@ -274,9 +311,13 @@ export class Turret {
     const now = Date.now();
     if (now - this.lastFireTime < TURRET_CONFIG.FIRE_COOLDOWN) return;
 
-    // 检查角度是否对准（夹角 < 15度）
-    const angleDiff = Math.abs(shortestAngleDiff(this.currentRotation, this.targetRotation));
-    if (angleDiff > TURRET_CONFIG.FIRE_ANGLE_THRESHOLD) return;
+    // 检查偏航角是否对准（夹角 < 15度）
+    const yawDiff = Math.abs(shortestAngleDiff(this.currentRotation, this.targetRotation));
+    if (yawDiff > TURRET_CONFIG.FIRE_ANGLE_THRESHOLD) return;
+
+    // 检查俯仰角是否对准（夹角 < 15度）
+    const pitchDiff = Math.abs(this.currentPitch - this.targetPitch);
+    if (pitchDiff > TURRET_CONFIG.FIRE_ANGLE_THRESHOLD) return;
 
     // 发射！
     this.fire();
@@ -288,14 +329,18 @@ export class Turret {
   fire() {
     this.lastFireTime = Date.now();
 
-    // 计算炮口位置（枪口在 z=2.6 处）
-    const barrelOffset = new THREE.Vector3(0, 0, 2.8);
-    barrelOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.currentRotation);
+    // 计算炮口位置（枪口在 z=3.1 处）
+    // 注意：visualRotationX = -this.currentPitch 才是实际的旋转角度
+    const visualRotationX = -this.currentPitch;
+    const barrelOffset = new THREE.Vector3(0, 0, 3.1);
+    barrelOffset.applyAxisAngle(new THREE.Vector3(1, 0, 0), visualRotationX);  // 俯仰角（X轴）
+    barrelOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.currentRotation); // 偏航角（Y轴）
     const muzzlePosition = new THREE.Vector3().copy(this.pivotPosition).add(barrelOffset);
 
-    // 计算发射方向
+    // 计算发射方向（必须与视觉旋转一致）
     const direction = new THREE.Vector3(0, 0, 1);
-    direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.currentRotation);
+    direction.applyAxisAngle(new THREE.Vector3(1, 0, 0), visualRotationX);  // 俯仰角（X轴）
+    direction.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.currentRotation); // 偏航角（Y轴）
 
     // 调用回调
     if (this.onFire) {
@@ -318,8 +363,12 @@ export class Turret {
 
     // 恢复默认朝向
     this.targetRotation = 0;
+    this.targetPitch = 0;
     if (this.pivotObject) {
       this.pivotObject.rotation.y = 0;
+    }
+    if (this.pitchObject) {
+      this.pitchObject.rotation.x = 0;
     }
 
     // 清理视觉表现
@@ -330,6 +379,7 @@ export class Turret {
         if (mesh.material) mesh.material.dispose();
       });
       this.turretMeshes = [];
+      this.pitchObject = null;
       this.pivotObject = null;
     }
   }
@@ -344,6 +394,7 @@ export class Turret {
       state: this.state,
       position: this.position,
       rotation: this.currentRotation,
+      pitch: this.currentPitch,
       hasTarget: !!this.targetEnemy,
       targetDistance: this.targetEnemy ? distance(this.pivotPosition, this.targetEnemy.position) : null
     };
