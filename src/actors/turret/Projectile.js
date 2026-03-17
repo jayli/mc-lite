@@ -16,7 +16,7 @@ export class Projectile {
     // 位置和运动
     this.position = new THREE.Vector3();
     this.direction = new THREE.Vector3();
-    this.speed = 20; // 格/秒
+    this.speed = 40; // 格/秒（提高一倍）
     this.maxDistance = 50; // 最大飞行距离
     this.distanceTraveled = 0;
 
@@ -42,7 +42,7 @@ export class Projectile {
   initialize(params) {
     this.position.copy(params.position);
     this.direction.copy(params.direction).normalize();
-    this.speed = 20;
+    this.speed = 40;
     this.maxDistance = 50;
     this.distanceTraveled = 0;
     this.damage = 1;
@@ -55,14 +55,17 @@ export class Projectile {
   }
 
   /**
-   * 创建炮弹的视觉网格
+   * 创建炮弹的视觉网格 - 激光形状
    */
   createMesh() {
     if (!this.mesh) {
-      // 使用简单的球体表示炮弹
-      const geometry = new THREE.SphereGeometry(0.15, 8, 8);
+      // 使用细长的圆柱体表示激光
+      const geometry = new THREE.CylinderGeometry(0.05, 0.05, 1.5, 8);
+      // 圆柱体默认是垂直的(Y轴)，需要旋转到Z轴方向
+      geometry.rotateX(Math.PI / 2);
+
       const material = new THREE.MeshBasicMaterial({
-        color: 0xff6600,
+        color: 0xffff00,
         transparent: true,
         opacity: 0.9
       });
@@ -71,7 +74,19 @@ export class Projectile {
     }
 
     this.mesh.position.copy(this.position);
+    this.updateMeshRotation();
     this.mesh.visible = true;
+  }
+
+  /**
+   * 更新激光网格的旋转方向
+   */
+  updateMeshRotation() {
+    if (!this.mesh) return;
+
+    // 让激光朝向飞行方向
+    const target = this.position.clone().add(this.direction);
+    this.mesh.lookAt(target);
   }
 
   /**
@@ -93,9 +108,10 @@ export class Projectile {
     this.position.add(moveVector);
     this.distanceTraveled += moveDistance;
 
-    // 更新视觉位置
+    // 更新视觉位置和旋转
     if (this.mesh) {
       this.mesh.position.copy(this.position);
+      this.updateMeshRotation();
     }
 
     // 检查是否超出最大距离
