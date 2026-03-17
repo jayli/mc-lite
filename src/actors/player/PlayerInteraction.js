@@ -267,17 +267,17 @@ export class PlayerInteraction {
 
     // 检查底座和上方空间是否可用
     // position.y 是底座下方一格的位置
-    // iron_ore 底座在 y+1，obsidian 柱子在 y+2 和 y+3
+    // iron_ore 底座在 y，obsidian 柱子在 y+1 和 y+2
     for (let dx = -1; dx <= 1; dx++) {
       for (let dz = -1; dz <= 1; dz++) {
-        if (this.player.physics.isSolid(x + dx, y + 1, z + dz)) {
-          console.warn(`[PlayerInteraction] 底座位置 (${x + dx}, ${y + 1}, ${z + dz}) 被占用，无法放置炮塔`);
+        if (this.player.physics.isSolid(x + dx, y, z + dz)) {
+          console.warn(`[PlayerInteraction] 底座位置 (${x + dx}, ${y}, ${z + dz}) 被占用，无法放置炮塔`);
           return false;
         }
       }
     }
     // obsidian 柱子位置
-    if (this.player.physics.isSolid(x, y + 2, z) || this.player.physics.isSolid(x, y + 3, z)) {
+    if (this.player.physics.isSolid(x, y + 1, z) || this.player.physics.isSolid(x, y + 2, z)) {
       console.warn('[PlayerInteraction] 上方空间被占用，无法放置炮塔');
       return false;
     }
@@ -285,7 +285,7 @@ export class PlayerInteraction {
     // 检查是否与玩家碰撞（检查整个炮塔占据的3格高度）
     if (this.player.position.x - 0.3 < x + 1 &&
         this.player.position.x + 0.3 > x &&
-        this.player.position.y < y + 3 &&
+        this.player.position.y < y + 2 &&
         this.player.position.y + 1.8 > y &&
         this.player.position.z - 0.3 < z + 1 &&
         this.player.position.z + 0.3 > z) return false;
@@ -297,16 +297,16 @@ export class PlayerInteraction {
       return false;
     }
 
-    // 放置 3x3 iron_ore 底座（y+1 层）
-    // position.y 是底座下方一格的位置，所以底座在 y+1
+    // 放置 3x3 iron_ore 底座（y 层）
+    // position.y 是底座下方一格的位置，所以底座在 y
     for (let dx = -1; dx <= 1; dx++) {
       for (let dz = -1; dz <= 1; dz++) {
-        this.player.world.setBlock(x + dx, y + 1, z + dz, 'iron_ore', 0);
+        this.player.world.setBlock(x + dx, y, z + dz, 'iron_ore', 0);
       }
     }
-    // 放置 obsidian 柱子（中心位置，y+2 和 y+3）
+    // 放置 obsidian 柱子（中心位置，y+1 和 y+2）
+    this.player.world.setBlock(x, y + 1, z, 'obsidian', 0);
     this.player.world.setBlock(x, y + 2, z, 'obsidian', 0);
-    this.player.world.setBlock(x, y + 3, z, 'obsidian', 0);
 
     // 创建炮塔位置（使用方块坐标）
     const position = new THREE.Vector3(x, y, z);
@@ -319,11 +319,11 @@ export class PlayerInteraction {
       // 如果炮塔创建失败，移除已放置的底座和 obsidian
       for (let dx = -1; dx <= 1; dx++) {
         for (let dz = -1; dz <= 1; dz++) {
-          this.player.world.removeBlock(x + dx, y + 1, z + dz);
+          this.player.world.removeBlock(x + dx, y, z + dz);
         }
       }
+      this.player.world.removeBlock(x, y + 1, z);
       this.player.world.removeBlock(x, y + 2, z);
-      this.player.world.removeBlock(x, y + 3, z);
       return false;
     }
 

@@ -50,15 +50,16 @@ export class Turret {
     // 结构方块列表（相对坐标）
     this.structureBlocks = this.calculateStructureBlocks();
 
-    // 旋转中心（pivot）位置 - obsidian 柱子顶端
+    // 旋转中心（pivot）位置
     // position.y 是底座下方一格的位置（即放置炮塔的地面层）
-    // turret.json 中方块的 worldY = position.y + block.y:
-    //   - iron_ore 底座 (y=1): worldY = position.y + 1
-    //   - obsidian 下 (y=2): worldY = position.y + 2
-    //   - obsidian 上 (y=3): worldY = position.y + 3
+    // 方块坐标（下移一格后）:
+    //   - iron_ore 底座: worldY = position.y
+    //   - obsidian 下: worldY = position.y + 1
+    //   - obsidian 上: worldY = position.y + 2
+    // pivot 保持在原来的高度（地面以上 3.3 格），使枪位置与之前一致
     this.pivotPosition = new THREE.Vector3(
       this.position.x + 0.5,
-      this.position.y + 3.3,  // obsidian 上在 y+3，稍微往上一点作为旋转中心
+      this.position.y + 3.3,  // 保持枪在原来的位置（地面以上 3.3 格）
       this.position.z + 0.5
     );
 
@@ -77,15 +78,15 @@ export class Turret {
    */
   calculateStructureBlocks() {
     const blocks = [];
-    // 底座 3x3 iron_ore (json y=1, world y=position.y + 1)
+    // 底座 3x3 iron_ore (world y=position.y)
     for (let x = -1; x <= 1; x++) {
       for (let z = -1; z <= 1; z++) {
-        blocks.push(new THREE.Vector3(x, 1, z));
+        blocks.push(new THREE.Vector3(x, 0, z));
       }
     }
-    // obsidian 柱子 (json y=2,3 -> world y=position.y+2, position.y+3)
+    // obsidian 柱子 (world y=position.y+1, position.y+2)
+    blocks.push(new THREE.Vector3(0, 1, 0));
     blocks.push(new THREE.Vector3(0, 2, 0));
-    blocks.push(new THREE.Vector3(0, 3, 0));
 
     return blocks;
   }
@@ -181,21 +182,20 @@ export class Turret {
   /**
    * 检查炮塔结构完整性
    * 检查 obsidian 柱子是否完整
-   * 注意：StructureLoader.generateBlocks: worldX = x + block.x, worldY = y + (block.y - bottomY)
-   * turret.json 中 bottomY=1，所以 worldY = position.y + block.y - 1
+   * 方块坐标（下移一格后）:
+   *   - obsidian 下: worldY = position.y + 1
+   *   - obsidian 上: worldY = position.y + 2
    * @returns {boolean}
    */
   checkIntegrity() {
     // position.y 是底座下方一格的位置
-    // turret.json 中方块的 worldY = position.y + block.y:
-    //   - obsidian 下 (block.y=2): worldY = position.y + 2
-    //   - obsidian 上 (block.y=3): worldY = position.y + 3
+    // obsidian 柱子位于 position.y + 1 和 position.y + 2
     const obsidianWorldX = this.position.x;
     const obsidianWorldZ = this.position.z;
 
     const criticalBlocks = [
-      { x: obsidianWorldX, y: this.position.y + 2, z: obsidianWorldZ, label: 'obsidian下' },
-      { x: obsidianWorldX, y: this.position.y + 3, z: obsidianWorldZ, label: 'obsidian上' }
+      { x: obsidianWorldX, y: this.position.y + 1, z: obsidianWorldZ, label: 'obsidian下' },
+      { x: obsidianWorldX, y: this.position.y + 2, z: obsidianWorldZ, label: 'obsidian上' }
     ];
 
     for (const worldPos of criticalBlocks) {
