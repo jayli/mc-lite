@@ -31,6 +31,10 @@ export class Projectile {
     // 回调引用
     this.onHit = null;
     this.onMaxDistance = null;
+
+    // 临时变量（避免每帧 clone 产生 GC 压力）
+    this._tempOldPos = new THREE.Vector3();
+    this._tempMoveVec = new THREE.Vector3();
   }
 
   /**
@@ -68,12 +72,12 @@ export class Projectile {
     // 计算移动距离
     const moveDistance = this.speed * deltaTime;
 
-    // 保存旧位置用于线段碰撞检测
-    const oldPosition = this.position.clone();
+    // 保存旧位置用于线段碰撞检测（复用临时变量，避免 clone）
+    this._tempOldPos.copy(this.position);
 
-    // 更新位置
-    const moveVector = this.direction.clone().multiplyScalar(moveDistance);
-    this.position.add(moveVector);
+    // 更新位置（复用临时变量，避免 clone）
+    this._tempMoveVec.copy(this.direction).multiplyScalar(moveDistance);
+    this.position.add(this._tempMoveVec);
     this.distanceTraveled += moveDistance;
 
     // 检查是否超出最大距离
@@ -87,7 +91,7 @@ export class Projectile {
 
     // 方块碰撞检测（双点检测：起点和终点）
     if (world) {
-      const blockHit = this.checkCollisionWithBlocks(oldPosition, this.position, world);
+      const blockHit = this.checkCollisionWithBlocks(this._tempOldPos, this.position, world);
       if (blockHit) {
         this.deactivate();
         return false;
@@ -95,7 +99,7 @@ export class Projectile {
     }
 
     // 碰撞检测（使用线段检测避免跳过目标）
-    const hit = this.checkCollisionWithSegment(oldPosition, this.position, enemies);
+    const hit = this.checkCollisionWithSegment(this._tempOldPos, this.position, enemies);
     if (hit) {
       this.onHitEnemy(hit);
       return false;

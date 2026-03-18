@@ -26,11 +26,15 @@ export class InstancedProjectileRenderer {
     this.activeIndices = new Set(); // 活跃的炮弹索引
     this.indexPool = []; // 可用索引池
 
-    // 临时矩阵和四元数（避免每帧创建）
+    // 临时对象（避免每帧创建）
     this._tempMatrix = new THREE.Matrix4();
     this._tempPosition = new THREE.Vector3();
     this._tempQuaternion = new THREE.Quaternion();
     this._tempScale = new THREE.Vector3(1, 1, 1);
+    this._tempObject3D = new THREE.Object3D();
+    this._tempDirection = new THREE.Vector3();
+    this._tempTarget = new THREE.Vector3();
+    this._defaultForward = new THREE.Vector3(0, 0, 1);
 
     this.initInstancedMesh();
   }
@@ -134,21 +138,19 @@ export class InstancedProjectileRenderer {
   updateProjectile(index, position, direction) {
     if (!this.activeIndices.has(index)) return;
 
-    // 使用 lookAt 方式计算旋转
-    const dummy = new THREE.Object3D();
+    const dummy = this._tempObject3D;
     dummy.position.copy(position);
 
     // 计算目标点：位置 + 方向（确保方向已归一化）
-    const dir = direction.clone().normalize();
-    const target = position.clone().add(dir);
+    this._tempDirection.copy(direction).normalize();
+    this._tempTarget.copy(position).add(this._tempDirection);
 
     // 避免位置和目标点重合
-    if (target.distanceToSquared(position) < 0.0001) {
-      // 方向几乎为零，使用默认朝向（Z轴正方向）
-      target.copy(position).add(new THREE.Vector3(0, 0, 1));
+    if (this._tempTarget.distanceToSquared(position) < 0.0001) {
+      this._tempTarget.copy(position).add(this._defaultForward);
     }
 
-    dummy.lookAt(target);
+    dummy.lookAt(this._tempTarget);
     dummy.updateMatrix();
 
     this.mesh.setMatrixAt(index, dummy.matrix);
@@ -161,8 +163,7 @@ export class InstancedProjectileRenderer {
    */
   updateBatch(projectiles) {
     let hasUpdate = false;
-    const dummy = new THREE.Object3D();
-    const defaultTarget = new THREE.Vector3(0, 0, 1);
+    const dummy = this._tempObject3D;
 
     for (const [index, data] of projectiles) {
       if (!this.activeIndices.has(index)) continue;
@@ -170,15 +171,15 @@ export class InstancedProjectileRenderer {
       dummy.position.copy(data.position);
 
       // 计算目标点：确保方向已归一化
-      const dir = data.direction.clone().normalize();
-      const target = data.position.clone().add(dir);
+      this._tempDirection.copy(data.direction).normalize();
+      this._tempTarget.copy(data.position).add(this._tempDirection);
 
       // 避免位置和目标点重合
-      if (target.distanceToSquared(data.position) < 0.0001) {
-        target.copy(data.position).add(defaultTarget);
+      if (this._tempTarget.distanceToSquared(data.position) < 0.0001) {
+        this._tempTarget.copy(data.position).add(this._defaultForward);
       }
 
-      dummy.lookAt(target);
+      dummy.lookAt(this._tempTarget);
       dummy.updateMatrix();
 
       this.mesh.setMatrixAt(index, dummy.matrix);

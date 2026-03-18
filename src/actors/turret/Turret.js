@@ -73,6 +73,11 @@ export class Turret {
     // 射击相关
     this.lastFireTime = 0;
 
+    // 完整性检查降频计数器
+    this._integrityCheckCounter = 0;
+    this._integrityCheckInterval = 30; // 每 30 帧检查一次（约 0.5 秒）
+    this._lastIntegrityResult = true;  // 缓存上次检查结果
+
     // 结构方块列表（相对坐标）
     this.structureBlocks = this.calculateStructureBlocks();
 
@@ -183,8 +188,13 @@ export class Turret {
   update(deltaTime, enemies) {
     if (this.state === 'DESTROYED') return;
 
-    // 检查结构完整性
-    if (!this.checkIntegrity()) {
+    // 降频检查结构完整性
+    this._integrityCheckCounter++;
+    if (this._integrityCheckCounter >= this._integrityCheckInterval) {
+      this._integrityCheckCounter = 0;
+      this._lastIntegrityResult = this.checkIntegrity();
+    }
+    if (!this._lastIntegrityResult) {
       this.destroy();
       return;
     }

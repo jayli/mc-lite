@@ -196,12 +196,6 @@ export class TurretManager {
       }
     }
 
-    // 调试：定期输出丧尸数量
-    this._debugFrame = (this._debugFrame || 0) + 1;
-    if (this._debugFrame % 120 === 0) {
-      console.log(`[TurretManager] 丧尸总数: ${this.enemyManager.zombies?.size || 0}, 活跃: ${enemies.length}`);
-    }
-
     return enemies;
   }
 
