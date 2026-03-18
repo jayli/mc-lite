@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { getBlockProperties } from '../../constants/BlockData.js';
+import { TURRET_CONFIG } from './Turret.js';
 
 export class Projectile {
   constructor() {
@@ -17,8 +18,8 @@ export class Projectile {
     // 位置和运动
     this.position = new THREE.Vector3();
     this.direction = new THREE.Vector3();
-    this.speed = 40; // 格/秒
-    this.maxDistance = 50; // 最大飞行距离
+    this.speed = TURRET_CONFIG.PROJECTILE_SPEED;
+    this.maxDistance = TURRET_CONFIG.MAX_KILL_DISTANCE;
     this.distanceTraveled = 0;
 
     // 伤害
@@ -44,8 +45,8 @@ export class Projectile {
   initialize(params) {
     this.position.copy(params.position);
     this.direction.copy(params.direction).normalize();
-    this.speed = 40;
-    this.maxDistance = 50;
+    this.speed = TURRET_CONFIG.PROJECTILE_SPEED;
+    this.maxDistance = TURRET_CONFIG.MAX_KILL_DISTANCE;
     this.distanceTraveled = 0;
     this.damage = 1;
     this.isActive = true;
@@ -154,10 +155,10 @@ export class Projectile {
     for (const enemy of enemies) {
       if (!enemy.isActive || enemy.isDead) continue;
 
-      // 瞄准丧尸上半身（胸部位置，脚底 + 1.2）
+      // 瞄准丧尸上半身（胸部位置）
       const enemyCenter = {
         x: enemy.position.x,
-        y: enemy.position.y + 1.2,
+        y: enemy.position.y + TURRET_CONFIG.ENEMY_BODY_OFFSET_Y,
         z: enemy.position.z
       };
 

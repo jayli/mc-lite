@@ -7,13 +7,37 @@ import * as THREE from 'three';
 import { shortestAngleDiff, lerpAngle, angleTo, distance, normalizeAngle } from '../../utils/MathUtils.js';
 
 // 炮塔配置常量
-const TURRET_CONFIG = {
+export const TURRET_CONFIG = {
+  // --- 检测与瞄准 ---
   DETECTION_RANGE: 50,      // 检测范围（格）
   ROTATION_SPEED: Math.PI / 2, // 旋转速度（90度/秒 = π/2 弧度/秒）
   PITCH_SPEED: Math.PI / 3,    // 俯仰角速度（60度/秒）
   FIRE_COOLDOWN: 500,       // 射击冷却时间（毫秒）
   FIRE_ANGLE_THRESHOLD: 0.26, // 射击角度阈值（15度 ≈ 0.26弧度）
   MAX_PITCH_ANGLE: Math.PI / 4, // 最大俯仰角（45度 = π/4 弧度）
+
+  // --- 结构尺寸 ---
+  PIVOT_HEIGHT_OFFSET: 3.3,   // 旋转中心高度偏移（相对于底座 position.y）
+
+  // --- 枪管外观 ---
+  GUN_HANDLE_SIZE: [0.8, 0.8, 2],     // 枪把尺寸 [宽, 高, 深]
+  GUN_HANDLE_OFFSET_Z: -0.5,          // 枪把 Z 轴偏移（向后）
+  GUN_HANDLE_COLOR: 0x888888,          // 枪把颜色
+
+  GUN_BARREL_SIZE: [0.4, 0.4, 2.5],   // 枪管尺寸 [宽, 高, 深]
+  GUN_BARREL_OFFSET_Z: 1.75,          // 枪管 Z 轴偏移（向前）
+  GUN_BARREL_COLOR: 0x444444,          // 枪管颜色
+
+  MUZZLE_SIZE: [0.5, 0.5, 0.3],       // 枪口装饰尺寸 [宽, 高, 深]
+  MUZZLE_OFFSET_Z: 3.1,               // 枪口 Z 轴偏移
+  MUZZLE_COLOR: 0x222222,              // 枪口颜色
+
+  // --- 炮弹参数 ---
+  PROJECTILE_SPEED: 40,     // 炮弹飞行速度（格/秒）
+  MAX_KILL_DISTANCE: 50,    // 炮弹最大飞行距离（格）
+
+  // --- 目标参数 ---
+  ENEMY_BODY_OFFSET_Y: 1.2, // 瞄准丧尸上半身的 Y 偏移（胸部位置）
 };
 
 export class Turret {
@@ -58,10 +82,10 @@ export class Turret {
     //   - iron_ore 底座: worldY = position.y
     //   - obsidian 下: worldY = position.y + 1
     //   - obsidian 上: worldY = position.y + 2
-    // pivot 保持在原来的高度（地面以上 3.3 格），使枪位置与之前一致
+    // pivot 保持在原来的高度，使枪位置与之前一致
     this.pivotPosition = new THREE.Vector3(
       this.position.x + 0.5,
-      this.position.y + 3.3,  // 保持枪在原来的位置（地面以上 3.3 格）
+      this.position.y + TURRET_CONFIG.PIVOT_HEIGHT_OFFSET,
       this.position.z + 0.5
     );
 
@@ -121,30 +145,30 @@ export class Turret {
   createTurretTopBlocks() {
     console.log(`[Turret ${this.id}] 创建枪的 mesh...`);
 
-    // 枪把（后方）- 模拟原来 iron 方块的体积
-    const handleGeometry = new THREE.BoxGeometry(0.8, 0.8, 2);
-    const handleMaterial = new THREE.MeshLambertMaterial({ color: 0x888888 });
+    // 枪把（后方）
+    const handleGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.GUN_HANDLE_SIZE);
+    const handleMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.GUN_HANDLE_COLOR });
 
     const handle = new THREE.Mesh(handleGeometry, handleMaterial);
-    handle.position.set(0, 0, -0.5); // 后方延伸
+    handle.position.set(0, 0, TURRET_CONFIG.GUN_HANDLE_OFFSET_Z);
     this.pitchObject.add(handle);
     this.turretMeshes.push(handle);
 
-    // 枪管（前方）- 更细长的枪管
-    const barrelGeometry = new THREE.BoxGeometry(0.4, 0.4, 2.5);
-    const barrelMaterial = new THREE.MeshLambertMaterial({ color: 0x444444 });
+    // 枪管（前方）
+    const barrelGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.GUN_BARREL_SIZE);
+    const barrelMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.GUN_BARREL_COLOR });
 
     const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
-    barrel.position.set(0, 0, 1.75); // 前方延伸
+    barrel.position.set(0, 0, TURRET_CONFIG.GUN_BARREL_OFFSET_Z);
     this.pitchObject.add(barrel);
     this.turretMeshes.push(barrel);
 
     // 枪口装饰
-    const muzzleGeometry = new THREE.BoxGeometry(0.5, 0.5, 0.3);
-    const muzzleMaterial = new THREE.MeshLambertMaterial({ color: 0x222222 });
+    const muzzleGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.MUZZLE_SIZE);
+    const muzzleMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.MUZZLE_COLOR });
 
     const muzzle = new THREE.Mesh(muzzleGeometry, muzzleMaterial);
-    muzzle.position.set(0, 0, 3.1); // 枪口
+    muzzle.position.set(0, 0, TURRET_CONFIG.MUZZLE_OFFSET_Z);
     this.pitchObject.add(muzzle);
     this.turretMeshes.push(muzzle);
 
@@ -237,11 +261,10 @@ export class Turret {
 
     // 计算目标旋转角度（偏航角和俯仰角）
     if (this.targetEnemy) {
-      // 瞄准丧尸的上半身（胸部位置），而不是脚底
-      // 丧尸 height=1.8，上半身中心大约在 y + 1.2 处
+      // 瞄准丧尸的上半身（胸部位置）
       const targetPos = {
         x: this.targetEnemy.position.x,
-        y: this.targetEnemy.position.y + 1.2,
+        y: this.targetEnemy.position.y + TURRET_CONFIG.ENEMY_BODY_OFFSET_Y,
         z: this.targetEnemy.position.z
       };
 
@@ -325,10 +348,10 @@ export class Turret {
   fire() {
     this.lastFireTime = Date.now();
 
-    // 计算炮口位置（枪口在 z=3.1 处）
+    // 计算炮口位置（枪口在 MUZZLE_OFFSET_Z 处）
     // 注意：visualRotationX = -this.currentPitch 才是实际的旋转角度
     const visualRotationX = -this.currentPitch;
-    const barrelOffset = new THREE.Vector3(0, 0, 3.1);
+    const barrelOffset = new THREE.Vector3(0, 0, TURRET_CONFIG.MUZZLE_OFFSET_Z);
     barrelOffset.applyAxisAngle(new THREE.Vector3(1, 0, 0), visualRotationX);  // 俯仰角（X轴）
     barrelOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), this.currentRotation); // 偏航角（Y轴）
     const muzzlePosition = new THREE.Vector3().copy(this.pivotPosition).add(barrelOffset);
