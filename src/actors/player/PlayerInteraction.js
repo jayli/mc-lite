@@ -10,6 +10,7 @@ import { getBlockProperties } from '../../constants/BlockData.js';
 import { nextOrientation } from '../../utils/OrientationUtils.js';
 import { Gun, WEAPON_TYPES } from '../weapon/Gun.js';
 import { gunModel, mag7Model, minigunModel } from '../../core/Engine.js';
+import { getStructureLoader } from '../../world/entity-system/StructureLoader.js';
 
 /**
  * 从对象向上查找特殊实体
@@ -237,6 +238,11 @@ export class PlayerInteraction {
       return this.tryPlaceTurret(x, y, z);
     }
 
+    // 特殊处理：丧尸巢穴方块放置时生成完整结构
+    if (type === 'zombie_nest_alias_block') {
+      return this.tryPlaceZombieNest(x, y, z);
+    }
+
     // 特殊处理：床方块放置时生成床结构
     if (type === 'bed_alias_block') {
       return this.tryPlaceBed(x, y, z);
@@ -358,6 +364,82 @@ export class PlayerInteraction {
   }
 
   /**
+   * 尝试放置丧尸巢穴
+   * @param {number} x - X坐标
+   * @param {number} y - Y坐标
+   * @param {number} z - Z坐标
+   * @returns {boolean} 是否成功放置
+   */
+  tryPlaceZombieNest(x, y, z) {
+    const game = this.player.game;
+    if (!game || !game.zombieNestManager) {
+      console.warn('[PlayerInteraction] ZombieNestManager 不可用');
+      return false;
+    }
+
+    if (game.zombieNestManager.nests.size >= game.zombieNestManager.maxNests) {
+      console.warn('[PlayerInteraction] 已达到最大丧尸巢穴数量限制，无法放置');
+      return false;
+    }
+
+    const loader = getStructureLoader('zombieNest');
+    const structureData = loader?.getData();
+    if (!loader || !structureData) {
+      console.warn('[PlayerInteraction] zombie_nest 结构尚未加载完成');
+      return false;
+    }
+
+    const structureBlocks = loader.generateBlocks(x, y, z);
+    if (structureBlocks.length === 0) {
+      console.warn('[PlayerInteraction] zombie_nest 结构数据为空');
+      return false;
+    }
+
+    for (const block of structureBlocks) {
+      const existingBlock = this.player.world.getBlock(block.x, block.y, block.z);
+      if (existingBlock && existingBlock !== 'air') {
+        console.warn(`[PlayerInteraction] 丧尸巢穴位置 (${block.x}, ${block.y}, ${block.z}) 被占用，无法放置`);
+        return false;
+      }
+
+      if (this.isPlayerCollidingWithBlock(block.x, block.y, block.z)) {
+        console.warn('[PlayerInteraction] 玩家与丧尸巢穴重叠，无法放置');
+        return false;
+      }
+    }
+
+    const criticalBlock = this.findStructureCriticalBlock(structureBlocks);
+    if (!criticalBlock) {
+      console.warn('[PlayerInteraction] 未找到丧尸巢穴关键方块');
+      return false;
+    }
+
+    for (const block of structureBlocks) {
+      this.player.world.setBlock(block.x, block.y, block.z, block.type, block.orientation ?? 0);
+    }
+
+    const nest = game.zombieNestManager.createNest({
+      position: { x, y, z },
+      structureBlocks,
+      criticalBlock
+    });
+
+    if (!nest) {
+      for (const block of structureBlocks) {
+        this.player.world.removeBlock(block.x, block.y, block.z);
+      }
+      console.warn('[PlayerInteraction] 创建丧尸巢穴运行时实例失败');
+      return false;
+    }
+
+    this.player.inventory.remove('zombie_nest_alias_block', 1);
+    audioManager.playSound('put', 0.3);
+
+    console.log(`[PlayerInteraction] 丧尸巢穴放置成功 at (${x}, ${y}, ${z})`);
+    return true;
+  }
+
+  /**
    * 尝试放置床
    * @param {number} x - X坐标
    * @param {number} y - Y坐标
@@ -415,6 +497,40 @@ export class PlayerInteraction {
 
     console.log(`[PlayerInteraction] 床放置成功 at (${x}, ${y}, ${z}), 床尾 at (${tailX}, ${y}, ${tailZ})`);
     return true;
+  }
+
+  /**
+   * 玩家是否与指定方块位置重叠
+   * @param {number} x - 方块坐标 X
+   * @param {number} y - 方块坐标 Y
+   * @param {number} z - 方块坐标 Z
+   * @returns {boolean}
+   */
+  isPlayerCollidingWithBlock(x, y, z) {
+    return this.player.position.x - 0.3 < x + 1 &&
+      this.player.position.x + 0.3 > x &&
+      this.player.position.y < y + 1 &&
+      this.player.position.y + 1.8 > y &&
+      this.player.position.z - 0.3 < z + 1 &&
+      this.player.position.z + 0.3 > z;
+  }
+
+  /**
+   * 找出结构中最高的关键方块
+   * @param {Array<Object>} blocks - 结构方块
+   * @returns {Object|null}
+   */
+  findStructureCriticalBlock(blocks) {
+    if (!Array.isArray(blocks) || blocks.length === 0) return null;
+
+    let criticalBlock = null;
+    for (const block of blocks) {
+      if (!criticalBlock || block.y > criticalBlock.y) {
+        criticalBlock = { ...block };
+      }
+    }
+
+    return criticalBlock;
   }
 
   /**

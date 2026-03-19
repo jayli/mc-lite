@@ -21,6 +21,7 @@ export function getCustomIconPath(item) {
     'cobblestone_step_updown': 'src/assets/textures/Cobblestone_step_updown.png',
     'stone_diorite_step': 'src/assets/textures/stone_diorite_step.png',
     'turret_alias_block': 'src/assets/textures/turret.png',
+    'zombie_nest_alias_block': 'src/assets/textures/zombie_nest_alias_block.png',
     'bed_alias_block': 'src/assets/textures/bed/Bed_(front_texture)_JE2_BE2.png'
   };
 

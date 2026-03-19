@@ -310,6 +310,15 @@ export const BLOCK_DATA = {
     isShadowEnabled: true,
     geometryType: 'box'
   },
+  'zombie_nest_alias_block': {
+    isSolid: true,
+    isTransparent: false,
+    isRendered: true,
+    isAOEnabled: false,
+    orientationEnabled: false,
+    isShadowEnabled: true,
+    geometryType: 'box'
+  },
 
   // ========== 新增方块类型 (30种) ==========
   // 深板岩系列

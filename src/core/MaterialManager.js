@@ -772,6 +772,9 @@ materials.registerMaterial('turret_alias_block', {
   roughness: 0.7,
   metalness: 0.3
 }); // 炮塔方块
+materials.registerMaterial('zombie_nest_alias_block', {
+  textureUrl: './src/assets/textures/zombie_nest_alias_block.png'
+}); // 丧尸巢穴别名方块
 
 
 // 新增金属与宝石方块
@@ -1005,4 +1008,3 @@ materials.registerMaterial('bed_alias_block', {
   color: 0x8B4513,
   roughness: 0.8
 });
-
