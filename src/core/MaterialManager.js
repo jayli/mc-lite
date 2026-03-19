@@ -270,6 +270,10 @@ export async function initializeMaterials() {
     './src/assets/textures/Deepslate_Gold.png',
     './src/assets/textures/Bricks.png',
     './src/assets/textures/flower_Allium.png',
+    './src/assets/textures/Azure_Bluet.png',
+    './src/assets/textures/Dead_Bush.png',
+    './src/assets/textures/Oxeye_Daisy.png',
+    './src/assets/textures/Red_Mushroom.png',
     './src/assets/textures/Cobblestone.png',
     './src/assets/textures/Blue_Wood_Planks.png',
     './src/assets/textures/End_Stone.png',
@@ -299,7 +303,39 @@ export async function initializeMaterials() {
     './src/assets/textures/Snow_top.png',
     './src/assets/textures/Snowy_Grass_Block_side.png',
     './src/assets/textures/ice.png',
-    './src/assets/textures/leaves_with_snow.png'
+    './src/assets/textures/leaves_with_snow.png',
+
+    // ========== 新增方块纹理 (30种) ==========
+    './src/assets/textures/Deepslate.png',
+    './src/assets/textures/Deepslate_Diamond_Ore.png',
+    './src/assets/textures/Polished_Deepslate.png',
+    './src/assets/textures/Glowstone.png',
+    './src/assets/textures/Ochre_Froglight.png',
+    './src/assets/textures/Oxidized_Cut_Copper.png',
+    './src/assets/textures/Weathered_Cut_Copper.png',
+    './src/assets/textures/Lava.png',
+    './src/assets/textures/Block_of_Quartz.png',
+    './src/assets/textures/Quartz_Bricks.png',
+    './src/assets/textures/Brain_Coral_Block.png',
+    './src/assets/textures/Block_of_Amber.png',
+    './src/assets/textures/Floatato.png',
+    './src/assets/textures/Clay.png',
+    './src/assets/textures/End_Stone_Bricks.png',
+    './src/assets/textures/Smooth_Stone.png',
+    './src/assets/textures/Smooth_Stone_1.png',
+    './src/assets/textures/Stone_Bricks.png',
+    './src/assets/textures/Tuff_Bricks.png',
+    './src/assets/textures/Snow.png',
+    './src/assets/textures/Light_Gray_Cloth.png',
+    './src/assets/textures/Pink_Wool.png',
+    './src/assets/textures/Nether_Bricks.png',
+    './src/assets/textures/Nether_Bricks_1.png',
+    './src/assets/textures/Nether_Gold_Ore.png',
+    './src/assets/textures/Netherrack.png',
+    './src/assets/textures/Polished_Blackstone_Bricks.png',
+    './src/assets/textures/Oak_Planks_1.png',
+    './src/assets/textures/Acacia_Planks.png',
+    './src/assets/textures/Bedrock.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -677,6 +713,32 @@ materials.registerMaterial('allium', {
   side: THREE.DoubleSide
 });
 
+// 新增花朵类材质 (4种)
+materials.registerMaterial('azure_bluet', {
+  textureUrl: './src/assets/textures/Azure_Bluet.png',
+  transparent: true,
+  alphaTest: 0.5,
+  side: THREE.DoubleSide
+});
+materials.registerMaterial('dead_bush', {
+  textureUrl: './src/assets/textures/Dead_Bush.png',
+  transparent: true,
+  alphaTest: 0.5,
+  side: THREE.DoubleSide
+});
+materials.registerMaterial('oxeye_daisy', {
+  textureUrl: './src/assets/textures/Oxeye_Daisy.png',
+  transparent: true,
+  alphaTest: 0.5,
+  side: THREE.DoubleSide
+});
+materials.registerMaterial('red_mushroom', {
+  textureUrl: './src/assets/textures/Red_Mushroom.png',
+  transparent: true,
+  alphaTest: 0.5,
+  side: THREE.DoubleSide
+});
+
 materials.registerMaterial('chimney', mkMat('#7f5b37')); // 深棕色烟囱
 const handrailBaseColor = "#b98e5b";
 const handrailPotColor = "#8e6148";
@@ -790,3 +852,60 @@ materials.registerMaterial('snow_leaves', {
     5: snowLeavesSide    // 北面：带雪树叶
   }
 });
+
+// ========== 新增方块材质 (30种) ==========
+
+// 深板岩系列
+materials.registerMaterial('deepslate', { textureUrl: './src/assets/textures/Deepslate.png' });
+materials.registerMaterial('deepslate_diamond_ore', { textureUrl: './src/assets/textures/Deepslate_Diamond_Ore.png' });
+materials.registerMaterial('polished_deepslate', { textureUrl: './src/assets/textures/Polished_Deepslate.png' });
+
+// 发光方块
+materials.registerMaterial('glowstone', { textureUrl: './src/assets/textures/Glowstone.png' });
+materials.registerMaterial('ochre_froglight', { textureUrl: './src/assets/textures/Ochre_Froglight.png' });
+
+// 铜系列
+materials.registerMaterial('oxidized_cut_copper', { textureUrl: './src/assets/textures/Oxidized_Cut_Copper.png' });
+materials.registerMaterial('weathered_cut_copper', { textureUrl: './src/assets/textures/Weathered_Cut_Copper.png' });
+
+// 岩浆
+materials.registerMaterial('lava', { textureUrl: './src/assets/textures/Lava.png' });
+
+// 石英系列
+materials.registerMaterial('block_of_quartz', { textureUrl: './src/assets/textures/Block_of_Quartz.png' });
+materials.registerMaterial('quartz_bricks', { textureUrl: './src/assets/textures/Quartz_Bricks.png' });
+
+// 珊瑚与琥珀
+materials.registerMaterial('brain_coral_block', { textureUrl: './src/assets/textures/Brain_Coral_Block.png' });
+materials.registerMaterial('block_of_amber', { textureUrl: './src/assets/textures/Block_of_Amber.png' });
+materials.registerMaterial('floatato', { textureUrl: './src/assets/textures/Floatato.png' });
+
+// 粘土与石头变体
+materials.registerMaterial('clay', { textureUrl: './src/assets/textures/Clay.png' });
+materials.registerMaterial('end_stone_bricks', { textureUrl: './src/assets/textures/End_Stone_Bricks.png' });
+materials.registerMaterial('smooth_stone', { textureUrl: './src/assets/textures/Smooth_Stone.png' });
+materials.registerMaterial('smooth_stone_1', { textureUrl: './src/assets/textures/Smooth_Stone_1.png' });
+materials.registerMaterial('stone_bricks', { textureUrl: './src/assets/textures/Stone_Bricks.png' });
+materials.registerMaterial('tuff_bricks', { textureUrl: './src/assets/textures/Tuff_Bricks.png' });
+
+// 雪方块
+materials.registerMaterial('snow_block', { textureUrl: './src/assets/textures/Snow.png' });
+
+// 布料与羊毛
+materials.registerMaterial('light_gray_cloth', { textureUrl: './src/assets/textures/Light_Gray_Cloth.png' });
+materials.registerMaterial('pink_wool', { textureUrl: './src/assets/textures/Pink_Wool.png' });
+
+// 下界系列
+materials.registerMaterial('nether_bricks', { textureUrl: './src/assets/textures/Nether_Bricks.png' });
+materials.registerMaterial('nether_bricks_1', { textureUrl: './src/assets/textures/Nether_Bricks_1.png' });
+materials.registerMaterial('nether_gold_ore', { textureUrl: './src/assets/textures/Nether_Gold_Ore.png' });
+materials.registerMaterial('netherrack', { textureUrl: './src/assets/textures/Netherrack.png' });
+materials.registerMaterial('polished_blackstone_bricks', { textureUrl: './src/assets/textures/Polished_Blackstone_Bricks.png' });
+
+// 木板变体
+materials.registerMaterial('oak_planks_1', { textureUrl: './src/assets/textures/Oak_Planks_1.png' });
+materials.registerMaterial('acacia_planks', { textureUrl: './src/assets/textures/Acacia_Planks.png' });
+
+// 基岩
+materials.registerMaterial('bedrock', { textureUrl: './src/assets/textures/Bedrock.png' });
+

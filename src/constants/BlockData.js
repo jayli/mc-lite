@@ -127,6 +127,35 @@ export const BLOCK_DATA = {
     geometryType: 'flower',
     orientationEnabled: true
   },
+  // 新增花朵类方块 (4种)
+  'azure_bluet': {
+    isSolid: false,
+    isTransparent: true,
+    isShadowEnabled: false,
+    geometryType: 'flower',
+    orientationEnabled: true
+  },
+  'dead_bush': {
+    isSolid: false,
+    isTransparent: true,
+    isShadowEnabled: false,
+    geometryType: 'flower',
+    orientationEnabled: true
+  },
+  'oxeye_daisy': {
+    isSolid: false,
+    isTransparent: true,
+    isShadowEnabled: false,
+    geometryType: 'flower',
+    orientationEnabled: true
+  },
+  'red_mushroom': {
+    isSolid: false,
+    isTransparent: true,
+    isShadowEnabled: false,
+    geometryType: 'flower',
+    orientationEnabled: true
+  },
   'vine': {
     isSolid: false,
     isTransparent: true,
@@ -280,7 +309,62 @@ export const BLOCK_DATA = {
     orientationEnabled: false,  // 炮塔不需要旋转朝向
     isShadowEnabled: true,
     geometryType: 'box'
-  }
+  },
+
+  // ========== 新增方块类型 (30种) ==========
+  // 深板岩系列
+  'deepslate': { orientationEnabled: false },
+  'deepslate_diamond_ore': { orientationEnabled: false },
+  'polished_deepslate': { orientationEnabled: false },
+
+  // 发光方块
+  'glowstone': { orientationEnabled: false },
+  'ochre_froglight': { orientationEnabled: false },
+
+  // 铜系列
+  'oxidized_cut_copper': { orientationEnabled: false },
+  'weathered_cut_copper': { orientationEnabled: false },
+
+  // 岩浆
+  'lava': { orientationEnabled: false },
+
+  // 石英系列
+  'block_of_quartz': { orientationEnabled: false },
+  'quartz_bricks': { orientationEnabled: false },
+
+  // 珊瑚与琥珀
+  'brain_coral_block': { orientationEnabled: false },
+  'block_of_amber': { orientationEnabled: false },
+  'floatato': { orientationEnabled: false },
+
+  // 粘土与石头变体
+  'clay': { orientationEnabled: false },
+  'end_stone_bricks': { orientationEnabled: false },
+  'smooth_stone': { orientationEnabled: false },
+  'smooth_stone_1': { orientationEnabled: false },
+  'stone_bricks': { orientationEnabled: false },
+  'tuff_bricks': { orientationEnabled: false },
+
+  // 雪方块 (注意: 命名为 snow_block 避免与现有 snow 冲突)
+  'snow_block': { orientationEnabled: false },
+
+  // 布料与羊毛
+  'light_gray_cloth': { orientationEnabled: false },
+  'pink_wool': { orientationEnabled: false },
+
+  // 下界系列
+  'nether_bricks': { orientationEnabled: false },
+  'nether_bricks_1': { orientationEnabled: false },
+  'nether_gold_ore': { orientationEnabled: false },
+  'netherrack': { orientationEnabled: false },
+  'polished_blackstone_bricks': { orientationEnabled: false },
+
+  // 木板变体
+  'oak_planks_1': { orientationEnabled: false },
+  'acacia_planks': { orientationEnabled: false },
+
+  // 基岩
+  'bedrock': { orientationEnabled: false }
 };
 
 /**

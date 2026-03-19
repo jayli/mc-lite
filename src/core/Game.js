@@ -171,6 +171,10 @@ export class Game {
     this.player.inventory.add('flower', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('short_grass', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('allium', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('azure_bluet', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('dead_bush', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('oxeye_daisy', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('red_mushroom', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('gold_block', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('emerald', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('amethyst', DEFAULT_INVENTORY_COUNT);
@@ -191,6 +195,39 @@ export class Game {
     this.player.inventory.add('ice', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('snow_leaves', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('turret_alias_block', DEFAULT_INVENTORY_COUNT);
+
+    // 新增方块 (30种)
+    this.player.inventory.add('deepslate', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('deepslate_diamond_ore', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('polished_deepslate', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('glowstone', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('ochre_froglight', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('oxidized_cut_copper', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('weathered_cut_copper', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('lava', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('block_of_quartz', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('quartz_bricks', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('brain_coral_block', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('block_of_amber', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('floatato', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('clay', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('end_stone_bricks', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('smooth_stone', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('smooth_stone_1', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('stone_bricks', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('tuff_bricks', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('snow_block', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('light_gray_cloth', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('pink_wool', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('nether_bricks', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('nether_bricks_1', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('nether_gold_ore', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('netherrack', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('polished_blackstone_bricks', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('oak_planks_1', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('acacia_planks', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('bedrock', DEFAULT_INVENTORY_COUNT);
+
     // this.player.inventory.add('cloud', DEFAULT_INVENTORY_COUNT);
 
     // 预加载 JSON 结构数据
