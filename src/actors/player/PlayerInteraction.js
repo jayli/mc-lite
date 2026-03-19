@@ -89,7 +89,7 @@ export class PlayerInteraction {
 
     if (button === 2) {
       const heldItem = this.player.inventory.getSelected()?.item;
-      if (hits.length > 0 && hits[0].distance < 9) {
+      if (hits.length > 0 && hits[0].distance < 15) {
         const hit = hits[0], m = hit.object, instanceId = hit.instanceId;
         if (m.userData.type === 'chest' && m.isInstancedMesh) {
           m.getMatrixAt(instanceId, this.player._dummyMatrix);
@@ -122,7 +122,7 @@ export class PlayerInteraction {
         }
         return;
       }
-      if (hits.length > 0 && hits[0].distance < 9) {
+      if (hits.length > 0 && hits[0].distance < 15) {
         const hit = hits[0], m = hit.object, type = m.userData.type || 'unknown';
         if (e.ctrlKey) {
           if (type === 'tnt') {
@@ -748,7 +748,7 @@ export class PlayerInteraction {
   doSkyPlace(type) {
     const origin = this.player.camera.position;
     this.player.camera.getWorldDirection(this.player._direction);
-    const step = 0.1, maxDist = 9;
+    const step = 0.1, maxDist = 15;
     this.player._tempVector.copy(origin);
     const neighborOffsets = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
     for(let d=0; d<maxDist; d+=step) {

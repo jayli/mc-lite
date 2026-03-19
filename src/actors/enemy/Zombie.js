@@ -28,7 +28,7 @@ const PHYSICS_CONFIG = {
   /** 移动速度（方块/帧） */
   speed: 0.02,
   /** 感知范围（方块） */
-  perceptionRange: 50,
+  perceptionRange: 80,
   /** 碰撞检测安全距离（防止穿模） */
   collisionPadding: 0.2,
   /** 重力加速度 */
