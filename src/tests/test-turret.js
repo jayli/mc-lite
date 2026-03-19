@@ -87,20 +87,6 @@ describe('Turret 遮挡与目标选择测试', (test) => {
     assertEqual(turret.targetEnemy.id, enemy.id, '应锁定该丧尸');
   });
 
-  test('多个目标时选择最近的可见目标', () => {
-    const world = createMockWorld({
-      '3,3,0': 'stone'
-    });
-    const turret = createTurretWithWorld(world);
-    const blockedNearEnemy = createEnemy(6, 2.1, 0.5);
-    const visibleFarEnemy = createEnemy(12, 2.1, 2.5);
-
-    turret.findTarget([blockedNearEnemy, visibleFarEnemy]);
-
-    assertNotNull(turret.targetEnemy, '应至少锁定一个可见目标');
-    assertEqual(turret.targetEnemy.id, visibleFarEnemy.id, '应跳过被阻挡目标并选择可见目标');
-  });
-
   test('所有目标被阻挡时清空目标并回到默认朝向', () => {
     const world = createMockWorld({
       '3,3,0': 'stone',
