@@ -1,6 +1,6 @@
 # Implementation Tasks: 添加新方块类型
 
-**Feature**: 添加新方块类型 | **Branch**: `001-add-blocks` | **Spec**: [spec.md](spec.md) | **Plan**: [plan.md](plan.md)
+**Feature**: 添加新方块类型 | **Branch**: `024-add-blocks` | **Spec**: [spec.md](spec.md) | **Plan**: [plan.md](plan.md)
 
 ---
 

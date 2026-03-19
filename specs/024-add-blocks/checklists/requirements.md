@@ -2,7 +2,7 @@
 
 **Purpose**: Validate specification completeness and quality before proceeding to planning
 **Created**: 2026-03-19
-**Feature**: [specs/001-add-blocks/spec.md](spec.md)
+**Feature**: [specs/024-add-blocks/spec.md](spec.md)
 
 ## Content Quality
 

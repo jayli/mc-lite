@@ -1,6 +1,6 @@
 # Feature Specification: 添加新方块类型
 
-**Feature Branch**: `001-add-blocks`
+**Feature Branch**: `024-add-blocks`
 **Created**: 2026-03-19
 **Status**: Draft
 **Input**: User description: "我要增加一些新的方块，石头块的材料在src/assets/textures目录中，要增加的方块有：Deepslate.png, Deepslate_Diamond_Ore.png, Glowstone.png, Oxidized_Cut_Copper.png, Weathered_Cut_Copper.png, Lava.png, Block_of_Quartz.png, Brain_Coral_Block.png, Block_of_Amber.png, Floatato.png, Clay.png, End_Stone_Bricks.png, Smooth_Stone.png, Smooth_Stone_1.png, Snow.png, Light_Gray_Cloth.png, Nether_Bricks.png, Nether_Bricks_1.png, Nether_Gold_Ore.png, Netherrack.png, Oak_Planks_1.png, Ochre_Froglight.png, Polished_Blackstone_Bricks.png, Pink_Wool.png, Polished_Deepslate.png, Quartz_Bricks.png, Stone_Bricks.png, Tuff_Bricks.png, Acacia_Planks.png, Bedrock.png。这些方块的属性跟stone是一样的"

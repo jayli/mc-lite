@@ -1,7 +1,7 @@
 # Implementation Plan: 添加新方块类型
 
-**Branch**: `001-add-blocks` | **Date**: 2026-03-19 | **Spec**: [spec.md](spec.md)
-**Input**: Feature specification from `/specs/001-add-blocks/spec.md`
+**Branch**: `024-add-blocks` | **Date**: 2026-03-19 | **Spec**: [spec.md](spec.md)
+**Input**: Feature specification from `/specs/024-add-blocks/spec.md`
 
 ## Summary
 
@@ -37,7 +37,7 @@
 ### Documentation (this feature)
 
 ```text
-specs/001-add-blocks/
+specs/024-add-blocks/
 ├── plan.md              # This file
 ├── spec.md              # Feature specification
 ├── checklists/          # Quality checklists
