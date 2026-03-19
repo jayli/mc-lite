@@ -39,9 +39,11 @@ export const TURRET_CONFIG = {
 
   // --- 目标参数 ---
   ENEMY_BODY_OFFSET_Y: 1.2, // 瞄准丧尸上半身的 Y 偏移（胸部位置）
-  LOS_SAMPLE_STEP: 0.25,    // 视线采样步长（格）
+  LOS_SAMPLE_STEP: 0.5,     // 视线采样步长（格）
   LOS_START_EPSILON: 0.1,   // 起点偏移，避免采样到炮塔自身
-  LOS_TARGET_EPSILON: 0.35  // 终点容差，避免目标贴身方块误判
+  LOS_TARGET_EPSILON: 0.35, // 终点容差，避免目标贴身方块误判
+  TARGET_REACQUIRE_INTERVAL: 120, // 目标重选间隔（毫秒）
+  TARGET_LOS_RECHECK_INTERVAL: 100 // 当前目标 LOS 复查间隔（毫秒）
 };
 
 export class Turret {
@@ -76,6 +78,8 @@ export class Turret {
 
     // 射击相关
     this.lastFireTime = 0;
+    this._lastTargetSearchTime = 0;
+    this._lastTargetLosCheckTime = 0;
 
     // 完整性检查降频计数器
     this._integrityCheckCounter = 0;
@@ -84,6 +88,7 @@ export class Turret {
 
     // 结构方块列表（相对坐标）
     this.structureBlocks = this.calculateStructureBlocks();
+    this._occlusionTypeCache = new Map();
 
     // 旋转中心（pivot）位置
     // position.y 是底座下方一格的位置（即放置炮塔的地面层）
@@ -203,8 +208,8 @@ export class Turret {
       return;
     }
 
-    // 寻找目标
-    this.findTarget(enemies);
+    // 寻找目标（带降频与目标保持）
+    this.updateTargetSelection(enemies);
 
     // 旋转瞄准
     this.updateRotation(deltaTime);
@@ -259,17 +264,20 @@ export class Turret {
    */
   findTarget(enemies) {
     let nearestEnemy = null;
-    let minDistance = TURRET_CONFIG.DETECTION_RANGE;
+    let minDistanceSq = TURRET_CONFIG.DETECTION_RANGE * TURRET_CONFIG.DETECTION_RANGE;
 
     for (const enemy of enemies) {
       if (!enemy.isActive || enemy.isDead) continue;
 
-      const dist = distance(this.pivotPosition, enemy.position);
-      if (dist >= minDistance) continue;
+      const dx = enemy.position.x - this.pivotPosition.x;
+      const dy = enemy.position.y - this.pivotPosition.y;
+      const dz = enemy.position.z - this.pivotPosition.z;
+      const distSq = dx * dx + dy * dy + dz * dz;
+      if (distSq >= minDistanceSq) continue;
       if (!this.hasLineOfSightToEnemy(enemy)) continue;
 
-      if (dist < minDistance) {
-        minDistance = dist;
+      if (distSq < minDistanceSq) {
+        minDistanceSq = distSq;
         nearestEnemy = enemy;
       }
     }
@@ -306,14 +314,69 @@ export class Turret {
   }
 
   /**
+   * 更新目标选择（降低每帧全量 LOS 计算开销）
+   * @param {Array} enemies - 丧尸列表
+   */
+  updateTargetSelection(enemies) {
+    const now = Date.now();
+    const hasTarget = !!this.targetEnemy;
+
+    if (hasTarget) {
+      if (!this.targetEnemy.isActive || this.targetEnemy.isDead) {
+        this.targetEnemy = null;
+      } else {
+        const dx = this.targetEnemy.position.x - this.pivotPosition.x;
+        const dy = this.targetEnemy.position.y - this.pivotPosition.y;
+        const dz = this.targetEnemy.position.z - this.pivotPosition.z;
+        const distSq = dx * dx + dy * dy + dz * dz;
+        const rangeSq = TURRET_CONFIG.DETECTION_RANGE * TURRET_CONFIG.DETECTION_RANGE;
+        if (distSq > rangeSq) {
+          this.targetEnemy = null;
+        } else if (now - this._lastTargetLosCheckTime >= TURRET_CONFIG.TARGET_LOS_RECHECK_INTERVAL) {
+          this._lastTargetLosCheckTime = now;
+          if (!this.hasLineOfSightToEnemy(this.targetEnemy)) {
+            this.targetEnemy = null;
+          }
+        }
+      }
+    }
+
+    if (!this.targetEnemy || now - this._lastTargetSearchTime >= TURRET_CONFIG.TARGET_REACQUIRE_INTERVAL) {
+      this.findTarget(enemies);
+      this._lastTargetSearchTime = now;
+      this._lastTargetLosCheckTime = now;
+    } else {
+      // 保持当前目标时也需要持续刷新瞄准角
+      const targetPos = {
+        x: this.targetEnemy.position.x,
+        y: this.targetEnemy.position.y + TURRET_CONFIG.ENEMY_BODY_OFFSET_Y,
+        z: this.targetEnemy.position.z
+      };
+      this.targetRotation = angleTo(this.pivotPosition, targetPos);
+      const dx = targetPos.x - this.pivotPosition.x;
+      const dy = targetPos.y - this.pivotPosition.y;
+      const dz = targetPos.z - this.pivotPosition.z;
+      const horizontalDist = Math.sqrt(dx * dx + dz * dz);
+      let pitch = Math.atan2(dy, horizontalDist);
+      pitch = Math.max(-TURRET_CONFIG.MAX_PITCH_ANGLE, Math.min(TURRET_CONFIG.MAX_PITCH_ANGLE, pitch));
+      this.targetPitch = pitch;
+    }
+  }
+
+  /**
    * 判断方块类型是否会阻挡炮塔视线
    * @param {string|null} blockType - 方块类型
    * @returns {boolean}
    */
   isBlockOccluding(blockType) {
     if (!blockType || blockType === 'air') return false;
+    const cached = this._occlusionTypeCache.get(blockType);
+    if (cached !== undefined) return cached;
+
     const props = getBlockProperties(blockType);
-    return props.isSolid && !props.isTransparent;
+    const result = props.isSolid && !props.isTransparent;
+    this._occlusionTypeCache.set(blockType, result);
+    return result;
   }
 
   /**
@@ -347,12 +410,26 @@ export class Turret {
     const endDistance = Math.max(startDistance, totalDistance - TURRET_CONFIG.LOS_TARGET_EPSILON);
     const step = TURRET_CONFIG.LOS_SAMPLE_STEP;
 
+    let lastX = Number.NaN;
+    let lastY = Number.NaN;
+    let lastZ = Number.NaN;
+
     for (let d = startDistance; d <= endDistance; d += step) {
       const sx = this.pivotPosition.x + dirX * d;
       const sy = this.pivotPosition.y + dirY * d;
       const sz = this.pivotPosition.z + dirZ * d;
 
-      const block = this.world.getBlock(Math.floor(sx), Math.floor(sy), Math.floor(sz));
+      const bx = Math.floor(sx);
+      const by = Math.floor(sy);
+      const bz = Math.floor(sz);
+
+      // 采样步长可能在同一体素内重复，跳过重复查询
+      if (bx === lastX && by === lastY && bz === lastZ) continue;
+      lastX = bx;
+      lastY = by;
+      lastZ = bz;
+
+      const block = this.world.getBlock(bx, by, bz);
       if (this.isBlockOccluding(block)) {
         return false;
       }
@@ -402,6 +479,14 @@ export class Turret {
     // 检查冷却
     const now = Date.now();
     if (now - this.lastFireTime < TURRET_CONFIG.FIRE_COOLDOWN) return;
+
+    // 射击瞬间复核 LOS，确保不对遮挡目标开火
+    if (!this.hasLineOfSightToEnemy(this.targetEnemy)) {
+      this.targetEnemy = null;
+      this.targetRotation = this.defaultRotation;
+      this.targetPitch = 0;
+      return;
+    }
 
     // 检查偏航角是否对准（夹角 < 15度）
     const yawDiff = Math.abs(shortestAngleDiff(this.currentRotation, this.targetRotation));
