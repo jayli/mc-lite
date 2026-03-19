@@ -319,6 +319,7 @@ export class Turret {
    */
   updateTargetSelection(enemies) {
     const now = Date.now();
+    const hasEnemies = Array.isArray(enemies) && enemies.length > 0;
     const hasTarget = !!this.targetEnemy;
 
     if (hasTarget) {
@@ -341,10 +342,25 @@ export class Turret {
       }
     }
 
-    if (!this.targetEnemy || now - this._lastTargetSearchTime >= TURRET_CONFIG.TARGET_REACQUIRE_INTERVAL) {
+    // 场上没有丧尸时，不进行目标扫描，避免空转开销
+    if (!hasEnemies) {
+      if (!this.targetEnemy) {
+        this.targetRotation = this.defaultRotation;
+        this.targetPitch = 0;
+      }
+      return;
+    }
+
+    // 有目标时：仅在达到重选间隔后才允许切换目标
+    // 无目标时：同样按重选间隔扫描，避免每帧全量 LOS
+    if (now - this._lastTargetSearchTime >= TURRET_CONFIG.TARGET_REACQUIRE_INTERVAL) {
       this.findTarget(enemies);
       this._lastTargetSearchTime = now;
       this._lastTargetLosCheckTime = now;
+    } else if (!this.targetEnemy) {
+      // 没有目标但尚未到重选时间，维持默认朝向
+      this.targetRotation = this.defaultRotation;
+      this.targetPitch = 0;
     } else {
       // 保持当前目标时也需要持续刷新瞄准角
       const targetPos = {
