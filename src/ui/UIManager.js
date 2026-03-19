@@ -3,6 +3,7 @@ import { HUD } from './HUD.js';
 import { InventoryUI } from './Inventory.js';
 import { playgroundService } from '../services/PlaygroundService.js';
 import { ZOMBIE_LIMIT_LOW, ZOMBIE_LIMIT_MED, ZOMBIE_LIMIT_HIGH } from '../constants/GameConfig.js';
+import { VISUAL_STYLE_KEYS } from '../core/Engine.js';
 
 /**
  * UI 管理器 - 负责协调所有 UI 组件的初始化和更新
@@ -35,6 +36,8 @@ export class UIManager {
     const btnPerf = document.getElementById('btn-perf');
     const btnMid = document.getElementById('btn-mid');
     const btnQuality = document.getElementById('btn-quality');
+    const btnStyleDay = document.getElementById('btn-style-day');
+    const btnStyleOvercast = document.getElementById('btn-style-overcast');
     const btnSave = document.getElementById('btn-save-game');
     const btnGunDestroyOn = document.getElementById('btn-gun-destroy-on');
     const btnGunDestroyOff = document.getElementById('btn-gun-destroy-off');
@@ -104,6 +107,22 @@ export class UIManager {
       this.hud.showMessage('已切换至画质模式 (1.0x)');
       this.updateActiveButtons();
     };
+
+    // 环境风格切换
+    if (btnStyleDay && btnStyleOvercast) {
+      btnStyleDay.onclick = (e) => {
+        e.stopPropagation();
+        this.game.engine.setVisualStyle(VISUAL_STYLE_KEYS.DAY);
+        this.hud.showMessage('已切换至白天风格');
+        this.updateActiveButtons();
+      };
+      btnStyleOvercast.onclick = (e) => {
+        e.stopPropagation();
+        this.game.engine.setVisualStyle(VISUAL_STYLE_KEYS.OVERCAST);
+        this.hud.showMessage('已切换至阴天风格');
+        this.updateActiveButtons();
+      };
+    }
 
     // 枪械破坏设置
     if (btnGunDestroyOn && btnGunDestroyOff) {
@@ -330,6 +349,8 @@ export class UIManager {
     const btnPerf = document.getElementById('btn-perf');
     const btnMid = document.getElementById('btn-mid');
     const btnQuality = document.getElementById('btn-quality');
+    const btnStyleDay = document.getElementById('btn-style-day');
+    const btnStyleOvercast = document.getElementById('btn-style-overcast');
     const btnGunDestroyOn = document.getElementById('btn-gun-destroy-on');
     const btnGunDestroyOff = document.getElementById('btn-gun-destroy-off');
     const btnZombie20 = document.getElementById('btn-zombie-20');
@@ -341,6 +362,12 @@ export class UIManager {
     btnPerf.classList.toggle('active', scale === 0.4);
     btnMid.classList.toggle('active', scale === 0.7);
     btnQuality.classList.toggle('active', scale === 1.0);
+
+    if (btnStyleDay && btnStyleOvercast) {
+      const currentStyle = this.game.engine.currentVisualStyle;
+      btnStyleDay.classList.toggle('active', currentStyle === VISUAL_STYLE_KEYS.DAY);
+      btnStyleOvercast.classList.toggle('active', currentStyle === VISUAL_STYLE_KEYS.OVERCAST);
+    }
 
     if (btnGunDestroyOn && btnGunDestroyOff) {
       btnGunDestroyOn.classList.toggle('active', this.game.canGunsDestroyBlocks);

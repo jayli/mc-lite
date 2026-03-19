@@ -3,7 +3,7 @@
 
 import { manualSaveService } from '../services/ManualSaveService.js';
 import { persistenceService } from '../services/PersistenceService.js';
-import { Engine } from './Engine.js';
+import { Engine, VISUAL_STYLE_KEYS } from './Engine.js';
 import { World } from '../world/World.js';
 import { UIManager } from '../ui/UIManager.js';
 import { Player } from '../actors/player/Player.js';
@@ -353,7 +353,8 @@ export class Game {
       seed: WORLD_CONFIG.SEED,           // 世界生成种子，用于确保地形一致性
       settings: {                        // 游戏设置
         canGunsDestroyBlocks: this.canGunsDestroyBlocks,
-        maxActiveZombies: this.maxActiveZombies
+        maxActiveZombies: this.maxActiveZombies,
+        visualStyle: this.engine.currentVisualStyle
       }
     };
 
@@ -388,6 +389,8 @@ export class Game {
       this.canGunsDestroyBlocks = saveData.settings.canGunsDestroyBlocks !== undefined ? saveData.settings.canGunsDestroyBlocks : true;
       this.maxActiveZombies = saveData.settings.maxActiveZombies !== undefined ? saveData.settings.maxActiveZombies : 10;
       this.enemyManager.maxActiveZombies = this.maxActiveZombies; // 同步到敌人管理器
+      const visualStyle = saveData.settings.visualStyle || VISUAL_STYLE_KEYS.DAY;
+      this.engine.setVisualStyle(visualStyle);
     }
 
     // 4. 检测创造台状态并更新UI

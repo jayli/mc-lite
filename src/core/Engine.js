@@ -25,6 +25,11 @@ export const FOG_FAR = 70;
 export const SHADOW_MAP_SIZE = 512;
 // 阴影相机的覆盖范围大小（米）
 export const SHADOW_CAMERA_SIZE = 30;
+// 环境风格配置键
+export const VISUAL_STYLE_KEYS = {
+  DAY: 'day',
+  OVERCAST: 'overcast'
+};
 
 export let carModel = null;      // 汽车模型缓存
 export let gunManModel = null;   // 枪手模型缓存
@@ -42,6 +47,33 @@ export class Engine {
     this.scene = new THREE.Scene();
     this.scene.background = null;
     this.scene.fog = new THREE.Fog(FOG_COLOR, FOG_NEAR, FOG_FAR);
+    this.isUnderwater = false;
+    this.currentVisualStyle = VISUAL_STYLE_KEYS.DAY;
+    this.visualStyles = {
+      [VISUAL_STYLE_KEYS.DAY]: {
+        fogColor: FOG_COLOR,
+        fogNear: FOG_NEAR,
+        fogFar: FOG_FAR,
+        directionalLightColor: 0xfffaf0,
+        directionalLightIntensity: 3.2,
+        ambientLightColor: 0xddeeff,
+        ambientLightIntensity: 1,
+        backgroundMode: 'skybox',
+        backgroundColor: null
+      },
+      [VISUAL_STYLE_KEYS.OVERCAST]: {
+        // 阴天参数参考最初版本 components/main.js
+        fogColor: 0x87CEEB,
+        fogNear: 20,
+        fogFar: 90,
+        directionalLightColor: 0xffffff,
+        directionalLightIntensity: 1.2,
+        ambientLightColor: 0xffffff,
+        ambientLightIntensity: 0.5,
+        backgroundMode: 'color',
+        backgroundColor: 0x87CEEB
+      }
+    };
 
     // 2. 相机初始化 (FOV, Aspect, Near, Far)
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
@@ -84,7 +116,8 @@ export class Engine {
     light.shadow.normalBias = 0.078;                  // 设置法线偏移，改善斜面阴影质量
 
     this.scene.add(light);
-    this.scene.add(new THREE.AmbientLight(0xddeeff, 1));
+    this.ambientLight = new THREE.AmbientLight(0xddeeff, 1);
+    this.scene.add(this.ambientLight);
 
     this.light = light;
 
@@ -95,6 +128,7 @@ export class Engine {
 
     this.createSun();
     this.createSkybox();
+    this.setVisualStyle(VISUAL_STYLE_KEYS.DAY);
 
     this.init();
     this.loadModel();
@@ -304,12 +338,51 @@ export class Engine {
 
   createSkybox() {
     const loader = new THREE.CubeTextureLoader();
-    const texture = loader.setPath('src/assets/skyBox4/').load([
+    this.skyboxTexture = loader.setPath('src/assets/skyBox4/').load([
       'posx.jpg', 'negx.jpg',
       'posy.jpg', 'negy.jpg',
       'posz.jpg', 'negz.jpg'
     ]);
-    this.scene.background = texture;
+    this.scene.background = this.skyboxTexture;
+  }
+
+  getVisualStyle(styleKey) {
+    return this.visualStyles[styleKey] || this.visualStyles[VISUAL_STYLE_KEYS.DAY];
+  }
+
+  applySurfaceFogFromStyle() {
+    const style = this.getVisualStyle(this.currentVisualStyle);
+    this.scene.fog.color.set(style.fogColor);
+    this.scene.fog.near = style.fogNear;
+    this.scene.fog.far = style.fogFar;
+
+    if (this.waterMaterial) {
+      this.waterMaterial.uniforms.uFogColor.value.set(style.fogColor);
+      this.waterMaterial.uniforms.uFogNear.value = style.fogNear;
+      this.waterMaterial.uniforms.uFogFar.value = style.fogFar;
+    }
+  }
+
+  setVisualStyle(styleKey) {
+    const targetStyleKey = this.visualStyles[styleKey] ? styleKey : VISUAL_STYLE_KEYS.DAY;
+    const style = this.getVisualStyle(targetStyleKey);
+    this.currentVisualStyle = targetStyleKey;
+
+    this.light.color.set(style.directionalLightColor);
+    this.light.intensity = style.directionalLightIntensity;
+    this.ambientLight.color.set(style.ambientLightColor);
+    this.ambientLight.intensity = style.ambientLightIntensity;
+
+    if (style.backgroundMode === 'skybox' && this.skyboxTexture) {
+      this.scene.background = this.skyboxTexture;
+    } else {
+      this.scene.background = new THREE.Color(style.backgroundColor || 0x87CEEB);
+    }
+
+    // 水下时仍保持水下雾，离开水下后再回到当前风格雾参数
+    if (!this.isUnderwater) {
+      this.applySurfaceFogFromStyle();
+    }
   }
 
   /**
@@ -526,16 +599,8 @@ export class Engine {
       }
     } else {
       if (this.isUnderwater) {
-        this.scene.fog.color.set(FOG_COLOR);
-        this.scene.fog.near = FOG_NEAR;
-        this.scene.fog.far = FOG_FAR;
         this.isUnderwater = false;
-
-        if (this.waterMaterial) {
-          this.waterMaterial.uniforms.uFogColor.value.set(FOG_COLOR);
-          this.waterMaterial.uniforms.uFogNear.value = FOG_NEAR;
-          this.waterMaterial.uniforms.uFogFar.value = FOG_FAR;
-        }
+        this.applySurfaceFogFromStyle();
       }
     }
 
