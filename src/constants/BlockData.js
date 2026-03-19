@@ -364,15 +364,16 @@ export const BLOCK_DATA = {
   'acacia_planks': { orientationEnabled: false },
 
   // 基岩
-  'bedrock': { orientationEnabled: false }
-};
+  'bedrock': { orientationEnabled: false },
 
-/**
- * 获取方块属性的辅助函数
- * 自动为非透明方块启用AO（环境光遮蔽）
- * @param {string|object} type - 方块类型字符串或对象
- * @returns {Object} 方块属性对象（包含自动计算的isAOEnabled）
- */
+  // ========== 新增方块 (6种) - 属性与 stone 一致 ==========
+  'polished_diorite': { orientationEnabled: false },
+  'polished_granite': { orientationEnabled: false },
+  'piston': { orientationEnabled: false },
+  'piston_head': { orientationEnabled: false },
+  'mud_bricks': { orientationEnabled: false },
+  'orange_shulker_box': { orientationEnabled: false }
+};
 export function getBlockProperties(type) {
   if (!type) return { ...DEFAULT_PROPERTIES };
 

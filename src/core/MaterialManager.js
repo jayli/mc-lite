@@ -335,7 +335,15 @@ export async function initializeMaterials() {
     './src/assets/textures/Polished_Blackstone_Bricks.png',
     './src/assets/textures/Oak_Planks_1.png',
     './src/assets/textures/Acacia_Planks.png',
-    './src/assets/textures/Bedrock.png'
+    './src/assets/textures/Bedrock.png',
+
+    // ========== 新增方块纹理 (6种) ==========
+    './src/assets/textures/Polished_Diorite.png',
+    './src/assets/textures/Polished_Granite.png',
+    './src/assets/textures/Piston.png',
+    './src/assets/textures/Piston_Head.png',
+    './src/assets/textures/Mud_Bricks.png',
+    './src/assets/textures/Orange_Shulker_Box.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -908,4 +916,12 @@ materials.registerMaterial('acacia_planks', { textureUrl: './src/assets/textures
 
 // 基岩
 materials.registerMaterial('bedrock', { textureUrl: './src/assets/textures/Bedrock.png' });
+
+// ========== 新增方块材质 (6种) ==========
+materials.registerMaterial('polished_diorite', { textureUrl: './src/assets/textures/Polished_Diorite.png' });
+materials.registerMaterial('polished_granite', { textureUrl: './src/assets/textures/Polished_Granite.png' });
+materials.registerMaterial('piston', { textureUrl: './src/assets/textures/Piston.png' });
+materials.registerMaterial('piston_head', { textureUrl: './src/assets/textures/Piston_Head.png' });
+materials.registerMaterial('mud_bricks', { textureUrl: './src/assets/textures/Mud_Bricks.png' });
+materials.registerMaterial('orange_shulker_box', { textureUrl: './src/assets/textures/Orange_Shulker_Box.png' });
 

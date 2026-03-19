@@ -228,6 +228,14 @@ export class Game {
     this.player.inventory.add('acacia_planks', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('bedrock', DEFAULT_INVENTORY_COUNT);
 
+    // 新增方块 (6种) - 属性与 stone 一致
+    this.player.inventory.add('polished_diorite', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('polished_granite', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('piston', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('piston_head', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('mud_bricks', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('orange_shulker_box', DEFAULT_INVENTORY_COUNT);
+
     // this.player.inventory.add('cloud', DEFAULT_INVENTORY_COUNT);
 
     // 预加载 JSON 结构数据
