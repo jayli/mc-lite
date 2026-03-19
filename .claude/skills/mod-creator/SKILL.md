@@ -1,3 +1,10 @@
+---
+name: mod-creator
+description: 帮助用户根据实体模型示例图创建新的实体模型 JSON 文件，仿照 tank.json 格式，基于已有方块构成 3D 实体（建筑、载具、装饰物等）
+argument-hint: "<entity-name> [群系] [概率] [渲染距离]"
+user-invocable: true
+---
+
 # mod-creator 技能
 
 ## 技能目的
@@ -53,6 +60,8 @@
 **装饰方块**：
 - `allium`, `azure_bluet`, `dead_bush`, `oxeye_daisy`, `red_mushroom`
 - `chimney`, `handrail`, `vertical_pillar`, `horizontal_pillar`
+
+除了这些方块之外，在 `src/constants/BlockData.js` 可能还有其他更多方块类型，也请你一并考虑。
 
 ## 执行流程
 
