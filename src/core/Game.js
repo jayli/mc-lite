@@ -42,7 +42,7 @@ export class Game {
     // 初始化 Stats 监控
     this.stats = new Stats();
     this.stats.dom.style.position = 'absolute';
-    this.stats.dom.style.top = '54px';
+    this.stats.dom.style.top = '10px';
     this.stats.dom.style.right = '10px';
     this.stats.dom.style.left = 'auto'; // 确保不靠左
     document.body.appendChild(this.stats.dom);

@@ -71,7 +71,7 @@ body { margin: 0; overflow: hidden; background-color: #87CEEB; user-select: none
 
 /* 设置按钮样式 */
 #settings-btn {
-  position: absolute; top: 10px; right: 10px;
+  position: absolute; top: 64px; right: 10px;
   width: 33px; height: 33px;
   background: rgba(0,0,0,0.6); border: 2px solid #555;
   color: white; font-size: 24px;
