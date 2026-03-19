@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { shortestAngleDiff, lerpAngle, angleTo, distance, normalizeAngle } from '../../utils/MathUtils.js';
+import { getBlockProperties } from '../../constants/BlockData.js';
 
 // 炮塔配置常量
 export const TURRET_CONFIG = {
@@ -38,6 +39,9 @@ export const TURRET_CONFIG = {
 
   // --- 目标参数 ---
   ENEMY_BODY_OFFSET_Y: 1.2, // 瞄准丧尸上半身的 Y 偏移（胸部位置）
+  LOS_SAMPLE_STEP: 0.25,    // 视线采样步长（格）
+  LOS_START_EPSILON: 0.1,   // 起点偏移，避免采样到炮塔自身
+  LOS_TARGET_EPSILON: 0.35  // 终点容差，避免目标贴身方块误判
 };
 
 export class Turret {
@@ -261,6 +265,9 @@ export class Turret {
       if (!enemy.isActive || enemy.isDead) continue;
 
       const dist = distance(this.pivotPosition, enemy.position);
+      if (dist >= minDistance) continue;
+      if (!this.hasLineOfSightToEnemy(enemy)) continue;
+
       if (dist < minDistance) {
         minDistance = dist;
         nearestEnemy = enemy;
@@ -296,6 +303,62 @@ export class Turret {
       this.targetRotation = this.defaultRotation;
       this.targetPitch = 0;
     }
+  }
+
+  /**
+   * 判断方块类型是否会阻挡炮塔视线
+   * @param {string|null} blockType - 方块类型
+   * @returns {boolean}
+   */
+  isBlockOccluding(blockType) {
+    if (!blockType || blockType === 'air') return false;
+    const props = getBlockProperties(blockType);
+    return props.isSolid && !props.isTransparent;
+  }
+
+  /**
+   * 判断炮塔到敌人是否有无遮挡视线
+   * 规则：仅“实心且不透明”方块会阻挡；未加载区块（null）视为无遮挡
+   * @param {Object} enemy - 丧尸对象
+   * @returns {boolean}
+   */
+  hasLineOfSightToEnemy(enemy) {
+    if (!enemy || !enemy.position || !this.world || !this.world.getBlock) return false;
+
+    const targetX = enemy.position.x;
+    const targetY = enemy.position.y + TURRET_CONFIG.ENEMY_BODY_OFFSET_Y;
+    const targetZ = enemy.position.z;
+
+    const dx = targetX - this.pivotPosition.x;
+    const dy = targetY - this.pivotPosition.y;
+    const dz = targetZ - this.pivotPosition.z;
+    const totalDistance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+    // 目标极近时直接视为可见
+    if (totalDistance <= TURRET_CONFIG.LOS_START_EPSILON) {
+      return true;
+    }
+
+    const dirX = dx / totalDistance;
+    const dirY = dy / totalDistance;
+    const dirZ = dz / totalDistance;
+
+    const startDistance = TURRET_CONFIG.LOS_START_EPSILON;
+    const endDistance = Math.max(startDistance, totalDistance - TURRET_CONFIG.LOS_TARGET_EPSILON);
+    const step = TURRET_CONFIG.LOS_SAMPLE_STEP;
+
+    for (let d = startDistance; d <= endDistance; d += step) {
+      const sx = this.pivotPosition.x + dirX * d;
+      const sy = this.pivotPosition.y + dirY * d;
+      const sz = this.pivotPosition.z + dirZ * d;
+
+      const block = this.world.getBlock(Math.floor(sx), Math.floor(sy), Math.floor(sz));
+      if (this.isBlockOccluding(block)) {
+        return false;
+      }
+    }
+
+    return true;
   }
 
   /**
