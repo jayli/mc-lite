@@ -395,7 +395,7 @@ export class UIManager {
     if (btnTntDestroyToggle) {
       const isEnabled = this.game.canTntDestroyBlocks !== false;
       btnTntDestroyToggle.classList.toggle('active', isEnabled);
-      btnTntDestroyToggle.innerText = isEnabled ? '开启' : '关闭';
+      btnTntDestroyToggle.innerText = isEnabled ? '点击关闭' : '点击开启';
     }
 
     // 更新创造台按钮状态
