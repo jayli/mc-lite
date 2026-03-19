@@ -25,7 +25,7 @@ self.onerror = (e) => {
 };
 
 // 结构数据加载器实例
-const { uglyHouse, desertPyramid, birchTree, birchTreeWithSnow, tank, tower } = structureLoaders;
+const { uglyHouse, desertVillage, desertPyramid, birchTree, birchTreeWithSnow, tank, tower } = structureLoaders;
 
 // Smoothstep 平滑插值
 function smoothstep(edge0, edge1, x) {
@@ -46,6 +46,7 @@ onmessage = async function(e) {
   // 预加载所有结构数据（等待完成后再生成地形）
   await Promise.all([
     uglyHouse.load(),
+    desertVillage.load(),
     desertPyramid.load(),
     birchTree.load(),
     birchTreeWithSnow.load(),
@@ -353,6 +354,13 @@ onmessage = async function(e) {
           if (!occupied && seededRandom(wx, wz, seed + 25) < 0.00016 && safeForStructure) {
             const task = () => generateDesertPyramid(wx, h + 1, wz, fakeChunk, dPlaceholder);
             task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'desertPyramid';
+            structureQueue.push(task);
+            occupied = true;
+          }
+          // 在沙漠地形中生成沙漠村庄（概率与 desert_pyramid 一致：0.00016）
+          if (!occupied && seededRandom(wx, wz, seed + 26) < 0.00016 && safeForStructure) {
+            const task = () => generateDesertVillage(wx, h + 1, wz, fakeChunk, dPlaceholder);
+            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'desertVillage';
             structureQueue.push(task);
             occupied = true;
           }
@@ -928,6 +936,18 @@ function generateTank(x, y, z, chunk, dObj) {
  */
 function generateDesertPyramid(x, y, z, chunk, dObj) {
   desertPyramid.generate(x, y, z, chunk, dObj, true);
+}
+
+/**
+ * 生成沙漠村庄（从 JSON 数据）
+ * @param {number} x - X 坐标（村庄中心点）
+ * @param {number} y - Y 坐标（地面高度）
+ * @param {number} z - Z 坐标（村庄中心点）
+ * @param {Object} chunk - 区块对象
+ * @param {Object} dObj - 数据收集对象
+ */
+function generateDesertVillage(x, y, z, chunk, dObj) {
+  desertVillage.generate(x, y, z, chunk, dObj, true);
 }
 
 /**

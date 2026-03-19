@@ -7,6 +7,7 @@ import { Tree } from '../entities/Tree.js';
 import { Cloud } from '../entities/Cloud.js';
 import { Island } from '../entities/Island.js';
 import { RealisticTree } from '../entities/RealisticTree.js';
+import { structureLoaders } from './StructureLoader.js';
 
 /**
  * 实体管理器单例类
@@ -282,6 +283,16 @@ class EntityManagerClass {
       categories: ['structure', 'building', 'desert']
     }));
 
+    // 沙漠村庄（JSON 加载）
+    this.register('desert_village', new JsonEntity({
+      id: 'desert_village',
+      biomes: ['DESERT'],
+      probability: 0.00016,  // 与 desert_pyramid 保持一致
+      loader: null,  // 将在 initSpecial 中设置
+      crossChunkDist: 10,
+      categories: ['structure', 'building', 'desert']
+    }));
+
     // 坦克（JSON 加载）
     this.register('tank', new JsonEntity({
       id: 'tank',
@@ -423,6 +434,11 @@ class EntityManagerClass {
    * 这些实体的 loader 需要在外部设置
    */
   initSpecial() {
+    this.setLoader('tree_birch', structureLoaders.birchTree);
+    this.setLoader('ugly_house', structureLoaders.uglyHouse);
+    this.setLoader('desert_village', structureLoaders.desertVillage);
+    this.setLoader('tank', structureLoaders.tank);
+
     // 模因人（gun_man.glb）
     this.register('gun_man', new CodeEntity({
       id: 'gun_man',

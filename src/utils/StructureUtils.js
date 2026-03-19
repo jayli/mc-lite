@@ -20,6 +20,7 @@
  */
 export const STRUCTURE_RENDER_DIST = {
   uglyHouse: 24,      // UglyHouse 最大约 40x40
+  desertVillage: 10,  // DesertVillage 约 17x17，含前方台阶和平台
   desertPyramid: 16,  // DesertPyramid 约 25x25，含台阶外扩
   tree: 8,            // RealisticTree 树木
   static_tree: 8,     // 静态树（白桦树、普通树等）
@@ -37,6 +38,7 @@ export const STRUCTURE_RENDER_DIST = {
 export const STRUCTURE_HEIGHT_RANGE_SPECIAL = {
   tank: 35,       // tank 结构 Y 方向±35（共 71 格），覆盖 1-70 的范围
   uglyHouse: 22,  // uglyHouse 结构 Y 方向±22（共 45 格），覆盖 1-44 的范围
+  desertVillage: 12, // DesertVillage 最高约 11 层，预留一定容差
   desertPyramid: 20, // DesertPyramid 最高约 16 层，预留一定容差
   tower: 28       // tower 结构 Y 方向±28，覆盖塔身与屋顶
 };
