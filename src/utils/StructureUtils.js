@@ -24,6 +24,7 @@ export const STRUCTURE_RENDER_DIST = {
   static_tree: 8,     // 静态树（白桦树、普通树等）
   house: 5,           // 普通小屋约 5x5
   tank: 20,           // Tank 尺寸约 35x70x40 (X/Z: ±20, Y: 根据实际结构调整)
+  tower: 8,           // 海岛高塔尺寸约 9x28x10
   rover: 3,           // 火星车
   gunman: 3,          // 模型人
   island: 16          // 空岛跨Chunk渲染距离
@@ -34,7 +35,8 @@ export const STRUCTURE_RENDER_DIST = {
  */
 export const STRUCTURE_HEIGHT_RANGE_SPECIAL = {
   tank: 35,       // tank 结构 Y 方向±35（共 71 格），覆盖 1-70 的范围
-  uglyHouse: 22   // uglyHouse 结构 Y 方向±22（共 45 格），覆盖 1-44 的范围
+  uglyHouse: 22,  // uglyHouse 结构 Y 方向±22（共 45 格），覆盖 1-44 的范围
+  tower: 28       // tower 结构 Y 方向±28，覆盖塔身与屋顶
 };
 
 /**

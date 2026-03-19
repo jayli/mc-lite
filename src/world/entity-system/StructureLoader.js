@@ -162,6 +162,7 @@ export const structureLoaders = {
   birchTree: new StructureLoader('brich_tree', new URL('../structures/brich_tree.json', moduleBase).href),
   birchTreeWithSnow: new StructureLoader('brich_tree_with_snow', new URL('../structures/brich_tree_with_snow.json', moduleBase).href),
   tank: new StructureLoader('tank', new URL('../structures/tank.json', moduleBase).href),
+  tower: new StructureLoader('tower', new URL('../structures/tower.json', moduleBase).href),
   bed: new StructureLoader('bed', new URL('../structures/bed.json', moduleBase).href)
 };
 
@@ -175,6 +176,7 @@ export async function preloadAllStructures() {
     structureLoaders.birchTree.load(),
     structureLoaders.birchTreeWithSnow.load(),
     structureLoaders.tank.load(),
+    structureLoaders.tower.load(),
     structureLoaders.bed.load()
   ]);
   console.log('All structures preloaded');

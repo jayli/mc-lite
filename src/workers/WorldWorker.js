@@ -25,7 +25,7 @@ self.onerror = (e) => {
 };
 
 // 结构数据加载器实例
-const { uglyHouse, birchTree, birchTreeWithSnow, tank } = structureLoaders;
+const { uglyHouse, birchTree, birchTreeWithSnow, tank, tower } = structureLoaders;
 
 // Smoothstep 平滑插值
 function smoothstep(edge0, edge1, x) {
@@ -48,7 +48,8 @@ onmessage = async function(e) {
     uglyHouse.load(),
     birchTree.load(),
     birchTreeWithSnow.load(),
-    tank.load()
+    tank.load(),
+    tower.load()
   ]).catch(err => console.error('Failed to load structure data:', err));
 
   // 计算当前区块的范围 - 提前定义，供 snapshot 模式使用
@@ -64,6 +65,7 @@ onmessage = async function(e) {
   let rovers = []; // 记录火星车的位置
   const structureQueue = []; // 结构生成队列，确保结构覆盖地形
   const structureCenters = []; // 结构中心点列表，用于跨 Chunk 渲染
+  const islandTowerCenters = new Set(); // 记录海岛高塔中心，保证每座海岛只生成一次
 
   // 模拟 Chunk 类的 add 方法 - 改为写入 blockMap
   const fakeChunk = {
@@ -149,6 +151,7 @@ onmessage = async function(e) {
         // 海岛生成逻辑
         const islandResult = IslandMap.generate(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, seed);
         const distanceFromCenter = islandInfo.distFromCenter;
+        const towerExclusionRadius = 5;
         const waterRingMax = 15 + 4 + 20; // 海岛半径 + 过渡带 + 海水环
 
         // 在海岛四周强制生成沙块填充（确保与大陆隔离至少 20 格）
@@ -174,6 +177,19 @@ onmessage = async function(e) {
 
         // 在海岛主体区域生成树木（减少概率，每座海岛约 1 棵）
         if (islandResult && islandInfo.zone === 'core' && !islandResult.isBelowSeaLevel) {
+          const isTowerCenter = wx === islandInfo.centerX && wz === islandInfo.centerZ;
+          const towerCenterKey = `${islandInfo.centerX},${islandInfo.centerZ}`;
+
+          if (isTowerCenter && !islandTowerCenters.has(towerCenterKey)) {
+            const task = () => generateTower(islandInfo.centerX, islandResult.surfaceY + 1, islandInfo.centerZ, fakeChunk, dPlaceholder);
+            task.centerX = islandInfo.centerX;
+            task.centerY = islandResult.surfaceY + 1;
+            task.centerZ = islandInfo.centerZ;
+            task.type = 'tower';
+            structureQueue.push(task);
+            islandTowerCenters.add(towerCenterKey);
+          }
+
           // 使用区块级别的确定性随机来决定是否生成树木
           const treeChance = seededRandom(wx, wz, seed + 100);
           const treeCount = islandInfo.transitionFactor === 0 ? (treeChance < 0.0015 ? 2 : treeChance < 0.003 ? 1 : 0) : 0;
@@ -189,7 +205,11 @@ onmessage = async function(e) {
 
               // 检查树木位置是否在海岛范围内
               const treeIslandInfo = IslandMap.getIslandInfo(treeX, treeZ, seed, terrainGen);
-              if (treeIslandInfo && treeIslandInfo.zone === 'core') {
+              const distFromTowerCenter = Math.max(
+                Math.abs(treeX - islandInfo.centerX),
+                Math.abs(treeZ - islandInfo.centerZ)
+              );
+              if (treeIslandInfo && treeIslandInfo.zone === 'core' && distFromTowerCenter > towerExclusionRadius) {
                 const task = () => Tree.generate(treeX, treeY, treeZ, fakeChunk, 'default', dPlaceholder);
                 task.centerX = treeX;
                 task.centerY = treeY;
@@ -888,6 +908,18 @@ function generateBirchTreeWithSnow(x, y, z, chunk, dObj) {
  */
 function generateTank(x, y, z, chunk, dObj) {
   tank.generate(x, y, z, chunk, dObj, true);
+}
+
+/**
+ * 生成海岛高塔（从 JSON 数据）
+ * @param {number} x - X 坐标（高塔中心点）
+ * @param {number} y - Y 坐标（地面高度）
+ * @param {number} z - Z 坐标（高塔中心点）
+ * @param {Object} chunk - 区块对象
+ * @param {Object} dObj - 数据收集对象
+ */
+function generateTower(x, y, z, chunk, dObj) {
+  tower.generate(x, y, z, chunk, dObj, true);
 }
 
 /**
