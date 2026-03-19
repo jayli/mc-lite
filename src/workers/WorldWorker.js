@@ -288,6 +288,18 @@ onmessage = async function(e) {
                 structureQueue.push(task);
               }
             }
+          } else if (forestRand < 0.10) {
+            // 在森林中生成更多的新植物
+            const plantRand = seededRandom(wx, wz, seed + 19);
+            if (plantRand < 0.25) {
+              fakeChunk.add(wx, h + 1, wz, 'azure_bluet', dPlaceholder, false);
+            } else if (plantRand < 0.40) {
+              fakeChunk.add(wx, h + 1, wz, 'oxeye_daisy', dPlaceholder, false);
+            } else if (plantRand < 0.55) {
+              fakeChunk.add(wx, h + 1, wz, 'red_mushroom', dPlaceholder, false);
+            } else if (plantRand < 0.70) {
+              fakeChunk.add(wx, h + 1, wz, 'dead_bush', dPlaceholder, false);
+            }
           }
         } else if (centerBiome === 'AZALEA') {
           if (seededRandom(wx, wz, seed + 19) < 0.045) {
@@ -306,6 +318,11 @@ onmessage = async function(e) {
         } else if (centerBiome === 'DESERT') {
           let occupied = false;
           if (seededRandom(wx, wz, seed + 21) < 0.01) fakeChunk.add(wx, h + 1, wz, 'cactus', dPlaceholder);
+          // 沙漠中生成少量 dead_bush
+          if (!occupied && seededRandom(wx, wz, seed + 24) < 0.005) {
+            fakeChunk.add(wx, h + 1, wz, 'dead_bush', dPlaceholder, false);
+            occupied = true;
+          }
           if (seededRandom(wx, wz, seed + 22) < 0.0005 && safeForStructure) {
             const task = () => generateStructure('rover', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers);
             task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'rover';
@@ -337,9 +354,26 @@ onmessage = async function(e) {
             if (randPlant < 0.05) {
               fakeChunk.add(wx, h + 1, wz, 'short_grass', dPlaceholder, false);
             } else if (randPlant < 0.10) {
+              // 花朵类型：allium、普通flower、azure_bluet
               const flowerRand = seededRandom(wx, wz, seed + 3);
-              const flowerType = flowerRand < 0.33 ? 'allium' : 'flower';
+              let flowerType;
+              if (flowerRand < 0.33) {
+                flowerType = 'allium';
+              } else if (flowerRand < 0.66) {
+                flowerType = 'flower';
+              } else {
+                flowerType = 'azure_bluet';
+              }
               fakeChunk.add(wx, h + 1, wz, flowerType, dPlaceholder, false);
+            } else if (randPlant < 0.11) {
+              // 少量生成 oxeye_daisy（1%概率）
+              fakeChunk.add(wx, h + 1, wz, 'oxeye_daisy', dPlaceholder, false);
+            } else if (randPlant < 0.115) {
+              // 少量生成 red_mushroom（0.5%概率）
+              fakeChunk.add(wx, h + 1, wz, 'red_mushroom', dPlaceholder, false);
+            } else if (randPlant < 0.13) {
+              // 少量生成 dead_bush（1.5%概率）
+              fakeChunk.add(wx, h + 1, wz, 'dead_bush', dPlaceholder, false);
             }
           }
           if (seededRandom(wx, wz, seed + 4) < 0.001 && safeForStructure) {
@@ -699,7 +733,9 @@ const isTransparent = (type) => {
   // 默认情况：'air', 'water'等为透明
   return type === 'air' || type === 'water' || type === 'glass_block' ||
          type === 'glass_blink' || type === 'flower' || type === 'short_grass' ||
-         type === 'allium' || type === 'vine' || type === 'lilypad';
+         type === 'allium' || type === 'vine' || type === 'lilypad' ||
+         type === 'azure_bluet' || type === 'dead_bush' || type === 'oxeye_daisy' ||
+         type === 'red_mushroom';
 };
 
 /**
