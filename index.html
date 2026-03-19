@@ -49,18 +49,22 @@
                 <button id="btn-quality" class="btn-small">画质 (1.0x)</button>
               </div>
             </div>
-            <div class="setting-item" style="margin-top:10px;">
-              <span style="text-align:left;">环境风格:</span>
-              <div class="btn-group">
-                <button id="btn-style-day" class="btn-small">白天</button>
-                <button id="btn-style-overcast" class="btn-small">阴天</button>
-              </div>
-            </div>
-            <div class="setting-item" style="margin-top:10px;">
-              <span style="text-align:left;">枪械破坏:</span>
-              <div class="btn-group">
-                <button id="btn-gun-destroy-on" class="btn-small">开启</button>
-                <button id="btn-gun-destroy-off" class="btn-small">关闭</button>
+            <div class="setting-item setting-combined-item" style="margin-top:10px;">
+              <div class="setting-combined-box">
+                <div class="setting-combined-col">
+                  <span style="text-align:left;">环境风格:</span>
+                  <div class="btn-group">
+                    <button id="btn-style-day" class="btn-small">白天</button>
+                    <button id="btn-style-overcast" class="btn-small">阴天</button>
+                  </div>
+                </div>
+                <div class="setting-combined-col">
+                  <span style="text-align:left;">枪械破坏:</span>
+                  <div class="btn-group">
+                    <button id="btn-gun-destroy-on" class="btn-small">开启</button>
+                    <button id="btn-gun-destroy-off" class="btn-small">关闭</button>
+                  </div>
+                </div>
               </div>
             </div>
             <div class="setting-item" style="margin-top:10px;">
@@ -82,11 +86,11 @@
             <!-- 位置变更功能按钮 -->
             <div class="setting-item">
               <span style="text-align:left;">位置变更:</span>
-              <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
-                <button id="btn-teleport-frozen" style="flex:1; min-width:80px; background:#5b9bd5;">冰封山峰</button>
-                <button id="btn-teleport-pyramid" style="flex:1; min-width:80px; background:#ed7d31;">金字塔</button>
-                <button id="btn-teleport-island" style="flex:1; min-width:80px; background:#2ca02c;">海岛</button>
-                <button id="btn-teleport-snow" style="flex:1; min-width:80px; background:#aec7e8;">雪地</button>
+              <div class="landmark-btn-row" style="margin-top:8px;">
+                <button id="btn-teleport-frozen" style="background:#5b9bd5;">冰封山峰</button>
+                <button id="btn-teleport-pyramid" style="background:#ed7d31;">金字塔</button>
+                <button id="btn-teleport-island" style="background:#2ca02c;">海岛</button>
+                <button id="btn-teleport-snow" style="background:#aec7e8;">雪地</button>
               </div>
               <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
                 <button id="btn-record-position" style="flex:1; min-width:120px; background:#4a90e2;">记录当前位置</button>

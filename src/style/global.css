@@ -137,3 +137,44 @@ button.active {
   border-top: none;
   padding-top: 0;
 }
+
+/* 第一列第二行：环境风格 + 枪械破坏合并块 */
+.setting-combined-item {
+  border: 1px solid #888;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.setting-combined-box {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.setting-combined-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 8px;
+}
+
+.setting-combined-col:first-child {
+  border-right: 1px solid #888;
+  padding-left: 0;
+}
+
+.setting-combined-col:last-child {
+  padding-right: 0;
+}
+
+/* 位置变更：地标按钮固定一行四列 */
+.landmark-btn-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.landmark-btn-row button {
+  padding-left: 4px;
+  padding-right: 4px;
+  white-space: nowrap;
+}
