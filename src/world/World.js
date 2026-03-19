@@ -20,7 +20,6 @@ const getParticleSystem = () => globalThis._ParticleSystem || ParticleSystem;
 const CHUNK_SIZE = 16;
 /** 渲染距离（以区块为单位），玩家周围 3x3 的区块将被加载 */
 const RENDER_DIST = 3;
-
 /**
  * 世界管理器类
  * 管理游戏世界中的所有区块、粒子效果和方块操作，是世界数据的中央访问点
@@ -74,6 +73,12 @@ export class World {
     // 用于 Mag7、TNT 等批量删除场景，避免 AO 阴影计算丢失
     this.batchFaceCullingTimeout = null;
 
+    // --- 方块查询缓存 ---
+    // 命中缓存：blockKey -> 所属 chunkKey（仅缓存跨区块命中）
+    this.crossChunkOwnerCache = new Map();
+    // miss 缓存：仅在当前帧有效，避免同帧重复全量扫描
+    this.crossChunkMissCache = new Set();
+
     // 初始化 AO 修复管理器（暂时禁用，Mag7 现在使用 isBatch=false）
     // this.aoRepairManager = new AORepairManager(this);
   }
@@ -84,6 +89,11 @@ export class World {
    * @param {number} dt - 自上一帧以来的增量时间（秒）
    */
   update(playerPos = new THREE.Vector3(), dt = 0) {
+    // 每帧清空 miss 缓存，避免跨帧陈旧查询结果影响其它系统
+    this.crossChunkMissCache.clear();
+
+    let chunkTopologyChanged = false;
+
     // 计算玩家所在的区块坐标
     const cx = Math.floor(playerPos.x / CHUNK_SIZE);
     const cz = Math.floor(playerPos.z / CHUNK_SIZE);
@@ -97,6 +107,7 @@ export class World {
           const chunk = new Chunk(cx + i, cz + j, this);
           this.chunks.set(key, chunk);
           this.scene.add(chunk.group);
+          chunkTopologyChanged = true;
         }
       }
     }
@@ -116,7 +127,12 @@ export class World {
         }
         chunk.dispose(); // 释放显存
         this.chunks.delete(key);
+        chunkTopologyChanged = true;
       }
+    }
+
+    if (chunkTopologyChanged) {
+      this.clearBlockLookupCaches();
     }
 
     // 更新粒子系统逻辑（运动、透明度衰减等）
@@ -277,6 +293,9 @@ export class World {
     // if (this.aoRepairManager) {
     //   this.aoRepairManager.recordBatchRemoval(positions);
     // }
+
+    // 批量删除会修改多个 chunk 的 blockData，统一清理查询缓存
+    this.clearBlockLookupCaches();
   }
 
   /**
@@ -340,21 +359,46 @@ export class World {
     if (chunk) {
       const entry = chunk.blockData[blockKey];
       if (entry) {
-        return parseBlockEntry(entry).type;
+        // 本地命中优先，避免旧跨区块缓存干扰
+        this.crossChunkOwnerCache.delete(blockKey);
+        this.crossChunkMissCache.delete(blockKey);
+        return this.getBlockTypeFromEntry(entry);
       }
+    }
+
+    // 跨区块命中缓存
+    const ownerChunkKey = this.crossChunkOwnerCache.get(blockKey);
+    if (ownerChunkKey) {
+      const ownerChunk = this.chunks.get(ownerChunkKey);
+      if (ownerChunk && ownerChunk.isReady && ownerChunk !== chunk) {
+        const entry = ownerChunk.blockData[blockKey];
+        if (entry) {
+          return this.getBlockTypeFromEntry(entry);
+        }
+      }
+      // 缓存失效，回退到扫描
+      this.crossChunkOwnerCache.delete(blockKey);
+    }
+
+    // 单帧 miss 缓存，避免同帧高频重复全量扫描
+    if (this.crossChunkMissCache.has(blockKey)) {
+      return null;
     }
 
     // 跨Chunk实体方块查找：搜索所有已加载的Chunk
     // 跨Chunk实体的blockData存储在结构中心所在的Chunk中
-    for (const [, otherChunk] of this.chunks) {
+    for (const [otherKey, otherChunk] of this.chunks) {
       if (otherChunk.isReady && otherChunk !== chunk) {
         const entry = otherChunk.blockData[blockKey];
         if (entry) {
-          return parseBlockEntry(entry).type;
+          this.crossChunkOwnerCache.set(blockKey, otherKey);
+          this.crossChunkMissCache.delete(blockKey);
+          return this.getBlockTypeFromEntry(entry);
         }
       }
     }
 
+    this.crossChunkMissCache.add(blockKey);
     return null;
   }
 
@@ -415,6 +459,7 @@ export class World {
 
     // 逻辑委托：调用区块的动态添加方法，处理网格生成和邻居面更新
     chunk.addBlockDynamic(x, y, z, typeOrEntry, orientation);
+    this.clearBlockLookupCaches();
   }
 
   /**
@@ -434,6 +479,7 @@ export class World {
     // 首先尝试在方块坐标所在的Chunk删除
     if (chunk && chunk.blockData[blockKey]) {
       chunk.removeBlock(x, y, z);
+      this.clearBlockLookupCaches();
       return;
     }
 
@@ -441,6 +487,7 @@ export class World {
     for (const [, otherChunk] of this.chunks) {
       if (otherChunk.isReady && otherChunk !== chunk && otherChunk.blockData[blockKey]) {
         otherChunk.removeBlock(x, y, z);
+        this.clearBlockLookupCaches();
         return;
       }
     }
@@ -459,6 +506,25 @@ export class World {
     const chunk = this.chunks.get(key);
     if (chunk) {
       chunk.removeCollisionKey(x, y, z);
+      this.clearBlockLookupCaches();
     }
+  }
+
+  /**
+   * 从 blockData 条目中提取方块类型（兼容字符串/对象）
+   * @param {string|object} entry - 方块条目
+   * @returns {string}
+   */
+  getBlockTypeFromEntry(entry) {
+    if (typeof entry === 'string') return entry;
+    return parseBlockEntry(entry).type;
+  }
+
+  /**
+   * 清空 getBlock 相关缓存
+   */
+  clearBlockLookupCaches() {
+    this.crossChunkOwnerCache.clear();
+    this.crossChunkMissCache.clear();
   }
 }
