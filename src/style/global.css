@@ -138,6 +138,13 @@ button.active {
   padding-top: 0;
 }
 
+.setting-title {
+  text-align: left;
+  font-size: 14px;
+  line-height: 1.2;
+  font-weight: bold;
+}
+
 /* 第一列第二行：环境风格 + 枪械破坏合并块 */
 .setting-combined-item {
   border: 1px solid #888;
@@ -164,6 +171,12 @@ button.active {
 
 .setting-combined-col:last-child {
   padding-right: 0;
+}
+
+.btn-status-toggle {
+  width: 100%;
+  padding: 6px 4px;
+  font-size: 12px;
 }
 
 /* 位置变更：地标按钮固定一行四列 */

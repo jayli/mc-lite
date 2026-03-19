@@ -44,6 +44,7 @@ export class UIManager {
     const btnZombie20 = document.getElementById('btn-zombie-20');
     const btnZombie30 = document.getElementById('btn-zombie-30');
     const btnZombie50 = document.getElementById('btn-zombie-50');
+    const btnTntDestroyToggle = document.getElementById('btn-tnt-destroy-toggle');
     const btnCreatePlayground = document.getElementById('btn-create-playground');
     const btnExportModel = document.getElementById('btn-export-model');
     const btnTeleportFrozen = document.getElementById('btn-teleport-frozen');
@@ -161,6 +162,16 @@ export class UIManager {
         this.game.maxActiveZombies = ZOMBIE_LIMIT_HIGH;
         this.game.enemyManager.maxActiveZombies = ZOMBIE_LIMIT_HIGH;
         this.hud.showMessage(`已设置丧尸数量上限为 ${ZOMBIE_LIMIT_HIGH} 个`);
+        this.updateActiveButtons();
+      };
+    }
+
+    // TNT 破坏方块设置（单按钮开关）
+    if (btnTntDestroyToggle) {
+      btnTntDestroyToggle.onclick = (e) => {
+        e.stopPropagation();
+        this.game.canTntDestroyBlocks = !this.game.canTntDestroyBlocks;
+        this.hud.showMessage(this.game.canTntDestroyBlocks ? '已开启 TNT 爆炸破坏方块' : '已关闭 TNT 爆炸破坏方块');
         this.updateActiveButtons();
       };
     }
@@ -356,6 +367,7 @@ export class UIManager {
     const btnZombie20 = document.getElementById('btn-zombie-20');
     const btnZombie30 = document.getElementById('btn-zombie-30');
     const btnZombie50 = document.getElementById('btn-zombie-50');
+    const btnTntDestroyToggle = document.getElementById('btn-tnt-destroy-toggle');
 
     if (!btnPerf || !btnMid || !btnQuality) return;
 
@@ -378,6 +390,12 @@ export class UIManager {
       btnZombie20.classList.toggle('active', this.game.maxActiveZombies === ZOMBIE_LIMIT_LOW);
       btnZombie30.classList.toggle('active', this.game.maxActiveZombies === ZOMBIE_LIMIT_MED);
       btnZombie50.classList.toggle('active', this.game.maxActiveZombies === ZOMBIE_LIMIT_HIGH);
+    }
+
+    if (btnTntDestroyToggle) {
+      const isEnabled = this.game.canTntDestroyBlocks !== false;
+      btnTntDestroyToggle.classList.toggle('active', isEnabled);
+      btnTntDestroyToggle.innerText = isEnabled ? '开启' : '关闭';
     }
 
     // 更新创造台按钮状态

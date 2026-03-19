@@ -48,6 +48,7 @@ export class Game {
     document.body.appendChild(this.stats.dom);
 
     this.canGunsDestroyBlocks = false; // 是否允许枪械破坏方块
+    this.canTntDestroyBlocks = true; // 是否允许 TNT 爆炸破坏方块
     this.maxActiveZombies = 20; // 最大活跃丧尸数
 
     this.isRunning = false; // 游戏运行状态标志
@@ -353,6 +354,7 @@ export class Game {
       seed: WORLD_CONFIG.SEED,           // 世界生成种子，用于确保地形一致性
       settings: {                        // 游戏设置
         canGunsDestroyBlocks: this.canGunsDestroyBlocks,
+        canTntDestroyBlocks: this.canTntDestroyBlocks,
         maxActiveZombies: this.maxActiveZombies,
         visualStyle: this.engine.currentVisualStyle
       }
@@ -387,6 +389,7 @@ export class Game {
     // 3. 恢复设置
     if (saveData.settings) {
       this.canGunsDestroyBlocks = saveData.settings.canGunsDestroyBlocks !== undefined ? saveData.settings.canGunsDestroyBlocks : true;
+      this.canTntDestroyBlocks = saveData.settings.canTntDestroyBlocks !== undefined ? saveData.settings.canTntDestroyBlocks : true;
       this.maxActiveZombies = saveData.settings.maxActiveZombies !== undefined ? saveData.settings.maxActiveZombies : 10;
       this.enemyManager.maxActiveZombies = this.maxActiveZombies; // 同步到敌人管理器
       const visualStyle = saveData.settings.visualStyle || VISUAL_STYLE_KEYS.DAY;

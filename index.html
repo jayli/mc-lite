@@ -42,7 +42,7 @@
           <!-- 左侧列：画质、枪械、丧尸、存档 -->
           <div class="settings-column">
             <div class="setting-item">
-              <span style="text-align:left;">渲染画质:</span>
+              <span class="setting-title">渲染画质:</span>
               <div class="btn-group">
                 <button id="btn-perf" class="btn-small">性能 (0.4x)</button>
                 <button id="btn-mid" class="btn-small">平衡 (0.7x)</button>
@@ -52,14 +52,14 @@
             <div class="setting-item setting-combined-item" style="margin-top:10px;">
               <div class="setting-combined-box">
                 <div class="setting-combined-col">
-                  <span style="text-align:left;">环境风格:</span>
+                  <span class="setting-title">环境风格:</span>
                   <div class="btn-group">
                     <button id="btn-style-day" class="btn-small">白天</button>
                     <button id="btn-style-overcast" class="btn-small">阴天</button>
                   </div>
                 </div>
                 <div class="setting-combined-col">
-                  <span style="text-align:left;">枪械破坏:</span>
+                  <span class="setting-title">枪械破坏:</span>
                   <div class="btn-group">
                     <button id="btn-gun-destroy-on" class="btn-small">开启</button>
                     <button id="btn-gun-destroy-off" class="btn-small">关闭</button>
@@ -67,17 +67,25 @@
                 </div>
               </div>
             </div>
-            <div class="setting-item" style="margin-top:10px;">
-              <span style="text-align:left;">丧尸数量:</span>
-              <div class="btn-group">
-                <button id="btn-zombie-20" class="btn-small">20个</button>
-                <button id="btn-zombie-30" class="btn-small">30个</button>
-                <button id="btn-zombie-50" class="btn-small">50个</button>
+            <div class="setting-item setting-combined-item" style="margin-top:10px;">
+              <div class="setting-combined-box">
+                <div class="setting-combined-col">
+                  <span class="setting-title">丧尸数量:</span>
+                  <div class="btn-group">
+                    <button id="btn-zombie-20" class="btn-small">20个</button>
+                    <button id="btn-zombie-30" class="btn-small">30个</button>
+                    <button id="btn-zombie-50" class="btn-small">50个</button>
+                  </div>
+                </div>
+                <div class="setting-combined-col">
+                  <span class="setting-title">TNT破坏方块:</span>
+                  <button id="btn-tnt-destroy-toggle" class="btn-small btn-status-toggle">开启</button>
+                </div>
               </div>
             </div>
             <!-- 存档功能按钮 -->
             <div class="setting-item" style="margin-top:15px; padding-top:15px;">
-              <span style="text-align:left;">游戏存档:</span>
+              <span class="setting-title">游戏存档:</span>
               <button id="btn-save-game" style="width:100%; margin-top:5px; background:#4a90e2;">保存当前进度 (存档)</button>
             </div>
           </div>
@@ -85,7 +93,7 @@
           <div class="settings-column">
             <!-- 位置变更功能按钮 -->
             <div class="setting-item">
-              <span style="text-align:left;">位置变更:</span>
+              <span class="setting-title">位置变更:</span>
               <div class="landmark-btn-row" style="margin-top:8px;">
                 <button id="btn-teleport-frozen" style="background:#5b9bd5;">冰封山峰</button>
                 <button id="btn-teleport-pyramid" style="background:#ed7d31;">金字塔</button>
@@ -99,7 +107,7 @@
             </div>
             <!-- 创造台功能按钮 -->
             <div class="setting-item" style="margin-top:15px; padding-top:15px;">
-              <span style="text-align:left;">模型创造台:</span>
+              <span class="setting-title">模型创造台:</span>
               <button id="btn-create-playground" style="width:100%; margin-top:5px; background:#4a90e2;">打开创造台</button>
               <button id="btn-export-model" style="width:100%; margin-top:5px; background:#8b8b8b; display:none;">导出模型</button>
             </div>

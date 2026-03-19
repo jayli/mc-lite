@@ -490,11 +490,14 @@ export class PlayerInteraction {
       const { blocksToDestroy, tntToIgnite, center } = data.payload;
       const ignitingKeys = new Set(this.player.ignitingTNTs);
       tntToIgnite.forEach(tnt => ignitingKeys.add(`${tnt.x},${tnt.y},${tnt.z}`));
-      this.player.world.removeBlocksBatch(blocksToDestroy.filter(p => {
-        if (ignitingKeys.has(`${p.x},${p.y},${p.z}`)) return false;
-        const type = this.player.world.getBlock(p.x, p.y, p.z);
-        return type && (type !== 'end_stone' || this.player.world.getBlock(p.x, p.y - 1, p.z));
-      }));
+      const canTntDestroyBlocks = this.player.game?.canTntDestroyBlocks !== false;
+      if (canTntDestroyBlocks) {
+        this.player.world.removeBlocksBatch(blocksToDestroy.filter(p => {
+          if (ignitingKeys.has(`${p.x},${p.y},${p.z}`)) return false;
+          const type = this.player.world.getBlock(p.x, p.y, p.z);
+          return type && (type !== 'end_stone' || this.player.world.getBlock(p.x, p.y - 1, p.z));
+        }));
+      }
       tntToIgnite.forEach(tnt => {
         const key = `${tnt.x},${tnt.y},${tnt.z}`;
         if (this.player.ignitingTNTs.has(key)) return;
