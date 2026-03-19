@@ -159,6 +159,7 @@ const moduleBase = new URL('.', import.meta.url).href;
  */
 export const structureLoaders = {
   uglyHouse: new StructureLoader('ugly_house', new URL('../structures/ugly_house.json', moduleBase).href),
+  desertPyramid: new StructureLoader('desert_pyramid', new URL('../structures/desert_pyramid.json', moduleBase).href),
   birchTree: new StructureLoader('brich_tree', new URL('../structures/brich_tree.json', moduleBase).href),
   birchTreeWithSnow: new StructureLoader('brich_tree_with_snow', new URL('../structures/brich_tree_with_snow.json', moduleBase).href),
   tank: new StructureLoader('tank', new URL('../structures/tank.json', moduleBase).href),
@@ -174,6 +175,7 @@ export const structureLoaders = {
 export async function preloadAllStructures() {
   await Promise.all([
     structureLoaders.uglyHouse.load(),
+    structureLoaders.desertPyramid.load(),
     structureLoaders.birchTree.load(),
     structureLoaders.birchTreeWithSnow.load(),
     structureLoaders.tank.load(),
