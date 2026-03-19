@@ -35,6 +35,12 @@ export class Projectile {
     // 临时变量（避免每帧 clone 产生 GC 压力）
     this._tempOldPos = new THREE.Vector3();
     this._tempMoveVec = new THREE.Vector3();
+
+    // 缓存常量与方块遮挡类型查询结果，减少热路径重复计算
+    this._projectileRadius = 0.3;
+    this._enemyRadius = 0.5;
+    this._hitRadiusSq = (this._projectileRadius + this._enemyRadius) ** 2;
+    this._occlusionTypeCache = new Map();
   }
 
   /**
@@ -118,32 +124,24 @@ export class Projectile {
    */
   checkCollisionWithBlocks(startPos, endPos, world) {
     if (!world || !world.getBlock) return false;
+    const x1 = Math.floor(startPos.x);
+    const y1 = Math.floor(startPos.y);
+    const z1 = Math.floor(startPos.z);
 
-    // 检测两个点：起点和终点
-    const checkPoints = [startPos, endPos];
-
-    for (const point of checkPoints) {
-      const x = Math.floor(point.x);
-      const y = Math.floor(point.y);
-      const z = Math.floor(point.z);
-
-      const block = world.getBlock(x, y, z);
-
-      // 如果没有方块（空气），继续
-      if (!block || block === 'air') continue;
-
-      // 获取方块属性
-      const props = getBlockProperties(block);
-
-      // 实心不透明方块会阻挡炮弹
-      if (props.isSolid && !props.isTransparent) {
-        return true; // 发生碰撞
-      }
-
-      // 非实心或透明方块（玻璃、树叶等）可以穿透
+    if (this.isBlockOccluding(world.getBlock(x1, y1, z1))) {
+      return true;
     }
 
-    return false; // 未发生碰撞
+    const x2 = Math.floor(endPos.x);
+    const y2 = Math.floor(endPos.y);
+    const z2 = Math.floor(endPos.z);
+
+    // 起点终点在同一体素时，避免重复查询
+    if (x1 === x2 && y1 === y2 && z1 === z2) {
+      return false;
+    }
+
+    return this.isBlockOccluding(world.getBlock(x2, y2, z2));
   }
 
   /**
@@ -154,25 +152,15 @@ export class Projectile {
    * @returns {Object|null} 返回命中的敌人或 null
    */
   checkCollisionWithSegment(startPos, endPos, enemies) {
-    const projectileRadius = 0.3;
-
     for (const enemy of enemies) {
       if (!enemy.isActive || enemy.isDead) continue;
+      const enemyX = enemy.position.x;
+      const enemyY = enemy.position.y + TURRET_CONFIG.ENEMY_BODY_OFFSET_Y;
+      const enemyZ = enemy.position.z;
 
-      // 瞄准丧尸上半身（胸部位置）
-      const enemyCenter = {
-        x: enemy.position.x,
-        y: enemy.position.y + TURRET_CONFIG.ENEMY_BODY_OFFSET_Y,
-        z: enemy.position.z
-      };
-
-      // 丧尸碰撞半径（宽0.6，考虑整体范围）
-      const enemyRadius = 0.5;
-
-      // 计算线段到丧尸中心的最短距离
-      const dist = this.distanceFromPointToSegment(enemyCenter, startPos, endPos);
-
-      if (dist < projectileRadius + enemyRadius) {
+      // 使用平方距离比较，避免每次命中检测都开方
+      const distSq = this.distanceSqFromPointToSegment(enemyX, enemyY, enemyZ, startPos, endPos);
+      if (distSq < this._hitRadiusSq) {
         // 命中！
         return enemy;
       }
@@ -182,17 +170,15 @@ export class Projectile {
   }
 
   /**
-   * 计算点到线段的最短距离
-   * @param {Object} point - 点坐标 {x, y, z}
+   * 计算点到线段的最短距离平方
+   * @param {number} px - 点坐标 X
+   * @param {number} py - 点坐标 Y
+   * @param {number} pz - 点坐标 Z
    * @param {THREE.Vector3} segStart - 线段起点
    * @param {THREE.Vector3} segEnd - 线段终点
-   * @returns {number} 最短距离
+   * @returns {number} 最短距离平方
    */
-  distanceFromPointToSegment(point, segStart, segEnd) {
-    const px = point.x;
-    const py = point.y;
-    const pz = point.z;
-
+  distanceSqFromPointToSegment(px, py, pz, segStart, segEnd) {
     const x1 = segStart.x, y1 = segStart.y, z1 = segStart.z;
     const x2 = segEnd.x, y2 = segEnd.y, z2 = segEnd.z;
 
@@ -209,7 +195,7 @@ export class Projectile {
       const ddx = px - x1;
       const ddy = py - y1;
       const ddz = pz - z1;
-      return Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
+      return ddx * ddx + ddy * ddy + ddz * ddz;
     }
 
     // 计算投影参数 t（0到1之间表示在线段内）
@@ -225,7 +211,23 @@ export class Projectile {
     const distY = py - closestY;
     const distZ = pz - closestZ;
 
-    return Math.sqrt(distX * distX + distY * distY + distZ * distZ);
+    return distX * distX + distY * distY + distZ * distZ;
+  }
+
+  /**
+   * 判断方块类型是否会阻挡炮弹
+   * @param {string|null} blockType - 方块类型
+   * @returns {boolean}
+   */
+  isBlockOccluding(blockType) {
+    if (!blockType || blockType === 'air') return false;
+    const cached = this._occlusionTypeCache.get(blockType);
+    if (cached !== undefined) return cached;
+
+    const props = getBlockProperties(blockType);
+    const result = props.isSolid && !props.isTransparent;
+    this._occlusionTypeCache.set(blockType, result);
+    return result;
   }
 
   /**
