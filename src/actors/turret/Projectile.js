@@ -128,11 +128,13 @@ export class Projectile {
    */
   checkCollisionWithBlocks(startPos, endPos, world) {
     if (!world || !world.getBlock) return false;
+    const useFastPath = typeof world.getBlockFast === 'function';
     const x1 = Math.floor(startPos.x);
     const y1 = Math.floor(startPos.y);
     const z1 = Math.floor(startPos.z);
 
-    if (this.isBlockOccluding(world.getBlock(x1, y1, z1))) {
+    const startBlock = useFastPath ? world.getBlockFast(x1, y1, z1) : world.getBlock(x1, y1, z1);
+    if (this.isBlockOccluding(startBlock)) {
       return true;
     }
 
@@ -145,7 +147,8 @@ export class Projectile {
       return false;
     }
 
-    return this.isBlockOccluding(world.getBlock(x2, y2, z2));
+    const endBlock = useFastPath ? world.getBlockFast(x2, y2, z2) : world.getBlock(x2, y2, z2);
+    return this.isBlockOccluding(endBlock);
   }
 
   /**

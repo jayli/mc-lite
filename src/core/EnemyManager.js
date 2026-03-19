@@ -22,6 +22,10 @@ export class EnemyManager {
     this._workerUpdateCounter = 0;
     this._workerUpdateInterval = 3; // 每 3 帧发送一次
     this._lastSentPlayerPosition = null; // 缓存玩家位置用于插值
+    this._getBlockForEnemyPhysics = (x, y, z) => {
+      if (this.world?.getBlockFast) return this.world.getBlockFast(x, y, z);
+      return this.world?.getBlock ? this.world.getBlock(x, y, z) : null;
+    };
   }
 
   setupWorkerCommunication() {
@@ -105,7 +109,7 @@ export class EnemyManager {
       }
 
       // 执行物理模拟 (重力, 碰撞, 移动)
-      zombie.update(this.world.getBlock.bind(this.world), deltaTime);
+      zombie.update(this._getBlockForEnemyPhysics, deltaTime);
 
       // 收集新位置
       enemyUpdates.push({

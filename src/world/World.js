@@ -403,6 +403,52 @@ export class World {
   }
 
   /**
+   * 获取指定世界坐标的方块类型（快速路径）
+   * 仅查询：坐标所属 Chunk + crossChunkOwnerCache
+   * 不执行全量 Chunk 扫描，适用于高频实时判定（如 AI / LOS / 弹道碰撞）
+   *
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @returns {string|null} 方块类型，未命中则返回 null
+   */
+  getBlockFast(x, y, z) {
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cz = Math.floor(z / CHUNK_SIZE);
+    const key = `${cx},${cz}`;
+    const chunk = this.chunks.get(key);
+
+    const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+
+    // 首先查找方块坐标所属 Chunk
+    if (chunk) {
+      const entry = chunk.blockData[blockKey];
+      if (entry) {
+        this.crossChunkOwnerCache.delete(blockKey);
+        this.crossChunkMissCache.delete(blockKey);
+        return this.getBlockTypeFromEntry(entry);
+      }
+    }
+
+    // 命中跨 Chunk 所有者缓存（仅 O(1) 查找）
+    const ownerChunkKey = this.crossChunkOwnerCache.get(blockKey);
+    if (ownerChunkKey) {
+      const ownerChunk = this.chunks.get(ownerChunkKey);
+      if (ownerChunk && ownerChunk.isReady && ownerChunk !== chunk) {
+        const entry = ownerChunk.blockData[blockKey];
+        if (entry) {
+          return this.getBlockTypeFromEntry(entry);
+        }
+      }
+      // 缓存失效时清理，避免后续重复命中无效项
+      this.crossChunkOwnerCache.delete(blockKey);
+    }
+
+    this.crossChunkMissCache.add(blockKey);
+    return null;
+  }
+
+  /**
    * 获取指定世界坐标的方块完整信息（包含朝向）
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y

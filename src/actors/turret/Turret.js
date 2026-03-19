@@ -219,6 +219,19 @@ export class Turret {
   }
 
   /**
+   * 方块查询（优先使用快速路径）
+   * @param {number} x
+   * @param {number} y
+   * @param {number} z
+   * @returns {string|null}
+   */
+  getBlockForTurret(x, y, z) {
+    if (!this.world) return null;
+    if (this.world.getBlockFast) return this.world.getBlockFast(x, y, z);
+    return this.world.getBlock ? this.world.getBlock(x, y, z) : null;
+  }
+
+  /**
    * 检查炮塔结构完整性
    * 检查 obsidian 柱子是否完整
    * 方块坐标（下移一格后）:
@@ -238,7 +251,7 @@ export class Turret {
     ];
 
     for (const worldPos of criticalBlocks) {
-      const block = this.world.getBlock(worldPos.x, worldPos.y, worldPos.z);
+      const block = this.getBlockForTurret(worldPos.x, worldPos.y, worldPos.z);
       // 首次检查或调试时输出
       if (this._firstIntegrityCheck === undefined) {
         console.log(`[Turret ${this.id}] 检查 ${worldPos.label} (${worldPos.x},${worldPos.y},${worldPos.z}): ${block || 'air'}`);
@@ -445,7 +458,7 @@ export class Turret {
       lastY = by;
       lastZ = bz;
 
-      const block = this.world.getBlock(bx, by, bz);
+      const block = this.getBlockForTurret(bx, by, bz);
       if (this.isBlockOccluding(block)) {
         return false;
       }
