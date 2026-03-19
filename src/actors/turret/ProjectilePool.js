@@ -17,6 +17,11 @@ export class ProjectilePool {
     // 活跃炮弹 Map<projectile, instanceIndex>
     this.active = new Map();
 
+    // 每帧复用缓冲，避免 update() 中频繁分配临时对象
+    this._updateIndices = [];
+    this._updateProjectiles = [];
+    this._toRelease = [];
+
     // InstancedMesh 渲染器
     this.renderer = new InstancedProjectileRenderer(scene, maxSize);
 
@@ -65,7 +70,7 @@ export class ProjectilePool {
     this.active.set(projectile, instanceIndex);
 
     // 立即更新一次渲染
-    this.renderer.updateProjectile(instanceIndex, projectile.position, projectile.direction);
+    this.renderer.updateProjectile(instanceIndex, projectile.position, projectile.orientation);
 
     return projectile;
   }
@@ -104,32 +109,31 @@ export class ProjectilePool {
    * @param {World} world - 世界引用，用于方块碰撞检测
    */
   update(deltaTime, enemies, world) {
-    // 收集需要更新的炮弹
-    const updates = new Map();
-    const toRelease = [];
+    // 复用数组，避免每帧创建临时对象
+    this._updateIndices.length = 0;
+    this._updateProjectiles.length = 0;
+    this._toRelease.length = 0;
 
     for (const [projectile, instanceIndex] of this.active) {
       const stillActive = projectile.update(deltaTime, enemies, world);
 
       if (stillActive) {
-        // 仍在活跃，更新渲染
-        updates.set(instanceIndex, {
-          position: projectile.position,
-          direction: projectile.direction
-        });
+        // 仍在活跃，记录索引和炮弹引用，后续批量更新
+        this._updateIndices.push(instanceIndex);
+        this._updateProjectiles.push(projectile);
       } else {
         // 已停用，准备回收
-        toRelease.push(projectile);
+        this._toRelease.push(projectile);
       }
     }
 
     // 批量更新渲染（只需一次 needsUpdate）
-    if (updates.size > 0) {
-      this.renderer.updateBatch(updates);
+    if (this._updateIndices.length > 0) {
+      this.renderer.updateBatch(this._updateIndices, this._updateProjectiles);
     }
 
     // 回收已停用的炮弹
-    for (const projectile of toRelease) {
+    for (const projectile of this._toRelease) {
       this.release(projectile);
     }
   }

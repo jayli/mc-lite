@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import { getBlockProperties } from '../../constants/BlockData.js';
 import { TURRET_CONFIG } from './Turret.js';
 
+const DEFAULT_FORWARD = new THREE.Vector3(0, 0, 1);
+
 export class Projectile {
   constructor() {
     // 标识
@@ -18,6 +20,7 @@ export class Projectile {
     // 位置和运动
     this.position = new THREE.Vector3();
     this.direction = new THREE.Vector3();
+    this.orientation = new THREE.Quaternion();
     this.speed = TURRET_CONFIG.PROJECTILE_SPEED;
     this.maxDistance = TURRET_CONFIG.MAX_KILL_DISTANCE;
     this.distanceTraveled = 0;
@@ -55,6 +58,7 @@ export class Projectile {
   initialize(params) {
     this.position.copy(params.position);
     this.direction.copy(params.direction).normalize();
+    this.orientation.setFromUnitVectors(DEFAULT_FORWARD, this.direction);
     this.speed = TURRET_CONFIG.PROJECTILE_SPEED;
     this.maxDistance = TURRET_CONFIG.MAX_KILL_DISTANCE;
     this.distanceTraveled = 0;
@@ -152,11 +156,27 @@ export class Projectile {
    * @returns {Object|null} 返回命中的敌人或 null
    */
   checkCollisionWithSegment(startPos, endPos, enemies) {
+    // Broad-phase 边界只计算一次，避免在敌人循环中重复做 min/max
+    const margin = this._projectileRadius + this._enemyRadius;
+    const minX = Math.min(startPos.x, endPos.x) - margin;
+    const maxX = Math.max(startPos.x, endPos.x) + margin;
+    const minY = Math.min(startPos.y, endPos.y) - margin;
+    const maxY = Math.max(startPos.y, endPos.y) + margin;
+    const minZ = Math.min(startPos.z, endPos.z) - margin;
+    const maxZ = Math.max(startPos.z, endPos.z) + margin;
+
     for (const enemy of enemies) {
       if (!enemy.isActive || enemy.isDead) continue;
       const enemyX = enemy.position.x;
       const enemyY = enemy.position.y + TURRET_CONFIG.ENEMY_BODY_OFFSET_Y;
       const enemyZ = enemy.position.z;
+
+      // Broad-phase：先用扫掠 AABB 粗筛，快速排除明显不可能命中的目标
+      if (enemyX < minX || enemyX > maxX ||
+          enemyY < minY || enemyY > maxY ||
+          enemyZ < minZ || enemyZ > maxZ) {
+        continue;
+      }
 
       // 使用平方距离比较，避免每次命中检测都开方
       const distSq = this.distanceSqFromPointToSegment(enemyX, enemyY, enemyZ, startPos, endPos);

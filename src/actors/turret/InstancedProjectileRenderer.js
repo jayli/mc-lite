@@ -28,13 +28,7 @@ export class InstancedProjectileRenderer {
 
     // 临时对象（避免每帧创建）
     this._tempMatrix = new THREE.Matrix4();
-    this._tempPosition = new THREE.Vector3();
-    this._tempQuaternion = new THREE.Quaternion();
     this._tempScale = new THREE.Vector3(1, 1, 1);
-    this._tempObject3D = new THREE.Object3D();
-    this._tempDirection = new THREE.Vector3();
-    this._tempTarget = new THREE.Vector3();
-    this._defaultForward = new THREE.Vector3(0, 0, 1);
 
     this.initInstancedMesh();
   }
@@ -133,56 +127,32 @@ export class InstancedProjectileRenderer {
    * 更新炮弹的变换矩阵
    * @param {number} index - 实例索引
    * @param {THREE.Vector3} position - 位置
-   * @param {THREE.Vector3} direction - 方向
+   * @param {THREE.Quaternion} orientation - 朝向四元数
    */
-  updateProjectile(index, position, direction) {
+  updateProjectile(index, position, orientation) {
     if (!this.activeIndices.has(index)) return;
 
-    const dummy = this._tempObject3D;
-    dummy.position.copy(position);
-
-    // 计算目标点：位置 + 方向（确保方向已归一化）
-    this._tempDirection.copy(direction).normalize();
-    this._tempTarget.copy(position).add(this._tempDirection);
-
-    // 避免位置和目标点重合
-    if (this._tempTarget.distanceToSquared(position) < 0.0001) {
-      this._tempTarget.copy(position).add(this._defaultForward);
-    }
-
-    dummy.lookAt(this._tempTarget);
-    dummy.updateMatrix();
-
-    this.mesh.setMatrixAt(index, dummy.matrix);
+    this._tempMatrix.compose(position, orientation, this._tempScale);
+    this.mesh.setMatrixAt(index, this._tempMatrix);
     this.mesh.instanceMatrix.needsUpdate = true;
   }
 
   /**
    * 批量更新多个炮弹（优化版本）
-   * @param {Map<number, {position: THREE.Vector3, direction: THREE.Vector3}>} projectiles
+   * @param {Array<number>} indices - 实例索引列表
+   * @param {Array} projectiles - 炮弹对象列表
    */
-  updateBatch(projectiles) {
+  updateBatch(indices, projectiles) {
     let hasUpdate = false;
-    const dummy = this._tempObject3D;
 
-    for (const [index, data] of projectiles) {
+    for (let i = 0; i < indices.length; i++) {
+      const index = indices[i];
       if (!this.activeIndices.has(index)) continue;
+      const projectile = projectiles[i];
+      if (!projectile) continue;
 
-      dummy.position.copy(data.position);
-
-      // 计算目标点：确保方向已归一化
-      this._tempDirection.copy(data.direction).normalize();
-      this._tempTarget.copy(data.position).add(this._tempDirection);
-
-      // 避免位置和目标点重合
-      if (this._tempTarget.distanceToSquared(data.position) < 0.0001) {
-        this._tempTarget.copy(data.position).add(this._defaultForward);
-      }
-
-      dummy.lookAt(this._tempTarget);
-      dummy.updateMatrix();
-
-      this.mesh.setMatrixAt(index, dummy.matrix);
+      this._tempMatrix.compose(projectile.position, projectile.orientation, this._tempScale);
+      this.mesh.setMatrixAt(index, this._tempMatrix);
       hasUpdate = true;
     }
 
