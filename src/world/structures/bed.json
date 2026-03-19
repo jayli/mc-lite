@@ -1,0 +1,6 @@
+{
+  "blocks": [
+    {"x": 0, "y": 0, "z": 0, "type": "bed_head", "direction": 0},
+    {"x": 0, "y": 0, "z": -1, "type": "bed_tail", "direction": 0}
+  ]
+}

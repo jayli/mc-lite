@@ -183,6 +183,16 @@ const geoCobblestoneStepUpdown = (() => {
 })();
 
 /**
+ * 半高方块几何体 - 高度为0.5的方块，用于床等家具
+ * 向下偏移0.25，使方块底部紧贴地面（y=0），顶部在y=0.5
+ */
+const geoHalfBlock = (() => {
+  const geo = new THREE.BoxGeometry(1, 0.5, 1);
+  geo.translate(0, -0.25, 0); // 向下偏移，使底部紧贴地面
+  return addVertexIdAttribute(geo);
+})();
+
+/**
  * 几何体映射表 - 将方块类型映射到对应的几何体
  */
 export const geomMap = {
@@ -202,6 +212,7 @@ export const geomMap = {
   'cobblestone_step': geoCobblestoneStep,
   'cobblestone_step_updown': geoCobblestoneStepUpdown,
   'stone_diorite_step': geoCobblestoneStep,
+  'half_block': geoHalfBlock,
   'default': addVertexIdAttribute(new THREE.BoxGeometry(1, 1, 1))
 };
 

@@ -236,6 +236,9 @@ export class Game {
     this.player.inventory.add('mud_bricks', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('orange_shulker_box', DEFAULT_INVENTORY_COUNT);
 
+    // 床方块
+    this.player.inventory.add('bed_alias_block', DEFAULT_INVENTORY_COUNT);
+
     // this.player.inventory.add('cloud', DEFAULT_INVENTORY_COUNT);
 
     // 预加载 JSON 结构数据

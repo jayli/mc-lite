@@ -372,7 +372,28 @@ export const BLOCK_DATA = {
   'piston': { orientationEnabled: false },
   'piston_head': { orientationEnabled: false },
   'mud_bricks': { orientationEnabled: false },
-  'orange_shulker_box': { orientationEnabled: false }
+  'orange_shulker_box': { orientationEnabled: false },
+
+  // ========== 床方块 ==========
+  'bed_head': {
+    isSolid: true,
+    isTransparent: false,
+    geometryType: 'half_block',
+    orientationEnabled: false
+  },
+  'bed_tail': {
+    isSolid: true,
+    isTransparent: false,
+    geometryType: 'half_block',
+    orientationEnabled: false
+  },
+  'bed_alias_block': {
+    isSolid: false,
+    isTransparent: true,
+    isRendered: false,
+    isShadowEnabled: false,
+    orientationEnabled: false
+  }
 };
 export function getBlockProperties(type) {
   if (!type) return { ...DEFAULT_PROPERTIES };

@@ -237,6 +237,11 @@ export class PlayerInteraction {
       return this.tryPlaceTurret(x, y, z);
     }
 
+    // 特殊处理：床方块放置时生成床结构
+    if (type === 'bed_alias_block') {
+      return this.tryPlaceBed(x, y, z);
+    }
+
     if (this.player.physics.isSolid(x, y, z)) return false;
     if (this.player.position.x - 0.3 < x + 1 &&
       this.player.position.x + 0.3 > x &&
@@ -355,6 +360,66 @@ export class PlayerInteraction {
     audioManager.playSound('put', 0.3);
 
     console.log(`[PlayerInteraction] 炮塔放置成功 at (${x}, ${y}, ${z})`);
+    return true;
+  }
+
+  /**
+   * 尝试放置床
+   * @param {number} x - X坐标
+   * @param {number} y - Y坐标
+   * @param {number} z - Z坐标
+   * @returns {boolean} 是否成功放置
+   */
+  tryPlaceBed(x, y, z) {
+    // 计算玩家面向方向，确定床尾位置
+    const playerPos = this.player.position;
+    const dx = playerPos.x - (x + 0.5);
+    const dz = playerPos.z - (z + 0.5);
+
+    // 根据玩家面向确定床尾位置（床头面向玩家，床尾在后方）
+    let tailX = x, tailZ = z;
+    if (Math.abs(dx) > Math.abs(dz)) {
+      // 玩家在东西方向更远
+      tailX = dx > 0 ? x - 1 : x + 1;
+    } else {
+      // 玩家在南北方向更远
+      tailZ = dz > 0 ? z - 1 : z + 1;
+    }
+
+    // 检查床头位置是否被占用
+    if (this.player.physics.isSolid(x, y, z)) {
+      console.warn(`[PlayerInteraction] 床头位置 (${x}, ${y}, ${z}) 被占用，无法放置床`);
+      return false;
+    }
+
+    // 检查床尾位置是否被占用
+    if (this.player.physics.isSolid(tailX, y, tailZ)) {
+      console.warn(`[PlayerInteraction] 床尾位置 (${tailX}, ${y}, ${tailZ}) 被占用，无法放置床`);
+      return false;
+    }
+
+    // 检查玩家是否与床碰撞（检查床头，床尾0.5高度不会碰撞到玩家）
+    if (this.player.position.x - 0.3 < x + 1 &&
+        this.player.position.x + 0.3 > x &&
+        this.player.position.y < y + 0.5 &&
+        this.player.position.y + 1.8 > y &&
+        this.player.position.z - 0.3 < z + 1 &&
+        this.player.position.z + 0.3 > z) {
+      console.warn('[PlayerInteraction] 玩家与床头碰撞，无法放置');
+      return false;
+    }
+
+    // 放置床头
+    this.player.world.setBlock(x, y, z, 'bed_head', 0);
+
+    // 放置床尾
+    this.player.world.setBlock(tailX, y, tailZ, 'bed_tail', 0);
+
+    // 消耗物品并播放音效
+    this.player.inventory.remove('bed_alias_block', 1);
+    audioManager.playSound('put', 0.3);
+
+    console.log(`[PlayerInteraction] 床放置成功 at (${x}, ${y}, ${z}), 床尾 at (${tailX}, ${y}, ${tailZ})`);
     return true;
   }
 

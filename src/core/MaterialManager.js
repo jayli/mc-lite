@@ -343,7 +343,15 @@ export async function initializeMaterials() {
     './src/assets/textures/Piston.png',
     './src/assets/textures/Piston_Head.png',
     './src/assets/textures/Mud_Bricks.png',
-    './src/assets/textures/Orange_Shulker_Box.png'
+    './src/assets/textures/Orange_Shulker_Box.png',
+
+    // ========== 床方块纹理 ==========
+    './src/assets/textures/bed/Bed_(back_texture)_JE2_BE2.png',
+    './src/assets/textures/bed/Bed_(front_texture)_JE2_BE2.png',
+    './src/assets/textures/bed/Bed_(top_texture)_JE1_BE1.png',
+    './src/assets/textures/bed/Bed_(bottom_texture)_JE1_BE1.png',
+    './src/assets/textures/bed/Bed_(top_side_texture)_JE2_BE2.png',
+    './src/assets/textures/bed/Bed_(bottom_side_texture)_JE2_BE2.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -924,4 +932,77 @@ materials.registerMaterial('piston', { textureUrl: './src/assets/textures/Piston
 materials.registerMaterial('piston_head', { textureUrl: './src/assets/textures/Piston_Head.png' });
 materials.registerMaterial('mud_bricks', { textureUrl: './src/assets/textures/Mud_Bricks.png' });
 materials.registerMaterial('orange_shulker_box', { textureUrl: './src/assets/textures/Orange_Shulker_Box.png' });
+
+// ========== 床方块材质 ==========
+// 床头侧面材质 - 只使用纹理下半部分（0.5-1.0），repeat y=0.5 + offset=0.5
+// 右侧面（+X）需要水平翻转，左侧面（-X）正常
+const bedHeadSideLeft = {
+  textureUrl: './src/assets/textures/bed/Bed_(top_side_texture)_JE2_BE2.png',
+  repeat: [1, 0.5],
+  offset: [0, 0.5]
+};
+const bedHeadSideRight = {
+  textureUrl: './src/assets/textures/bed/Bed_(top_side_texture)_JE2_BE2.png',
+  repeat: [-1, 0.5],  // 水平翻转
+  offset: [1, 0.5]
+};
+const bedHeadTop = {
+  textureUrl: './src/assets/textures/bed/Bed_(top_texture)_JE1_BE1.png',
+  rotation: -Math.PI / 2  // 顺时针旋转90度
+};
+const bedHeadFront = {
+  textureUrl: './src/assets/textures/bed/Bed_(back_texture)_JE2_BE2.png',
+  repeat: [1, 0.5],
+  offset: [0, 0.5]
+};
+const bedHeadBack = { transparent: true, opacity: 0 };
+const bedHeadBottom = { transparent: true, opacity: 0 };
+
+materials.registerMaterial('bed_head', {
+  faces: {
+    0: bedHeadSideRight, // +X (右) - 水平翻转
+    1: bedHeadSideLeft,  // -X (左) - 正常
+    2: bedHeadTop,       // +Y (上)
+    3: bedHeadBottom,    // -Y (下)
+    4: bedHeadFront,     // +Z (前 - 面向玩家)
+    5: bedHeadBack       // -Z (后 - 与床尾连接，透明)
+  }
+});
+
+// 床尾材质 - 后面显示床尾纹理，前面透明（与床头连接）
+// 右侧面（+X）需要水平翻转，左侧面（-X）正常
+const bedTailSideLeft = {
+  textureUrl: './src/assets/textures/bed/Bed_(bottom_side_texture)_JE2_BE2.png',
+  repeat: [1, 0.5],
+  offset: [0, 0.5]
+};
+const bedTailSideRight = {
+  textureUrl: './src/assets/textures/bed/Bed_(bottom_side_texture)_JE2_BE2.png',
+  repeat: [-1, 0.5],  // 水平翻转
+  offset: [1, 0.5]
+};
+const bedTailTop = { textureUrl: './src/assets/textures/bed/Bed_(bottom_texture)_JE1_BE1.png' };
+const bedTailBack = {
+  textureUrl: './src/assets/textures/bed/Bed_(front_texture)_JE2_BE2.png',
+  repeat: [1, 0.5],
+  offset: [0, 0.5]
+};
+const bedTailFront = { transparent: true, opacity: 0 };
+const bedTailBottom = { transparent: true, opacity: 0 };
+
+materials.registerMaterial('bed_tail', {
+  faces: {
+    0: bedTailSideRight, // +X (右) - 水平翻转
+    1: bedTailSideLeft,  // -X (左) - 正常
+    2: bedTailTop,       // +Y (上)
+    3: bedTailBottom,    // -Y (下)
+    4: bedTailFront,     // +Z (前 - 与床头连接，透明)
+    5: bedTailBack       // -Z (后 - 面向玩家)
+  }
+});
+
+materials.registerMaterial('bed_alias_block', {
+  color: 0x8B4513,
+  roughness: 0.8
+});
 

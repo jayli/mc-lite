@@ -20,7 +20,8 @@ export function getCustomIconPath(item) {
     'cobblestone_step': 'src/assets/textures/Cobblestone_step.png',
     'cobblestone_step_updown': 'src/assets/textures/Cobblestone_step_updown.png',
     'stone_diorite_step': 'src/assets/textures/stone_diorite_step.png',
-    'turret_alias_block': 'src/assets/textures/turret.png'
+    'turret_alias_block': 'src/assets/textures/turret.png',
+    'bed_alias_block': 'src/assets/textures/bed/Bed_(front_texture)_JE2_BE2.png'
   };
 
   return customIcons[item] || null;
