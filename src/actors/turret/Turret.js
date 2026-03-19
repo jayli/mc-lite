@@ -65,6 +65,9 @@ export class Turret {
     // 状态
     this.state = 'ACTIVE'; // 'ACTIVE' | 'DESTROYED'
 
+    // 回调
+    this.onDestroy = params.onDestroy || null; // 炮塔销毁时的回调
+
     // 旋转相关 - 使用传入的初始朝向
     const initialRotation = params.initialRotation || 0;
     this.defaultRotation = initialRotation; // 默认朝向（没有目标时的朝向，由放置位置决定）
@@ -587,6 +590,11 @@ export class Turret {
       this.turretMeshes = [];
       this.pitchObject = null;
       this.pivotObject = null;
+    }
+
+    // 通知管理器移除自己
+    if (this.onDestroy) {
+      this.onDestroy(this.id);
     }
   }
 

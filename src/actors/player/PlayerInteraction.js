@@ -267,6 +267,19 @@ export class PlayerInteraction {
    * @returns {boolean} 是否成功放置
    */
   tryPlaceTurret(x, y, z) {
+    // 获取 Game 实例中的 TurretManager
+    const game = this.player.game;
+    if (!game || !game.turretManager) {
+      console.warn('[PlayerInteraction] TurretManager 不可用');
+      return false;
+    }
+
+    // 【优先级最高】检查炮塔数量限制 - 在放置任何方块之前检查
+    if (game.turretManager.turrets.size >= game.turretManager.maxTurrets) {
+      console.warn('[PlayerInteraction] 已达到最大炮塔数量限制，无法放置');
+      return false;
+    }
+
     // 检查基础位置是否被占用
     if (this.player.physics.isSolid(x, y, z)) return false;
 
@@ -295,12 +308,6 @@ export class PlayerInteraction {
         this.player.position.z - 0.3 < z + 1 &&
         this.player.position.z + 0.3 > z) return false;
 
-    // 获取 Game 实例中的 TurretManager
-    const game = this.player.game;
-    if (!game || !game.turretManager) {
-      console.warn('[PlayerInteraction] TurretManager 不可用');
-      return false;
-    }
 
     // 放置 3x3 iron_ore 底座（y 层）
     // position.y 是底座下方一格的位置，所以底座在 y
@@ -341,19 +348,6 @@ export class PlayerInteraction {
 
     // 调用 TurretManager 创建炮塔，传入初始朝向
     const turret = game.turretManager.createTurret(position, initialRotation);
-
-    if (!turret) {
-      console.warn('[PlayerInteraction] 炮塔创建失败，可能已达数量上限');
-      // 如果炮塔创建失败，移除已放置的底座和 obsidian
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dz = -1; dz <= 1; dz++) {
-          this.player.world.removeBlock(x + dx, y, z + dz);
-        }
-      }
-      this.player.world.removeBlock(x, y + 1, z);
-      this.player.world.removeBlock(x, y + 2, z);
-      return false;
-    }
 
     // 消耗物品并播放音效
     this.player.inventory.remove('turret_alias_block', 1);

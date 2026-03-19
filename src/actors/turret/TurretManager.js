@@ -51,6 +51,7 @@ export class TurretManager {
       world: this.world,
       scene: this.scene,
       onFire: (fireData) => this.handleTurretFire(fireData),
+      onDestroy: (turretId) => this.handleTurretDestroy(turretId),
       initialRotation  // 传递初始朝向
     });
 
@@ -86,6 +87,16 @@ export class TurretManager {
     if (!projectile) {
       console.warn('[TurretManager] 无法获取炮弹，对象池已满');
     }
+  }
+
+  /**
+   * 处理炮塔销毁事件
+   * @param {string} turretId - 被销毁的炮塔 ID
+   */
+  handleTurretDestroy(turretId) {
+    console.log(`[TurretManager] 炮塔被销毁：${turretId}`);
+    this.turrets.delete(turretId);
+    console.log(`[TurretManager] 当前炮塔数量：${this.turrets.size}/${this.maxTurrets}`);
   }
 
   /**
@@ -207,8 +218,6 @@ export class TurretManager {
     const turret = this.turrets.get(id);
     if (turret) {
       turret.destroy();
-      this.turrets.delete(id);
-      console.log(`[TurretManager] 移除炮塔: ${id}`);
     }
   }
 
