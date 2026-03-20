@@ -47,6 +47,7 @@ export class UIManager {
     const btnTntDestroyToggle = document.getElementById('btn-tnt-destroy-toggle');
     const btnCreatePlayground = document.getElementById('btn-create-playground');
     const btnExportModel = document.getElementById('btn-export-model');
+    const btnImportModel = document.getElementById('btn-import-model');
     const btnTeleportFrozen = document.getElementById('btn-teleport-frozen');
     const btnTeleportPyramid = document.getElementById('btn-teleport-pyramid');
     const btnTeleportIsland = document.getElementById('btn-teleport-island');
@@ -227,6 +228,9 @@ export class UIManager {
             if (btnExportModel) {
               btnExportModel.style.display = 'none';
             }
+            if (btnImportModel) {
+              btnImportModel.style.display = 'none';
+            }
           } else if (result.error === 'PLAYER_IN_PLAYGROUND') {
             this.hud.showMessage('请离开创造台区域后再关闭');
           } else {
@@ -243,6 +247,9 @@ export class UIManager {
             // 显示导出模型按钮
             if (btnExportModel) {
               btnExportModel.style.display = 'block';
+            }
+            if (btnImportModel) {
+              btnImportModel.style.display = 'block';
             }
           } else {
             if (result.error === 'PLAYGROUND_EXISTS') {
@@ -269,6 +276,37 @@ export class UIManager {
         } else {
           this.hud.showMessage('导出失败：' + result.error);
         }
+      };
+    }
+
+    if (btnImportModel) {
+      btnImportModel.onclick = async (e) => {
+        e.stopPropagation();
+
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.json,application/json';
+
+        fileInput.onchange = async (event) => {
+          const target = event.target;
+          const file = target && target.files && target.files[0];
+          if (!file) return;
+
+          try {
+            const jsonText = await file.text();
+            const result = playgroundService.importModelFromJson(jsonText);
+            if (result.success) {
+              this.hud.showMessage(`导入完成：放置 ${result.placed}，跳过 ${result.skipped}，无效 ${result.invalid}`);
+            } else {
+              this.hud.showMessage('导入失败：' + result.error);
+            }
+          } catch (error) {
+            console.error('Import model failed:', error);
+            this.hud.showMessage('导入失败：READ_FILE_FAILED');
+          }
+        };
+
+        fileInput.click();
       };
     }
 
@@ -328,6 +366,7 @@ export class UIManager {
   updatePlaygroundButtonState() {
     const btnCreatePlayground = document.getElementById('btn-create-playground');
     const btnExportModel = document.getElementById('btn-export-model');
+    const btnImportModel = document.getElementById('btn-import-model');
 
     if (!btnCreatePlayground) return;
 
@@ -340,6 +379,9 @@ export class UIManager {
       if (btnExportModel) {
         btnExportModel.style.display = 'block';
       }
+      if (btnImportModel) {
+        btnImportModel.style.display = 'block';
+      }
     } else {
       // 创造台不存在，显示"打开创造台"按钮
       btnCreatePlayground.disabled = false;
@@ -348,6 +390,9 @@ export class UIManager {
       // 隐藏导出模型按钮
       if (btnExportModel) {
         btnExportModel.style.display = 'none';
+      }
+      if (btnImportModel) {
+        btnImportModel.style.display = 'none';
       }
     }
   }

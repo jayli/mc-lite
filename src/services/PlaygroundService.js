@@ -1,10 +1,9 @@
 // src/services/PlaygroundService.js
 /**
  * PlaygroundService - 创造台服务
- * 负责创建、管理创造台平台和导出模型数据
+ * 负责创建、管理创造台平台和导入/导出模型数据
  */
 
-import { materials } from '../core/MaterialManager.js';
 import { persistenceService } from './PersistenceService.js';
 
 /**
@@ -463,6 +462,92 @@ export class PlaygroundService {
       console.error('Export failed:', error);
       return { success: false, error: 'DOWNLOAD_FAILED' };
     }
+  }
+
+  /**
+   * 从 JSON 字符串导入模型到创造台
+   * @param {string} jsonText - 模型 JSON 字符串（格式兼容 tank.json）
+   * @returns {{ success: boolean, error?: string, placed?: number, skipped?: number, invalid?: number }}
+   */
+  importModelFromJson(jsonText) {
+    if (!this.isPlaygroundActive || !this.playgroundOrigin) {
+      return { success: false, error: 'PLAYGROUND_NOT_ACTIVE' };
+    }
+
+    if (!this.world) {
+      return { success: false, error: 'WORLD_NOT_INITIALIZED' };
+    }
+
+    let modelData;
+    try {
+      modelData = JSON.parse(jsonText);
+    } catch {
+      return { success: false, error: 'INVALID_JSON' };
+    }
+
+    if (!modelData || !Array.isArray(modelData.blocks)) {
+      return { success: false, error: 'INVALID_MODEL_FORMAT' };
+    }
+
+    const centerX = this.playgroundOrigin.x + this.playgroundSize / 2;
+    const centerY = this.playgroundOrigin.y;
+    const centerZ = this.playgroundOrigin.z + this.playgroundSize / 2;
+
+    let placed = 0;
+    let skipped = 0;
+    let invalid = 0;
+
+    for (const block of modelData.blocks) {
+      if (!block || typeof block !== 'object') {
+        invalid++;
+        continue;
+      }
+
+      const relX = Number(block.x);
+      const relY = Number(block.y);
+      const relZ = Number(block.z);
+      const type = typeof block.type === 'string' ? block.type : '';
+
+      if (!Number.isFinite(relX) || !Number.isFinite(relY) || !Number.isFinite(relZ) || !type) {
+        invalid++;
+        continue;
+      }
+
+      const x = Math.round(centerX + relX);
+      const y = Math.round(centerY + relY);
+      const z = Math.round(centerZ + relZ);
+
+      // 防止越界写入
+      if (y < 0 || y > 255) {
+        invalid++;
+        continue;
+      }
+
+      // 目标位置已有方块时跳过（含创造台方块）
+      const existingType = this.world.getBlock(x, y, z);
+      if (existingType && existingType !== 'air') {
+        skipped++;
+        continue;
+      }
+
+      const orientation = this.convertDirectionToOrientation(block.direction);
+      this.world.setBlock(x, y, z, type, orientation);
+      placed++;
+    }
+
+    return { success: true, placed, skipped, invalid };
+  }
+
+  /**
+   * 将导入模型中的 direction 转为游戏内 orientation
+   * @param {number} direction - 模型方向值
+   * @returns {number} orientation (0-3)
+   */
+  convertDirectionToOrientation(direction) {
+    const normalized = Number(direction);
+    if (!Number.isFinite(normalized)) return 0;
+    const intDir = Math.trunc(normalized);
+    return ((intDir % 4) + 4) % 4;
   }
 
   /**
