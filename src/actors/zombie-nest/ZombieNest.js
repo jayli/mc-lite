@@ -28,7 +28,6 @@ export class ZombieNest {
    * @param {string} params.id - 唯一标识
    * @param {Object} params.position - 放置基准坐标
    * @param {World} params.world - 世界实例
-   * @param {Array<Object>} params.structureBlocks - 结构方块列表
    * @param {Object} params.criticalBlock - 关键顶端方块
    * @param {Function|null} params.onSpawn - 刷怪回调
    * @param {Function|null} params.onDestroy - 销毁回调
@@ -37,7 +36,6 @@ export class ZombieNest {
     this.id = params.id;
     this.position = { ...params.position };
     this.world = params.world;
-    this.structureBlocks = Array.isArray(params.structureBlocks) ? params.structureBlocks.map(block => ({ ...block })) : [];
     this.criticalBlock = params.criticalBlock ? { ...params.criticalBlock } : null;
     this.onSpawn = params.onSpawn || null;
     this.onDestroy = params.onDestroy || null;

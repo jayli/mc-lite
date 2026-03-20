@@ -16,6 +16,10 @@ export const GameConfig = {
   /** 高画质设置下的丧尸数量上限 */
   ZOMBIE_LIMIT_HIGH: 50,
 
+  // ==================== 丧尸巢穴配置 ====================
+  /** 丧尸巢穴数量上限 */
+  ZOMBIE_NEST_LIMIT: 8,
+
   // ==================== 地图配置 ====================
   /** 地图偏移量（用于避免浮点精度问题） */
   MAP_OFFSET: 300,
@@ -42,6 +46,9 @@ export const ZOMBIE_LIMIT_MED = GameConfig.ZOMBIE_LIMIT_MED;
 
 /** 高画质设置下的丧尸数量上限 */
 export const ZOMBIE_LIMIT_HIGH = GameConfig.ZOMBIE_LIMIT_HIGH;
+
+/** 丧尸巢穴数量上限 */
+export const ZOMBIE_NEST_LIMIT = GameConfig.ZOMBIE_NEST_LIMIT;
 
 /** 地图偏移量（用于避免浮点精度问题） */
 export const MAP_OFFSET = GameConfig.MAP_OFFSET;

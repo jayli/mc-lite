@@ -5,6 +5,7 @@
 
 import { Zombie } from '../enemy/Zombie.js';
 import { ZombieNest } from './ZombieNest.js';
+import { ZOMBIE_NEST_LIMIT } from '../../constants/GameConfig.js';
 
 export class ZombieNestManager {
   /**
@@ -18,7 +19,31 @@ export class ZombieNestManager {
     this.enemyManager = enemyManager;
 
     this.nests = new Map();
-    this.maxNests = 8;
+    this.maxNests = ZOMBIE_NEST_LIMIT;
+  }
+
+  /**
+   * 当前活动巢穴数量
+   * @returns {number}
+   */
+  getNestCount() {
+    return this.nests.size;
+  }
+
+  /**
+   * 最大巢穴数量
+   * @returns {number}
+   */
+  getMaxNests() {
+    return this.maxNests;
+  }
+
+  /**
+   * 是否可继续创建巢穴
+   * @returns {boolean}
+   */
+  canCreateNest() {
+    return this.getNestCount() < this.getMaxNests();
   }
 
   /**
@@ -27,7 +52,7 @@ export class ZombieNestManager {
    * @returns {ZombieNest|null}
    */
   createNest(params) {
-    if (this.nests.size >= this.maxNests) {
+    if (!this.canCreateNest()) {
       console.warn('[ZombieNestManager] 已达到最大丧尸巢穴数量限制');
       return null;
     }
@@ -37,7 +62,6 @@ export class ZombieNestManager {
       id,
       position: params.position,
       world: this.world,
-      structureBlocks: params.structureBlocks,
       criticalBlock: params.criticalBlock,
       onSpawn: (spawnData) => this.handleNestSpawn(spawnData),
       onDestroy: (nestId) => this.handleNestDestroy(nestId)
@@ -85,7 +109,7 @@ export class ZombieNestManager {
    * 更新所有巢穴
    * @returns {void}
    */
-  update() {
+  update(_dt) {
     for (const nest of this.nests.values()) {
       nest.update();
     }

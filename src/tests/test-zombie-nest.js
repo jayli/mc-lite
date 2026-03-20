@@ -116,12 +116,17 @@ describe('ZombieNestManager 数量限制测试', (test) => {
 
     const created = [];
     for (let i = 0; i < manager.maxNests; i++) {
+      assertTrue(manager.canCreateNest(), `创建第 ${i + 1} 个巢穴前应允许放置`);
       created.push(manager.createNest({
         position: { x: i * 10, y: 0, z: 0 },
         structureBlocks: [{ x: i * 10, y: 5, z: 0, type: 'gold_block' }],
         criticalBlock: { x: i * 10, y: 5, z: 0, type: 'gold_block' }
       }));
     }
+
+    assertFalse(manager.canCreateNest(), '达到上限后不应允许继续创建');
+    assertEqual(manager.getNestCount(), manager.maxNests, 'getNestCount 应与 Map 大小一致');
+    assertEqual(manager.getMaxNests(), manager.maxNests, 'getMaxNests 应返回上限值');
 
     const extraNest = manager.createNest({
       position: { x: 999, y: 0, z: 0 },

@@ -42,27 +42,41 @@ export class PlayerInteraction {
    */
   getInteractionTargets() {
     const targets = [];
-    for (const chunk of this.player.world.chunks.values()) targets.push(chunk.group);
+    const seen = new Set();
+    const pushTarget = (obj) => {
+      if (!obj || seen.has(obj)) return;
+      seen.add(obj);
+      targets.push(obj);
+    };
+
+    for (const chunk of this.player.world.chunks.values()) pushTarget(chunk.group);
 
     // 添加丧尸作为交互目标（如果游戏有敌人管理器）
     if (this.player.game && this.player.game.enemyManager) {
+      let hasRenderMeshes = false;
+
       // 从EnemyManager获取渲染网格（InstancedMesh）
       if (typeof this.player.game.enemyManager.getRenderMeshes === 'function') {
         const renderMeshes = this.player.game.enemyManager.getRenderMeshes();
-        targets.push(...renderMeshes);
+        hasRenderMeshes = renderMeshes.length > 0;
+        for (const mesh of renderMeshes) {
+          pushTarget(mesh);
+        }
       }
 
-      // 从EnemyManager获取所有敌人实例
-      const enemies = this.player.game.enemyManager.getAllEnemies();
-      for (const enemy of enemies) {
-        if (enemy.mesh) {
-          targets.push(enemy.mesh);
+      // 优先使用 InstancedMesh，旧 mesh 只作为回退
+      if (!hasRenderMeshes) {
+        const enemies = this.player.game.enemyManager.getAllEnemies();
+        for (const enemy of enemies) {
+          if (enemy.mesh) {
+            pushTarget(enemy.mesh);
+          }
         }
       }
     }
 
     chestManager.chestAnimations.forEach(anim => {
-      if (anim.mesh) targets.push(anim.mesh);
+      if (anim.mesh) pushTarget(anim.mesh);
     });
     return targets;
   }
@@ -372,29 +386,85 @@ export class PlayerInteraction {
    */
   tryPlaceZombieNest(x, y, z) {
     const game = this.player.game;
-    if (!game || !game.zombieNestManager) {
+    const nestManager = game?.zombieNestManager;
+    if (!nestManager) {
       console.warn('[PlayerInteraction] ZombieNestManager 不可用');
       return false;
     }
 
-    if (game.zombieNestManager.nests.size >= game.zombieNestManager.maxNests) {
+    const canCreateNest = typeof nestManager.canCreateNest === 'function'
+      ? nestManager.canCreateNest()
+      : nestManager.nests.size < nestManager.maxNests;
+    if (!canCreateNest) {
       console.warn('[PlayerInteraction] 已达到最大丧尸巢穴数量限制，无法放置');
       return false;
     }
 
+    const structureBlocks = this.getZombieNestStructureBlocks(x, y, z);
+    if (!structureBlocks) {
+      return false;
+    }
+
+    if (!this.canPlaceZombieNestAt(structureBlocks)) {
+      return false;
+    }
+
+    const criticalBlock = this.findStructureCriticalBlock(structureBlocks);
+    if (!criticalBlock) {
+      console.warn('[PlayerInteraction] 未找到丧尸巢穴关键方块');
+      return false;
+    }
+
+    this.applyStructureBlocks(structureBlocks);
+
+    const nest = nestManager.createNest({
+      position: { x, y, z },
+      criticalBlock
+    });
+
+    if (!nest) {
+      this.rollbackStructureBlocks(structureBlocks);
+      console.warn('[PlayerInteraction] 创建丧尸巢穴运行时实例失败');
+      return false;
+    }
+
+    this.player.inventory.remove('zombie_nest_alias_block', 1);
+    audioManager.playSound('put', 0.3);
+
+    console.log(`[PlayerInteraction] 丧尸巢穴放置成功 at (${x}, ${y}, ${z})`);
+    return true;
+  }
+
+  /**
+   * 获取丧尸巢穴结构方块
+   * @param {number} x - X坐标
+   * @param {number} y - Y坐标
+   * @param {number} z - Z坐标
+   * @returns {Array<Object>|null}
+   */
+  getZombieNestStructureBlocks(x, y, z) {
     const loader = getStructureLoader('zombieNest');
     const structureData = loader?.getData();
     if (!loader || !structureData) {
       console.warn('[PlayerInteraction] zombie_nest 结构尚未加载完成');
-      return false;
+      return null;
     }
 
     const structureBlocks = loader.generateBlocks(x, y, z);
     if (structureBlocks.length === 0) {
       console.warn('[PlayerInteraction] zombie_nest 结构数据为空');
-      return false;
+      return null;
     }
 
+    return structureBlocks;
+  }
+
+  /**
+   * 校验丧尸巢穴放置条件
+   * @param {Array<Object>} structureBlocks - 结构方块
+   * @returns {boolean}
+   */
+  canPlaceZombieNestAt(structureBlocks) {
     for (const block of structureBlocks) {
       const existingBlock = this.player.world.getBlock(block.x, block.y, block.z);
       if (existingBlock && existingBlock !== 'air') {
@@ -407,36 +477,27 @@ export class PlayerInteraction {
         return false;
       }
     }
+    return true;
+  }
 
-    const criticalBlock = this.findStructureCriticalBlock(structureBlocks);
-    if (!criticalBlock) {
-      console.warn('[PlayerInteraction] 未找到丧尸巢穴关键方块');
-      return false;
-    }
-
-    for (const block of structureBlocks) {
+  /**
+   * 应用结构方块到世界
+   * @param {Array<Object>} blocks - 结构方块
+   */
+  applyStructureBlocks(blocks) {
+    for (const block of blocks) {
       this.player.world.setBlock(block.x, block.y, block.z, block.type, block.orientation ?? 0);
     }
+  }
 
-    const nest = game.zombieNestManager.createNest({
-      position: { x, y, z },
-      structureBlocks,
-      criticalBlock
-    });
-
-    if (!nest) {
-      for (const block of structureBlocks) {
-        this.player.world.removeBlock(block.x, block.y, block.z);
-      }
-      console.warn('[PlayerInteraction] 创建丧尸巢穴运行时实例失败');
-      return false;
+  /**
+   * 回滚结构方块
+   * @param {Array<Object>} blocks - 结构方块
+   */
+  rollbackStructureBlocks(blocks) {
+    for (const block of blocks) {
+      this.player.world.removeBlock(block.x, block.y, block.z);
     }
-
-    this.player.inventory.remove('zombie_nest_alias_block', 1);
-    audioManager.playSound('put', 0.3);
-
-    console.log(`[PlayerInteraction] 丧尸巢穴放置成功 at (${x}, ${y}, ${z})`);
-    return true;
   }
 
   /**
