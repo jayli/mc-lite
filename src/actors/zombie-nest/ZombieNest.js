@@ -86,8 +86,20 @@ export class ZombieNest {
    */
   checkIntegrity() {
     if (!this.criticalBlock) return false;
+    // 关键方块所属区块未加载时，不做破坏判定，避免远离区块时误销毁巢穴
+    if (this.isCriticalChunkUnavailable()) return true;
     const blockType = this.getBlock(this.criticalBlock.x, this.criticalBlock.y, this.criticalBlock.z);
     return blockType === this.criticalBlock.type;
+  }
+
+  /**
+   * 关键方块所在 Chunk 当前是否不可用
+   * @returns {boolean}
+   */
+  isCriticalChunkUnavailable() {
+    if (!this.world || !this.criticalBlock) return false;
+    if (typeof this.world.isChunkLoadedAt !== 'function') return false;
+    return !this.world.isChunkLoadedAt(this.criticalBlock.x, this.criticalBlock.z);
   }
 
   /**

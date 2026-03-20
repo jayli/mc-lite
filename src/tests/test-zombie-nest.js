@@ -13,7 +13,8 @@ function createMockWorld(blocks = {}) {
     getBlock: (x, y, z) => {
       const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
       return blocks[key] ?? null;
-    }
+    },
+    isChunkLoadedAt: () => true
   };
 }
 
@@ -56,6 +57,20 @@ describe('ZombieNest 行为测试', (test) => {
 
     assertEqual(nest.state, 'DESTROYED', '关键方块消失后应失效');
     assertEqual(destroyedId, nest.id, '失效时应通知管理器');
+  });
+
+  test('关键方块所在 Chunk 未加载时不应误判为失效', () => {
+    const blocks = {
+      '0,5,0': 'gold_block'
+    };
+    const world = createMockWorld(blocks);
+    world.isChunkLoadedAt = () => false;
+
+    const nest = createNest(world);
+    nest._integrityCheckCounter = ZOMBIE_NEST_CONFIG.INTEGRITY_CHECK_INTERVAL - 1;
+    nest.update();
+
+    assertEqual(nest.state, 'ACTIVE', 'Chunk 未加载时应保持激活，等待区块恢复后再检查');
   });
 
   test('到达刷怪时间且出生点合法时会刷怪', () => {

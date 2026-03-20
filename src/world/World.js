@@ -403,6 +403,20 @@ export class World {
   }
 
   /**
+   * 指定坐标所属 Chunk 是否已加载且完成初始化
+   * @param {number} x - 世界坐标 X
+   * @param {number} z - 世界坐标 Z
+   * @returns {boolean}
+   */
+  isChunkLoadedAt(x, z) {
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cz = Math.floor(z / CHUNK_SIZE);
+    const key = `${cx},${cz}`;
+    const chunk = this.chunks.get(key);
+    return !!(chunk && chunk.isReady);
+  }
+
+  /**
    * 获取指定世界坐标的方块类型（快速路径）
    * 仅查询：坐标所属 Chunk + crossChunkOwnerCache
    * 不执行全量 Chunk 扫描，适用于高频实时判定（如 AI / LOS / 弹道碰撞）

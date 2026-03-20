@@ -29,6 +29,7 @@ export class Game {
     this.engine = new Engine();
     // 初始化游戏世界（地形、区块等）
     this.world = new World(this.engine.scene);
+    this.world.persistenceService = persistenceService;
     // 初始化玩家角色
     this.player = new Player(this.world, this.engine.camera);
     this.player.game = this; // 将游戏实例传递给玩家对象
@@ -40,6 +41,8 @@ export class Game {
     // 初始化炮塔管理器
     this.turretManager = new TurretManager(this.engine.scene, this.world, this.enemyManager);
     this.zombieNestManager = new ZombieNestManager(this.engine.scene, this.world, this.enemyManager);
+    // 让 Chunk 生成回调可直接恢复该 Chunk 的巢穴运行时实例
+    this.world.zombieNestManager = this.zombieNestManager;
 
     // 初始化 Stats 监控
     this.stats = new Stats();

@@ -145,6 +145,12 @@ export function extendChunk(Chunk) {
           persistence?.saveChunkData?.(this.cx, this.cz, newSnapshot);
         }
 
+        // 5. 恢复该 Chunk 中的丧尸巢穴运行时实例（直接按快照记录重建，无需扫描）
+        const zombieNests = newSnapshot?.entities?.zombieNests;
+        if (Array.isArray(zombieNests) && zombieNests.length > 0) {
+          this.world?.zombieNestManager?.restoreNestsForChunk?.(this.cx, this.cz, zombieNests);
+        }
+
         this.isReady = true;
         resolve();
       });

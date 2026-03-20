@@ -89,8 +89,9 @@ onmessage = async function(e) {
       entities: snapshot.entities ? {
         realisticTrees: snapshot.entities.realisticTrees || [],
         modGunMan: snapshot.entities.modGunMan || [],
-        rovers: snapshot.entities.rovers || []
-      } : { realisticTrees: [], modGunMan: [], rovers: [] }
+        rovers: snapshot.entities.rovers || [],
+        zombieNests: snapshot.entities.zombieNests || []
+      } : { realisticTrees: [], modGunMan: [], rovers: [], zombieNests: [] }
     };
   }
 
@@ -477,6 +478,7 @@ onmessage = async function(e) {
     realisticTrees = savedSnapshot.entities.realisticTrees || [];
     modGunMan = savedSnapshot.entities.modGunMan || [];
     rovers = savedSnapshot.entities.rovers || [];
+    const zombieNests = savedSnapshot.entities.zombieNests || [];
 
     // 重建结构中心列表（从实体列表）
     // 修复：保留静态结构（如 tank, house, static_tree），只移除动态实体，避免 reload 后静态结构被截断
@@ -505,6 +507,16 @@ onmessage = async function(e) {
       rovers.forEach(pos => {
         if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
           structureCenters.push({ type: 'rover', ...pos });
+        }
+      });
+    }
+
+    if (zombieNests) {
+      zombieNests.forEach(nest => {
+        const pos = nest?.position;
+        if (!pos) return;
+        if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
+          structureCenters.push({ type: 'zombieNest', x: pos.x, y: pos.y, z: pos.z });
         }
       });
     }
@@ -760,7 +772,12 @@ onmessage = async function(e) {
     structureCenters, // 新增：当前 Chunk 负责渲染的结构中心列表
     snapshot: {
       blocks: blocksForSnapshot,
-      entities: { realisticTrees, modGunMan, rovers }
+      entities: {
+        realisticTrees,
+        modGunMan,
+        rovers,
+        zombieNests: savedSnapshot?.entities?.zombieNests || []
+      }
     }
   });
 };
