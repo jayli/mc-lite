@@ -38,7 +38,7 @@ const ROOMS_PER_CHUNK = 2;
 const MAX_ROOM_SIZE = 5;
 
 onmessage = async function(e) {
-  const { cx, cz, seed, snapshot, structureCenters: incomingStructureCenters } = e.data;
+  const { cx, cz, seed, snapshot, structureCenters: incomingStructureCenters, callbackKey } = e.data;
 
   // 同步种子
   setSeed(seed);
@@ -756,7 +756,7 @@ onmessage = async function(e) {
 
   // 返回数据
   postMessage({
-    cx, cz, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys,
+    cx, cz, callbackKey, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys,
     structureCenters, // 新增：当前 Chunk 负责渲染的结构中心列表
     snapshot: {
       blocks: blocksForSnapshot,

@@ -219,8 +219,11 @@ export const geomMap = {
 export function extendChunk(Chunk) {
   // 注册 Worker 消息处理器
   worldWorker.onmessage = (e) => {
-    const { cx, cz, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters } = e.data;
-    const key = `${cx},${cz}`;
+    const {
+      cx, cz, callbackKey,
+      d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters
+    } = e.data;
+    const key = callbackKey || `${cx},${cz}`;
     if (workerCallbacks.has(key)) {
       workerCallbacks.get(key)({ d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters });
       workerCallbacks.delete(key);
@@ -244,6 +247,7 @@ export function extendChunk(Chunk) {
    */
   Chunk.prototype.scheduleConsolidation = function() {
     if (this.isConsolidating) return;
+    if (this.deferConsolidation) return;
 
     // 清除现有的定时器
     if (this.consolidationTimer) {
@@ -291,6 +295,7 @@ export function extendChunk(Chunk) {
     worldWorker.postMessage({
       cx: this.cx,
       cz: this.cz,
+      callbackKey,
       seed: WORLD_CONFIG.SEED,
       snapshot: {
         blocks: { ...this.blockData },

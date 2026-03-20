@@ -5,6 +5,9 @@
  */
 
 import { persistenceService } from './PersistenceService.js';
+import { getBlockProperties } from '../constants/BlockData.js';
+import { WORLD_CONFIG } from '../utils/MathUtils.js';
+import { worldWorker, workerCallbacks } from '../world/ChunkConsolidation.js';
 
 /**
  * 创造台服务类 - 单例模式
@@ -213,7 +216,7 @@ export class PlaygroundService {
   /**
    * 在玩家附近创建创造台
    * @param {THREE.Vector3} playerPos - 玩家位置
-   * @returns {{ success: boolean, error?: string }}
+   * @returns {{ success: boolean, error?: string, affectedChunkKeys?: string[] }}
    */
   createPlayground(playerPos) {
     if (this.isPlaygroundActive) {
@@ -273,8 +276,8 @@ export class PlaygroundService {
 
     this.playgroundOrigin = { x: originX, y: originY, z: originZ };
 
-    // 生成 40x40 平台
-    let placed = 0;
+    // 生成 40x40 平台（批量快写，不走逐块动态渲染）
+    const platformBlocks = [];
     for (let dx = 0; dx < this.playgroundSize; dx++) {
       for (let dz = 0; dz < this.playgroundSize; dz++) {
         const x = Math.floor(originX + dx);
@@ -285,22 +288,27 @@ export class PlaygroundService {
         const centerX = Math.floor(this.playgroundSize / 2);
         const centerZ = Math.floor(this.playgroundSize / 2);
         if (dx === centerX && dz === centerZ) {
-          // 中心标记方块
-          this.world.setBlock(x, y, z, 'playground_center_block');
-          this.playgroundBlocks.add(`${x},${y},${z}`);
+          platformBlocks.push({ x, y, z, type: 'playground_center_block', orientation: 0 });
         } else {
-          // 普通平台方块
-          this.world.setBlock(x, y, z, 'playground_block');
-          this.playgroundBlocks.add(`${x},${y},${z}`);
+          platformBlocks.push({ x, y, z, type: 'playground_block', orientation: 0 });
         }
-        placed++;
       }
     }
+    const batchResult = this.world.setBlocksBatch(platformBlocks, {
+      deferConsolidation: true,
+      replaceExisting: true
+    });
+    const affectedChunkKeys = new Set(batchResult.touchedChunks);
+    platformBlocks.forEach((block) => {
+      this.playgroundBlocks.add(`${block.x},${block.y},${block.z}`);
+      affectedChunkKeys.add(this.getChunkKeyForPosition(block.x, block.z));
+    });
+    const placed = batchResult.placed;
 
     this.isPlaygroundActive = true;
     console.log(`Playground created: ${placed} blocks at (${originX}, ${originY}, ${originZ})`);
 
-    return { success: true, origin: this.playgroundOrigin };
+    return { success: true, origin: this.playgroundOrigin, affectedChunkKeys: Array.from(affectedChunkKeys) };
   }
 
   /**
@@ -465,11 +473,11 @@ export class PlaygroundService {
   }
 
   /**
-   * 从 JSON 字符串导入模型到创造台
+   * 从 JSON 字符串导入模型到创造台（批量快写 + 导入后统一优化）
    * @param {string} jsonText - 模型 JSON 字符串（格式兼容 tank.json）
-   * @returns {{ success: boolean, error?: string, placed?: number, skipped?: number, invalid?: number }}
+   * @returns {Promise<{ success: boolean, error?: string, placed?: number, skipped?: number, invalid?: number, affectedChunkKeys?: string[] }>}
    */
-  importModelFromJson(jsonText) {
+  async importModelFromJson(jsonText) {
     if (!this.isPlaygroundActive || !this.playgroundOrigin) {
       return { success: false, error: 'PLAYGROUND_NOT_ACTIVE' };
     }
@@ -496,6 +504,9 @@ export class PlaygroundService {
     let placed = 0;
     let skipped = 0;
     let invalid = 0;
+    const affectedChunkKeys = new Set();
+    const pendingPosSet = new Set();
+    const blocksToPlace = [];
 
     for (const block of modelData.blocks) {
       if (!block || typeof block !== 'object') {
@@ -506,16 +517,24 @@ export class PlaygroundService {
       const relX = Number(block.x);
       const relY = Number(block.y);
       const relZ = Number(block.z);
-      const type = typeof block.type === 'string' ? block.type : '';
+      const type = typeof block.type === 'string' ? block.type.trim() : '';
 
       if (!Number.isFinite(relX) || !Number.isFinite(relY) || !Number.isFinite(relZ) || !type) {
         invalid++;
         continue;
       }
 
+      const props = getBlockProperties(type);
+      // 统一跳过不可渲染方块（例如 collider / 各类占位符），避免“透明可碰撞”
+      if (!props.isRendered) {
+        skipped++;
+        continue;
+      }
+
       const x = Math.round(centerX + relX);
       const y = Math.round(centerY + relY);
       const z = Math.round(centerZ + relZ);
+      const posKey = `${x},${y},${z}`;
 
       // 防止越界写入
       if (y < 0 || y > 255) {
@@ -523,19 +542,215 @@ export class PlaygroundService {
         continue;
       }
 
-      // 目标位置已有方块时跳过（含创造台方块）
-      const existingType = this.world.getBlock(x, y, z);
-      if (existingType && existingType !== 'air') {
+      // 同一次导入中，重复坐标只保留首次，避免重复写入
+      if (pendingPosSet.has(posKey)) {
         skipped++;
         continue;
       }
 
       const orientation = this.convertDirectionToOrientation(block.direction);
-      this.world.setBlock(x, y, z, type, orientation);
-      placed++;
+      pendingPosSet.add(posKey);
+      blocksToPlace.push({ x, y, z, type, orientation });
+      affectedChunkKeys.add(this.getChunkKeyForPosition(x, z));
     }
 
-    return { success: true, placed, skipped, invalid };
+    const clearInfo = this.collectModelAreaBlocksToClear();
+    const clearResult = this.world.setBlocksBatch(clearInfo.blocks, {
+      deferConsolidation: true,
+      replaceExisting: true
+    });
+    clearResult.touchedChunks.forEach((key) => affectedChunkKeys.add(key));
+
+    // 导入阶段只写逻辑数据，不创建动态 mesh，避免导入中帧率骤降
+    const importResult = this.world.setBlocksBatch(blocksToPlace, {
+      deferConsolidation: true,
+      replaceExisting: false
+    });
+    placed = importResult.placed;
+    skipped += importResult.skipped;
+    importResult.touchedChunks.forEach((key) => affectedChunkKeys.add(key));
+
+    return {
+      success: true,
+      placed,
+      skipped,
+      invalid,
+      affectedChunkKeys: Array.from(affectedChunkKeys)
+    };
+  }
+
+  /**
+   * 收集创造台模型区中的可清除方块（保留平台本体）
+   * @returns {{ blocks: Array<{x:number,y:number,z:number,type:string,orientation:number}> }}
+   */
+  collectModelAreaBlocksToClear() {
+    const blocks = [];
+    if (!this.world || !this.playgroundOrigin) return { blocks };
+
+    const minX = Math.floor(this.playgroundOrigin.x);
+    const maxX = minX + this.playgroundSize - 1;
+    const minZ = Math.floor(this.playgroundOrigin.z);
+    const maxZ = minZ + this.playgroundSize - 1;
+    const minY = Math.floor(this.playgroundOrigin.y) + 1;
+
+    for (const [, chunk] of this.world.chunks) {
+      if (!chunk || !chunk.blockData) continue;
+
+      for (const [key, entry] of Object.entries(chunk.blockData)) {
+        const [x, y, z] = key.split(',').map(Number);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
+        if (x < minX || x > maxX || z < minZ || z > maxZ || y < minY) continue;
+
+        const type = typeof entry === 'string' ? entry : entry?.type;
+        if (!type || type === 'air' || type === 'playground_block' || type === 'playground_center_block') {
+          continue;
+        }
+
+        blocks.push({ x, y, z, type: 'air', orientation: 0 });
+      }
+    }
+
+    return { blocks };
+  }
+
+  /**
+   * 将世界坐标转换为区块键
+   * @param {number} x - 世界坐标 X
+   * @param {number} z - 世界坐标 Z
+   * @returns {string} 区块键 "cx,cz"
+   */
+  getChunkKeyForPosition(x, z) {
+    return `${Math.floor(x / 16)},${Math.floor(z / 16)}`;
+  }
+
+  /**
+   * 等待指定区块优化完成（Worker 一次性计算并回写）
+   * @param {string[]|Set<string>} chunkKeys - 受影响区块列表
+   * @param {number} timeoutMs - 超时时间（毫秒）
+   * @param {{ includeNeighbors?: boolean }} [options]
+   * @returns {Promise<boolean>}
+   */
+  async waitForOptimizationComplete(chunkKeys, timeoutMs = 30000, options = {}) {
+    if (!this.world || !chunkKeys) return true;
+    const includeNeighbors = options.includeNeighbors === true;
+    const baseKeys = Array.isArray(chunkKeys) ? chunkKeys : Array.from(chunkKeys);
+    const keys = includeNeighbors ? this.expandChunkKeysWithNeighbors(baseKeys) : baseKeys;
+    if (keys.length === 0) return true;
+
+    const pendingKeys = [];
+    for (const key of keys) {
+      const chunk = this.world.chunks.get(key);
+      if (!chunk || !chunk.isReady) continue;
+      if (chunk.dirtyBlocks > 0 || chunk.isConsolidating || chunk.consolidationTimer) {
+        pendingKeys.push(key);
+      }
+    }
+    if (pendingKeys.length === 0) return true;
+
+    return this.optimizeChunksWithWorker(pendingKeys, timeoutMs);
+  }
+
+  /**
+   * 将指定区块一次性提交到 Worker 优化，并同步回主线程
+   * @param {string[]} chunkKeys - 待优化区块键列表
+   * @param {number} timeoutMs - 超时时间
+   * @returns {Promise<boolean>}
+   */
+  async optimizeChunksWithWorker(chunkKeys, timeoutMs = 30000) {
+    if (!this.world || !Array.isArray(chunkKeys) || chunkKeys.length === 0) return true;
+
+    const tasks = [];
+    for (const key of chunkKeys) {
+      const chunk = this.world.chunks.get(key);
+      if (!chunk || !chunk.isReady) continue;
+
+      tasks.push(new Promise((resolve) => {
+        const callbackKey = `pg-opt:${key}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+        const consolidatedCount = chunk.dirtyBlocks;
+        const consolidatedMeshKeys = new Set(chunk.dynamicMeshes.keys());
+
+        if (chunk.consolidationTimer) {
+          clearTimeout(chunk.consolidationTimer);
+          chunk.consolidationTimer = null;
+        }
+        chunk.deferConsolidation = false;
+        chunk.isConsolidating = true;
+
+        const timeoutId = setTimeout(() => {
+          workerCallbacks.delete(callbackKey);
+          chunk.isConsolidating = false;
+          console.warn(`[PlaygroundService] Worker 优化超时: ${key}`);
+          resolve(false);
+        }, timeoutMs);
+
+        workerCallbacks.set(callbackKey, (data) => {
+          clearTimeout(timeoutId);
+          try {
+            chunk._applyConsolidateResult(data, consolidatedCount, consolidatedMeshKeys);
+            resolve(true);
+          } catch (error) {
+            chunk.isConsolidating = false;
+            console.error(`[PlaygroundService] 应用 Worker 优化结果失败: ${key}`, error);
+            resolve(false);
+          }
+        });
+
+        worldWorker.postMessage({
+          cx: chunk.cx,
+          cz: chunk.cz,
+          callbackKey,
+          seed: WORLD_CONFIG.SEED,
+          snapshot: {
+            blocks: { ...chunk.blockData },
+            entities: { ...chunk.entities }
+          },
+          structureCenters: chunk.structureCenters,
+          isOptimization: true
+        });
+      }));
+    }
+
+    if (tasks.length === 0) return true;
+    const results = await Promise.all(tasks);
+    return results.every(Boolean);
+  }
+
+  /**
+   * 将传入区块扩展为“自身 + 邻居一圈（3x3）”
+   * @param {string[]} chunkKeys - 区块键数组
+   * @returns {string[]} 扩展后的区块键数组
+   */
+  expandChunkKeysWithNeighbors(chunkKeys) {
+    const expanded = new Set();
+    for (const key of chunkKeys) {
+      const [cxStr, czStr] = String(key).split(',');
+      const cx = Number(cxStr);
+      const cz = Number(czStr);
+      if (!Number.isFinite(cx) || !Number.isFinite(cz)) continue;
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          expanded.add(`${cx + dx},${cz + dz}`);
+        }
+      }
+    }
+    return Array.from(expanded);
+  }
+
+  /**
+   * 对指定区块立即触发一次合并（绕过防抖延迟）
+   * @param {Iterable<string>} chunkKeys - 区块键集合
+   */
+  triggerImmediateConsolidation(chunkKeys) {
+    if (!this.world || !chunkKeys) return;
+    for (const key of chunkKeys) {
+      const chunk = this.world.chunks.get(key);
+      if (!chunk || !chunk.isReady || chunk.dirtyBlocks <= 0 || chunk.isConsolidating) continue;
+      if (chunk.consolidationTimer) {
+        clearTimeout(chunk.consolidationTimer);
+        chunk.consolidationTimer = null;
+      }
+      chunk.consolidate();
+    }
   }
 
   /**

@@ -509,6 +509,66 @@ export class World {
   }
 
   /**
+   * 批量放置方块（导入专用）
+   * 按 Chunk 分组后走快速写入路径，避免逐块触发高成本动态更新
+   * @param {Array<{x:number,y:number,z:number,type:string,orientation?:number}>} blocks
+   * @param {{ deferConsolidation?: boolean, replaceExisting?: boolean }} [options]
+   * @returns {{ placed: number, skipped: number, touchedChunks: Set<string> }}
+   */
+  setBlocksBatch(blocks, options = {}) {
+    if (!Array.isArray(blocks) || blocks.length === 0) {
+      return { placed: 0, skipped: 0, touchedChunks: new Set() };
+    }
+
+    const deferConsolidation = options.deferConsolidation === true;
+    const replaceExisting = options.replaceExisting === true;
+    const chunkGroups = new Map();
+
+    for (const block of blocks) {
+      const cx = Math.floor(block.x / CHUNK_SIZE);
+      const cz = Math.floor(block.z / CHUNK_SIZE);
+      const key = `${cx},${cz}`;
+      if (!chunkGroups.has(key)) chunkGroups.set(key, []);
+      chunkGroups.get(key).push(block);
+    }
+
+    let placed = 0;
+    let skipped = 0;
+    const touchedChunks = new Set();
+
+    for (const [chunkKey, list] of chunkGroups.entries()) {
+      const chunk = this.chunks.get(chunkKey);
+      if (!chunk || !chunk.isReady || typeof chunk.addBlocksBatchFast !== 'function') {
+        skipped += list.length;
+        continue;
+      }
+
+      const result = chunk.addBlocksBatchFast(list, { deferConsolidation, replaceExisting });
+      placed += result.placed;
+      skipped += result.skipped;
+      if (result.placed > 0) {
+        touchedChunks.add(chunkKey);
+      }
+    }
+
+    this.clearBlockLookupCaches();
+    return { placed, skipped, touchedChunks };
+  }
+
+  /**
+   * 对指定 Chunk 统一调度合并
+   * @param {Iterable<string>} chunkKeys - Chunk 键列表（格式：cx,cz）
+   */
+  scheduleConsolidationForChunks(chunkKeys) {
+    if (!chunkKeys) return;
+    for (const key of chunkKeys) {
+      const chunk = this.chunks.get(key);
+      if (!chunk || !chunk.isReady || chunk.dirtyBlocks <= 0) continue;
+      chunk.scheduleConsolidation();
+    }
+  }
+
+  /**
    * 移除指定世界坐标的方块
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y

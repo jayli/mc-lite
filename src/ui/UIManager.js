@@ -238,26 +238,43 @@ export class UIManager {
           }
         } else {
           // 创建创造台
-          const result = playgroundService.createPlayground(playerPos);
-          if (result.success) {
-            this.hud.showMessage('创造台已创建');
-            // 更新按钮为关闭状态
-            btnCreatePlayground.style.background = '#e74c3c';
-            btnCreatePlayground.innerText = '关闭创造台';
-            // 显示导出模型按钮
-            if (btnExportModel) {
-              btnExportModel.style.display = 'block';
-            }
-            if (btnImportModel) {
-              btnImportModel.style.display = 'block';
-            }
-          } else {
-            if (result.error === 'PLAYGROUND_EXISTS') {
-              this.hud.showMessage('创造台已存在');
-            } else if (result.error === 'NO_SPACE') {
-              this.hud.showMessage('无法找到合适的空间，请移动位置');
+          const removeLoading = this.showBlockingLoading('创造台生成中，正在进行合并与面剔除优化，请稍候...');
+          let optimizationDone = false;
+          try {
+            const result = playgroundService.createPlayground(playerPos);
+            if (result.success) {
+              optimizationDone = await playgroundService.waitForOptimizationComplete(
+                result.affectedChunkKeys || [],
+                20000,
+                { includeNeighbors: false }
+              );
+              if (optimizationDone) {
+                this.hud.showMessage('创造台已创建');
+                // 更新按钮为关闭状态
+                btnCreatePlayground.style.background = '#e74c3c';
+                btnCreatePlayground.innerText = '关闭创造台';
+                // 显示导出模型按钮
+                if (btnExportModel) {
+                  btnExportModel.style.display = 'block';
+                }
+                if (btnImportModel) {
+                  btnImportModel.style.display = 'block';
+                }
+              } else {
+                this.hud.showMessage('创造台优化未完成，已保持锁定状态，请稍候重试');
+              }
             } else {
-              this.hud.showMessage('创建失败：' + result.error);
+              if (result.error === 'PLAYGROUND_EXISTS') {
+                this.hud.showMessage('创造台已存在');
+              } else if (result.error === 'NO_SPACE') {
+                this.hud.showMessage('无法找到合适的空间，请移动位置');
+              } else {
+                this.hud.showMessage('创建失败：' + result.error);
+              }
+            }
+          } finally {
+            if (optimizationDone) {
+              removeLoading();
             }
           }
         }
@@ -294,11 +311,29 @@ export class UIManager {
 
           try {
             const jsonText = await file.text();
-            const result = playgroundService.importModelFromJson(jsonText);
-            if (result.success) {
-              this.hud.showMessage(`导入完成：放置 ${result.placed}，跳过 ${result.skipped}，无效 ${result.invalid}`);
-            } else {
-              this.hud.showMessage('导入失败：' + result.error);
+            const removeLoading = this.showBlockingLoading('模型导入中，正在进行合并与面剔除优化，请稍候...');
+            let optimizationDone = false;
+            try {
+              const result = await playgroundService.importModelFromJson(jsonText);
+              if (result.success) {
+                optimizationDone = await playgroundService.waitForOptimizationComplete(
+                  result.affectedChunkKeys || [],
+                  30000,
+                  { includeNeighbors: false }
+                );
+                if (!optimizationDone) {
+                  this.hud.showMessage('模型优化未完成，已保持锁定状态，请稍候重试');
+                  return;
+                }
+                this.hud.showMessage(`导入完成：放置 ${result.placed}，跳过 ${result.skipped}，无效 ${result.invalid}`);
+              } else {
+                optimizationDone = true;
+                this.hud.showMessage('导入失败：' + result.error);
+              }
+            } finally {
+              if (optimizationDone) {
+                removeLoading();
+              }
             }
           } catch (error) {
             console.error('Import model failed:', error);
@@ -558,5 +593,43 @@ export class UIManager {
       btnReturn.disabled = !hasPosition;
       btnReturn.style.background = hasPosition ? '#4a90e2' : '#999';
     }
+  }
+
+  /**
+   * 显示全屏交互锁定层，返回关闭函数
+   * @param {string} message - 提示文本
+   * @returns {Function} 调用后移除遮罩
+   */
+  showBlockingLoading(message) {
+    const overlay = document.createElement('div');
+    overlay.style.position = 'fixed';
+    overlay.style.left = '0';
+    overlay.style.top = '0';
+    overlay.style.width = '100vw';
+    overlay.style.height = '100vh';
+    overlay.style.background = 'rgba(0, 0, 0, 0.52)';
+    overlay.style.zIndex = '100000';
+    overlay.style.display = 'flex';
+    overlay.style.alignItems = 'center';
+    overlay.style.justifyContent = 'center';
+    overlay.style.pointerEvents = 'auto';
+
+    const text = document.createElement('div');
+    text.textContent = message || '处理中，请稍候...';
+    text.style.color = '#ffffff';
+    text.style.fontSize = '18px';
+    text.style.fontWeight = '600';
+    text.style.textAlign = 'center';
+    text.style.maxWidth = '70vw';
+    text.style.lineHeight = '1.6';
+
+    overlay.appendChild(text);
+    document.body.appendChild(overlay);
+
+    return () => {
+      if (overlay.parentNode) {
+        overlay.parentNode.removeChild(overlay);
+      }
+    };
   }
 }

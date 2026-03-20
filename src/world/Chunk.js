@@ -70,6 +70,7 @@ export class Chunk {
     this.dirtyBlocks = 0;
     this.consolidationTimer = null;
     this.isConsolidating = false;
+    this.deferConsolidation = false;
     this.dynamicMeshes = new Map();
 
     // 批量 Face Culling 更新系统
@@ -504,6 +505,69 @@ export class Chunk {
         return { block: nb, neighbors: getNeighborsOf(nx, ny, nz) };
       });
     }
+  }
+
+  /**
+   * 批量快速添加方块（导入专用）
+   * 仅更新逻辑状态与持久化记录，不逐块创建动态网格；由后续 consolidate 统一重建渲染
+   * @param {Array<{x:number,y:number,z:number,type:string,orientation?:number}>} blocks
+   * @param {{ deferConsolidation?: boolean, replaceExisting?: boolean }} [options]
+   * @returns {{ placed: number, skipped: number }}
+   */
+  addBlocksBatchFast(blocks, options = {}) {
+    const deferConsolidation = options.deferConsolidation === true;
+    const replaceExisting = options.replaceExisting === true;
+    let placed = 0;
+    let skipped = 0;
+    let hasChanges = false;
+
+    for (const block of blocks) {
+      const x = Math.floor(block.x);
+      const y = Math.floor(block.y);
+      const z = Math.floor(block.z);
+      const key = `${x},${y},${z}`;
+
+      if (!this._isInResponsibility(x, y, z)) {
+        skipped++;
+        continue;
+      }
+
+      const oldEntry = this.blockData[key];
+      const oldType = oldEntry ? parseBlockEntry(oldEntry).type : null;
+      const nextType = typeof block.type === 'string' ? block.type : 'air';
+
+      // 默认不覆盖已有非空气方块；replaceExisting=true 时允许覆盖
+      if (!replaceExisting && nextType !== 'air' && oldType && oldType !== 'air') {
+        skipped++;
+        continue;
+      }
+
+      // 清理操作：目标是 air，当前位置为空则跳过
+      if (nextType === 'air' && (!oldType || oldType === 'air')) {
+        skipped++;
+        continue;
+      }
+
+      const orientation = nextType === 'air'
+        ? 0
+        : (Number.isFinite(block.orientation) ? Math.trunc(block.orientation) : 0);
+      const entry = { type: nextType, orientation };
+
+      getPersistenceService().recordChangeForChunk(this.cx, this.cz, x, y, z, entry);
+      this._updateBlockState(key, nextType, entry);
+      this.dirtyBlocks++;
+      hasChanges = true;
+      placed++;
+    }
+
+    if (hasChanges) {
+      this.saveDebounced();
+      if (!deferConsolidation) {
+        this.scheduleConsolidation();
+      }
+    }
+
+    return { placed, skipped };
   }
 
   /**
