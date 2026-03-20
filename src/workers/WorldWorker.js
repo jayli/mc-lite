@@ -74,6 +74,10 @@ onmessage = async function(e) {
     add: (x, y, z, type, dObj, solid = true, orientation = 0) => {
       const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
       blockMap.set(key, { x, y, z, type, solid, orientation });
+    },
+    getBlockType: (x, y, z) => {
+      const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+      return blockMap.get(key)?.type || null;
     }
   };
 
@@ -935,7 +939,7 @@ function generateTank(x, y, z, chunk, dObj) {
  * @param {Object} dObj - 数据收集对象
  */
 function generateDesertPyramid(x, y, z, chunk, dObj) {
-  desertPyramid.generate(x, y, z, chunk, dObj, true);
+  generateStructureWithGroundSupport(desertPyramid, x, y, z, chunk, dObj);
 }
 
 /**
@@ -947,7 +951,63 @@ function generateDesertPyramid(x, y, z, chunk, dObj) {
  * @param {Object} dObj - 数据收集对象
  */
 function generateDesertVillage(x, y, z, chunk, dObj) {
-  desertVillage.generate(x, y, z, chunk, dObj, true);
+  generateStructureWithGroundSupport(desertVillage, x, y, z, chunk, dObj);
+}
+
+/**
+ * 生成 JSON 结构，并在底部悬空时向下补支撑方块
+ * @param {Object} loader - StructureLoader 实例
+ * @param {number} x - X 坐标（结构中心点）
+ * @param {number} y - Y 坐标（地面高度）
+ * @param {number} z - Z 坐标（结构中心点）
+ * @param {Object} chunk - 区块对象
+ * @param {Object} dObj - 数据收集对象
+ */
+function generateStructureWithGroundSupport(loader, x, y, z, chunk, dObj) {
+  // 兼容未预加载或无高级接口的场景
+  if (!loader || !loader.getData || !loader.addToChunk || !loader.generateBlocks) {
+    loader?.generate?.(x, y, z, chunk, dObj, true);
+    return;
+  }
+
+  const blocks = loader.generateBlocks(x, y, z, y);
+  loader.addToChunk(chunk, blocks, dObj, true);
+
+  // 参考 UglyHouse 的处理思路：底部若悬空，则逐列向下补一格一格的支撑方块
+  // 仅对底层方块进行支撑，避免无意义填充内部空间。
+  const bottomColumns = new Map();
+  for (const block of blocks) {
+    const key = `${Math.floor(block.x)},${Math.floor(block.z)}`;
+    const existing = bottomColumns.get(key);
+    if (!existing || block.y < existing.y) {
+      bottomColumns.set(key, block);
+    }
+  }
+
+  const minSupportY = -64;
+  const isSolidType = (type) => {
+    if (!type) return false;
+    return Boolean(getBlockProperties(type).isSolid);
+  };
+
+  for (const baseBlock of bottomColumns.values()) {
+    const supportType = baseBlock.type || 'sandstone';
+    const supportSolid = isSolidType(supportType);
+    let fillY = Math.floor(baseBlock.y) - 1;
+
+    while (fillY >= minSupportY) {
+      const existingType = typeof chunk.getBlockType === 'function'
+        ? chunk.getBlockType(baseBlock.x, fillY, baseBlock.z)
+        : null;
+
+      if (isSolidType(existingType)) {
+        break;
+      }
+
+      chunk.add(baseBlock.x, fillY, baseBlock.z, supportType, dObj, supportSolid, 0);
+      fillY--;
+    }
+  }
 }
 
 /**
@@ -971,5 +1031,5 @@ function generateTower(x, y, z, chunk, dObj) {
  * @param {Object} dObj - 数据收集对象
  */
 function generateUglyHouse(x, y, z, chunk, dObj) {
-  uglyHouse.generate(x, y, z, chunk, dObj, true);
+  generateStructureWithGroundSupport(uglyHouse, x, y, z, chunk, dObj);
 }
