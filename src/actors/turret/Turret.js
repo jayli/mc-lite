@@ -200,6 +200,9 @@ export class Turret {
   update(deltaTime, enemies) {
     if (this.state === 'DESTROYED') return;
 
+    // 自愈：如果视觉节点意外丢失，在炮塔仍存活时自动恢复
+    this.ensureVisuals();
+
     // 降频检查结构完整性
     this._integrityCheckCounter++;
     if (this._integrityCheckCounter >= this._integrityCheckInterval) {
@@ -235,6 +238,49 @@ export class Turret {
   }
 
   /**
+   * 检查指定坐标所属 Chunk 是否已加载且可查询
+   * @param {number} x
+   * @param {number} z
+   * @returns {boolean}
+   */
+  isChunkLoadedForPosition(x, z) {
+    if (!this.world?.chunks) return false;
+    const cx = Math.floor(x / 16);
+    const cz = Math.floor(z / 16);
+    const chunk = this.world.chunks.get(`${cx},${cz}`);
+    return !!(chunk && chunk.isReady);
+  }
+
+  /**
+   * 自愈视觉节点：避免因异常清理导致“炮身消失”
+   */
+  ensureVisuals() {
+    if (this.state === 'DESTROYED' || !this.scene) return;
+
+    const visualsMissing = !this.pivotObject || !this.pitchObject || this.turretMeshes.length === 0;
+    if (visualsMissing) {
+      if (this.pivotObject?.parent) {
+        this.pivotObject.parent.remove(this.pivotObject);
+      }
+      this.pivotObject = null;
+      this.pitchObject = null;
+      this.turretMeshes = [];
+      this.createVisuals();
+      if (this.pivotObject) this.pivotObject.rotation.y = this.currentRotation;
+      if (this.pitchObject) this.pitchObject.rotation.x = -this.currentPitch;
+      return;
+    }
+
+    // 避免节点被外部逻辑移出场景后不再显示
+    if (this.pivotObject.parent !== this.scene) {
+      this.scene.add(this.pivotObject);
+    }
+    if (this.pitchObject.parent !== this.pivotObject) {
+      this.pivotObject.add(this.pitchObject);
+    }
+  }
+
+  /**
    * 检查炮塔结构完整性
    * 检查 obsidian 柱子是否完整
    * 方块坐标（下移一格后）:
@@ -254,6 +300,11 @@ export class Turret {
     ];
 
     for (const worldPos of criticalBlocks) {
+      // 关键修复：远离后 Chunk 可能被卸载，未加载状态不应判定为结构损坏
+      if (!this.isChunkLoadedForPosition(worldPos.x, worldPos.z)) {
+        continue;
+      }
+
       const block = this.getBlockForTurret(worldPos.x, worldPos.y, worldPos.z);
       // 首次检查或调试时输出
       if (this._firstIntegrityCheck === undefined) {
