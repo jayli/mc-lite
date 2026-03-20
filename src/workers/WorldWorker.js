@@ -973,39 +973,77 @@ function generateStructureWithGroundSupport(loader, x, y, z, chunk, dObj) {
   const blocks = loader.generateBlocks(x, y, z, y);
   loader.addToChunk(chunk, blocks, dObj, true);
 
-  // 参考 UglyHouse 的处理思路：底部若悬空，则逐列向下补一格一格的支撑方块
-  // 仅对底层方块进行支撑，避免无意义填充内部空间。
-  const bottomColumns = new Map();
-  for (const block of blocks) {
-    const key = `${Math.floor(block.x)},${Math.floor(block.z)}`;
-    const existing = bottomColumns.get(key);
-    if (!existing || block.y < existing.y) {
-      bottomColumns.set(key, block);
-    }
-  }
-
   const minSupportY = -64;
+  // 仅补“最多悬空 5 格”的情况：
+  // 若 baseY 为底层方块 Y，则允许地面最低出现在 baseY - 6（中间 5 个空气格）
+  const maxFloatingBlocks = 5;
   const isSolidType = (type) => {
     if (!type) return false;
     return Boolean(getBlockProperties(type).isSolid);
   };
 
-  for (const baseBlock of bottomColumns.values()) {
+  // 只对实体“本地 y=1（贴地层）”的方块做支撑补地。
+  // 这样可避免对结构内部本应悬空的高层方块进行错误填充。
+  const supportColumns = new Map();
+  const loaderData = loader.getData?.();
+  const localBlocks = loaderData?.blocks || [];
+  const bottomY = typeof loader.getBottomY === 'function' ? loader.getBottomY() : 1;
+
+  for (const localBlock of localBlocks) {
+    if (Math.floor(localBlock.y) !== 1) continue;
+
+    const worldX = Math.floor(x + localBlock.x);
+    const worldY = Math.floor(y + (localBlock.y - bottomY));
+    const worldZ = Math.floor(z + localBlock.z);
+    const key = `${worldX},${worldZ}`;
+
+    supportColumns.set(key, {
+      x: worldX,
+      y: worldY,
+      z: worldZ,
+      type: localBlock.type
+    });
+  }
+
+  for (const baseBlock of supportColumns.values()) {
     const supportType = baseBlock.type || 'sandstone';
     const supportSolid = isSolidType(supportType);
-    let fillY = Math.floor(baseBlock.y) - 1;
+    const baseY = Math.floor(baseBlock.y);
+    const probeMinY = Math.max(minSupportY, baseY - (maxFloatingBlocks + 1));
+    let supportGroundY = null;
 
-    while (fillY >= minSupportY) {
+    for (let probeY = baseY - 1; probeY >= probeMinY; probeY--) {
       const existingType = typeof chunk.getBlockType === 'function'
-        ? chunk.getBlockType(baseBlock.x, fillY, baseBlock.z)
+        ? chunk.getBlockType(baseBlock.x, probeY, baseBlock.z)
         : null;
 
       if (isSolidType(existingType)) {
+        supportGroundY = probeY;
         break;
       }
+    }
 
+    // 兜底：跨 Chunk 情况下，blockMap 可能没有该列的地形数据。
+    // 这时回退到地形高度估算，避免沙漠台阶边缘出现 1 格悬空漏补。
+    if (supportGroundY === null) {
+      const worldX = Math.floor(baseBlock.x);
+      const worldZ = Math.floor(baseBlock.z);
+      const biome = terrainGen.getBiome(worldX, worldZ);
+      const terrainY = Math.floor(terrainGen.generateHeight(worldX, worldZ, biome));
+      const floatingBlocks = baseY - terrainY - 1;
+
+      if (floatingBlocks >= 1 && floatingBlocks <= maxFloatingBlocks) {
+        supportGroundY = terrainY;
+      }
+    }
+
+    // 仅填补离地较近（5 格以内）的悬空，避免云层/空岛等高空结构被错误拉柱
+    if (supportGroundY === null) {
+      continue;
+    }
+
+    for (let fillY = baseY - 1; fillY > supportGroundY; fillY--) {
       chunk.add(baseBlock.x, fillY, baseBlock.z, supportType, dObj, supportSolid, 0);
-      fillY--;
     }
   }
 }
