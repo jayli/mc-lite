@@ -41,8 +41,9 @@ export class Game {
     // 初始化炮塔管理器
     this.turretManager = new TurretManager(this.engine.scene, this.world, this.enemyManager);
     this.zombieNestManager = new ZombieNestManager(this.engine.scene, this.world, this.enemyManager);
-    // 让 Chunk 生成回调可直接恢复该 Chunk 的巢穴运行时实例
+    // 让 Chunk 生成回调可直接恢复该 Chunk 的巢穴和炮塔运行时实例
     this.world.zombieNestManager = this.zombieNestManager;
+    this.world.turretManager = this.turretManager;
 
     // 初始化 Stats 监控
     this.stats = new Stats();
@@ -415,6 +416,10 @@ export class Game {
     const worldDeltas = [];
     for (const [key, data] of persistenceService.cache.entries()) {
       worldDeltas.push({ key, ...data });
+      // 调试：记录包含炮塔的区块
+      if (data.entities?.turrets?.length > 0) {
+        console.log(`[Save] 导出炮塔数据: chunk ${key}, 数量:`, data.entities.turrets.length);
+      }
     }
 
     return {
@@ -523,7 +528,29 @@ export class Game {
       this.engine.setVisualStyle(visualStyle);
     }
 
-    // 4. 检测创造台状态并更新UI
+    // 4. 从存档恢复丧尸巢穴和炮塔实例
+    if (saveData.worldDeltas) {
+      console.log('[Save] 开始恢复实体，区块数量:', saveData.worldDeltas.length);
+      for (const chunk of saveData.worldDeltas) {
+        const { key, entities } = chunk;
+        if (!entities) continue;
+        const [cx, cz] = key.split(',').map(Number);
+
+        // 恢复丧尸巢穴
+        if (Array.isArray(entities.zombieNests) && entities.zombieNests.length > 0) {
+          console.log(`[Save] 恢复丧尸巢穴: chunk ${key}, 数量:`, entities.zombieNests.length);
+          this.zombieNestManager.restoreNestsForChunk(cx, cz, entities.zombieNests);
+        }
+
+        // 恢复炮塔
+        if (Array.isArray(entities.turrets) && entities.turrets.length > 0) {
+          console.log(`[Save] 恢复炮塔: chunk ${key}, 数量:`, entities.turrets.length);
+          this.turretManager.restoreTurretsForChunk(cx, cz, entities.turrets);
+        }
+      }
+    }
+
+    // 5. 检测创造台状态并更新UI
     if (this.ui) {
       // 重新检测创造台（存档数据已注入）
       const { playgroundService } = await import('../services/PlaygroundService.js');

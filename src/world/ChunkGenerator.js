@@ -151,6 +151,12 @@ export function extendChunk(Chunk) {
           this.world?.zombieNestManager?.restoreNestsForChunk?.(this.cx, this.cz, zombieNests);
         }
 
+        // 6. 恢复该 Chunk 中的炮塔运行时实例（直接按快照记录重建，无需扫描）
+        const turrets = newSnapshot?.entities?.turrets;
+        if (Array.isArray(turrets) && turrets.length > 0) {
+          this.world?.turretManager?.restoreTurretsForChunk?.(this.cx, this.cz, turrets);
+        }
+
         this.isReady = true;
         resolve();
       });
