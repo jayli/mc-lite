@@ -398,7 +398,6 @@ export class World {
       }
     }
 
-    this.crossChunkMissCache.add(blockKey);
     return null;
   }
 
@@ -458,7 +457,6 @@ export class World {
       this.crossChunkOwnerCache.delete(blockKey);
     }
 
-    this.crossChunkMissCache.add(blockKey);
     return null;
   }
 

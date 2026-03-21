@@ -23,7 +23,7 @@ export class EnemyManager {
     this._workerUpdateInterval = 3; // 每 3 帧发送一次
     this._lastSentPlayerPosition = null; // 缓存玩家位置用于插值
     this._getBlockForEnemyPhysics = (x, y, z) => {
-      if (this.world?.getBlockFast) return this.world.getBlockFast(x, y, z);
+      // 敌人物理优先正确性：统一走完整查询，避免跨 Chunk 归属方块漏判
       return this.world?.getBlock ? this.world.getBlock(x, y, z) : null;
     };
   }

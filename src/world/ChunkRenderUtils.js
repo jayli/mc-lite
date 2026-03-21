@@ -8,6 +8,7 @@ import { faceCullingSystem } from '../core/FaceCullingSystem.js';
 import { createChunkNeighborSampler } from './ChunkNeighborUtils.js';
 import { CONSOLIDATION_DELAY } from './ChunkConsolidation.js';
 import { createOcclusionChecker, calculateAOForBlock } from '../utils/AOUtils.js';
+import { parseBlockEntry } from '../utils/OrientationUtils.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getFaceCullingSystem = () => globalThis._faceCullingSystem || faceCullingSystem;
@@ -19,6 +20,17 @@ const getBlockProps = (type) => {
 };
 
 export function extendChunk(Chunk) {
+  const normalizeBlockType = (entryOrType) => {
+    if (!entryOrType) return null;
+    if (typeof entryOrType === 'string') return entryOrType;
+    if (typeof entryOrType === 'object') {
+      if (typeof entryOrType.type === 'string') return entryOrType.type;
+      const parsed = parseBlockEntry(entryOrType);
+      return parsed?.type || null;
+    }
+    return null;
+  };
+
   /**
    * 清理资源 - 释放几何体和材质，防止内存泄漏
    * 在区块不再需要时调用
@@ -112,11 +124,15 @@ export function extendChunk(Chunk) {
   Chunk.prototype._triggerFaceCullingUpdate = function(x, y, z, type) {
     const fcSystem = getFaceCullingSystem();
     if (fcSystem && fcSystem.isEnabled()) {
+      const typeStr = normalizeBlockType(type);
+      if (!typeStr) return;
+
       const position = new THREE.Vector3(x, y, z);
-      const block = { type };
+      const block = { type: typeStr };
 
       const { getNeighborsOf } = createChunkNeighborSampler(this, (entry) => {
-        return entry ? { type: entry } : null;
+        const neighborType = normalizeBlockType(entry);
+        return neighborType ? { type: neighborType } : null;
       });
 
       fcSystem.updateBlock(position, block, getNeighborsOf(x, y, z));

@@ -585,6 +585,17 @@ export class Chunk {
         // 如果原本可见，跨区块暴露也需要触发 Face Culling 更新
         this._triggerFaceCullingUpdate(x, y, z, this.blockData[key]);
       }
+      return;
+    }
+
+    // 跨 Chunk 结构方块兜底：
+    // 当前 Chunk 可能只负责“坐标范围”，但方块数据实际归属于其他 Chunk。
+    // 若本地未命中，尝试在已加载 Chunk 中定位真实持有者并委托其执行 reveal。
+    for (const [, otherChunk] of this.world.chunks) {
+      if (!otherChunk || otherChunk === this || !otherChunk.isReady) continue;
+      if (!otherChunk.blockData[key]) continue;
+      otherChunk.checkReveal(x, y, z);
+      return;
     }
   }
 

@@ -17,11 +17,26 @@ export function createChunkNeighborSampler(chunk, formatNeighbor) {
       ? chunk
       : chunk.world.chunks.get(`${cx},${cz}`);
 
-    if (!targetChunk || !targetChunk.isReady) return null;
-
     const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-    const entry = targetChunk.blockData[key];
-    return formatNeighbor(entry);
+
+    // 优先走坐标所属 Chunk，命中成本最低
+    if (targetChunk && targetChunk.isReady) {
+      const entry = targetChunk.blockData[key];
+      if (entry) {
+        return formatNeighbor(entry);
+      }
+    }
+
+    // 回退到 World 级查询，覆盖“跨 Chunk 归属”的结构方块
+    // 避免邻居采样把真实方块误判为空气，导致面更新滞后到 consolidate
+    if (chunk.world?.getBlockEntry) {
+      const worldEntry = chunk.world.getBlockEntry(nx, ny, nz);
+      if (worldEntry) {
+        return formatNeighbor(worldEntry);
+      }
+    }
+
+    return null;
   };
 
   const getNeighborsOf = (nx, ny, nz) => ({
