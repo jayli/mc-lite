@@ -137,10 +137,24 @@ export function extendChunk(Chunk) {
         // 4. 重要：在生成完成后，立即保存快照数据
         if (newSnapshot) {
           const persistence = getPersistenceService();
+          // 合并策略：保留缓存中现有的 entities（如炮塔），Worker 只负责 blocks
+          // 因为 Worker 不会保留所有实体类型（如 turrets）
+          const chunkKey = `${this.cx},${this.cz}`;
+          const existingData = persistence?.cache?.get?.(chunkKey);
+          if (existingData?.entities) {
+            // 保留 Worker 返回的 entities，但补充缓存中有而 Worker 没有的实体类型
+            newSnapshot.entities = {
+              ...existingData.entities,
+              ...newSnapshot.entities,
+              // 确保这些实体类型不会被 Worker 的空数组覆盖
+              turrets: existingData.entities.turrets || newSnapshot.entities?.turrets || []
+            };
+          }
+
           // 先更新内存缓存，避免刚加载完成后立刻修改时写入不到缓存
           // 测试环境的 mock persistence 可能没有 cache 字段，需要兼容
           if (persistence?.cache?.set) {
-            persistence.cache.set(`${this.cx},${this.cz}`, newSnapshot);
+            persistence.cache.set(chunkKey, newSnapshot);
           }
           persistence?.saveChunkData?.(this.cx, this.cz, newSnapshot);
         }
