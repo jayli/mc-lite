@@ -299,6 +299,99 @@ export class World {
   }
 
   /**
+   * 解析指定坐标的方块“真实持有者”
+   * 统一处理：坐标所属 Chunk、本地缓存命中、跨 Chunk 全量扫描
+   *
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @param {{ allowScan?: boolean }} [options]
+   * @returns {{
+   *   ownerChunk: Chunk,
+   *   ownerChunkKey: string,
+   *   coordChunk: Chunk|null,
+   *   coordChunkKey: string,
+   *   blockKey: string,
+   *   entry: string|object
+   * }|null}
+   */
+  resolveBlockOwner(x, y, z, options = {}) {
+    const allowScan = options.allowScan !== false;
+
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    const iz = Math.floor(z);
+    const cx = Math.floor(ix / CHUNK_SIZE);
+    const cz = Math.floor(iz / CHUNK_SIZE);
+    const coordChunkKey = `${cx},${cz}`;
+    const coordChunk = this.chunks.get(coordChunkKey) || null;
+    const blockKey = `${ix},${iy},${iz}`;
+
+    // 1) 坐标所属 Chunk 优先
+    if (coordChunk) {
+      const entry = coordChunk.blockData[blockKey];
+      if (entry) {
+        this.crossChunkOwnerCache.delete(blockKey);
+        this.crossChunkMissCache.delete(blockKey);
+        return {
+          ownerChunk: coordChunk,
+          ownerChunkKey: coordChunkKey,
+          coordChunk,
+          coordChunkKey,
+          blockKey,
+          entry
+        };
+      }
+    }
+
+    // 2) 跨 Chunk owner 缓存命中
+    const ownerChunkKey = this.crossChunkOwnerCache.get(blockKey);
+    if (ownerChunkKey) {
+      const ownerChunk = this.chunks.get(ownerChunkKey);
+      if (ownerChunk && ownerChunk.isReady) {
+        const entry = ownerChunk.blockData[blockKey];
+        if (entry) {
+          return {
+            ownerChunk,
+            ownerChunkKey,
+            coordChunk,
+            coordChunkKey,
+            blockKey,
+            entry
+          };
+        }
+      }
+      // 缓存失效，清理后回退
+      this.crossChunkOwnerCache.delete(blockKey);
+    }
+
+    // 3) 快速模式不扫描
+    if (!allowScan) {
+      return null;
+    }
+
+    // 4) 全量扫描已加载 Chunk
+    for (const [otherKey, otherChunk] of this.chunks) {
+      if (!otherChunk || !otherChunk.isReady || otherChunk === coordChunk) continue;
+      const entry = otherChunk.blockData[blockKey];
+      if (!entry) continue;
+      this.crossChunkOwnerCache.set(blockKey, otherKey);
+      this.crossChunkMissCache.delete(blockKey);
+      return {
+        ownerChunk: otherChunk,
+        ownerChunkKey: otherKey,
+        coordChunk,
+        coordChunkKey,
+        blockKey,
+        entry
+      };
+    }
+
+    this.crossChunkMissCache.add(blockKey);
+    return null;
+  }
+
+  /**
    * 判断指定世界坐标是否为实心方块（用于物理碰撞检测）
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y
@@ -348,57 +441,8 @@ export class World {
    * @returns {string|null} 方块类型（如 'stone'），如果区块未加载则返回 null
    */
   getBlock(x, y, z) {
-    const cx = Math.floor(x / CHUNK_SIZE);
-    const cz = Math.floor(z / CHUNK_SIZE);
-    const key = `${cx},${cz}`;
-    const chunk = this.chunks.get(key);
-
-    const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-
-    // 首先查找方块坐标所在的Chunk
-    if (chunk) {
-      const entry = chunk.blockData[blockKey];
-      if (entry) {
-        // 本地命中优先，避免旧跨区块缓存干扰
-        this.crossChunkOwnerCache.delete(blockKey);
-        this.crossChunkMissCache.delete(blockKey);
-        return this.getBlockTypeFromEntry(entry);
-      }
-    }
-
-    // 跨区块命中缓存
-    const ownerChunkKey = this.crossChunkOwnerCache.get(blockKey);
-    if (ownerChunkKey) {
-      const ownerChunk = this.chunks.get(ownerChunkKey);
-      if (ownerChunk && ownerChunk.isReady && ownerChunk !== chunk) {
-        const entry = ownerChunk.blockData[blockKey];
-        if (entry) {
-          return this.getBlockTypeFromEntry(entry);
-        }
-      }
-      // 缓存失效，回退到扫描
-      this.crossChunkOwnerCache.delete(blockKey);
-    }
-
-    // 单帧 miss 缓存，避免同帧高频重复全量扫描
-    if (this.crossChunkMissCache.has(blockKey)) {
-      return null;
-    }
-
-    // 跨Chunk实体方块查找：搜索所有已加载的Chunk
-    // 跨Chunk实体的blockData存储在结构中心所在的Chunk中
-    for (const [otherKey, otherChunk] of this.chunks) {
-      if (otherChunk.isReady && otherChunk !== chunk) {
-        const entry = otherChunk.blockData[blockKey];
-        if (entry) {
-          this.crossChunkOwnerCache.set(blockKey, otherKey);
-          this.crossChunkMissCache.delete(blockKey);
-          return this.getBlockTypeFromEntry(entry);
-        }
-      }
-    }
-
-    return null;
+    const owner = this.resolveBlockOwner(x, y, z, { allowScan: true });
+    return owner ? this.getBlockTypeFromEntry(owner.entry) : null;
   }
 
   /**
@@ -426,38 +470,8 @@ export class World {
    * @returns {string|null} 方块类型，未命中则返回 null
    */
   getBlockFast(x, y, z) {
-    const cx = Math.floor(x / CHUNK_SIZE);
-    const cz = Math.floor(z / CHUNK_SIZE);
-    const key = `${cx},${cz}`;
-    const chunk = this.chunks.get(key);
-
-    const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-
-    // 首先查找方块坐标所属 Chunk
-    if (chunk) {
-      const entry = chunk.blockData[blockKey];
-      if (entry) {
-        this.crossChunkOwnerCache.delete(blockKey);
-        this.crossChunkMissCache.delete(blockKey);
-        return this.getBlockTypeFromEntry(entry);
-      }
-    }
-
-    // 命中跨 Chunk 所有者缓存（仅 O(1) 查找）
-    const ownerChunkKey = this.crossChunkOwnerCache.get(blockKey);
-    if (ownerChunkKey) {
-      const ownerChunk = this.chunks.get(ownerChunkKey);
-      if (ownerChunk && ownerChunk.isReady && ownerChunk !== chunk) {
-        const entry = ownerChunk.blockData[blockKey];
-        if (entry) {
-          return this.getBlockTypeFromEntry(entry);
-        }
-      }
-      // 缓存失效时清理，避免后续重复命中无效项
-      this.crossChunkOwnerCache.delete(blockKey);
-    }
-
-    return null;
+    const owner = this.resolveBlockOwner(x, y, z, { allowScan: false });
+    return owner ? this.getBlockTypeFromEntry(owner.entry) : null;
   }
 
   /**
@@ -468,32 +482,8 @@ export class World {
    * @returns {{ type: string, orientation: number }|null} 方块信息，如果区块未加载则返回 null
    */
   getBlockEntry(x, y, z) {
-    const cx = Math.floor(x / CHUNK_SIZE);
-    const cz = Math.floor(z / CHUNK_SIZE);
-    const key = `${cx},${cz}`;
-    const chunk = this.chunks.get(key);
-
-    const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-
-    // 首先查找方块坐标所在的Chunk
-    if (chunk) {
-      const entry = chunk.blockData[blockKey];
-      if (entry) {
-        return parseBlockEntry(entry);
-      }
-    }
-
-    // 跨Chunk实体方块查找：搜索所有已加载的Chunk
-    for (const [, otherChunk] of this.chunks) {
-      if (otherChunk.isReady && otherChunk !== chunk) {
-        const entry = otherChunk.blockData[blockKey];
-        if (entry) {
-          return parseBlockEntry(entry);
-        }
-      }
-    }
-
-    return null;
+    const owner = this.resolveBlockOwner(x, y, z, { allowScan: true });
+    return owner ? parseBlockEntry(owner.entry) : null;
   }
 
   /**
@@ -587,28 +577,10 @@ export class World {
    * @param {number} z - 世界坐标 Z
    */
   removeBlock(x, y, z) {
-    const cx = Math.floor(x / CHUNK_SIZE);
-    const cz = Math.floor(z / CHUNK_SIZE);
-    const key = `${cx},${cz}`;
-    const chunk = this.chunks.get(key);
-
-    const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-
-    // 首先尝试在方块坐标所在的Chunk删除
-    if (chunk && chunk.blockData[blockKey]) {
-      chunk.removeBlock(x, y, z);
-      this.clearBlockLookupCaches();
-      return;
-    }
-
-    // 跨Chunk实体方块：在存储该方块的Chunk中删除
-    for (const [, otherChunk] of this.chunks) {
-      if (otherChunk.isReady && otherChunk !== chunk && otherChunk.blockData[blockKey]) {
-        otherChunk.removeBlock(x, y, z);
-        this.clearBlockLookupCaches();
-        return;
-      }
-    }
+    const owner = this.resolveBlockOwner(x, y, z, { allowScan: true });
+    if (!owner) return;
+    owner.ownerChunk.removeBlock(x, y, z);
+    this.clearBlockLookupCaches();
   }
 
   /**
@@ -618,14 +590,10 @@ export class World {
    * @param {number} z - 世界坐标 Z
    */
   removeBlockCollider(x, y, z) {
-    const cx = Math.floor(x / CHUNK_SIZE);
-    const cz = Math.floor(z / CHUNK_SIZE);
-    const key = `${cx},${cz}`;
-    const chunk = this.chunks.get(key);
-    if (chunk) {
-      chunk.removeCollisionKey(x, y, z);
-      this.clearBlockLookupCaches();
-    }
+    const owner = this.resolveBlockOwner(x, y, z, { allowScan: true });
+    if (!owner) return;
+    owner.ownerChunk.removeCollisionKey(x, y, z);
+    this.clearBlockLookupCaches();
   }
 
   /**

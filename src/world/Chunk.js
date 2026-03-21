@@ -577,25 +577,17 @@ export class Chunk {
    * @param {number} z - 世界坐标 Z
    */
   checkReveal(x, y, z) {
-    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-    if (this.blockData[key]) {
-      if (!this.visibleKeys.has(key)) {
-        this.addBlockDynamic(x, y, z, this.blockData[key]);
-      } else {
-        // 如果原本可见，跨区块暴露也需要触发 Face Culling 更新
-        this._triggerFaceCullingUpdate(x, y, z, this.blockData[key]);
-      }
-      return;
-    }
+    const owner = this.world.resolveBlockOwner(x, y, z, { allowScan: true });
+    if (!owner) return;
 
-    // 跨 Chunk 结构方块兜底：
-    // 当前 Chunk 可能只负责“坐标范围”，但方块数据实际归属于其他 Chunk。
-    // 若本地未命中，尝试在已加载 Chunk 中定位真实持有者并委托其执行 reveal。
-    for (const [, otherChunk] of this.world.chunks) {
-      if (!otherChunk || otherChunk === this || !otherChunk.isReady) continue;
-      if (!otherChunk.blockData[key]) continue;
-      otherChunk.checkReveal(x, y, z);
-      return;
+    const targetChunk = owner.ownerChunk;
+    const { blockKey, entry } = owner;
+
+    if (!targetChunk.visibleKeys.has(blockKey)) {
+      targetChunk.addBlockDynamic(x, y, z, entry);
+    } else {
+      // 如果原本可见，跨区块暴露也需要触发 Face Culling 更新
+      targetChunk._triggerFaceCullingUpdate(x, y, z, entry);
     }
   }
 
