@@ -13,6 +13,9 @@ import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { EnemyManager } from './EnemyManager.js'; // 替换为新的敌人管理器
 import { TurretManager } from '../actors/turret/TurretManager.js';
 import { ZombieNestManager } from '../actors/zombie-nest/ZombieNestManager.js';
+import { EntityRegistry } from '../actors/entity-registry/EntityRegistry.js';
+import { TurretPlacementHandler } from '../actors/turret/TurretPlacementHandler.js';
+import { ZombieNestPlacementHandler } from '../actors/zombie-nest/ZombieNestPlacementHandler.js';
 import { preloadAllStructures } from '../world/entity-system/StructureLoader.js';
 import { DEFAULT_INVENTORY_COUNT } from '../constants/GameConfig.js';
 import Stats from 'stats';
@@ -44,6 +47,10 @@ export class Game {
     // 让 Chunk 生成回调可直接恢复该 Chunk 的巢穴和炮塔运行时实例
     this.world.zombieNestManager = this.zombieNestManager;
     this.world.turretManager = this.turretManager;
+
+    // 初始化实体注册表
+    this.entityRegistry = new EntityRegistry();
+    this.initEntityRegistry();
 
     // 初始化 Stats 监控
     this.stats = new Stats();
@@ -278,6 +285,30 @@ export class Game {
   */
   stop() {
     this.isRunning = false;
+  }
+
+  /**
+   * 初始化实体注册表
+   * 注册所有复杂实体类型的放置处理器
+   */
+  initEntityRegistry() {
+    // 注册炮塔放置处理器
+    this.entityRegistry.register('turret_alias_block', new TurretPlacementHandler({
+      player: this.player,
+      world: this.world,
+      game: this,
+      turretManager: this.turretManager
+    }));
+
+    // 注册丧尸巢穴放置处理器
+    this.entityRegistry.register('zombie_nest_alias_block', new ZombieNestPlacementHandler({
+      player: this.player,
+      world: this.world,
+      game: this,
+      zombieNestManager: this.zombieNestManager
+    }));
+
+    console.log('[Game] EntityRegistry 初始化完成，已注册', this.entityRegistry.getRegistrationCount(), '个实体类型');
   }
 
   /**

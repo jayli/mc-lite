@@ -577,14 +577,17 @@ export class Chunk {
    * @param {number} z - 世界坐标 Z
    */
   checkReveal(x, y, z) {
-    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-    if (this.blockData[key]) {
-      if (!this.visibleKeys.has(key)) {
-        this.addBlockDynamic(x, y, z, this.blockData[key]);
-      } else {
-        // 如果原本可见，跨区块暴露也需要触发 Face Culling 更新
-        this._triggerFaceCullingUpdate(x, y, z, this.blockData[key]);
-      }
+    const owner = this.world.resolveBlockOwner(x, y, z, { allowScan: true });
+    if (!owner) return;
+
+    const targetChunk = owner.ownerChunk;
+    const { blockKey, entry } = owner;
+
+    if (!targetChunk.visibleKeys.has(blockKey)) {
+      targetChunk.addBlockDynamic(x, y, z, entry);
+    } else {
+      // 如果原本可见，跨区块暴露也需要触发 Face Culling 更新
+      targetChunk._triggerFaceCullingUpdate(x, y, z, entry);
     }
   }
 

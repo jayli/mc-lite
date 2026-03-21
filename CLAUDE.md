@@ -226,6 +226,8 @@ npm run lint
 ## Active Technologies
 - JavaScript (ES2020+), Three.js r160 + Three.js for 3D rendering, Custom voxel engine (025-add-bed)
 - In-memory world data with chunk-based storage, no persistence for beds (025-add-bed)
+- JavaScript ES2020+ + Three.js r160 (026-turret-nest-encapsulation)
+- In-memory chunk data, JSON-based persistence (026-turret-nest-encapsulation)
 
 ## Recent Changes
 - 025-add-bed: Added JavaScript (ES2020+), Three.js r160 + Three.js for 3D rendering, Custom voxel engine
