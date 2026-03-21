@@ -29,8 +29,12 @@
         <h2 style="margin-top:0;">发现现有存档</h2>
         <p>检测到您之前手动保存的游戏进度，请选择：</p>
         <div style="display:flex; gap:15px; margin-top:25px; justify-content:center;">
-          <button id="btn-load-save" style="background:#559944; flex:1;">加载存档</button>
+          <button id="btn-load-save" style="background:#559944; flex:1;">加载存档(IndexedDB)</button>
           <button id="btn-new-world" style="background:#8b8b8b; flex:1;">开启新世界</button>
+        </div>
+        <div style="margin-top:15px; padding-top:15px; border-top:2px solid #999;">
+          <p style="margin:0 0 10px 0; font-size:14px; color:#666;">或从文件导入存档：</p>
+          <button id="btn-import-save-file" style="background:#7a9e7e; width:100%;">从文件导入存档</button>
         </div>
       </div>
     </div>
@@ -86,7 +90,10 @@
             <!-- 存档功能按钮 -->
             <div class="setting-item" style="margin-top:15px; padding-top:15px;">
               <span class="setting-title">游戏存档:</span>
-              <button id="btn-save-game" style="width:100%; margin-top:5px; background:#4a90e2;">保存当前进度 (存档)</button>
+              <div style="display:flex; gap:8px; margin-top:5px;">
+                <button id="btn-save-game" style="flex:1; background:#4a90e2;">保存进度(IndexedDB)</button>
+                <button id="btn-export-save" style="flex:1; background:#7a9e7e;">导出到文件</button>
+              </div>
             </div>
           </div>
           <!-- 右侧列：位置变更、创造台 -->
@@ -186,6 +193,41 @@ import { Game } from './src/core/Game.js';
               newBtn.onclick = () => {
                 startGame(null);
               };
+
+              // 从文件导入存档按钮处理
+              const importFileBtn = document.getElementById('btn-import-save-file');
+              if (importFileBtn) {
+                importFileBtn.onclick = async () => {
+                  // 创建文件选择输入框
+                  const fileInput = document.createElement('input');
+                  fileInput.type = 'file';
+                  fileInput.accept = '.json,application/json';
+
+                  fileInput.onchange = async (event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+
+                    try {
+                      const jsonText = await file.text();
+                      const saveData = JSON.parse(jsonText);
+
+                      // 验证存档格式
+                      if (!saveData.player || !saveData.worldDeltas) {
+                        alert('无效的存档文件格式');
+                        return;
+                      }
+
+                      console.log(`[Import] Save file loaded: ${file.name}, seed: ${saveData.seed}`);
+                      startGame(saveData);
+                    } catch (error) {
+                      console.error('Import save failed:', error);
+                      alert('导入存档失败：' + (error.message || '文件读取错误'));
+                    }
+                  };
+
+                  fileInput.click();
+                };
+              }
             } else {
               const game = new Game();
               game.start();

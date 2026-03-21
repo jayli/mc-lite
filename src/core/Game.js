@@ -393,6 +393,16 @@ export class Game {
    * 收集当前游戏快照并保存到磁盘
    */
   async saveToDisk() {
+    const snapshot = this.collectSnapshot();
+    console.log(`[Save] Game saved with seed: ${WORLD_CONFIG.SEED}`);
+    await manualSaveService.save(snapshot);
+  }
+
+  /**
+   * 收集当前游戏快照数据
+   * @returns {object} 游戏快照对象
+   */
+  collectSnapshot() {
     const playerSnapshot = {
       x: this.player.position.x,        // 玩家在X轴上的位置坐标
       y: this.player.position.y,        // 玩家在Y轴上的位置坐标
@@ -407,7 +417,7 @@ export class Game {
       worldDeltas.push({ key, ...data });
     }
 
-    const snapshot = {
+    return {
       player: playerSnapshot,            // 玩家状态快照（位置、视角等）
       worldDeltas: worldDeltas,         // 世界变化数据（保存所有修改过的区块）
       seed: WORLD_CONFIG.SEED,           // 世界生成种子，用于确保地形一致性
@@ -418,9 +428,67 @@ export class Game {
         visualStyle: this.engine.currentVisualStyle
       }
     };
+  }
 
-    console.log(`[Save] Game saved with seed: ${WORLD_CONFIG.SEED}`);
-    await manualSaveService.save(snapshot);
+  /**
+   * 导出存档到 JSON 文件
+   */
+  async exportToFile() {
+    const snapshot = this.collectSnapshot();
+    const saveData = {
+      version: '1.0',
+      exportedAt: new Date().toISOString(),
+      ...snapshot
+    };
+
+    // 创建 JSON Blob
+    const jsonStr = JSON.stringify(saveData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+
+    // 生成文件名：mc_save_YYYYMMDD_HHMMSS.json
+    const now = new Date();
+    const dateStr = now.getFullYear() +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0');
+    const timeStr = String(now.getHours()).padStart(2, '0') +
+      String(now.getMinutes()).padStart(2, '0') +
+      String(now.getSeconds()).padStart(2, '0');
+    const filename = `mc_save_${dateStr}_${timeStr}.json`;
+
+    // 使用 File System Access API（如果支持）
+    if ('showSaveFilePicker' in window) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: filename,
+          types: [{
+            description: 'Minecraft Save Files',
+            accept: { 'application/json': ['.json'] }
+          }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return { success: true, filename };
+      } catch (err) {
+        // 用户取消操作，不执行下载
+        if (err.name === 'AbortError') {
+          return { success: false, cancelled: true };
+        }
+        // 其他 API 失败，继续执行传统下载方式
+        console.warn('[Export] File System Access API failed, falling back to download:', err);
+      }
+    }
+
+    // 回退：使用传统下载方式
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    return { success: true, filename };
   }
 
   /**

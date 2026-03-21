@@ -39,6 +39,7 @@ export class UIManager {
     const btnStyleDay = document.getElementById('btn-style-day');
     const btnStyleOvercast = document.getElementById('btn-style-overcast');
     const btnSave = document.getElementById('btn-save-game');
+    const btnExportSave = document.getElementById('btn-export-save');
     const btnGunDestroyOn = document.getElementById('btn-gun-destroy-on');
     const btnGunDestroyOff = document.getElementById('btn-gun-destroy-off');
     const btnZombie20 = document.getElementById('btn-zombie-20');
@@ -193,6 +194,32 @@ export class UIManager {
         } finally {
           btnSave.disabled = false;
           btnSave.innerText = '保存当前进度 (存档)';
+        }
+      };
+    }
+
+    // 导出存档到文件按钮处理
+    if (btnExportSave) {
+      btnExportSave.onclick = async (e) => {
+        e.stopPropagation();
+        btnExportSave.disabled = true;
+        btnExportSave.innerText = '正在导出...';
+
+        try {
+          const result = await this.game.exportToFile();
+          if (result.cancelled) {
+            // 用户取消，不显示任何消息
+          } else if (result.success) {
+            this.hud.showMessage(`存档已导出: ${result.filename}`);
+          } else {
+            this.hud.showMessage('导出失败，请重试');
+          }
+        } catch (error) {
+          console.error('Export failed:', error);
+          this.hud.showMessage('导出失败，请重试');
+        } finally {
+          btnExportSave.disabled = false;
+          btnExportSave.innerText = '导出存档到文件';
         }
       };
     }
