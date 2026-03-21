@@ -9,7 +9,6 @@
 
 import { EntityPlacementHandler } from '../entity-registry/EntityPlacementHandler.js';
 import { getStructureLoader } from '../../world/entity-system/StructureLoader.js';
-import { audioManager } from '../../core/AudioManager.js';
 
 /**
  * 丧尸巢穴放置处理器
@@ -33,7 +32,7 @@ export class ZombieNestPlacementHandler extends EntityPlacementHandler {
    * @param {number} x - 方块X坐标
    * @param {number} y - 方块Y坐标
    * @param {number} z - 方块Z坐标
-   * @returns {boolean}
+   * @returns {boolean|Array<Object>} - 如果不能放置返回false，如果能放置返回结构方块数组
    */
   canPlace(x, y, z) {
     // 检查管理器是否可用
@@ -72,7 +71,8 @@ export class ZombieNestPlacementHandler extends EntityPlacementHandler {
       }
     }
 
-    return true;
+    // 返回结构方块供 place() 复用，避免重复生成
+    return structureBlocks;
   }
 
   /**
@@ -84,11 +84,8 @@ export class ZombieNestPlacementHandler extends EntityPlacementHandler {
    * @returns {boolean}
    */
   place(x, y, z) {
-    if (!this.canPlace(x, y, z)) {
-      return false;
-    }
-
-    const structureBlocks = this.getStructureBlocks(x, y, z);
+    // canPlace 返回结构方块数组或 false，复用结果避免重复生成
+    const structureBlocks = this.canPlace(x, y, z);
     if (!structureBlocks) {
       return false;
     }
@@ -117,7 +114,7 @@ export class ZombieNestPlacementHandler extends EntityPlacementHandler {
 
     // 消耗物品并播放音效
     this.player.inventory?.remove('zombie_nest_alias_block', 1);
-    audioManager.playSound('put', 0.3);
+    this.playSound('put', 0.3);
 
     console.log(`[ZombieNestPlacementHandler] 丧尸巢穴放置成功 at (${x}, ${y}, ${z})`);
     return true;
@@ -185,25 +182,4 @@ export class ZombieNestPlacementHandler extends EntityPlacementHandler {
     }
   }
 
-  /**
-   * 检查玩家是否与指定方块位置碰撞
-   * @param {number} x - 方块X坐标
-   * @param {number} y - 方块Y坐标
-   * @param {number} z - 方块Z坐标
-   * @returns {boolean}
-   */
-  isPlayerCollidingWithBlock(x, y, z) {
-    const px = this.player.position.x;
-    const py = this.player.position.y;
-    const pz = this.player.position.z;
-
-    return (
-      px - 0.3 < x + 1 &&
-      px + 0.3 > x &&
-      py < y + 1 &&
-      py + 1.8 > y &&
-      pz - 0.3 < z + 1 &&
-      pz + 0.3 > z
-    );
-  }
 }

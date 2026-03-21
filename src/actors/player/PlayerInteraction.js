@@ -10,7 +10,6 @@ import { getBlockProperties } from '../../constants/BlockData.js';
 import { nextOrientation } from '../../utils/OrientationUtils.js';
 import { Gun, WEAPON_TYPES } from '../weapon/Gun.js';
 import { gunModel, mag7Model, minigunModel } from '../../core/Engine.js';
-import { getStructureLoader } from '../../world/entity-system/StructureLoader.js';
 
 /**
  * 从对象向上查找特殊实体

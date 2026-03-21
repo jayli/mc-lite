@@ -8,6 +8,8 @@
  * - 隐藏实体内部实现细节，降低模块耦合
  */
 
+import { audioManager } from '../../core/AudioManager.js';
+
 /**
  * 实体放置处理器基类
  * 所有复杂实体（炮塔、丧尸巢穴等）的放置处理器必须继承此类
@@ -127,8 +129,6 @@ export class EntityPlacementHandler {
    * @param {number} volume - 音量（0-1）
    */
   playSound(soundName, volume = 0.3) {
-    if (this.game && this.game.audioManager) {
-      this.game.audioManager.playSound(soundName, volume);
-    }
+    audioManager.playSound(soundName, volume);
   }
 }

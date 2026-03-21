@@ -9,7 +9,6 @@
 
 import * as THREE from 'three';
 import { EntityPlacementHandler } from '../entity-registry/EntityPlacementHandler.js';
-import { audioManager } from '../../core/AudioManager.js';
 
 /**
  * 炮塔放置处理器
@@ -142,7 +141,7 @@ export class TurretPlacementHandler extends EntityPlacementHandler {
 
     // 消耗物品并播放音效
     this.player.inventory?.remove('turret_alias_block', 1);
-    audioManager.playSound('put', 0.3);
+    this.playSound('put', 0.3);
 
     console.log(`[TurretPlacementHandler] 炮塔放置成功 at (${x}, ${y}, ${z})`);
     return true;
