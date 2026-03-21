@@ -191,3 +191,11 @@ button.active {
   padding-right: 4px;
   white-space: nowrap;
 }
+
+/* 存档按钮样式 - 减小内边距以适应文字 */
+#btn-save-game,
+#btn-export-save {
+  padding-left: 6px;
+  padding-right: 6px;
+  white-space: nowrap;
+}
