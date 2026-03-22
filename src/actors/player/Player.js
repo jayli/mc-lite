@@ -13,6 +13,7 @@ import { Gun, WEAPON_TYPES } from '../weapon/Gun.js';
 import { getBlockProperties } from '../../constants/BlockData.js';
 import { nextOrientation } from '../../utils/OrientationUtils.js';
 import { IslandMap } from '../../workers/maps/IslandMap.js';
+import { PlainLand } from '../../workers/maps/PlainLand.js';
 import { terrainGen } from '../../world/TerrainGen.js';
 import { FrozenMountain } from '../../workers/maps/FrozenMountain.js';
 import { Pyramid } from '../../workers/maps/Pyramid.js';
@@ -75,24 +76,32 @@ export class Player {
     this.moveCheckFrequency = 1;   // 碰撞检测频率 (每几帧检查一次)
 
     // 初始出生点逻辑
-    // 玩家必定出生在海岛（测试模式）
+    // 默认优先出生在 plain_land（城堡平地）
     let spawnX, spawnZ;
 
-    // 在海岛出生
-    console.log('[Spawn] 计算海岛出生点，seed:', WORLD_CONFIG.SEED);
-    const islandSpawn = IslandMap.getIslandSpawnPoint(WORLD_CONFIG.SEED, terrainGen);
-    if (islandSpawn) {
-      spawnX = islandSpawn.x;
-      spawnZ = islandSpawn.z;
-      console.log('[Spawn] 出生在海岛:', spawnX, spawnZ);
-      console.log('[Spawn] 海岛中心：', islandSpawn.islandCenterX, islandSpawn.islandCenterZ);
-      console.log('[Spawn] 区域：', islandSpawn.zone);
+    // 优先在平地（plain_land）出生
+    console.log('[Spawn] 计算 plain_land 出生点，seed:', WORLD_CONFIG.SEED);
+    const plainLandSpawn = PlainLand.getPlainLandSpawnPoint(WORLD_CONFIG.SEED, terrainGen);
+    if (plainLandSpawn) {
+      spawnX = plainLandSpawn.x;
+      spawnZ = plainLandSpawn.z;
+      console.log('[Spawn] 出生在 plain_land:', spawnX, spawnZ);
+      console.log('[Spawn] plain_land 中心：', plainLandSpawn.plainLandCenterX, plainLandSpawn.plainLandCenterZ);
     } else {
-      // 如果海岛出生点计算失败，回退到雪地出生
-      console.log('[Spawn] 海岛出生点计算失败，回退到雪地');
-      const slInfo = getSnowLandCenter(0, 0, WORLD_CONFIG.SEED);
-      spawnX = slInfo.centerX;
-      spawnZ = slInfo.centerZ;
+      // 如果 plain_land 出生点计算失败，回退到海岛
+      console.log('[Spawn] plain_land 出生点计算失败，回退到海岛');
+      const islandSpawn = IslandMap.getIslandSpawnPoint(WORLD_CONFIG.SEED, terrainGen);
+      if (islandSpawn) {
+        spawnX = islandSpawn.x;
+        spawnZ = islandSpawn.z;
+        console.log('[Spawn] 回退出生在海岛:', spawnX, spawnZ);
+      } else {
+        // 最后兜底：雪地
+        console.log('[Spawn] 海岛也不可用，回退到雪地');
+        const slInfo = getSnowLandCenter(0, 0, WORLD_CONFIG.SEED);
+        spawnX = slInfo.centerX;
+        spawnZ = slInfo.centerZ;
+      }
     }
 
     // 直接在这个位置出生，不做高度/生物群系检查
@@ -825,7 +834,7 @@ export class Player {
 
   /**
    * 获取最近的地标位置
-   * @param {string} landmarkType - 'frozen' | 'pyramid' | 'island' | 'snow'
+   * @param {string} landmarkType - 'frozen' | 'pyramid' | 'island' | 'snow' | 'plain_land'
    * @returns {Object|null} - {x, z} 地标中心坐标，如果未找到则返回 null
    */
   getNearestLandmarkPosition(landmarkType) {
@@ -898,6 +907,12 @@ export class Player {
               centerX = snowLandCx;
               centerZ = snowLandCz;
             }
+            break;
+          }
+          case 'plain_land': {
+            const { cx, cz } = PlainLand.getPlainLandCenterInRegion(rx, rz, seed);
+            centerX = cx;
+            centerZ = cz;
             break;
           }
         }

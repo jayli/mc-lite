@@ -21,7 +21,7 @@ export class PlaygroundService {
     this.world = null;
     this._isPlaygroundActive = false;
     this.playgroundOrigin = null; // 创造台中心坐标
-    this.playgroundSize = 40;     // 40x40 平台
+    this.playgroundSize = 54;     // 54x54 平台（在原 40x40 基础上每边扩 7 格）
     this.playgroundBlocks = new Set(); // 存储创造台上所有方块的 key
   }
 
@@ -276,7 +276,7 @@ export class PlaygroundService {
 
     this.playgroundOrigin = { x: originX, y: originY, z: originZ };
 
-    // 生成 40x40 平台（批量快写，不走逐块动态渲染）
+    // 生成 playgroundSize x playgroundSize 平台（批量快写，不走逐块动态渲染）
     const platformBlocks = [];
     for (let dx = 0; dx < this.playgroundSize; dx++) {
       for (let dz = 0; dz < this.playgroundSize; dz++) {

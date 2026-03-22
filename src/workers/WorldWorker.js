@@ -11,6 +11,7 @@ import { Pyramid } from './maps/Pyramid.js';
 import { SnowLand } from './maps/SnowLand.js';
 import { FrozenMountain } from './maps/FrozenMountain.js';
 import { IslandMap } from './maps/IslandMap.js';
+import { PlainLand } from './maps/PlainLand.js';
 import { belongsToStructure as checkBelongsToStructure } from '../utils/StructureUtils.js';
 import {
   computeFaceVisibilityMask,
@@ -25,7 +26,7 @@ self.onerror = (e) => {
 };
 
 // 结构数据加载器实例
-const { uglyHouse, desertVillage, desertPyramid, birchTree, birchTreeWithSnow, tank, tower } = structureLoaders;
+const { uglyHouse, desertVillage, desertPyramid, birchTree, birchTreeWithSnow, tank, tower, castle } = structureLoaders;
 
 // Smoothstep 平滑插值
 function smoothstep(edge0, edge1, x) {
@@ -51,7 +52,8 @@ onmessage = async function(e) {
     birchTree.load(),
     birchTreeWithSnow.load(),
     tank.load(),
-    tower.load()
+    tower.load(),
+    castle.load()
   ]).catch(err => console.error('Failed to load structure data:', err));
 
   // 计算当前区块的范围 - 提前定义，供 snapshot 模式使用
@@ -68,6 +70,7 @@ onmessage = async function(e) {
   const structureQueue = []; // 结构生成队列，确保结构覆盖地形
   const structureCenters = []; // 结构中心点列表，用于跨 Chunk 渲染
   const islandTowerCenters = new Set(); // 记录海岛高塔中心，保证每座海岛只生成一次
+  const plainLandCastleCenters = new Set(); // 记录平地城堡中心，保证每个平地只生成一次
 
   // 模拟 Chunk 类的 add 方法 - 改为写入 blockMap
   const fakeChunk = {
@@ -149,6 +152,10 @@ onmessage = async function(e) {
       const islandInfo = IslandMap.getIslandInfo(wx, wz, seed, terrainGen);
       const inIsland = islandInfo !== null;
 
+      // 检查当前坐标是否在平地范围内（城堡专用地形）
+      const plainLandInfo = PlainLand.getPlainLandInfo(wx, wz, seed, terrainGen);
+      const inPlainLand = plainLandInfo !== null;
+
       if (inPyramid) {
         Pyramid.generate(wx, wz, h, pyInfo, fakeChunk, dPlaceholder);
 
@@ -227,6 +234,28 @@ onmessage = async function(e) {
             }
           }
 
+        }
+      } else if (inPlainLand) {
+        // 平地生成逻辑（规则正方形 + 完全平坦）
+        const plainLandResult = PlainLand.generate(wx, wz, h, plainLandInfo, fakeChunk, dPlaceholder);
+
+        // 每块平地唯一生成一个城堡，固定在中心
+        const isCastleCenter = wx === plainLandInfo.centerX && wz === plainLandInfo.centerZ;
+        const castleCenterKey = `${plainLandInfo.centerX},${plainLandInfo.centerZ}`;
+        if (isCastleCenter && !plainLandCastleCenters.has(castleCenterKey)) {
+          const task = () => generateCastle(
+            plainLandInfo.centerX,
+            plainLandResult.surfaceY + 1,
+            plainLandInfo.centerZ,
+            fakeChunk,
+            dPlaceholder
+          );
+          task.centerX = plainLandInfo.centerX;
+          task.centerY = plainLandResult.surfaceY + 1;
+          task.centerZ = plainLandInfo.centerZ;
+          task.type = 'castle';
+          structureQueue.push(task);
+          plainLandCastleCenters.add(castleCenterKey);
         }
       } else if (inSnowLand) {
         const snowResult = SnowLand.generate(wx, wz, h, slInfo, fakeChunk, dPlaceholder);
@@ -1075,6 +1104,18 @@ function generateStructureWithGroundSupport(loader, x, y, z, chunk, dObj) {
  */
 function generateTower(x, y, z, chunk, dObj) {
   tower.generate(x, y, z, chunk, dObj, true);
+}
+
+/**
+ * 生成城堡（从 JSON 数据）
+ * @param {number} x - X 坐标（城堡中心点）
+ * @param {number} y - Y 坐标（地面高度）
+ * @param {number} z - Z 坐标（城堡中心点）
+ * @param {Object} chunk - 区块对象
+ * @param {Object} dObj - 数据收集对象
+ */
+function generateCastle(x, y, z, chunk, dObj) {
+  generateStructureWithGroundSupport(castle, x, y, z, chunk, dObj);
 }
 
 /**

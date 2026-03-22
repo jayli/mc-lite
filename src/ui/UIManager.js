@@ -53,6 +53,7 @@ export class UIManager {
     const btnTeleportPyramid = document.getElementById('btn-teleport-pyramid');
     const btnTeleportIsland = document.getElementById('btn-teleport-island');
     const btnTeleportSnow = document.getElementById('btn-teleport-snow');
+    const btnTeleportPlainLand = document.getElementById('btn-teleport-plain-land');
     const btnReturnOrigin = document.getElementById('btn-return-origin');
     const btnRecordPosition = document.getElementById('btn-record-position');
 
@@ -399,6 +400,12 @@ export class UIManager {
         this.teleportToLandmark('snow', settingsModal);
       };
     }
+    if (btnTeleportPlainLand) {
+      btnTeleportPlainLand.onclick = (e) => {
+        e.stopPropagation();
+        this.teleportToLandmark('plain_land', settingsModal);
+      };
+    }
     if (btnReturnOrigin) {
       btnReturnOrigin.onclick = (e) => {
         e.stopPropagation();
@@ -520,7 +527,7 @@ export class UIManager {
 
   /**
    * 闪现到地标
-   * @param {string} landmarkType - 地标类型：'frozen' | 'pyramid' | 'island' | 'snow'
+   * @param {string} landmarkType - 地标类型：'frozen' | 'pyramid' | 'island' | 'snow' | 'plain_land'
    * @param {HTMLElement} settingsModal - 设置模态框元素
    */
   teleportToLandmark(landmarkType, settingsModal) {
@@ -559,7 +566,8 @@ export class UIManager {
       'frozen': '冰封山峰',
       'pyramid': '金字塔',
       'island': '海岛',
-      'snow': '雪地'
+      'snow': '雪地',
+      'plain_land': '平地'
     };
     this.hud.showMessage(`已闪现到${landmarkNames[landmarkType] || '目的地'}`);
   }
