@@ -20,18 +20,46 @@ export const TURRET_CONFIG = {
   // --- 结构尺寸 ---
   PIVOT_HEIGHT_OFFSET: 3.3,   // 旋转中心高度偏移（相对于底座 position.y）
 
-  // --- 枪管外观 ---
-  GUN_HANDLE_SIZE: [0.8, 0.8, 2],     // 枪把尺寸 [宽, 高, 深]
-  GUN_HANDLE_OFFSET_Z: -0.5,          // 枪把 Z 轴偏移（向后）
-  GUN_HANDLE_COLOR: 0x888888,          // 枪把颜色
+  // --- 炮塔主体外观（楔形结构） ---
+  TURRET_TOWER_SIZE: {
+    FRONT: [1.6, 1.2, 0.4],      // 前装甲板 [宽, 高, 深]
+    SIDE: [0.8, 1.0, 1.5],       // 侧装甲板 [宽, 高, 深]
+    TOP: [1.6, 0.3, 1.5],        // 顶装甲板 [宽, 高, 深]
+    BACK: [1.6, 1.2, 0.3],       // 后装甲板 [宽, 高, 深]
+  },
+  TURRET_TOWER_COLOR: {
+    MAIN: 0xcccccc,   // 浅灰色主体
+    DARK: 0xbbbbbb,   // 中灰色后板
+  },
+  TURRET_TOWER_POS: {
+    FRONT: [0, -0.2, 0.6],       // 前板相对位置
+    LEFT: [-0.8, -0.1, -0.2],    // 左板相对位置
+    RIGHT: [0.8, -0.1, -0.2],    // 右板相对位置
+    TOP: [0, 0.6, -0.2],         // 顶板相对位置
+    BACK: [0, -0.2, -0.95],      // 后板相对位置
+  },
 
-  GUN_BARREL_SIZE: [0.4, 0.4, 2.5],   // 枪管尺寸 [宽, 高, 深]
-  GUN_BARREL_OFFSET_Z: 1.75,          // 枪管 Z 轴偏移（向前）
-  GUN_BARREL_COLOR: 0x444444,          // 枪管颜色
+  // --- 炮管系统配置 ---
+  GUN_BARREL_SIZE: {
+    LENGTH: 3.0,           // 炮管长度
+    DIAMETER: 0.3,         // 炮管直径
+  },
+  GUN_ROOT_SIZE: [0.6, 0.6, 0.4],  // 炮管根部尺寸
+  GUN_SIGHT_SIZE: [0.3, 0.3, 0.4], // 瞄准器尺寸
+  GUN_COLOR: {
+    BARREL: 0x222222,      // 黑色炮管
+    ROOT: 0xeeeeee,        // 白色根部
+    SIGHT: 0x3366cc,       // 蓝色瞄准器
+  },
+  GUN_POS: {
+    BARREL_Z: 2.0,         // 炮管 Z 偏移
+    ROOT_Z: 0.5,           // 根部 Z 偏移
+    SIGHT_Y: 0.5,          // 瞄准器 Y 偏移
+    SIGHT_Z: 0.3,          // 瞄准器 Z 偏移
+  },
 
-  MUZZLE_SIZE: [0.5, 0.5, 0.3],       // 枪口装饰尺寸 [宽, 高, 深]
-  MUZZLE_OFFSET_Z: 3.1,               // 枪口 Z 轴偏移
-  MUZZLE_COLOR: 0x222222,              // 枪口颜色
+  // --- 炮口位置（新炮管更长） ---
+  MUZZLE_OFFSET_Z: 3.5,    // 炮口在炮管最前端
 
   // --- 炮弹参数 ---
   PROJECTILE_SPEED: 40,     // 炮弹飞行速度（格/秒）
