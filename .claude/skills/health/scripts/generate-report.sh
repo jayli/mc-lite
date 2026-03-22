@@ -15,8 +15,8 @@ generate_health_report() {
   local complexity_score=$7
   local debt_bonus=$8
   local unused_deduction=$9
-  local style_deduction=$10
-  local no_tests_deduction=$11
+  local style_deduction=${10}
+  local no_tests_deduction=${11}
 
   local total_score=$((test_score + debt_score + doc_score + comment_score + security_score + standard_score + complexity_score + debt_bonus - unused_deduction - style_deduction - no_tests_deduction))
 
