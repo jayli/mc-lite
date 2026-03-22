@@ -202,17 +202,21 @@ export class Turret {
     this.pitchObject.add(front);
     this.turretMeshes.push(front);
 
-    // 2. 左侧装甲板
+    // 2. 左侧装甲板（前边缘倾斜，与前装甲匹配）
     const leftGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.SIDE);
     const left = new THREE.Mesh(leftGeometry, mainMaterial);
-    left.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.LEFT);
+    // 前边缘向下倾斜，与前装甲斜度匹配
+    left.rotation.x = -Math.PI / 8; // -22.5度
+    left.position.set(-0.8, -0.05, -0.1);
     this.pitchObject.add(left);
     this.turretMeshes.push(left);
 
-    // 3. 右侧装甲板
+    // 3. 右侧装甲板（前边缘倾斜，与前装甲匹配）
     const rightGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.SIDE);
     const right = new THREE.Mesh(rightGeometry, mainMaterial);
-    right.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.RIGHT);
+    // 前边缘向下倾斜，与前装甲斜度匹配
+    right.rotation.x = -Math.PI / 8; // -22.5度
+    right.position.set(0.8, -0.05, -0.1);
     this.pitchObject.add(right);
     this.turretMeshes.push(right);
 
