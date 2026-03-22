@@ -192,11 +192,13 @@ export class Turret {
 
     // === 创建炮塔主体（楔形结构） ===
 
-    // 1. 前装甲板（倾斜前表面）
+    // 1. 前装甲板（倾斜前表面 - 向后倾斜约22度，类似坦克前装甲）
     const frontGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.FRONT);
     const mainMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.TURRET_TOWER_COLOR.MAIN });
     const front = new THREE.Mesh(frontGeometry, mainMaterial);
-    front.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.FRONT);
+    // 向后倾斜，使前装甲有斜度（坦克风格）
+    front.rotation.x = -Math.PI / 8; // -22.5度
+    front.position.set(0, -0.05, 0.75);
     this.pitchObject.add(front);
     this.turretMeshes.push(front);
 
