@@ -53,9 +53,9 @@ export const TURRET_CONFIG = {
   },
   GUN_POS: {
     BARREL_Z: 2.0,         // 炮管 Z 偏移
-    ROOT_Z: 0.5,           // 根部 Z 偏移
+    ROOT_Z: 0.9,           // 根部 Z 偏移（向前露出前装甲）
     SIGHT_Y: 0.5,          // 瞄准器 Y 偏移
-    SIGHT_Z: 0.3,          // 瞄准器 Z 偏移
+    SIGHT_Z: 0.7,          // 瞄准器 Z 偏移（向前露出前装甲）
   },
 
   // --- 炮口位置（新炮管更长） ---
