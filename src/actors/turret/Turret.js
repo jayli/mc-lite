@@ -184,40 +184,85 @@ export class Turret {
   }
 
   /**
-   * 创建炮塔顶部的枪（替代原来的 iron + horizontal_pillar 4个方块）
-   * 以 obsidian 柱子顶端为旋转中心，枪从中心向前后延伸
+   * 创建炮塔顶部的楔形结构（替代原来的简单枪造型）
+   * 现代化海军炮塔风格：楔形主体 + 细长炮管 + 蓝色瞄准器
    */
   createTurretTopBlocks() {
-    console.log(`[Turret ${this.id}] 创建枪的 mesh...`);
+    console.log(`[Turret ${this.id}] 创建现代化楔形炮塔...`);
 
-    // 枪把（后方）
-    const handleGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.GUN_HANDLE_SIZE);
-    const handleMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.GUN_HANDLE_COLOR });
+    // === 创建炮塔主体（楔形结构） ===
 
-    const handle = new THREE.Mesh(handleGeometry, handleMaterial);
-    handle.position.set(0, 0, TURRET_CONFIG.GUN_HANDLE_OFFSET_Z);
-    this.pitchObject.add(handle);
-    this.turretMeshes.push(handle);
+    // 1. 前装甲板（倾斜前表面）
+    const frontGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.FRONT);
+    const mainMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.TURRET_TOWER_COLOR.MAIN });
+    const front = new THREE.Mesh(frontGeometry, mainMaterial);
+    front.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.FRONT);
+    this.pitchObject.add(front);
+    this.turretMeshes.push(front);
 
-    // 枪管（前方）
-    const barrelGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.GUN_BARREL_SIZE);
-    const barrelMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.GUN_BARREL_COLOR });
+    // 2. 左侧装甲板
+    const leftGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.SIDE);
+    const left = new THREE.Mesh(leftGeometry, mainMaterial);
+    left.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.LEFT);
+    this.pitchObject.add(left);
+    this.turretMeshes.push(left);
 
+    // 3. 右侧装甲板
+    const rightGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.SIDE);
+    const right = new THREE.Mesh(rightGeometry, mainMaterial);
+    right.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.RIGHT);
+    this.pitchObject.add(right);
+    this.turretMeshes.push(right);
+
+    // 4. 顶部装甲板
+    const topGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.TOP);
+    const top = new THREE.Mesh(topGeometry, mainMaterial);
+    top.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.TOP);
+    this.pitchObject.add(top);
+    this.turretMeshes.push(top);
+
+    // 5. 后装甲板（深色）
+    const backGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.BACK);
+    const darkMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.TURRET_TOWER_COLOR.DARK });
+    const back = new THREE.Mesh(backGeometry, darkMaterial);
+    back.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.BACK);
+    this.pitchObject.add(back);
+    this.turretMeshes.push(back);
+
+    // === 创建炮管系统 ===
+
+    // 6. 炮管（细长圆柱）
+    const barrelGeometry = new THREE.CylinderGeometry(
+      TURRET_CONFIG.GUN_BARREL_SIZE.DIAMETER / 2,
+      TURRET_CONFIG.GUN_BARREL_SIZE.DIAMETER / 2,
+      TURRET_CONFIG.GUN_BARREL_SIZE.LENGTH,
+      12
+    );
+    // 旋转圆柱使其沿 Z 轴延伸
+    barrelGeometry.rotateX(Math.PI / 2);
+    const barrelMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.GUN_COLOR.BARREL });
     const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
-    barrel.position.set(0, 0, TURRET_CONFIG.GUN_BARREL_OFFSET_Z);
+    barrel.position.set(0, 0, TURRET_CONFIG.GUN_POS.BARREL_Z);
     this.pitchObject.add(barrel);
     this.turretMeshes.push(barrel);
 
-    // 枪口装饰
-    const muzzleGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.MUZZLE_SIZE);
-    const muzzleMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.MUZZLE_COLOR });
+    // 7. 炮管根部（白色连接机构）
+    const rootGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.GUN_ROOT_SIZE);
+    const rootMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.GUN_COLOR.ROOT });
+    const root = new THREE.Mesh(rootGeometry, rootMaterial);
+    root.position.set(0, 0, TURRET_CONFIG.GUN_POS.ROOT_Z);
+    this.pitchObject.add(root);
+    this.turretMeshes.push(root);
 
-    const muzzle = new THREE.Mesh(muzzleGeometry, muzzleMaterial);
-    muzzle.position.set(0, 0, TURRET_CONFIG.MUZZLE_OFFSET_Z);
-    this.pitchObject.add(muzzle);
-    this.turretMeshes.push(muzzle);
+    // 8. 蓝色瞄准器（光学传感器）
+    const sightGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.GUN_SIGHT_SIZE);
+    const sightMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.GUN_COLOR.SIGHT });
+    const sight = new THREE.Mesh(sightGeometry, sightMaterial);
+    sight.position.set(0, TURRET_CONFIG.GUN_POS.SIGHT_Y, TURRET_CONFIG.GUN_POS.SIGHT_Z);
+    this.pitchObject.add(sight);
+    this.turretMeshes.push(sight);
 
-    console.log(`[Turret ${this.id}] 枪创建完成: 枪把+枪管+枪口`);
+    console.log(`[Turret ${this.id}] 炮塔创建完成: 5个主体部件 + 3个炮管部件`);
   }
 
   /**
