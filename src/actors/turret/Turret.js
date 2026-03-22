@@ -202,21 +202,37 @@ export class Turret {
     this.pitchObject.add(front);
     this.turretMeshes.push(front);
 
-    // 2. 左侧装甲板（前边缘倾斜，与前装甲匹配）
-    const leftGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.SIDE);
+    // 2. 左侧装甲板（梯形 - 只有前边缘倾斜，顶底边水平）
+    const sideDepthTop = 1.0;    // 顶部深度（前边向后倾斜，所以顶部深度较短）
+    const sideDepthBottom = 1.5; // 底部深度
+    const sideHeight = 1.0;
+    const sideWidth = 0.8;
+    // 创建梯形截面（在 YZ 平面）
+    const leftShape = new THREE.Shape();
+    leftShape.moveTo(0, -sideHeight/2);                    // 底部前点
+    leftShape.lineTo(sideDepthBottom, -sideHeight/2);      // 底部后点
+    leftShape.lineTo(sideDepthBottom, sideHeight/2);       // 顶部后点
+    leftShape.lineTo(sideDepthBottom - sideDepthTop, sideHeight/2); // 顶部前点（向后倾斜）
+    leftShape.lineTo(0, -sideHeight/2);                    // 回到底部前点
+    const leftGeometry = new THREE.ExtrudeGeometry(leftShape, {
+      depth: sideWidth,
+      bevelEnabled: false
+    });
+    // ExtrudeGeometry 沿 Z 轴挤出，需要旋转使宽度沿 X 轴
+    leftGeometry.rotateY(-Math.PI / 2);
     const left = new THREE.Mesh(leftGeometry, mainMaterial);
-    // 前边缘向下倾斜，与前装甲斜度匹配
-    left.rotation.x = -Math.PI / 8; // -22.5度
-    left.position.set(-0.8, -0.05, -0.1);
+    left.position.set(-0.8, -0.1, -0.6);
     this.pitchObject.add(left);
     this.turretMeshes.push(left);
 
-    // 3. 右侧装甲板（前边缘倾斜，与前装甲匹配）
-    const rightGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.SIDE);
+    // 3. 右侧装甲板（梯形 - 只有前边缘倾斜）
+    const rightGeometry = new THREE.ExtrudeGeometry(leftShape, {
+      depth: sideWidth,
+      bevelEnabled: false
+    });
+    rightGeometry.rotateY(-Math.PI / 2);
     const right = new THREE.Mesh(rightGeometry, mainMaterial);
-    // 前边缘向下倾斜，与前装甲斜度匹配
-    right.rotation.x = -Math.PI / 8; // -22.5度
-    right.position.set(0.8, -0.05, -0.1);
+    right.position.set(0.8, -0.1, -0.6);
     this.pitchObject.add(right);
     this.turretMeshes.push(right);
 
