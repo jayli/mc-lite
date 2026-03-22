@@ -12,8 +12,10 @@ check_unused_code() {
   local commented_blocks=0
 
   if [ -f "package.json" ]; then
-    unused_vars=$(npm run lint -- --rule 'no-unused-vars: error' 2>&1 | grep -c "'.*' is assigned a value but never used" || echo 0)
-    unused_funcs=$(npm run lint -- --rule 'no-unused-vars: error' 2>&1 | grep -c "'.*' is defined but never used" || echo 0)
+    unused_vars=$(npm run lint -- --rule 'no-unused-vars: error' 2>&1 | grep -c "'.*' is assigned a value but never used" || true)
+    unused_funcs=$(npm run lint -- --rule 'no-unused-vars: error' 2>&1 | grep -c "'.*' is defined but never used" || true)
+    [ -z "$unused_vars" ] && unused_vars=0
+    [ -z "$unused_funcs" ] && unused_funcs=0
   fi
 
   # 通过 grep 检查大量注释掉的代码块（可能是废弃代码）
@@ -23,6 +25,7 @@ check_unused_code() {
   local unreferenced_exports=0
   if command -v npx &> /dev/null && [ -f "tsconfig.json" ]; then
     unreferenced_exports=$(npx ts-prune --project tsconfig.json 2>/dev/null | wc -l || echo 0)
+    [ -z "$unreferenced_exports" ] && unreferenced_exports=0
   fi
 
   # 计算减分

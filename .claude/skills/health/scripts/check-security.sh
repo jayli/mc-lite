@@ -4,16 +4,19 @@
 
 check_security() {
   local score=0
+  local vulns=0
 
   # 硬编码密钥（5分）- 红线检查
   local secrets=$(grep -riE "(api[_-]?key|secret|password|token)\s*[=:]\s*[\"'][^\"']{8,}[\"']" src/ --include="*.js" 2>/dev/null | grep -v "//\|/\*" | wc -l)
   [ "$secrets" -eq 0 ] && score=$((score + 5))
 
   # 依赖漏洞（5分）
-  local vulns=0
   if [ -f "package.json" ] && command -v npm &>/dev/null; then
     npm audit --json > /tmp/audit.json 2>/dev/null
-    vulns=$(cat /tmp/audit.json 2>/dev/null | grep -c "severity.*high\|severity.*critical" || echo 0)
+    if [ -s /tmp/audit.json ]; then
+      vulns=$(grep -Ec "severity.*high|severity.*critical" /tmp/audit.json || true)
+      [ -z "$vulns" ] && vulns=0
+    fi
   fi
 
   if [ "$vulns" -eq 0 ]; then

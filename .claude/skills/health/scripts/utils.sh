@@ -6,8 +6,10 @@
 generate_report_filename() {
   local date_str=$(date +%Y-%m-%d)
   local max_num=0
+  local file
 
-  for file in ./health_check/${date_str}-*-health-check.md 2>/dev/null; do
+  shopt -s nullglob
+  for file in ./health_check/${date_str}-*-health-check.md; do
     if [ -f "$file" ]; then
       local num=$(basename "$file" | grep -oE '^[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}-[0-9]{3}' | tail -1 | cut -d'-' -f4)
       if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -gt "$max_num" ]; then
@@ -15,6 +17,7 @@ generate_report_filename() {
       fi
     fi
   done
+  shopt -u nullglob
 
   local next_num=$(printf "%03d" $((max_num + 1)))
   echo "./health_check/${date_str}-${next_num}-health-check.md"

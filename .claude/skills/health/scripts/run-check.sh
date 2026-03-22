@@ -1,7 +1,7 @@
 #!/bin/bash
 # 主执行脚本：运行所有健康检查
 
-SCRIPT_DIR="$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # 导入所有检查脚本
 source "$SCRIPT_DIR/utils.sh"

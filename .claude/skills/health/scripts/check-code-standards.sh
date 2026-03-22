@@ -4,6 +4,8 @@
 
 check_code_standards() {
   local score=0
+  local unused=0
+  local conventional_ratio=0
 
   # ESLint配置（3分）
   if [ -f ".eslintrc.js" ] || [ -f ".eslintrc.json" ] || [ -f "eslint.config.js" ]; then
@@ -16,9 +18,9 @@ check_code_standards() {
   [ "$camelCase_violations" -lt 10 ] && score=$((score + 2))
 
   # 未使用变量（2分）
-  local unused=0
   if [ -f "package.json" ]; then
-    unused=$(npm run lint 2>&1 | grep -c "no-unused-vars" || echo 0)
+    unused=$(npm run lint 2>&1 | grep -c "no-unused-vars" || true)
+    [ -z "$unused" ] && unused=0
   fi
 
   if [ "$unused" -lt 20 ]; then
@@ -28,7 +30,7 @@ check_code_standards() {
   fi
 
   # Git提交规范（3分）- Conventional Commits
-  local conventional_ratio=$(check_conventional_commits)
+  conventional_ratio=$(check_conventional_commits)
   if [ "$conventional_ratio" -gt 70 ]; then
     score=$((score + 3))
   elif [ "$conventional_ratio" -gt 40 ]; then
@@ -42,10 +44,11 @@ check_code_standards() {
 
 check_conventional_commits() {
   # 检查最近100条提交中符合 Conventional Commits 的比例
-  local total=$(git log --oneline -100 2>/dev/null | wc -l)
+  local total=$(git log --oneline -100 2>/dev/null | wc -l | tr -d ' ')
   [ "$total" -eq 0 ] && echo 0 && return
 
-  local conventional=$(git log --oneline -100 2>/dev/null | grep -cE "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?:" || echo 0)
+  local conventional=$(git log --oneline -100 2>/dev/null | grep -cE "^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?:" || true)
+  [ -z "$conventional" ] && conventional=0
   echo $((conventional * 100 / total))
 }
 

@@ -1,26 +1,8 @@
 #!/bin/bash
 # 生成健康检查报告
 
-SCRIPT_DIR="$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/utils.sh"
-
-# 生成带自增编号的报告文件名
-generate_report_filename() {
-  local date_str=$(date +%Y-%m-%d)
-  local max_num=0
-
-  for file in ./health_check/${date_str}-*-health-check.md 2>/dev/null; do
-    if [ -f "$file" ]; then
-      local num=$(basename "$file" | grep -oE '^[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}-[0-9]{3}' | tail -1 | cut -d'-' -f4)
-      if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -gt "$max_num" ]; then
-        max_num="$num"
-      fi
-    fi
-  done
-
-  local next_num=$(printf "%03d" $((max_num + 1)))
-  echo "./health_check/${date_str}-${next_num}-health-check.md"
-}
 
 # 生成 Markdown 报告
 generate_health_report() {
