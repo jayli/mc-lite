@@ -65,7 +65,30 @@ const mockPersistenceService = {
 const createMockWorld = () => ({
   chunks: new Map(),
   isSolid: (x, y, z) => false,
-  getBlock: (x, y, z) => null
+  getBlock: (x, y, z) => null,
+  resolveBlockOwner(x, y, z, options = {}) {
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    const iz = Math.floor(z);
+    const CHUNK_SIZE = 16;
+    const cx = Math.floor(ix / CHUNK_SIZE);
+    const cz = Math.floor(iz / CHUNK_SIZE);
+    const coordChunkKey = `${cx},${cz}`;
+    const coordChunk = this.chunks.get(coordChunkKey) || null;
+    const blockKey = `${ix},${iy},${iz}`;
+
+    if (coordChunk && coordChunk.blockData[blockKey]) {
+      return {
+        ownerChunk: coordChunk,
+        ownerChunkKey: coordChunkKey,
+        coordChunk,
+        coordChunkKey,
+        blockKey,
+        entry: coordChunk.blockData[blockKey]
+      };
+    }
+    return null;
+  }
 });
 
 describe('Chunk 真实类测试', (test) => {
