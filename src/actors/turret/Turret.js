@@ -32,11 +32,19 @@ export const TURRET_CONFIG = {
     DARK: 0xbbbbbb,   // 中灰色后板
   },
   TURRET_TOWER_POS: {
-    FRONT: [0, -0.2, 0.6],       // 前板相对位置
+    FRONT: [0, -0.05, 0.75],     // 前板相对位置
     LEFT: [-0.8, -0.1, -0.1],    // 左板相对位置
     RIGHT: [0.8, -0.1, -0.1],    // 右板相对位置
     TOP: [0, 0.6, -0.2],         // 顶板相对位置
     BACK: [0, -0.2, -0.95],      // 后板相对位置
+  },
+
+  // --- 装甲纹理配置 ---
+  ARMOR_TEXTURES: {
+    FRONT: 'src/assets/turret/turret_pic1.jpeg',  // 前装甲纹理
+    SIDE: 'src/assets/turret/turret_pic2.jpg',    // 侧装甲纹理
+    TOP: 'src/assets/turret/turret_pic3.jpg',     // 顶面纹理
+    BACK: 'src/assets/turret/turret_pic3.jpg',    // 后装甲纹理
   },
 
   // --- 炮管系统配置 ---
@@ -190,43 +198,65 @@ export class Turret {
   createTurretTopBlocks() {
     console.log(`[Turret ${this.id}] 创建现代化楔形炮塔...`);
 
+    // 创建纹理加载器
+    const textureLoader = new THREE.TextureLoader();
+
+    // 加载纹理并配置参数
+    const loadTexture = (url) => {
+      const texture = textureLoader.load(url);
+      texture.magFilter = THREE.NearestFilter;
+      texture.minFilter = THREE.NearestFilter;
+      texture.generateMipmaps = false;
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return texture;
+    };
+
+    // 加载各面纹理
+    const frontTexture = loadTexture(TURRET_CONFIG.ARMOR_TEXTURES.FRONT);
+    const sideTexture = loadTexture(TURRET_CONFIG.ARMOR_TEXTURES.SIDE);
+    const topTexture = loadTexture(TURRET_CONFIG.ARMOR_TEXTURES.TOP);
+    const backTexture = loadTexture(TURRET_CONFIG.ARMOR_TEXTURES.BACK);
+
     // === 创建炮塔主体（楔形结构） ===
 
     // 1. 前装甲板（倾斜前表面 - 向后倾斜约22度，类似坦克前装甲）
     const frontGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.FRONT);
-    const mainMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.TURRET_TOWER_COLOR.MAIN });
-    const front = new THREE.Mesh(frontGeometry, mainMaterial);
+    const frontMaterial = new THREE.MeshLambertMaterial({ map: frontTexture });
+    const front = new THREE.Mesh(frontGeometry, frontMaterial);
     // 向后倾斜，使前装甲有斜度（坦克风格）
     front.rotation.x = -Math.PI / 8; // -22.5度
-    front.position.set(0, -0.05, 0.75);
+    front.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.FRONT);
     this.pitchObject.add(front);
     this.turretMeshes.push(front);
 
     // 2. 左侧装甲板
     const leftGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.SIDE);
-    const left = new THREE.Mesh(leftGeometry, mainMaterial);
+    const leftMaterial = new THREE.MeshLambertMaterial({ map: sideTexture });
+    const left = new THREE.Mesh(leftGeometry, leftMaterial);
     left.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.LEFT);
     this.pitchObject.add(left);
     this.turretMeshes.push(left);
 
     // 3. 右侧装甲板
     const rightGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.SIDE);
-    const right = new THREE.Mesh(rightGeometry, mainMaterial);
+    const rightMaterial = new THREE.MeshLambertMaterial({ map: sideTexture });
+    const right = new THREE.Mesh(rightGeometry, rightMaterial);
     right.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.RIGHT);
     this.pitchObject.add(right);
     this.turretMeshes.push(right);
 
     // 4. 顶部装甲板
     const topGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.TOP);
-    const top = new THREE.Mesh(topGeometry, mainMaterial);
+    const topMaterial = new THREE.MeshLambertMaterial({ map: topTexture });
+    const top = new THREE.Mesh(topGeometry, topMaterial);
     top.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.TOP);
     this.pitchObject.add(top);
     this.turretMeshes.push(top);
 
     // 5. 后装甲板（深色）
     const backGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.BACK);
-    const darkMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.TURRET_TOWER_COLOR.DARK });
-    const back = new THREE.Mesh(backGeometry, darkMaterial);
+    const backMaterial = new THREE.MeshLambertMaterial({ map: backTexture });
+    const back = new THREE.Mesh(backGeometry, backMaterial);
     back.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.BACK);
     this.pitchObject.add(back);
     this.turretMeshes.push(back);
