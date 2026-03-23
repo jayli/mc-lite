@@ -217,6 +217,31 @@ onmessage = async function(e) {
 
   const centerBiome = terrainGen.getBiome(cx * CHUNK_SIZE, cz * CHUNK_SIZE);
   const dPlaceholder = {};
+  /**
+   * 创建结构生成任务并加入队列
+   * 仅做入队与元信息挂载，不改变 taskFn 原有调用参数，保证行为不变
+   * @param {Function} taskFn - 预先封装好的零参数任务函数
+   * @param {number} centerX - 中心 X 坐标
+   * @param {number} centerY - 中心 Y 坐标
+   * @param {number} centerZ - 中心 Z 坐标
+   * @param {string} type - 结构类型
+   * @param {Set} [centers] - 可选的中心点集合（用于去重）
+   * @param {string} [centerKey] - 可选的中心点键
+   * @returns {Function} 创建的任务函数
+   */
+  function createStructureTask(taskFn, centerX, centerY, centerZ, type, centers = null, centerKey = null) {
+    taskFn.centerX = centerX;
+    taskFn.centerY = centerY;
+    taskFn.centerZ = centerZ;
+    taskFn.type = type;
+    structureQueue.push(taskFn);
+
+    if (centers && centerKey) {
+      centers.add(centerKey);
+    }
+
+    return taskFn;
+  }
 
   for (let x = 0; x < CHUNK_SIZE; x++) {
     for (let z = 0; z < CHUNK_SIZE; z++) {
@@ -285,13 +310,15 @@ onmessage = async function(e) {
           const towerCenterKey = `${islandInfo.centerX},${islandInfo.centerZ}`;
 
           if (isTowerCenter && !islandTowerCenters.has(towerCenterKey)) {
-            const task = () => generateTower(islandInfo.centerX, islandResult.surfaceY + 1, islandInfo.centerZ, fakeChunk, dPlaceholder);
-            task.centerX = islandInfo.centerX;
-            task.centerY = islandResult.surfaceY + 1;
-            task.centerZ = islandInfo.centerZ;
-            task.type = 'tower';
-            structureQueue.push(task);
-            islandTowerCenters.add(towerCenterKey);
+            createStructureTask(
+              generateTower.bind(null, islandInfo.centerX, islandResult.surfaceY + 1, islandInfo.centerZ, fakeChunk, dPlaceholder),
+              islandInfo.centerX,
+              islandResult.surfaceY + 1,
+              islandInfo.centerZ,
+              'tower',
+              islandTowerCenters,
+              towerCenterKey
+            );
           }
 
           // 使用区块级别的确定性随机来决定是否生成树木
@@ -314,12 +341,13 @@ onmessage = async function(e) {
                 Math.abs(treeZ - islandInfo.centerZ)
               );
               if (treeIslandInfo && treeIslandInfo.zone === 'core' && distFromTowerCenter > towerExclusionRadius) {
-                const task = () => Tree.generate(treeX, treeY, treeZ, fakeChunk, 'default', dPlaceholder);
-                task.centerX = treeX;
-                task.centerY = treeY;
-                task.centerZ = treeZ;
-                task.type = 'static_tree';
-                structureQueue.push(task);
+                createStructureTask(
+                  Tree.generate.bind(Tree, treeX, treeY, treeZ, fakeChunk, 'default', dPlaceholder),
+                  treeX,
+                  treeY,
+                  treeZ,
+                  'static_tree'
+                );
               }
             }
           }
@@ -333,41 +361,39 @@ onmessage = async function(e) {
         const isCastleCenter = wx === plainLandInfo.centerX && wz === plainLandInfo.centerZ;
         const castleCenterKey = `${plainLandInfo.centerX},${plainLandInfo.centerZ}`;
         if (isCastleCenter && !plainLandCastleCenters.has(castleCenterKey)) {
-          const task = () => generateCastle(
+          createStructureTask(
+            generateCastle.bind(null, plainLandInfo.centerX, plainLandResult.surfaceY + 1, plainLandInfo.centerZ, fakeChunk, dPlaceholder),
             plainLandInfo.centerX,
             plainLandResult.surfaceY + 1,
             plainLandInfo.centerZ,
-            fakeChunk,
-            dPlaceholder
+            'castle',
+            plainLandCastleCenters,
+            castleCenterKey
           );
-          task.centerX = plainLandInfo.centerX;
-          task.centerY = plainLandResult.surfaceY + 1;
-          task.centerZ = plainLandInfo.centerZ;
-          task.type = 'castle';
-          structureQueue.push(task);
-          plainLandCastleCenters.add(castleCenterKey);
         }
       } else if (inSnowLand) {
         const snowResult = SnowLand.generate(wx, wz, h, slInfo, fakeChunk, dPlaceholder);
         // 在雪地以 0.002 概率生成带雪白桦树（仅在主体区域且不在海平面以下）
         if (slInfo.transitionFactor === 0 && !snowResult.isBelowSeaLevel && seededRandom(wx, wz, seed + 10) < 0.002) {
-          const task = () => generateBirchTreeWithSnow(wx, snowResult.surfaceY + 1, wz, fakeChunk, dPlaceholder);
-          task.centerX = wx;
-          task.centerY = snowResult.surfaceY + 1;
-          task.centerZ = wz;
-          task.type = 'static_tree';
-          structureQueue.push(task);
+          createStructureTask(
+            generateBirchTreeWithSnow.bind(null, wx, snowResult.surfaceY + 1, wz, fakeChunk, dPlaceholder),
+            wx,
+            snowResult.surfaceY + 1,
+            wz,
+            'static_tree'
+          );
         }
       } else if (inFrozenMountain) {
         const fmResult = FrozenMountain.generate(wx, wz, h, fmInfo, fakeChunk, dPlaceholder);
         // 在冰封山峰以 0.0010 概率生成带雪白桦树（仅在主体区域且不在海平面以下）
         if (fmInfo.transitionFactor === 0 && !fmResult.isBelowSeaLevel && seededRandom(wx, wz, seed + 11) < 0.0010) {
-          const task = () => generateBirchTreeWithSnow(wx, fmResult.surfaceY + 1, wz, fakeChunk, dPlaceholder);
-          task.centerX = wx;
-          task.centerY = fmResult.surfaceY + 1;
-          task.centerZ = wz;
-          task.type = 'static_tree';
-          structureQueue.push(task);
+          createStructureTask(
+            generateBirchTreeWithSnow.bind(null, wx, fmResult.surfaceY + 1, wz, fakeChunk, dPlaceholder),
+            wx,
+            fmResult.surfaceY + 1,
+            wz,
+            'static_tree'
+          );
         }
       } else if (h < wLvl) {
         fakeChunk.add(wx, h, wz, 'sand', dPlaceholder);
@@ -418,9 +444,13 @@ onmessage = async function(e) {
               // 10% 概率生成白桦树，90% 概率生成普通大树
               if (seededRandom(wx, wz, seed + 16) < 0.1) {
                 // 放入队列，确保在地形生成完成后执行，避免方块重叠
-                const task = () => generateBirchTree(wx, h + 1, wz, fakeChunk, dPlaceholder);
-                task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'static_tree';
-                structureQueue.push(task);
+                createStructureTask(
+                  generateBirchTree.bind(null, wx, h + 1, wz, fakeChunk, dPlaceholder),
+                  wx,
+                  h + 1,
+                  wz,
+                  'static_tree'
+                );
               } else {
                 const leafRand = seededRandom(wx, wz, seed + 17);
                 const isYellow = leafRand < 0.1;
@@ -429,9 +459,13 @@ onmessage = async function(e) {
                 const isBirch = logRand < 0.1;
                 const logType = isBirch ? 'birch_log' : null;
                 // 放入队列，确保在地形生成完成后执行，避免方块重叠
-                const task = () => Tree.generate(wx, h + 1, wz, fakeChunk, 'big', dPlaceholder, logType, leafType);
-                task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'static_tree';
-                structureQueue.push(task);
+                createStructureTask(
+                  Tree.generate.bind(Tree, wx, h + 1, wz, fakeChunk, 'big', dPlaceholder, logType, leafType),
+                  wx,
+                  h + 1,
+                  wz,
+                  'static_tree'
+                );
               }
             }
           } else if (forestRand < 0.10) {
@@ -450,16 +484,24 @@ onmessage = async function(e) {
         } else if (centerBiome === 'AZALEA') {
           if (seededRandom(wx, wz, seed + 19) < 0.045) {
             // 放入队列，确保在地形生成完成后执行，避免方块重叠
-            const task = () => Tree.generate(wx, h + 1, wz, fakeChunk, 'azalea', dPlaceholder);
-            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'static_tree';
-            structureQueue.push(task);
+            createStructureTask(
+              Tree.generate.bind(Tree, wx, h + 1, wz, fakeChunk, 'azalea', dPlaceholder),
+              wx,
+              h + 1,
+              wz,
+              'static_tree'
+            );
           }
         } else if (centerBiome === 'SWAMP') {
           if (seededRandom(wx, wz, seed + 20) < 0.03) {
             // 放入队列，确保在地形生成完成后执行，避免方块重叠
-            const task = () => Tree.generate(wx, h + 1, wz, fakeChunk, 'swamp', dPlaceholder);
-            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'static_tree';
-            structureQueue.push(task);
+            createStructureTask(
+              Tree.generate.bind(Tree, wx, h + 1, wz, fakeChunk, 'swamp', dPlaceholder),
+              wx,
+              h + 1,
+              wz,
+              'static_tree'
+            );
           }
         } else if (centerBiome === 'DESERT') {
           let occupied = false;
@@ -470,9 +512,13 @@ onmessage = async function(e) {
             occupied = true;
           }
           if (seededRandom(wx, wz, seed + 22) < 0.0005 && safeForStructure) {
-            const task = () => generateStructure('rover', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers);
-            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'rover';
-            structureQueue.push(task);
+            createStructureTask(
+              generateStructure.bind(null, 'rover', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers),
+              wx,
+              h + 1,
+              wz,
+              'rover'
+            );
           }
           const largeStaticType = resolveLargeStaticStructureType({
             wx,
@@ -484,19 +530,31 @@ onmessage = async function(e) {
             occupied
           });
           if (largeStaticType === 'desertPyramid') {
-            const task = () => generateDesertPyramid(wx, h + 1, wz, fakeChunk, dPlaceholder);
-            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'desertPyramid';
-            structureQueue.push(task);
+            createStructureTask(
+              generateDesertPyramid.bind(null, wx, h + 1, wz, fakeChunk, dPlaceholder),
+              wx,
+              h + 1,
+              wz,
+              'desertPyramid'
+            );
             occupied = true;
           } else if (largeStaticType === 'desertVillage') {
-            const task = () => generateDesertVillage(wx, h + 1, wz, fakeChunk, dPlaceholder);
-            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'desertVillage';
-            structureQueue.push(task);
+            createStructureTask(
+              generateDesertVillage.bind(null, wx, h + 1, wz, fakeChunk, dPlaceholder),
+              wx,
+              h + 1,
+              wz,
+              'desertVillage'
+            );
             occupied = true;
           } else if (largeStaticType === 'uglyHouse') {
-            const task = () => generateUglyHouse(wx, h + 1, wz, fakeChunk, dPlaceholder);
-            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'uglyHouse';
-            structureQueue.push(task);
+            createStructureTask(
+              generateUglyHouse.bind(null, wx, h + 1, wz, fakeChunk, dPlaceholder),
+              wx,
+              h + 1,
+              wz,
+              'uglyHouse'
+            );
             occupied = true;
           }
         } else {
@@ -508,9 +566,13 @@ onmessage = async function(e) {
           }
           if (!occupied && seededRandom(wx, wz, seed + 1) < 0.005) {
             // 放入队列，确保在地形生成完成后执行，避免方块重叠
-            const task = () => Tree.generate(wx, h + 1, wz, fakeChunk, 'default', dPlaceholder);
-            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'static_tree';
-            structureQueue.push(task);
+            createStructureTask(
+              Tree.generate.bind(Tree, wx, h + 1, wz, fakeChunk, 'default', dPlaceholder),
+              wx,
+              h + 1,
+              wz,
+              'static_tree'
+            );
             occupied = true;
           }
           if (!occupied) {
@@ -541,9 +603,13 @@ onmessage = async function(e) {
             }
           }
           if (seededRandom(wx, wz, seed + 4) < 0.001 && safeForStructure) {
-            const task = () => generateStructure('house', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers);
-            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'house';
-            structureQueue.push(task);
+            createStructureTask(
+              generateStructure.bind(null, 'house', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers),
+              wx,
+              h + 1,
+              wz,
+              'house'
+            );
           }
           const largeStaticType = resolveLargeStaticStructureType({
             wx,
@@ -556,9 +622,13 @@ onmessage = async function(e) {
           });
           // 在草地上生成坦克（低概率，确保不与其他物体重叠）
           if (largeStaticType === 'tank') {
-            const task = () => generateTank(wx, h + 1, wz, fakeChunk, dPlaceholder);
-            task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'tank';
-            structureQueue.push(task);
+            createStructureTask(
+              generateTank.bind(null, wx, h + 1, wz, fakeChunk, dPlaceholder),
+              wx,
+              h + 1,
+              wz,
+              'tank'
+            );
             occupied = true;
           }
         }
