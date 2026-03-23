@@ -40,6 +40,98 @@ function smoothstep(edge0, edge1, x) {
 const CHUNK_SIZE = 16;
 const ROOMS_PER_CHUNK = 2;
 const MAX_ROOM_SIZE = 5;
+const LARGE_STATIC_SCAN_PADDING = 36; // 与 castle/tank 最大渲染半径一致
+
+/**
+ * 将世界坐标转换为 Chunk 内局部坐标（0-15）
+ * @param {number} value
+ * @returns {number}
+ */
+function toLocalCoord(value) {
+  const mod = value % CHUNK_SIZE;
+  return mod >= 0 ? mod : mod + CHUNK_SIZE;
+}
+
+/**
+ * 判断指定世界坐标是否满足结构安全生成范围（对应 local 3..12）
+ * @param {number} wx
+ * @param {number} wz
+ * @returns {boolean}
+ */
+function isSafeForStructureAt(wx, wz) {
+  const lx = toLocalCoord(wx);
+  const lz = toLocalCoord(wz);
+  return lx >= 3 && lx <= 12 && lz >= 3 && lz <= 12;
+}
+
+/**
+ * 根据生物群系推导地表材质类型（与主生成逻辑保持一致）
+ * @param {string} biome
+ * @returns {string}
+ */
+function getSurfaceTypeByBiome(biome) {
+  if (biome === 'DESERT') return 'sand';
+  if (biome === 'AZALEA') return 'moss';
+  if (biome === 'SWAMP') return 'swamp_grass';
+  return 'grass';
+}
+
+/**
+ * 非沙漠地块中，是否已被“会阻止大型结构生成”的对象占用
+ * 与主流程 else 分支保持一致：先 gunman，再 tree
+ * @param {number} wx
+ * @param {number} wz
+ * @param {number} seed
+ * @returns {boolean}
+ */
+function isOccupiedForLargeStaticNonDesert(wx, wz, seed) {
+  const occupiedByGunman = seededRandom(wx, wz, seed) < 0.0005;
+  const occupiedByTree = !occupiedByGunman && seededRandom(wx, wz, seed + 1) < 0.005;
+  return occupiedByGunman || occupiedByTree;
+}
+
+/**
+ * 沙漠地块中，是否已被 dead_bush 占位（会阻止大型结构）
+ * 与主流程 DESERT 分支保持一致
+ * @param {number} wx
+ * @param {number} wz
+ * @param {number} seed
+ * @returns {boolean}
+ */
+function isOccupiedForLargeStaticDesert(wx, wz, seed) {
+  return seededRandom(wx, wz, seed + 24) < 0.005;
+}
+
+/**
+ * 统一的大型静态结构判定规则
+ * 返回值为结构类型或 null；不做任何副作用
+ * @param {Object} params
+ * @param {number} params.wx
+ * @param {number} params.wz
+ * @param {number} params.seed
+ * @param {string} params.biome
+ * @param {string} params.surfaceType
+ * @param {boolean} params.safeForStructure
+ * @param {boolean} params.occupied
+ * @returns {'desertPyramid'|'desertVillage'|'uglyHouse'|'tank'|null}
+ */
+function resolveLargeStaticStructureType(params) {
+  const { wx, wz, seed, biome, surfaceType, safeForStructure, occupied } = params;
+  if (!safeForStructure || occupied) return null;
+
+  if (biome === 'DESERT') {
+    if (seededRandom(wx, wz, seed + 25) < 0.00016) return 'desertPyramid';
+    if (seededRandom(wx, wz, seed + 26) < 0.00016) return 'desertVillage';
+    if (seededRandom(wx, wz, seed + 23) < 0.00008) return 'uglyHouse';
+    return null;
+  }
+
+  if (surfaceType === 'grass' && seededRandom(wx, wz, seed + 5) < 0.0001) {
+    return 'tank';
+  }
+
+  return null;
+}
 
 onmessage = async function(e) {
   const { cx, cz, seed, snapshot, structureCenters: incomingStructureCenters, callbackKey } = e.data;
@@ -378,7 +470,7 @@ onmessage = async function(e) {
           let occupied = false;
           if (seededRandom(wx, wz, seed + 21) < 0.01) fakeChunk.add(wx, h + 1, wz, 'cactus', dPlaceholder);
           // 沙漠中生成少量 dead_bush
-          if (!occupied && seededRandom(wx, wz, seed + 24) < 0.005) {
+          if (!occupied && isOccupiedForLargeStaticDesert(wx, wz, seed)) {
             fakeChunk.add(wx, h + 1, wz, 'dead_bush', dPlaceholder, false);
             occupied = true;
           }
@@ -387,22 +479,26 @@ onmessage = async function(e) {
             task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'rover';
             structureQueue.push(task);
           }
-          // 在沙漠地形中生成沙漠金字塔（概率是 ugly_house 的 2 倍：0.00016）
-          if (!occupied && seededRandom(wx, wz, seed + 25) < 0.00016 && safeForStructure) {
+          const largeStaticType = resolveLargeStaticStructureType({
+            wx,
+            wz,
+            seed,
+            biome: centerBiome,
+            surfaceType: getSurfaceTypeByBiome(centerBiome),
+            safeForStructure,
+            occupied
+          });
+          if (largeStaticType === 'desertPyramid') {
             const task = () => generateDesertPyramid(wx, h + 1, wz, fakeChunk, dPlaceholder);
             task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'desertPyramid';
             structureQueue.push(task);
             occupied = true;
-          }
-          // 在沙漠地形中生成沙漠村庄（概率与 desert_pyramid 一致：0.00016）
-          if (!occupied && seededRandom(wx, wz, seed + 26) < 0.00016 && safeForStructure) {
+          } else if (largeStaticType === 'desertVillage') {
             const task = () => generateDesertVillage(wx, h + 1, wz, fakeChunk, dPlaceholder);
             task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'desertVillage';
             structureQueue.push(task);
             occupied = true;
-          }
-          // 在沙漠地形中生成丑陋小屋（概率 0.00008）
-          if (!occupied && seededRandom(wx, wz, seed + 23) < 0.00008 && safeForStructure) {
+          } else if (largeStaticType === 'uglyHouse') {
             const task = () => generateUglyHouse(wx, h + 1, wz, fakeChunk, dPlaceholder);
             task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'uglyHouse';
             structureQueue.push(task);
@@ -454,8 +550,17 @@ onmessage = async function(e) {
             task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'house';
             structureQueue.push(task);
           }
+          const largeStaticType = resolveLargeStaticStructureType({
+            wx,
+            wz,
+            seed,
+            biome: centerBiome,
+            surfaceType: surf,
+            safeForStructure,
+            occupied
+          });
           // 在草地上生成坦克（低概率，确保不与其他物体重叠）
-          if (surf === 'grass' && !occupied && seededRandom(wx, wz, seed + 5) < 0.0001 && safeForStructure) {
+          if (largeStaticType === 'tank') {
             const task = () => generateTank(wx, h + 1, wz, fakeChunk, dPlaceholder);
             task.centerX = wx; task.centerY = h + 1; task.centerZ = wz; task.type = 'tank';
             structureQueue.push(task);
@@ -497,32 +602,15 @@ onmessage = async function(e) {
 
   // 大型静态结构邻域重建：
   // 让每个 Chunk 都能拿到“落在自己坐标内”的结构分片，避免中心 Chunk 卸载导致整栋闪灭/切割
-  const LARGE_STATIC_SCAN_PADDING = 36; // 与 castle/tank 最大渲染半径一致
   const scannedMinX = minX - LARGE_STATIC_SCAN_PADDING;
   const scannedMaxX = maxX + LARGE_STATIC_SCAN_PADDING;
   const scannedMinZ = minZ - LARGE_STATIC_SCAN_PADDING;
   const scannedMaxZ = maxZ + LARGE_STATIC_SCAN_PADDING;
   const wLvl = -2;
-
-  const toLocalCoord = (value) => {
-    const mod = value % CHUNK_SIZE;
-    return mod >= 0 ? mod : mod + CHUNK_SIZE;
-  };
-  const isSafeForStructureAt = (wx, wz) => {
-    const lx = toLocalCoord(wx);
-    const lz = toLocalCoord(wz);
-    return lx >= 3 && lx <= 12 && lz >= 3 && lz <= 12;
-  };
   const getChunkBiomeByWorld = (wx, wz) => {
     const ownerCx = Math.floor(wx / CHUNK_SIZE);
     const ownerCz = Math.floor(wz / CHUNK_SIZE);
     return terrainGen.getBiome(ownerCx * CHUNK_SIZE, ownerCz * CHUNK_SIZE);
-  };
-  const getSurfaceTypeByBiome = (biome) => {
-    if (biome === 'DESERT') return 'sand';
-    if (biome === 'AZALEA') return 'moss';
-    if (biome === 'SWAMP') return 'swamp_grass';
-    return 'grass';
   };
   const largeStructureTaskKeySet = new Set(
     structureQueueWithCenters
@@ -591,30 +679,21 @@ onmessage = async function(e) {
       const safeForStructure = isSafeForStructureAt(wx, wz);
       if (!safeForStructure) continue;
 
-      if (centerBiomeAtPos === 'DESERT') {
-        let occupied = false;
-        if (seededRandom(wx, wz, seed + 24) < 0.005) {
-          occupied = true;
-        }
-        if (!occupied && seededRandom(wx, wz, seed + 25) < 0.00016) {
-          appendLargeStaticTask('desertPyramid', wx, heightAtPos + 1, wz);
-          occupied = true;
-        }
-        if (!occupied && seededRandom(wx, wz, seed + 26) < 0.00016) {
-          appendLargeStaticTask('desertVillage', wx, heightAtPos + 1, wz);
-          occupied = true;
-        }
-        if (!occupied && seededRandom(wx, wz, seed + 23) < 0.00008) {
-          appendLargeStaticTask('uglyHouse', wx, heightAtPos + 1, wz);
-        }
-      } else {
-        const occupiedByGunman = seededRandom(wx, wz, seed) < 0.0005;
-        const occupiedByTree = !occupiedByGunman && seededRandom(wx, wz, seed + 1) < 0.005;
-        const occupied = occupiedByGunman || occupiedByTree;
-        const surfaceType = getSurfaceTypeByBiome(centerBiomeAtPos);
-        if (surfaceType === 'grass' && !occupied && seededRandom(wx, wz, seed + 5) < 0.0001) {
-          appendLargeStaticTask('tank', wx, heightAtPos + 1, wz);
-        }
+      const surfaceType = getSurfaceTypeByBiome(centerBiomeAtPos);
+      const occupiedForLargeStatic = centerBiomeAtPos === 'DESERT'
+        ? isOccupiedForLargeStaticDesert(wx, wz, seed)
+        : isOccupiedForLargeStaticNonDesert(wx, wz, seed);
+      const largeStaticType = resolveLargeStaticStructureType({
+        wx,
+        wz,
+        seed,
+        biome: centerBiomeAtPos,
+        surfaceType,
+        safeForStructure,
+        occupied: occupiedForLargeStatic
+      });
+      if (largeStaticType) {
+        appendLargeStaticTask(largeStaticType, wx, heightAtPos + 1, wz);
       }
     }
   }
@@ -627,6 +706,21 @@ onmessage = async function(e) {
       structureCenters.push({ type, x: centerX, y: centerY, z: centerZ });
     }
   });
+
+  // 统一 Chunk 归属判定，避免多处重复实现
+  const belongsToCrossChunkStructure = (bx, by, bz) =>
+    checkBelongsToCrossChunkStructure(bx, by, bz, structureCenters);
+  const isBlockOwnedByCurrentChunk = (block) => {
+    const inCurrentChunk = block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;
+    const isCrossChunkStructureBlock = !inCurrentChunk &&
+      belongsToCrossChunkStructure(block.x, block.y, block.z);
+    return inCurrentChunk || isCrossChunkStructureBlock;
+  };
+  const isLargeStaticCrossChunkBlock = (x, y, z) => {
+    const inCurrentChunk = x >= minX && x < maxX && z >= minZ && z < maxZ;
+    if (inCurrentChunk) return false;
+    return checkBelongsToLargeStaticStructure(x, y, z, structureCenters);
+  };
 
   // 如果有 snapshot，用 snapshot 中的方块覆盖 blockMap（保留玩家修改）
   if (savedSnapshot) {
@@ -682,13 +776,8 @@ onmessage = async function(e) {
       // 在 snapshot 模式下，需要根据 snapshot 清理“当前 Chunk 负责渲染/存储范围”的被删除方块
       // 注意：仅对可跨 Chunk 的小体积结构保留跨 Chunk 责任；大型静态结构按坐标归属
       for (const [key, b] of blockMap) {
-        const inCurrentChunk = b.x >= minX && b.x < maxX && b.z >= minZ && b.z < maxZ;
-        const isCrossChunkStructureBlock = !inCurrentChunk &&
-          checkBelongsToCrossChunkStructure(b.x, b.y, b.z, structureCenters);
-        const isInResponsibility = inCurrentChunk || isCrossChunkStructureBlock;
-
         // 只清理当前 Chunk 责任范围内的方块
-        if (isInResponsibility) {
+        if (isBlockOwnedByCurrentChunk(b)) {
           // 如果该坐标不在 snapshot 中，说明玩家已删除该方块（或该坐标原本就是空气）
           if (!savedSnapshot.blocks[key]) {
             blockMap.delete(key);
@@ -710,13 +799,10 @@ onmessage = async function(e) {
           entry.orientation = rawEntry.direction;
         }
         const [bx, by, bz] = key.split(',').map(Number);
-        const inCurrentChunk = bx >= minX && bx < maxX && bz >= minZ && bz < maxZ;
-        const isLargeStaticCrossChunk = !inCurrentChunk &&
-          checkBelongsToLargeStaticStructure(bx, by, bz, structureCenters);
 
         // 旧存档兼容纠偏：
         // 大型静态结构跨 Chunk 历史残留方块，统一回归到坐标所属 Chunk
-        if (isLargeStaticCrossChunk) {
+        if (isLargeStaticCrossChunkBlock(bx, by, bz)) {
           continue;
         }
 
@@ -876,17 +962,6 @@ onmessage = async function(e) {
     }
   }
 
-  // 辅助函数：判断一个方块是否属于可跨 Chunk 结构中心（仅小体积例外）
-  const belongsToCrossChunkStructure = (bx, by, bz) =>
-    checkBelongsToCrossChunkStructure(bx, by, bz, structureCenters);
-
-  const isBlockOwnedByCurrentChunk = (block) => {
-    const inCurrentChunk = block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;
-    const isCrossChunkStructureBlock = !inCurrentChunk &&
-      belongsToCrossChunkStructure(block.x, block.y, block.z);
-    return inCurrentChunk || isCrossChunkStructureBlock;
-  };
-
   // 仅保存当前 Chunk 负责的数据（地图语义）
   const blocksForSnapshot = {};
   for (const [key, b] of blockMap) {
@@ -895,10 +970,7 @@ onmessage = async function(e) {
   }
 
   for (const [key, block] of blockMap) {
-    const inCurrentChunk = block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;
-    const isCrossChunkStructureBlock = !inCurrentChunk &&
-      belongsToCrossChunkStructure(block.x, block.y, block.z);
-    const shouldOwnBlock = inCurrentChunk || isCrossChunkStructureBlock;
+    const shouldOwnBlock = isBlockOwnedByCurrentChunk(block);
 
     // 固体方块：只要在 Chunk 内或者是跨区结构方块，都添加到 solidBlocks
     if (block.solid && shouldOwnBlock) solidBlocks.push(key);
