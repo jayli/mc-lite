@@ -1,4 +1,6 @@
 // src/utils/StructureUtils.js
+import { isBigBuildingType } from '../world/entity-system/BigBuildingWhitelist.js';
+
 /**
  * 结构处理工具模块
  * 统一管理跨 Chunk 结构的渲染距离判断和归属检测
@@ -56,6 +58,15 @@ export const DEFAULT_RENDER_DIST = 8;
 export const STRUCTURE_HEIGHT_RANGE = 16;
 
 /**
+ * 判断结构类型是否属于大型静态结构
+ * @param {string} type - 结构类型
+ * @returns {boolean}
+ */
+export function isLargeStaticStructureType(type) {
+  return isBigBuildingType(type);
+}
+
+/**
  * 获取结构类型的渲染距离
  * @param {string} type - 结构类型
  * @returns {number} 渲染距离（方块数）
@@ -78,6 +89,67 @@ export function belongsToStructure(x, y, z, structureCenters) {
   }
 
   for (const center of structureCenters) {
+    const maxDist = getStructureRenderDist(center.type);
+    const heightRange = STRUCTURE_HEIGHT_RANGE_SPECIAL[center.type] ?? STRUCTURE_HEIGHT_RANGE;
+    const dx = Math.abs(x - center.x);
+    const dz = Math.abs(z - center.z);
+    const dy = Math.abs(y - center.y);
+
+    if (dx <= maxDist && dz <= maxDist && dy <= heightRange) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * 判断一个方块位置是否属于可跨 Chunk 渲染的结构中心
+ * 仅保留非大型静态结构的跨 Chunk 行为（如 tree/gunman/rover/zombieNest）
+ * @param {number} x - 方块 X 坐标
+ * @param {number} y - 方块 Y 坐标
+ * @param {number} z - 方块 Z 坐标
+ * @param {Array<{type: string, x: number, y: number, z: number}>} structureCenters - 结构中心列表
+ * @returns {boolean}
+ */
+export function belongsToCrossChunkStructure(x, y, z, structureCenters) {
+  if (!structureCenters || structureCenters.length === 0) {
+    return false;
+  }
+
+  for (const center of structureCenters) {
+    if (isLargeStaticStructureType(center.type)) continue;
+
+    const maxDist = getStructureRenderDist(center.type);
+    const heightRange = STRUCTURE_HEIGHT_RANGE_SPECIAL[center.type] ?? STRUCTURE_HEIGHT_RANGE;
+    const dx = Math.abs(x - center.x);
+    const dz = Math.abs(z - center.z);
+    const dy = Math.abs(y - center.y);
+
+    if (dx <= maxDist && dz <= maxDist && dy <= heightRange) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * 判断一个方块位置是否属于大型静态结构范围
+ * @param {number} x - 方块 X 坐标
+ * @param {number} y - 方块 Y 坐标
+ * @param {number} z - 方块 Z 坐标
+ * @param {Array<{type: string, x: number, y: number, z: number}>} structureCenters - 结构中心列表
+ * @returns {boolean}
+ */
+export function belongsToLargeStaticStructure(x, y, z, structureCenters) {
+  if (!structureCenters || structureCenters.length === 0) {
+    return false;
+  }
+
+  for (const center of structureCenters) {
+    if (!isLargeStaticStructureType(center.type)) continue;
+
     const maxDist = getStructureRenderDist(center.type);
     const heightRange = STRUCTURE_HEIGHT_RANGE_SPECIAL[center.type] ?? STRUCTURE_HEIGHT_RANGE;
     const dx = Math.abs(x - center.x);
@@ -120,6 +192,18 @@ export const StructureUtils = {
    */
   belongsToStructure(x, y, z, structureCenters) {
     return belongsToStructure(x, y, z, structureCenters);
+  },
+
+  isLargeStaticStructureType(type) {
+    return isLargeStaticStructureType(type);
+  },
+
+  belongsToCrossChunkStructure(x, y, z, structureCenters) {
+    return belongsToCrossChunkStructure(x, y, z, structureCenters);
+  },
+
+  belongsToLargeStaticStructure(x, y, z, structureCenters) {
+    return belongsToLargeStaticStructure(x, y, z, structureCenters);
   }
 };
 

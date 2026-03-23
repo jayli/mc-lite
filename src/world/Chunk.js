@@ -9,7 +9,7 @@ import { persistenceService } from '../services/PersistenceService.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
 import { getBlockProperties } from '../constants/BlockData.js';
 import { getRotationAngle, parseBlockEntry } from '../utils/OrientationUtils.js';
-import { getStructureRenderDist, belongsToStructure } from '../utils/StructureUtils.js';
+import { getStructureRenderDist, belongsToCrossChunkStructure } from '../utils/StructureUtils.js';
 import { createOcclusionChecker, computeBlockAOPacked } from '../utils/AOUtils.js';
 import { createChunkNeighborSampler } from './ChunkNeighborUtils.js';
 import { extendChunk as extendWithConsolidation, CHUNK_SIZE, geomMap } from './ChunkConsolidation.js';
@@ -103,7 +103,7 @@ export class Chunk {
     if (isInChunk) return true;
 
     if (this.structureCenters?.length > 0) {
-      return belongsToStructure(x, y, z, this.structureCenters);
+      return belongsToCrossChunkStructure(x, y, z, this.structureCenters);
     }
 
     return false;

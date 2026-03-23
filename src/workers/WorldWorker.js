@@ -12,7 +12,10 @@ import { SnowLand } from './maps/SnowLand.js';
 import { FrozenMountain } from './maps/FrozenMountain.js';
 import { IslandMap } from './maps/IslandMap.js';
 import { PlainLand } from './maps/PlainLand.js';
-import { belongsToStructure as checkBelongsToStructure } from '../utils/StructureUtils.js';
+import {
+  belongsToCrossChunkStructure as checkBelongsToCrossChunkStructure,
+  belongsToLargeStaticStructure as checkBelongsToLargeStaticStructure
+} from '../utils/StructureUtils.js';
 import {
   computeFaceVisibilityMask,
   createBlockMapNeighborQuery
@@ -492,6 +495,130 @@ onmessage = async function(e) {
     return { task, centerX: task.centerX, centerY: task.centerY, centerZ: task.centerZ, type: task.type };
   });
 
+  // 大型静态结构邻域重建：
+  // 让每个 Chunk 都能拿到“落在自己坐标内”的结构分片，避免中心 Chunk 卸载导致整栋闪灭/切割
+  const LARGE_STATIC_SCAN_PADDING = 36; // 与 castle/tank 最大渲染半径一致
+  const scannedMinX = minX - LARGE_STATIC_SCAN_PADDING;
+  const scannedMaxX = maxX + LARGE_STATIC_SCAN_PADDING;
+  const scannedMinZ = minZ - LARGE_STATIC_SCAN_PADDING;
+  const scannedMaxZ = maxZ + LARGE_STATIC_SCAN_PADDING;
+  const wLvl = -2;
+
+  const toLocalCoord = (value) => {
+    const mod = value % CHUNK_SIZE;
+    return mod >= 0 ? mod : mod + CHUNK_SIZE;
+  };
+  const isSafeForStructureAt = (wx, wz) => {
+    const lx = toLocalCoord(wx);
+    const lz = toLocalCoord(wz);
+    return lx >= 3 && lx <= 12 && lz >= 3 && lz <= 12;
+  };
+  const getChunkBiomeByWorld = (wx, wz) => {
+    const ownerCx = Math.floor(wx / CHUNK_SIZE);
+    const ownerCz = Math.floor(wz / CHUNK_SIZE);
+    return terrainGen.getBiome(ownerCx * CHUNK_SIZE, ownerCz * CHUNK_SIZE);
+  };
+  const getSurfaceTypeByBiome = (biome) => {
+    if (biome === 'DESERT') return 'sand';
+    if (biome === 'AZALEA') return 'moss';
+    if (biome === 'SWAMP') return 'swamp_grass';
+    return 'grass';
+  };
+  const largeStructureTaskKeySet = new Set(
+    structureQueueWithCenters
+      .filter(item => item.type)
+      .map(item => `${item.type}:${item.centerX},${item.centerY},${item.centerZ}`)
+  );
+  const appendLargeStaticTask = (type, centerX, centerY, centerZ) => {
+    const dedupeKey = `${type}:${centerX},${centerY},${centerZ}`;
+    if (largeStructureTaskKeySet.has(dedupeKey)) return;
+    largeStructureTaskKeySet.add(dedupeKey);
+
+    let task = null;
+    if (type === 'castle') {
+      task = () => generateCastle(centerX, centerY, centerZ, fakeChunk, dPlaceholder);
+    } else if (type === 'tank') {
+      task = () => generateTank(centerX, centerY, centerZ, fakeChunk, dPlaceholder);
+    } else if (type === 'tower') {
+      task = () => generateTower(centerX, centerY, centerZ, fakeChunk, dPlaceholder);
+    } else if (type === 'uglyHouse') {
+      task = () => generateUglyHouse(centerX, centerY, centerZ, fakeChunk, dPlaceholder);
+    } else if (type === 'desertVillage') {
+      task = () => generateDesertVillage(centerX, centerY, centerZ, fakeChunk, dPlaceholder);
+    } else if (type === 'desertPyramid') {
+      task = () => generateDesertPyramid(centerX, centerY, centerZ, fakeChunk, dPlaceholder);
+    }
+
+    if (!task) return;
+    task.centerX = centerX;
+    task.centerY = centerY;
+    task.centerZ = centerZ;
+    task.type = type;
+    structureQueueWithCenters.push({ task, centerX, centerY, centerZ, type });
+  };
+
+  for (let wx = scannedMinX; wx < scannedMaxX; wx++) {
+    for (let wz = scannedMinZ; wz < scannedMaxZ; wz++) {
+      const pyInfo = Pyramid.getPyramidInfo(wx, wz, seed, terrainGen);
+      if (pyInfo) continue;
+
+      const islandInfo = IslandMap.getIslandInfo(wx, wz, seed, terrainGen);
+      if (islandInfo) {
+        if (wx === islandInfo.centerX && wz === islandInfo.centerZ) {
+          appendLargeStaticTask('tower', islandInfo.centerX, -1, islandInfo.centerZ);
+        }
+        continue;
+      }
+
+      const plainLandInfo = PlainLand.getPlainLandInfo(wx, wz, seed, terrainGen);
+      if (plainLandInfo) {
+        if (wx === plainLandInfo.centerX && wz === plainLandInfo.centerZ) {
+          appendLargeStaticTask('castle', plainLandInfo.centerX, plainLandInfo.baseHeight + 1, plainLandInfo.centerZ);
+        }
+        continue;
+      }
+
+      const slInfo = SnowLand.getSnowLandInfo(wx, wz, seed, terrainGen);
+      if (slInfo) continue;
+
+      const fmInfo = FrozenMountain.getFrozenMountainInfo(wx, wz, seed, terrainGen);
+      if (fmInfo) continue;
+
+      const centerBiomeAtPos = getChunkBiomeByWorld(wx, wz);
+      const heightAtPos = terrainGen.generateHeight(wx, wz, centerBiomeAtPos);
+      if (heightAtPos < wLvl) continue;
+
+      const safeForStructure = isSafeForStructureAt(wx, wz);
+      if (!safeForStructure) continue;
+
+      if (centerBiomeAtPos === 'DESERT') {
+        let occupied = false;
+        if (seededRandom(wx, wz, seed + 24) < 0.005) {
+          occupied = true;
+        }
+        if (!occupied && seededRandom(wx, wz, seed + 25) < 0.00016) {
+          appendLargeStaticTask('desertPyramid', wx, heightAtPos + 1, wz);
+          occupied = true;
+        }
+        if (!occupied && seededRandom(wx, wz, seed + 26) < 0.00016) {
+          appendLargeStaticTask('desertVillage', wx, heightAtPos + 1, wz);
+          occupied = true;
+        }
+        if (!occupied && seededRandom(wx, wz, seed + 23) < 0.00008) {
+          appendLargeStaticTask('uglyHouse', wx, heightAtPos + 1, wz);
+        }
+      } else {
+        const occupiedByGunman = seededRandom(wx, wz, seed) < 0.0005;
+        const occupiedByTree = !occupiedByGunman && seededRandom(wx, wz, seed + 1) < 0.005;
+        const occupied = occupiedByGunman || occupiedByTree;
+        const surfaceType = getSurfaceTypeByBiome(centerBiomeAtPos);
+        if (surfaceType === 'grass' && !occupied && seededRandom(wx, wz, seed + 5) < 0.0001) {
+          appendLargeStaticTask('tank', wx, heightAtPos + 1, wz);
+        }
+      }
+    }
+  }
+
   structureQueueWithCenters.forEach(({ task, centerX, centerY, centerZ, type }) => {
     task();
     // 记录所有有中心点的结构，不限于当前 Chunk
@@ -553,11 +680,11 @@ onmessage = async function(e) {
     // 用 snapshot 中的方块覆盖 blockMap（保留玩家修改）
     if (savedSnapshot.blocks) {
       // 在 snapshot 模式下，需要根据 snapshot 清理“当前 Chunk 负责渲染/存储范围”的被删除方块
-      // 注意：跨 Chunk 结构方块也可能归属当前 Chunk，仅清理 chunk 内坐标会导致读档后复显
+      // 注意：仅对可跨 Chunk 的小体积结构保留跨 Chunk 责任；大型静态结构按坐标归属
       for (const [key, b] of blockMap) {
         const inCurrentChunk = b.x >= minX && b.x < maxX && b.z >= minZ && b.z < maxZ;
         const isCrossChunkStructureBlock = !inCurrentChunk &&
-          checkBelongsToStructure(b.x, b.y, b.z, structureCenters);
+          checkBelongsToCrossChunkStructure(b.x, b.y, b.z, structureCenters);
         const isInResponsibility = inCurrentChunk || isCrossChunkStructureBlock;
 
         // 只清理当前 Chunk 责任范围内的方块
@@ -583,6 +710,16 @@ onmessage = async function(e) {
           entry.orientation = rawEntry.direction;
         }
         const [bx, by, bz] = key.split(',').map(Number);
+        const inCurrentChunk = bx >= minX && bx < maxX && bz >= minZ && bz < maxZ;
+        const isLargeStaticCrossChunk = !inCurrentChunk &&
+          checkBelongsToLargeStaticStructure(bx, by, bz, structureCenters);
+
+        // 旧存档兼容纠偏：
+        // 大型静态结构跨 Chunk 历史残留方块，统一回归到坐标所属 Chunk
+        if (isLargeStaticCrossChunk) {
+          continue;
+        }
+
         const solid = getBlockProperties(entry.type).isSolid;
         blockMap.set(key, { x: bx, y: by, z: bz, type: entry.type, solid, orientation: entry.orientation });
       }
@@ -590,12 +727,6 @@ onmessage = async function(e) {
   }
 
   // 统一后处理：AO 计算、隐藏面剔除，并返回渲染数据
-  const blocksForSnapshot = {};
-  for (const [key, b] of blockMap) {
-    // 保存新格式（包含朝向）
-    blocksForSnapshot[key] = { type: b.type, orientation: b.orientation || 0 };
-  }
-
   // 将 blockMap 转换为 d 和 solidBlocks
   const d = {};
   const solidBlocks = [];
@@ -745,15 +876,32 @@ onmessage = async function(e) {
     }
   }
 
-  // 辅助函数：判断一个方块是否属于某个结构中心（使用统一的工具函数）
-  const belongsToStructure = (bx, by, bz) => checkBelongsToStructure(bx, by, bz, structureCenters);
+  // 辅助函数：判断一个方块是否属于可跨 Chunk 结构中心（仅小体积例外）
+  const belongsToCrossChunkStructure = (bx, by, bz) =>
+    checkBelongsToCrossChunkStructure(bx, by, bz, structureCenters);
+
+  const isBlockOwnedByCurrentChunk = (block) => {
+    const inCurrentChunk = block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;
+    const isCrossChunkStructureBlock = !inCurrentChunk &&
+      belongsToCrossChunkStructure(block.x, block.y, block.z);
+    return inCurrentChunk || isCrossChunkStructureBlock;
+  };
+
+  // 仅保存当前 Chunk 负责的数据（地图语义）
+  const blocksForSnapshot = {};
+  for (const [key, b] of blockMap) {
+    if (!isBlockOwnedByCurrentChunk(b)) continue;
+    blocksForSnapshot[key] = { type: b.type, orientation: b.orientation || 0 };
+  }
 
   for (const [key, block] of blockMap) {
     const inCurrentChunk = block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;
-    const isCrossChunkStructureBlock = !inCurrentChunk && belongsToStructure(block.x, block.y, block.z);
+    const isCrossChunkStructureBlock = !inCurrentChunk &&
+      belongsToCrossChunkStructure(block.x, block.y, block.z);
+    const shouldOwnBlock = inCurrentChunk || isCrossChunkStructureBlock;
 
     // 固体方块：只要在 Chunk 内或者是跨区结构方块，都添加到 solidBlocks
-    if (block.solid && (inCurrentChunk || isCrossChunkStructureBlock)) solidBlocks.push(key);
+    if (block.solid && shouldOwnBlock) solidBlocks.push(key);
     let visible = true;
     if (block.solid) {
       const { x, y, z } = block;
@@ -767,10 +915,12 @@ onmessage = async function(e) {
       if (covered && block.type !== 'chest') visible = false;
     }
 
-    allBlockTypes[key] = { type: block.type, orientation: block.orientation || 0 };
+    if (shouldOwnBlock) {
+      allBlockTypes[key] = { type: block.type, orientation: block.orientation || 0 };
+    }
 
     // 渲染条件：在当前 Chunk 内，或者属于当前 Chunk 的跨区结构
-    const shouldRender = inCurrentChunk || isCrossChunkStructureBlock;
+    const shouldRender = shouldOwnBlock;
 
     if (shouldRender && visible) {
       if (!d[block.type]) d[block.type] = [];

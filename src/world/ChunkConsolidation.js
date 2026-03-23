@@ -6,7 +6,6 @@ import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { getBlockProperties as getBlockProps } from '../constants/BlockData.js';
-import { belongsToStructure } from '../utils/StructureUtils.js';
 
 // 区块大小常量
 export const CHUNK_SIZE = 16;
