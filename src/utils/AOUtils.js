@@ -10,47 +10,47 @@ import { AO_VERTICES_COUNT } from '../constants/GameConfig.js';
  * 格式：[faceIdx][cornerIdx] = { side1: [dx,dy,dz], side2: [dx,dy,dz], corner: [dx,dy,dz] }
  */
 const AO_NEIGHBOR_OFFSETS = [
-  // Face 0 (+X side)
+  // Face 0 (+X side) - 基础偏移 [1,0,0]
   [
-    { side1: [0, 1, 0], side2: [0, 0, 1], corner: [0, 1, 1] },  // V0: Top, PZ
-    { side1: [0, 1, 0], side2: [0, 0, -1], corner: [0, 1, -1] }, // V1: Top, NZ
-    { side1: [0, -1, 0], side2: [0, 0, 1], corner: [0, -1, 1] }, // V2: Bottom, PZ
-    { side1: [0, -1, 0], side2: [0, 0, -1], corner: [0, -1, -1] } // V3: Bottom, NZ
+    { side1: [1, 1, 0], side2: [1, 0, 1], corner: [1, 1, 1] },   // V0: Top, PZ
+    { side1: [1, 1, 0], side2: [1, 0, -1], corner: [1, 1, -1] },  // V1: Top, NZ
+    { side1: [1, -1, 0], side2: [1, 0, 1], corner: [1, -1, 1] },  // V2: Bottom, PZ
+    { side1: [1, -1, 0], side2: [1, 0, -1], corner: [1, -1, -1] } // V3: Bottom, NZ
   ],
-  // Face 1 (-X side)
+  // Face 1 (-X side) - 基础偏移 [-1,0,0]
   [
-    { side1: [0, 1, 0], side2: [0, 0, -1], corner: [0, 1, -1] }, // V4: Top, NZ
-    { side1: [0, 1, 0], side2: [0, 0, 1], corner: [0, 1, 1] },   // V5: Top, PZ
-    { side1: [0, -1, 0], side2: [0, 0, -1], corner: [0, -1, -1] }, // V6: Bottom, NZ
-    { side1: [0, -1, 0], side2: [0, 0, 1], corner: [0, -1, 1] }  // V7: Bottom, PZ
+    { side1: [-1, 1, 0], side2: [-1, 0, -1], corner: [-1, 1, -1] }, // V4: Top, NZ
+    { side1: [-1, 1, 0], side2: [-1, 0, 1], corner: [-1, 1, 1] },   // V5: Top, PZ
+    { side1: [-1, -1, 0], side2: [-1, 0, -1], corner: [-1, -1, -1] }, // V6: Bottom, NZ
+    { side1: [-1, -1, 0], side2: [-1, 0, 1], corner: [-1, -1, 1] }  // V7: Bottom, PZ
   ],
-  // Face 2 (+Y top)
+  // Face 2 (+Y top) - 基础偏移 [0,1,0]
   [
-    { side1: [-1, 0, 0], side2: [0, 0, -1], corner: [-1, 0, -1] }, // V8: NX, NZ
-    { side1: [1, 0, 0], side2: [0, 0, -1], corner: [1, 0, -1] },   // V9: PX, NZ
-    { side1: [-1, 0, 0], side2: [0, 0, 1], corner: [-1, 0, 1] },   // V10: NX, PZ
-    { side1: [1, 0, 0], side2: [0, 0, 1], corner: [1, 0, 1] }      // V11: PX, PZ
+    { side1: [-1, 1, 0], side2: [0, 1, -1], corner: [-1, 1, -1] }, // V8: NX, NZ
+    { side1: [1, 1, 0], side2: [0, 1, -1], corner: [1, 1, -1] },   // V9: PX, NZ
+    { side1: [-1, 1, 0], side2: [0, 1, 1], corner: [-1, 1, 1] },   // V10: NX, PZ
+    { side1: [1, 1, 0], side2: [0, 1, 1], corner: [1, 1, 1] }      // V11: PX, PZ
   ],
-  // Face 3 (-Y bottom)
+  // Face 3 (-Y bottom) - 基础偏移 [0,-1,0]
   [
-    { side1: [-1, 0, 0], side2: [0, 0, 1], corner: [-1, 0, 1] },   // V12: NX, PZ
-    { side1: [1, 0, 0], side2: [0, 0, 1], corner: [1, 0, 1] },     // V13: PX, PZ
-    { side1: [-1, 0, 0], side2: [0, 0, -1], corner: [-1, 0, -1] }, // V14: NX, NZ
-    { side1: [1, 0, 0], side2: [0, 0, -1], corner: [1, 0, -1] }    // V15: PX, NZ
+    { side1: [-1, -1, 0], side2: [0, -1, 1], corner: [-1, -1, 1] },   // V12: NX, PZ
+    { side1: [1, -1, 0], side2: [0, -1, 1], corner: [1, -1, 1] },     // V13: PX, PZ
+    { side1: [-1, -1, 0], side2: [0, -1, -1], corner: [-1, -1, -1] }, // V14: NX, NZ
+    { side1: [1, -1, 0], side2: [0, -1, -1], corner: [1, -1, -1] }    // V15: PX, NZ
   ],
-  // Face 4 (+Z side)
+  // Face 4 (+Z side) - 基础偏移 [0,0,1]
   [
-    { side1: [-1, 0, 0], side2: [0, 1, 0], corner: [-1, 1, 0] },   // V16: NX, Top
-    { side1: [1, 0, 0], side2: [0, 1, 0], corner: [1, 1, 0] },     // V17: PX, Top
-    { side1: [-1, 0, 0], side2: [0, -1, 0], corner: [-1, -1, 0] }, // V18: NX, Bottom
-    { side1: [1, 0, 0], side2: [0, -1, 0], corner: [1, -1, 0] }    // V19: PX, Bottom
+    { side1: [-1, 0, 1], side2: [0, 1, 1], corner: [-1, 1, 1] },   // V16: NX, Top
+    { side1: [1, 0, 1], side2: [0, 1, 1], corner: [1, 1, 1] },     // V17: PX, Top
+    { side1: [-1, 0, 1], side2: [0, -1, 1], corner: [-1, -1, 1] },  // V18: NX, Bottom
+    { side1: [1, 0, 1], side2: [0, -1, 1], corner: [1, -1, 1] }    // V19: PX, Bottom
   ],
-  // Face 5 (-Z side)
+  // Face 5 (-Z side) - 基础偏移 [0,0,-1]
   [
-    { side1: [1, 0, 0], side2: [0, 1, 0], corner: [1, 1, 0] },     // V20: PX, Top
-    { side1: [-1, 0, 0], side2: [0, 1, 0], corner: [-1, 1, 0] },   // V21: NX, Top
-    { side1: [1, 0, 0], side2: [0, -1, 0], corner: [1, -1, 0] },   // V22: PX, Bottom
-    { side1: [-1, 0, 0], side2: [0, -1, 0], corner: [-1, -1, 0] }  // V23: NX, Bottom
+    { side1: [1, 0, -1], side2: [0, 1, -1], corner: [1, 1, -1] },   // V20: PX, Top
+    { side1: [-1, 0, -1], side2: [0, 1, -1], corner: [-1, 1, -1] }, // V21: NX, Top
+    { side1: [1, 0, -1], side2: [0, -1, -1], corner: [1, -1, -1] }, // V22: PX, Bottom
+    { side1: [-1, 0, -1], side2: [0, -1, -1], corner: [-1, -1, -1] } // V23: NX, Bottom
   ]
 ];
 
