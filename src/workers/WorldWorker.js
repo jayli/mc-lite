@@ -1,5 +1,5 @@
 // src/workers/WorldWorker.js
-import { setSeed, seededRandom } from '../utils/MathUtils.js';
+import { setSeed, seededRandom, smoothstep } from '../utils/MathUtils.js';
 import { parseBlockEntry } from '../utils/OrientationUtils.js';
 import { terrainGen } from '../world/TerrainGen.js';
 import { Tree } from '../world/entities/Tree.js';
@@ -31,12 +31,6 @@ self.onerror = (e) => {
 
 // 结构数据加载器实例
 const { uglyHouse, desertVillage, desertPyramid, birchTree, birchTreeWithSnow, tank, tower, castle } = structureLoaders;
-
-// Smoothstep 平滑插值
-function smoothstep(edge0, edge1, x) {
-  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
 
 const CHUNK_SIZE = 16;
 const ROOMS_PER_CHUNK = 2;

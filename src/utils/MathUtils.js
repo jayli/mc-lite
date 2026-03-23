@@ -47,6 +47,20 @@ export function clamp(val, min, max) {
 }
 
 /**
+ * Smoothstep 平滑插值函数
+ * 在 edge0 和 edge1 之间进行平滑的 Hermite 插值
+ * 常用于动画、过渡效果和噪声生成
+ * @param {number} edge0 - 起始边界
+ * @param {number} edge1 - 结束边界
+ * @param {number} x - 输入值
+ * @returns {number} 0-1 之间的平滑插值结果
+ */
+export function smoothstep(edge0, edge1, x) {
+  const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+/**
  * 计算两个角度之间的最短差值（处理角度环绕）
  * @param {number} current - 当前角度（弧度）
  * @param {number} target - 目标角度（弧度）
