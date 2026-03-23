@@ -468,6 +468,26 @@ export function getNonSolidTypes() {
 }
 
 /**
+ * 创建支持测试环境 mock 的方块属性解析函数
+ * 统一处理 globalThis._blockData 的依赖注入逻辑
+ *
+ * @param {Function} fallbackFn - 默认的方块属性获取函数（如 getBlockProperties）
+ * @returns {Function} 返回一个支持 mock 的 getBlockProps 函数
+ * @example
+ * // 在模块中使用：
+ * const getBlockProps = createBlockPropsResolver(getBlockProperties);
+ * const props = getBlockProps('stone');
+ */
+export function createBlockPropsResolver(fallbackFn) {
+  return function getBlockProps(type) {
+    if (globalThis._blockData && typeof globalThis._blockData.getBlockProperties === 'function') {
+      return globalThis._blockData.getBlockProperties(type);
+    }
+    return fallbackFn(type);
+  };
+}
+
+/**
  * 获取所有启用 AO 的方块类型数组
  * @returns {string[]}
  */

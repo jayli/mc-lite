@@ -4,7 +4,7 @@
  */
 import * as THREE from 'three';
 import { RealisticTree } from './entities/RealisticTree.js';
-import { getBlockProperties } from '../constants/BlockData.js';
+import { getBlockProperties, createBlockPropsResolver } from '../constants/BlockData.js';
 import { getRotationAngle } from '../utils/OrientationUtils.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { persistenceService } from '../services/PersistenceService.js';
@@ -19,12 +19,7 @@ const getCarModel = () => globalThis._carModel || carModel;
 const getGunManModel = () => globalThis._gunManModel || gunManModel;
 
 // 获取方块属性函数 - 优先使用测试环境的模拟
-function getBlockProps(type) {
-  if (globalThis._blockData && typeof globalThis._blockData.getBlockProperties === 'function') {
-    return globalThis._blockData.getBlockProperties(type);
-  }
-  return getBlockProperties(type);
-}
+const getBlockProps = createBlockPropsResolver(getBlockProperties);
 
 export function extendChunk(Chunk) {
   /**

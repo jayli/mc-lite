@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { materials } from '../core/MaterialManager.js';
 import { persistenceService } from '../services/PersistenceService.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
-import { getBlockProperties } from '../constants/BlockData.js';
+import { getBlockProperties, createBlockPropsResolver } from '../constants/BlockData.js';
 import { getRotationAngle, parseBlockEntry } from '../utils/OrientationUtils.js';
 import { getStructureRenderDist, belongsToCrossChunkStructure } from '../utils/StructureUtils.js';
 import { createOcclusionChecker, computeBlockAOPacked } from '../utils/AOUtils.js';
@@ -23,17 +23,8 @@ const getPersistenceService = () => globalThis._persistenceService || persistenc
 const getFaceCullingSystem = () => globalThis._faceCullingSystem || faceCullingSystem;
 const getMaterials = () => globalThis._materials || materials;
 
-/**
- * 获取方块属性函数 - 优先使用测试环境的模拟
- * @param {string} type - 方块类型
- * @returns {Object} 方块属性对象
- */
-function getBlockProps(type) {
-  if (globalThis._blockData && typeof globalThis._blockData.getBlockProperties === 'function') {
-    return globalThis._blockData.getBlockProperties(type);
-  }
-  return getBlockProperties(type);
-}
+// 获取方块属性函数 - 优先使用测试环境的模拟
+const getBlockProps = createBlockPropsResolver(getBlockProperties);
 
 /**
  * 区块类 - 负责单个区块的生成、管理和渲染
