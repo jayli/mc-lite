@@ -358,3 +358,71 @@ export function createBlockDataOcclusionChecker(blockData, getBlockPropsFn, opti
       : !props.isTransparent;
   };
 }
+
+/**
+ * 增量计算 AO 数据（用于动态方块更新）
+ * 统一的 AO 增量计算逻辑，可用于 Worker 和主线程
+ *
+ * @param {Object} position - 方块位置 {x, y, z}
+ * @param {'PLACE'|'DESTROY'} operation - 操作类型
+ * @param {string} blockType - 方块类型
+ * @param {Object} blockData - 局部方块数据 {"x,y,z": "type"}
+ * @param {number} neighborhoodRadius - 邻居半径（默认 1）
+ * @param {Function} getBlockPropsFn - 获取方块属性的函数
+ * @returns {Object} AO 计算结果 { aoData, affectedNeighbors, duration }
+ */
+export function computeIncrementalAO(position, operation, blockType, blockData, neighborhoodRadius = 1, getBlockPropsFn = getBlockProperties) {
+  const startTime = typeof performance !== 'undefined' ? performance.now() : 0;
+  const aoData = [];
+  const affectedNeighbors = [];
+
+  // 使用工具函数创建 isOccluding 函数
+  const isOccluding = createBlockDataOcclusionChecker(blockData, getBlockPropsFn);
+
+  const { x, y, z } = position;
+  const affected = new Set();
+
+  // 如果是放置方块，计算该方块的 AO
+  if (operation === 'PLACE' && isAOApplicable(blockType)) {
+    affected.add(`${x},${y},${z}`);
+  }
+
+  // 计算邻居方块的 AO 更新
+  for (let dx = -neighborhoodRadius; dx <= neighborhoodRadius; dx++) {
+    for (let dy = -neighborhoodRadius; dy <= neighborhoodRadius; dy++) {
+      for (let dz = -neighborhoodRadius; dz <= neighborhoodRadius; dz++) {
+        if (dx === 0 && dy === 0 && dz === 0) continue;
+
+        const nx = x + dx;
+        const ny = y + dy;
+        const nz = z + dz;
+        const key = `${nx},${ny},${nz}`;
+        const type = blockData[key];
+
+        if (type && isAOApplicable(type)) {
+          affected.add(key);
+        }
+      }
+    }
+  }
+
+  // 计算 AO
+  for (const key of affected) {
+    const [bx, by, bz] = key.split(',').map(Number);
+    const type = blockData[key];
+
+    if (type && isAOApplicable(type)) {
+      const { aoLow, aoHigh } = calculateAOForBlock(bx, by, bz, isOccluding);
+      aoData.push({ x: bx, y: by, z: bz, type, aoLow, aoHigh });
+      affectedNeighbors.push({ x: bx, y: by, z: bz });
+    }
+  }
+
+  const endTime = typeof performance !== 'undefined' ? performance.now() : 0;
+
+  return {
+    aoData,
+    affectedNeighbors,
+    duration: endTime - startTime
+  };
+}

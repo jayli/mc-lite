@@ -2,7 +2,7 @@
 // 统一 AO（环境光遮蔽）计算与管理系统
 
 import * as THREE from 'three';
-import { buildAODataForBlocks, calculateAOForBlock, isAOApplicable, packAOData, unpackAllAO, createBlockDataOcclusionChecker } from '../utils/AOUtils.js';
+import { buildAODataForBlocks, isAOApplicable, createBlockDataOcclusionChecker, computeIncrementalAO } from '../utils/AOUtils.js';
 import { getBlockProperties } from '../constants/BlockData.js';
 
 /**
@@ -428,60 +428,10 @@ export class AOSystem {
 
   /**
    * 主线程增量 AO 计算（Fallback 实现）
+   * 现在直接复用 AOUtils 中的通用实现
    * @private
    */
   _computeIncrementalAOInMainThread(position, operation, blockType, blockData, radius) {
-    const startTime = performance.now();
-    const aoData = [];
-    const affectedNeighbors = [];
-
-    // 使用工具函数创建 isOccluding 函数
-    const isOccluding = createBlockDataOcclusionChecker(blockData, getBlockProperties);
-
-    // 计算受影响的位置
-    const affected = new Set();
-    const { x, y, z } = position;
-
-    // 如果是放置方块，计算该方块的 AO
-    if (operation === 'PLACE' && isAOApplicable(blockType)) {
-      affected.add(`${x},${y},${z}`);
-    }
-
-    // 计算邻居方块的 AO 更新
-    for (let dx = -radius; dx <= radius; dx++) {
-      for (let dy = -radius; dy <= radius; dy++) {
-        for (let dz = -radius; dz <= radius; dz++) {
-          if (dx === 0 && dy === 0 && dz === 0) continue;
-
-          const nx = x + dx;
-          const ny = y + dy;
-          const nz = z + dz;
-          const key = `${nx},${ny},${nz}`;
-          const type = blockData[key];
-
-          if (type && isAOApplicable(type)) {
-            affected.add(key);
-          }
-        }
-      }
-    }
-
-    // 计算 AO
-    for (const key of affected) {
-      const [bx, by, bz] = key.split(',').map(Number);
-      const type = blockData[key];
-
-      if (type && isAOApplicable(type)) {
-        const { aoLow, aoHigh } = calculateAOForBlock(bx, by, bz, isOccluding);
-        aoData.push({ x: bx, y: by, z: bz, type, aoLow, aoHigh });
-        affectedNeighbors.push({ x: bx, y: by, z: bz });
-      }
-    }
-
-    return {
-      aoData,
-      affectedNeighbors,
-      duration: performance.now() - startTime
-    };
+    return computeIncrementalAO(position, operation, blockType, blockData, radius, getBlockProperties);
   }
 }
