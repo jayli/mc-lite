@@ -2,7 +2,7 @@
 // 专门处理隐藏面剔除计算的Worker
 
 import { getBlockProperties } from '../constants/BlockData.js';
-import { buildAODataForBlocks, calculateAOForBlock, isAOApplicable, computeIncrementalAO } from '../utils/AOUtils.js';
+import { buildAODataForBlocks, computeIncrementalAO } from '../utils/AOUtils.js';
 import {
   computeFaceVisibilityMask,
   createBlockDataNeighborQuery,
@@ -38,7 +38,6 @@ function createOccludingChecker(blockData, worldChunks, currentCx, currentCz) {
       type = blockData[key];
     } else {
       // 从相邻区块查找
-      const chunkKey = `${xChunk},${zChunk}`;
       const chunk = worldChunks?.find(c => c.cx === xChunk && c.cz === zChunk);
       if (chunk && chunk.blockData) {
         type = chunk.blockData[key];

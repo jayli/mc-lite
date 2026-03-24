@@ -8,7 +8,6 @@ import { persistenceService } from '../services/PersistenceService.js';
 import { noise } from '../utils/MathUtils.js';
 import { ParticleSystem } from './effects/ParticleSystem.js';
 import { parseBlockEntry } from '../utils/OrientationUtils.js';
-// import { AORepairManager } from '../core/AORepairManager.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
@@ -76,11 +75,6 @@ export class World {
     // --- 方块查询缓存 ---
     // 命中缓存：blockKey -> 所属 chunkKey（仅缓存跨区块命中）
     this.crossChunkOwnerCache = new Map();
-    // miss 缓存：仅在当前帧有效，避免同帧重复全量扫描
-    this.crossChunkMissCache = new Set();
-
-    // 初始化 AO 修复管理器（暂时禁用，Mag7 现在使用 isBatch=false）
-    // this.aoRepairManager = new AORepairManager(this);
   }
 
   /**
@@ -89,9 +83,6 @@ export class World {
    * @param {number} dt - 自上一帧以来的增量时间（秒）
    */
   update(playerPos = new THREE.Vector3(), dt = 0) {
-    // 每帧清空 miss 缓存，避免跨帧陈旧查询结果影响其它系统
-    this.crossChunkMissCache.clear();
-
     let chunkTopologyChanged = false;
 
     // 计算玩家所在的区块坐标
@@ -289,11 +280,6 @@ export class World {
       }, 100); // 100ms 防抖，等待所有批次完成
     }
 
-    // 记录批量删除，触发 AO 修复（暂时禁用，Mag7 现在使用 isBatch=false）
-    // if (this.aoRepairManager) {
-    //   this.aoRepairManager.recordBatchRemoval(positions);
-    // }
-
     // 批量删除会修改多个 chunk 的 blockData，统一清理查询缓存
     this.clearBlockLookupCaches();
   }
@@ -332,7 +318,6 @@ export class World {
       const entry = coordChunk.blockData[blockKey];
       if (entry) {
         this.crossChunkOwnerCache.delete(blockKey);
-        this.crossChunkMissCache.delete(blockKey);
         return {
           ownerChunk: coordChunk,
           ownerChunkKey: coordChunkKey,
@@ -376,7 +361,6 @@ export class World {
       const entry = otherChunk.blockData[blockKey];
       if (!entry) continue;
       this.crossChunkOwnerCache.set(blockKey, otherKey);
-      this.crossChunkMissCache.delete(blockKey);
       return {
         ownerChunk: otherChunk,
         ownerChunkKey: otherKey,
@@ -387,7 +371,6 @@ export class World {
       };
     }
 
-    this.crossChunkMissCache.add(blockKey);
     return null;
   }
 
@@ -611,6 +594,5 @@ export class World {
    */
   clearBlockLookupCaches() {
     this.crossChunkOwnerCache.clear();
-    this.crossChunkMissCache.clear();
   }
 }
