@@ -58,7 +58,8 @@ export class Engine {
         directionalLightIntensity: 3.2,
         ambientLightColor: 0xddeeff,
         ambientLightIntensity: 1,
-        backgroundMode: 'skybox',
+        // 使用雾色作为背景，避免远处方块雾化后与天空出现硬边
+        backgroundMode: 'fogColor',
         backgroundColor: null
       },
       [VISUAL_STYLE_KEYS.OVERCAST]: {
@@ -361,6 +362,10 @@ export class Engine {
       this.waterMaterial.uniforms.uFogNear.value = style.fogNear;
       this.waterMaterial.uniforms.uFogFar.value = style.fogFar;
     }
+
+    if (style.backgroundMode === 'fogColor') {
+      this.scene.background = new THREE.Color(style.fogColor);
+    }
   }
 
   setVisualStyle(styleKey) {
@@ -375,6 +380,8 @@ export class Engine {
 
     if (style.backgroundMode === 'skybox' && this.skyboxTexture) {
       this.scene.background = this.skyboxTexture;
+    } else if (style.backgroundMode === 'fogColor') {
+      this.scene.background = new THREE.Color(style.fogColor);
     } else {
       this.scene.background = new THREE.Color(style.backgroundColor || 0x87CEEB);
     }
@@ -589,6 +596,7 @@ export class Engine {
         this.scene.fog.color.set(0x103060);    // 设置水下雾的颜色为深蓝色
         this.scene.fog.near = 0.1;             // 设置水下雾的近距范围
         this.scene.fog.far = 15;               // 设置水下雾的远距范围，较短的距离增强水下效果
+        this.scene.background = new THREE.Color(0x103060); // 水下背景同步为雾色，避免远处边界突变
         this.isUnderwater = true;              // 标记玩家处于水下状态
 
         if (this.waterMaterial) {
