@@ -15,6 +15,10 @@ export const FOG_COLOR = 0x94bcf5;
 export const WATER_COLOR = 0x588be4;
 // 水面的初始透明度
 export const WATER_OPACITY = 0.7;
+// 海面可见半径：与区块可见范围接近（RENDER_DIST=3, CHUNK_SIZE=16 => 48），额外加少量缓冲
+export const WATER_VISIBLE_DISTANCE = 80;
+// 海面边缘淡出带宽，避免突然裁切
+export const WATER_EDGE_FADE_BAND = 15;
 // 水下雾的颜色 (更深的蓝色)
 export const WATER_FOG_COLOR = 0xa7d1e2;
 // 雾的起始距离（米）
@@ -65,8 +69,8 @@ export class Engine {
       [VISUAL_STYLE_KEYS.OVERCAST]: {
         // 阴天参数参考最初版本 components/main.js
         fogColor: 0x87CEEB,
-        fogNear: 23,
-        fogFar: 55,
+        fogNear: FOG_NEAR,
+        fogFar: FOG_FAR-5,
         directionalLightColor: 0xffffff,
         directionalLightIntensity: 1.2,
         ambientLightColor: 0xffffff,
@@ -444,6 +448,8 @@ export class Engine {
         void main() {
           vec2 pos = vWorldPosition.xz;
           float dist = length(pos - cameraPosition.xz);
+          float waterFade = 1.0 - smoothstep(${(WATER_VISIBLE_DISTANCE - WATER_EDGE_FADE_BAND).toFixed(1)}, ${WATER_VISIBLE_DISTANCE.toFixed(1)}, dist);
+          if (waterFade <= 0.001) discard;
 
           // 水域遮罩：只在靠近海洋的地方显示水面（切入岸边约4个方块）
           if (dist < 100.0) {
@@ -495,7 +501,7 @@ export class Engine {
           float fogFactor = smoothstep(uFogNear, uFogFar, vDepth);
           vec3 colorWithFog = mix(finalColor, uFogColor, fogFactor);
 
-          gl_FragColor = vec4(colorWithFog, uOpacity);
+          gl_FragColor = vec4(colorWithFog, uOpacity * waterFade);
         }
       `,
       transparent: true,
