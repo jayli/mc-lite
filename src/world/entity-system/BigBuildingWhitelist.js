@@ -7,6 +7,7 @@
 
 export const BIG_BUILDING_WHITELIST = Object.freeze([
   'castle',
+  'gate',
   'tank',
   'tower',
   'uglyHouse',
@@ -24,4 +25,3 @@ const BIG_BUILDING_SET = new Set(BIG_BUILDING_WHITELIST);
 export function isBigBuildingType(type) {
   return BIG_BUILDING_SET.has(type);
 }
-

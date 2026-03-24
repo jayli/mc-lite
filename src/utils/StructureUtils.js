@@ -30,6 +30,7 @@ export const STRUCTURE_RENDER_DIST = {
   tank: 20,           // Tank 尺寸约 35x70x40 (X/Z: ±20, Y: 根据实际结构调整)
   tower: 8,           // 海岛高塔尺寸约 9x28x10
   castle: 36,         // 城堡尺寸约 70x70，含外墙与塔楼
+  gate: 20,           // 拱门尺寸约 24x22x11（含两侧塔楼与连桥）
   rover: 3,           // 火星车
   gunman: 3,          // 模型人
   island: 16          // 空岛跨Chunk渲染距离
@@ -44,7 +45,8 @@ export const STRUCTURE_HEIGHT_RANGE_SPECIAL = {
   desertVillage: 12, // DesertVillage 最高约 11 层，预留一定容差
   desertPyramid: 20, // DesertPyramid 最高约 16 层，预留一定容差
   tower: 28,      // tower 结构 Y 方向±28，覆盖塔身与屋顶
-  castle: 36      // castle 结构 Y 方向±36，覆盖主楼与塔顶
+  castle: 36,     // castle 结构 Y 方向±36，覆盖主楼与塔顶
+  gate: 24        // gate 结构 Y 方向±24，覆盖拱顶与塔楼
 };
 
 /**

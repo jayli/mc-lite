@@ -26,7 +26,7 @@ self.onerror = (e) => {
 };
 
 // 结构数据加载器实例
-const { uglyHouse, desertVillage, desertPyramid, birchTree, birchTreeWithSnow, tank, tower, castle } = structureLoaders;
+const { uglyHouse, desertVillage, desertPyramid, birchTree, birchTreeWithSnow, tank, tower, castle, gate } = structureLoaders;
 
 const CHUNK_SIZE = 16;
 const ROOMS_PER_CHUNK = 2;
@@ -104,13 +104,15 @@ function isOccupiedForLargeStaticDesert(wx, wz, seed) {
  * @param {string} params.surfaceType
  * @param {boolean} params.safeForStructure
  * @param {boolean} params.occupied
- * @returns {'desertPyramid'|'desertVillage'|'uglyHouse'|'tank'|null}
+ * @returns {'desertPyramid'|'desertVillage'|'uglyHouse'|'gate'|'tank'|null}
  */
 function resolveLargeStaticStructureType(params) {
   const { wx, wz, seed, biome, surfaceType, safeForStructure, occupied } = params;
   if (!safeForStructure || occupied) return null;
 
   if (biome === 'DESERT') {
+    // gate 概率与 uglyHouse 一致（0.00008）
+    if (seededRandom(wx, wz, seed + 27) < 0.00008) return 'gate';
     if (seededRandom(wx, wz, seed + 25) < 0.00016) return 'desertPyramid';
     if (seededRandom(wx, wz, seed + 26) < 0.00016) return 'desertVillage';
     if (seededRandom(wx, wz, seed + 23) < 0.00008) return 'uglyHouse';
@@ -139,7 +141,8 @@ onmessage = async function(e) {
     birchTreeWithSnow.load(),
     tank.load(),
     tower.load(),
-    castle.load()
+    castle.load(),
+    gate.load()
   ]).catch(err => console.error('Failed to load structure data:', err));
 
   // 计算当前区块的范围 - 提前定义，供 snapshot 模式使用
@@ -680,6 +683,7 @@ onmessage = async function(e) {
   );
   const largeStaticTaskFactories = {
     castle: (x, y, z) => () => generateCastle(x, y, z, fakeChunk, dPlaceholder),
+    gate: (x, y, z) => () => generateGate(x, y, z, fakeChunk, dPlaceholder),
     tank: (x, y, z) => () => generateTank(x, y, z, fakeChunk, dPlaceholder),
     tower: (x, y, z) => () => generateTower(x, y, z, fakeChunk, dPlaceholder),
     uglyHouse: (x, y, z) => () => generateUglyHouse(x, y, z, fakeChunk, dPlaceholder),
@@ -1242,6 +1246,18 @@ function generateTower(x, y, z, chunk, dObj) {
  */
 function generateCastle(x, y, z, chunk, dObj) {
   generateStructureWithGroundSupport(castle, x, y, z, chunk, dObj);
+}
+
+/**
+ * 生成拱门（从 JSON 数据）
+ * @param {number} x - X 坐标（拱门中心点）
+ * @param {number} y - Y 坐标（地面高度）
+ * @param {number} z - Z 坐标（拱门中心点）
+ * @param {Object} chunk - 区块对象
+ * @param {Object} dObj - 数据收集对象
+ */
+function generateGate(x, y, z, chunk, dObj) {
+  generateStructureWithGroundSupport(gate, x, y, z, chunk, dObj);
 }
 
 /**

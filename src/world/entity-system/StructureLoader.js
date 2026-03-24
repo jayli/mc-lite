@@ -166,6 +166,7 @@ export const structureLoaders = {
   tank: new StructureLoader('tank', new URL('../structures/tank.json', moduleBase).href),
   tower: new StructureLoader('tower', new URL('../structures/tower.json', moduleBase).href),
   castle: new StructureLoader('castle', new URL('../structures/castle.json', moduleBase).href),
+  gate: new StructureLoader('gate', new URL('../structures/gate.json', moduleBase).href),
   bed: new StructureLoader('bed', new URL('../structures/bed.json', moduleBase).href),
   zombieNest: new StructureLoader('zombie_nest', new URL('../structures/zombie_nest.json', moduleBase).href)
 };
@@ -184,6 +185,7 @@ export async function preloadAllStructures() {
     structureLoaders.tank.load(),
     structureLoaders.tower.load(),
     structureLoaders.castle.load(),
+    structureLoaders.gate.load(),
     structureLoaders.bed.load(),
     structureLoaders.zombieNest.load()
   ]);
