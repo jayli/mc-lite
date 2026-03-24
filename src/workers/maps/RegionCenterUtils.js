@@ -40,3 +40,45 @@ export function getRegionSeededCenter(
     centerZ: regionZ * REGION_SIZE + offsetZ
   };
 }
+
+/**
+ * 将中心点裁剪到区域边界内，保证与边界至少保留 minMargin 距离
+ * @param {number} regionX - 区域 X 坐标
+ * @param {number} regionZ - 区域 Z 坐标
+ * @param {number} centerX - 原始中心点 X
+ * @param {number} centerZ - 原始中心点 Z
+ * @param {number} minMargin - 与区域边界的最小间距
+ * @param {Object} [options] - 可选配置
+ * @param {number} [options.regionSize=REGION_SIZE] - 区域尺寸
+ * @returns {{cx:number, cz:number}} 裁剪后的中心点
+ */
+export function clampCenterToRegion(
+  regionX,
+  regionZ,
+  centerX,
+  centerZ,
+  minMargin,
+  { regionSize = REGION_SIZE } = {}
+) {
+  let cx = centerX;
+  let cz = centerZ;
+
+  const regionLeft = regionX * regionSize;
+  const regionRight = (regionX + 1) * regionSize;
+  const regionTop = regionZ * regionSize;
+  const regionBottom = (regionZ + 1) * regionSize;
+
+  if (cx - minMargin < regionLeft) {
+    cx = regionLeft + minMargin;
+  } else if (cx + minMargin > regionRight) {
+    cx = regionRight - minMargin;
+  }
+
+  if (cz - minMargin < regionTop) {
+    cz = regionTop + minMargin;
+  } else if (cz + minMargin > regionBottom) {
+    cz = regionBottom - minMargin;
+  }
+
+  return { cx, cz };
+}

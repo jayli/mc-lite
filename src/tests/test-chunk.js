@@ -294,7 +294,7 @@ describe('Chunk 真实类测试', (test) => {
     teardownEnvironment();
   });
 
-  test('removeBlock - 跨 Chunk 归属方块删除应写入 owner chunk', () => {
+  test('removeBlock - 跨 Chunk 归属方块删除应写入 owner chunk（非大型结构）', () => {
     setupEnvironment();
 
     const world = createMockWorld();
@@ -303,8 +303,9 @@ describe('Chunk 真实类测试', (test) => {
     world.chunks.set('0,0', ownerChunk);
     world.chunks.set('1,0', neighborChunk);
 
-    // 模拟跨区归属：方块坐标在 chunk 1,0，但数据存储在 ownerChunk(0,0)
-    ownerChunk.structureCenters = [{ type: 'tank', x: 8, y: 10, z: 8 }];
+    // 模拟跨区归属（当前语义）：
+    // 仅非大型结构支持跨 Chunk owner，使用 static_tree 作为测试中心
+    ownerChunk.structureCenters = [{ type: 'static_tree', x: 15, y: 10, z: 8 }];
     ownerChunk.addBlockDynamic(16, 10, 8, 'stone', 0);
     ownerChunk.removeBlock(16, 10, 8);
 
@@ -336,14 +337,14 @@ describe('Chunk 真实类测试', (test) => {
     teardownEnvironment();
   });
 
-  test('removeBlocksBatch - 跨 Chunk 归属方块批量删除应写入 owner chunk', () => {
+  test('removeBlocksBatch - 跨 Chunk 归属方块批量删除应写入 owner chunk（非大型结构）', () => {
     setupEnvironment();
 
     const world = createMockWorld();
     const ownerChunk = new Chunk(0, 0, world);
     world.chunks.set('0,0', ownerChunk);
 
-    ownerChunk.structureCenters = [{ type: 'tank', x: 8, y: 10, z: 8 }];
+    ownerChunk.structureCenters = [{ type: 'static_tree', x: 15, y: 10, z: 8 }];
     ownerChunk.addBlockDynamic(16, 10, 8, 'stone', 0);
     ownerChunk.removeBlocksBatch([{ x: 16, y: 10, z: 8 }], false);
 

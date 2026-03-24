@@ -4,7 +4,7 @@
  * 负责冰封山峰的位置计算和方块生成
  */
 
-import { getRegionSeededCenter } from './RegionCenterUtils.js';
+import { getRegionSeededCenter, clampCenterToRegion } from './RegionCenterUtils.js';
 import {
   REGION_SIZE,
   FROZEN_MOUNTAIN_SIZE,
@@ -45,26 +45,7 @@ export function getFrozenMountainCenterInRegion(regionX, regionZ, seed) {
   const fmTotalHalfSize = fmHalfSize + fmTransitionSize;
   const fmMinMargin = fmTotalHalfSize + REGION_MIN_MARGIN;
 
-  const regionLeft = regionX * regionSize;
-  const regionRight = (regionX + 1) * regionSize;
-  const regionTop = regionZ * regionSize;
-  const regionBottom = (regionZ + 1) * regionSize;
-
-  // 调整 X 坐标
-  if (mountainCx - fmMinMargin < regionLeft) {
-    mountainCx = regionLeft + fmMinMargin;
-  } else if (mountainCx + fmMinMargin > regionRight) {
-    mountainCx = regionRight - fmMinMargin;
-  }
-
-  // 调整 Z 坐标
-  if (mountainCz - fmMinMargin < regionTop) {
-    mountainCz = regionTop + fmMinMargin;
-  } else if (mountainCz + fmMinMargin > regionBottom) {
-    mountainCz = regionBottom - fmMinMargin;
-  }
-
-  return { cx: mountainCx, cz: mountainCz };
+  return clampCenterToRegion(regionX, regionZ, mountainCx, mountainCz, fmMinMargin, { regionSize });
 }
 
 /**

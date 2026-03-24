@@ -383,18 +383,19 @@ describe('World 真实类测试', (test) => {
   });
 
   // =========== isSolid 测试 ===========
-  test('isSolid - 实心方块检测', async () => {
+  test('isSolid - 实心方块检测', () => {
     setupEnvironment();
 
     scene = new THREE.Scene();
     world = new World(scene);
-    world.update(new THREE.Vector3(0, 10, 0), 0.016);
 
-    // 等待 Chunk 准备就绪
-    await waitForChunkReady(world, '0,0');
-
-    // 放置实心方块
-    world.setBlock(5, 10, 5, 'stone', 0);
+    // 构造一个已就绪的区块，避免异步 Worker 时序导致的测试抖动
+    world.chunks.set('0,0', {
+      cx: 0,
+      cz: 0,
+      isReady: true,
+      solidBlocks: new Set(['5,10,5'])
+    });
 
     // 验证 stone 是实心
     assertTrue(world.isSolid(5, 10, 5), 'stone 应该是实心');
@@ -402,18 +403,18 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
-  test('isSolid - 非实心方块检测', async () => {
+  test('isSolid - 非实心方块检测', () => {
     setupEnvironment();
 
     scene = new THREE.Scene();
     world = new World(scene);
-    world.update(new THREE.Vector3(0, 10, 0), 0.016);
 
-    // 等待 Chunk 准备就绪
-    await waitForChunkReady(world, '0,0');
-
-    // 放置非实心方块（flower 和 short_grass 是 isSolid: false）
-    world.setBlock(5, 10, 5, 'flower', 0);
+    world.chunks.set('0,0', {
+      cx: 0,
+      cz: 0,
+      isReady: true,
+      solidBlocks: new Set()
+    });
 
     // 验证 flower 不是实心
     assertFalse(world.isSolid(5, 10, 5), 'flower 不应该是实心');

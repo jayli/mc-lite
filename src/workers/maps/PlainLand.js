@@ -7,7 +7,7 @@
  * 3. 每个区域最多一个平地，可作为城堡唯一生成点
  */
 
-import { getRegionSeededCenter } from './RegionCenterUtils.js';
+import { getRegionSeededCenter, clampCenterToRegion } from './RegionCenterUtils.js';
 import {
   REGION_SIZE,
   PLAIN_LAND_SIZE,
@@ -40,24 +40,7 @@ export function getPlainLandCenterInRegion(regionX, regionZ, seed) {
   const halfSize = Math.floor(PLAIN_LAND_SIZE / 2);
   const minMargin = halfSize + REGION_MIN_MARGIN;
 
-  const regionLeft = regionX * regionSize;
-  const regionRight = (regionX + 1) * regionSize;
-  const regionTop = regionZ * regionSize;
-  const regionBottom = (regionZ + 1) * regionSize;
-
-  if (plainLandCx - minMargin < regionLeft) {
-    plainLandCx = regionLeft + minMargin;
-  } else if (plainLandCx + minMargin > regionRight) {
-    plainLandCx = regionRight - minMargin;
-  }
-
-  if (plainLandCz - minMargin < regionTop) {
-    plainLandCz = regionTop + minMargin;
-  } else if (plainLandCz + minMargin > regionBottom) {
-    plainLandCz = regionBottom - minMargin;
-  }
-
-  return { cx: plainLandCx, cz: plainLandCz };
+  return clampCenterToRegion(regionX, regionZ, plainLandCx, plainLandCz, minMargin, { regionSize });
 }
 
 /**

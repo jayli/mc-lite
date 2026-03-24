@@ -4,7 +4,7 @@
  * 负责金字塔的位置计算和方块生成
  */
 
-import { getRegionSeededCenter } from './RegionCenterUtils.js';
+import { getRegionSeededCenter, clampCenterToRegion } from './RegionCenterUtils.js';
 import {
   REGION_SIZE,
   PYRAMID_SIZE,
@@ -36,27 +36,7 @@ export function getPyramidCenterInRegion(regionX, regionZ, seed) {
     offsetBaseZ: CENTER_OFFSET.BASE_Z
   });
 
-  let pyramidCx = centerX;
-  let pyramidCz = centerZ;
-
-  const regionLeft = regionX * regionSize;
-  const regionRight = (regionX + 1) * regionSize;
-  const regionTop = regionZ * regionSize;
-  const regionBottom = (regionZ + 1) * regionSize;
-
-  if (pyramidCx - minMargin < regionLeft) {
-    pyramidCx = regionLeft + minMargin;
-  } else if (pyramidCx + minMargin > regionRight) {
-    pyramidCx = regionRight - minMargin;
-  }
-
-  if (pyramidCz - minMargin < regionTop) {
-    pyramidCz = regionTop + minMargin;
-  } else if (pyramidCz + minMargin > regionBottom) {
-    pyramidCz = regionBottom - minMargin;
-  }
-
-  return { cx: pyramidCx, cz: pyramidCz };
+  return clampCenterToRegion(regionX, regionZ, centerX, centerZ, minMargin, { regionSize });
 }
 
 /**
