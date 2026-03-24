@@ -283,6 +283,16 @@ class EntityManagerClass {
       categories: ['structure', 'building', 'desert']
     }));
 
+    // 白塔（JSON 加载）
+    this.register('white_tower', new JsonEntity({
+      id: 'white_tower',
+      biomes: ['DESERT'],
+      probability: 0.00016,  // ugly_house 的 2 倍
+      loader: null,  // 将在 initSpecial 中设置
+      crossChunkDist: 24,
+      categories: ['structure', 'building', 'desert']
+    }));
+
     // 沙漠村庄（JSON 加载）
     this.register('desert_village', new JsonEntity({
       id: 'desert_village',
@@ -436,6 +446,7 @@ class EntityManagerClass {
   initSpecial() {
     this.setLoader('tree_birch', structureLoaders.birchTree);
     this.setLoader('ugly_house', structureLoaders.uglyHouse);
+    this.setLoader('white_tower', structureLoaders.whiteTower);
     this.setLoader('desert_village', structureLoaders.desertVillage);
     this.setLoader('tank', structureLoaders.tank);
 

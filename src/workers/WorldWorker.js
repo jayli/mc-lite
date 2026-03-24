@@ -26,7 +26,7 @@ self.onerror = (e) => {
 };
 
 // 结构数据加载器实例
-const { uglyHouse, desertVillage, desertPyramid, birchTree, birchTreeWithSnow, tank, tower, castle, gate } = structureLoaders;
+const { uglyHouse, whiteTower, desertVillage, desertPyramid, birchTree, birchTreeWithSnow, tank, tower, castle, gate } = structureLoaders;
 
 const CHUNK_SIZE = 16;
 const ROOMS_PER_CHUNK = 2;
@@ -104,7 +104,7 @@ function isOccupiedForLargeStaticDesert(wx, wz, seed) {
  * @param {string} params.surfaceType
  * @param {boolean} params.safeForStructure
  * @param {boolean} params.occupied
- * @returns {'desertPyramid'|'desertVillage'|'uglyHouse'|'gate'|'tank'|null}
+ * @returns {'desertPyramid'|'desertVillage'|'uglyHouse'|'whiteTower'|'gate'|'tank'|null}
  */
 function resolveLargeStaticStructureType(params) {
   const { wx, wz, seed, biome, surfaceType, safeForStructure, occupied } = params;
@@ -115,6 +115,7 @@ function resolveLargeStaticStructureType(params) {
     if (seededRandom(wx, wz, seed + 27) < 0.00008) return 'gate';
     if (seededRandom(wx, wz, seed + 25) < 0.00016) return 'desertPyramid';
     if (seededRandom(wx, wz, seed + 26) < 0.00016) return 'desertVillage';
+    if (seededRandom(wx, wz, seed + 28) < 0.00016) return 'whiteTower';
     if (seededRandom(wx, wz, seed + 23) < 0.00008) return 'uglyHouse';
     return null;
   }
@@ -135,6 +136,7 @@ onmessage = async function(e) {
   // 预加载所有结构数据（等待完成后再生成地形）
   await Promise.all([
     uglyHouse.load(),
+    whiteTower.load(),
     desertVillage.load(),
     desertPyramid.load(),
     birchTree.load(),
@@ -555,6 +557,15 @@ onmessage = async function(e) {
               'uglyHouse'
             );
             occupied = true;
+          } else if (largeStaticType === 'whiteTower') {
+            createStructureTask(
+              generateWhiteTower.bind(null, wx, h + 1, wz, fakeChunk, dPlaceholder),
+              wx,
+              h + 1,
+              wz,
+              'whiteTower'
+            );
+            occupied = true;
           }
         } else {
           let occupied = false;
@@ -686,6 +697,7 @@ onmessage = async function(e) {
     gate: (x, y, z) => () => generateGate(x, y, z, fakeChunk, dPlaceholder),
     tank: (x, y, z) => () => generateTank(x, y, z, fakeChunk, dPlaceholder),
     tower: (x, y, z) => () => generateTower(x, y, z, fakeChunk, dPlaceholder),
+    whiteTower: (x, y, z) => () => generateWhiteTower(x, y, z, fakeChunk, dPlaceholder),
     uglyHouse: (x, y, z) => () => generateUglyHouse(x, y, z, fakeChunk, dPlaceholder),
     desertVillage: (x, y, z) => () => generateDesertVillage(x, y, z, fakeChunk, dPlaceholder),
     desertPyramid: (x, y, z) => () => generateDesertPyramid(x, y, z, fakeChunk, dPlaceholder)
@@ -1270,4 +1282,16 @@ function generateGate(x, y, z, chunk, dObj) {
  */
 function generateUglyHouse(x, y, z, chunk, dObj) {
   generateStructureWithGroundSupport(uglyHouse, x, y, z, chunk, dObj);
+}
+
+/**
+ * 生成白塔（从 JSON 数据）
+ * @param {number} x - X 坐标（白塔中心点）
+ * @param {number} y - Y 坐标（地面高度）
+ * @param {number} z - Z 坐标（白塔中心点）
+ * @param {Object} chunk - 区块对象
+ * @param {Object} dObj - 数据收集对象
+ */
+function generateWhiteTower(x, y, z, chunk, dObj) {
+  generateStructureWithGroundSupport(whiteTower, x, y, z, chunk, dObj);
 }
