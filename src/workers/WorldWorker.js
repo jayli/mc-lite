@@ -678,26 +678,22 @@ onmessage = async function(e) {
       .filter(item => item.type)
       .map(item => `${item.type}:${item.centerX},${item.centerY},${item.centerZ}`)
   );
+  const largeStaticTaskFactories = {
+    castle: (x, y, z) => () => generateCastle(x, y, z, fakeChunk, dPlaceholder),
+    tank: (x, y, z) => () => generateTank(x, y, z, fakeChunk, dPlaceholder),
+    tower: (x, y, z) => () => generateTower(x, y, z, fakeChunk, dPlaceholder),
+    uglyHouse: (x, y, z) => () => generateUglyHouse(x, y, z, fakeChunk, dPlaceholder),
+    desertVillage: (x, y, z) => () => generateDesertVillage(x, y, z, fakeChunk, dPlaceholder),
+    desertPyramid: (x, y, z) => () => generateDesertPyramid(x, y, z, fakeChunk, dPlaceholder)
+  };
   const appendLargeStaticTask = (type, centerX, centerY, centerZ) => {
     const dedupeKey = `${type}:${centerX},${centerY},${centerZ}`;
     if (largeStructureTaskKeySet.has(dedupeKey)) return;
     largeStructureTaskKeySet.add(dedupeKey);
 
-    let task = null;
-    if (type === 'castle') {
-      task = () => generateCastle(centerX, centerY, centerZ, fakeChunk, dPlaceholder);
-    } else if (type === 'tank') {
-      task = () => generateTank(centerX, centerY, centerZ, fakeChunk, dPlaceholder);
-    } else if (type === 'tower') {
-      task = () => generateTower(centerX, centerY, centerZ, fakeChunk, dPlaceholder);
-    } else if (type === 'uglyHouse') {
-      task = () => generateUglyHouse(centerX, centerY, centerZ, fakeChunk, dPlaceholder);
-    } else if (type === 'desertVillage') {
-      task = () => generateDesertVillage(centerX, centerY, centerZ, fakeChunk, dPlaceholder);
-    } else if (type === 'desertPyramid') {
-      task = () => generateDesertPyramid(centerX, centerY, centerZ, fakeChunk, dPlaceholder);
-    }
-
+    const createTask = largeStaticTaskFactories[type];
+    if (!createTask) return;
+    const task = createTask(centerX, centerY, centerZ);
     if (!task) return;
     task.centerX = centerX;
     task.centerY = centerY;

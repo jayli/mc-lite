@@ -64,8 +64,8 @@ export class Engine {
       [VISUAL_STYLE_KEYS.OVERCAST]: {
         // 阴天参数参考最初版本 components/main.js
         fogColor: 0x87CEEB,
-        fogNear: 20,
-        fogFar: 90,
+        fogNear: 23,
+        fogFar: 55,
         directionalLightColor: 0xffffff,
         directionalLightIntensity: 1.2,
         ambientLightColor: 0xffffff,
