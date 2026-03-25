@@ -1,0 +1,8006 @@
+{
+  "blocks": [
+    {
+      "x": -8,
+      "y": 1,
+      "z": 7,
+      "type": "grass",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 2,
+      "z": 7,
+      "type": "allium",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 2,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 3,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 4,
+      "z": -6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 5,
+      "z": -6,
+      "type": "handrail",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 2,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 3,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 4,
+      "z": -5,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 5,
+      "z": -5,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 2,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 3,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 4,
+      "z": -4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 5,
+      "z": -4,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 2,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 3,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 4,
+      "z": -3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 5,
+      "z": -3,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 2,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 3,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 4,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 5,
+      "z": -2,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 2,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 3,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 4,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 5,
+      "z": -1,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 4,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 5,
+      "z": 0,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 4,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 5,
+      "z": 1,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 4,
+      "z": 2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 5,
+      "z": 2,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 4,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 5,
+      "z": 3,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 4,
+      "z": 4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 5,
+      "z": 4,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 2,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 4,
+      "z": 5,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 5,
+      "z": 5,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 2,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 3,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 4,
+      "z": 6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 5,
+      "z": 6,
+      "type": "handrail",
+      "direction": 1
+    },
+    {
+      "x": -7,
+      "y": 1,
+      "z": 7,
+      "type": "grass",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 2,
+      "z": 7,
+      "type": "oxeye_daisy",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 4,
+      "z": -6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": -6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 9,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 9,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 10,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 9,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 10,
+      "z": -3,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 11,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 9,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 10,
+      "z": -2,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 11,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 12,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 9,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 10,
+      "z": -1,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 11,
+      "z": -1,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 12,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 13,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 9,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 10,
+      "z": 0,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 11,
+      "z": 0,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 12,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 13,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 9,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 10,
+      "z": 1,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 11,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 12,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 9,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 10,
+      "z": 2,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 11,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 9,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 10,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 9,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 3,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 4,
+      "z": 6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 5,
+      "z": 6,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": -6,
+      "y": 1,
+      "z": 7,
+      "type": "grass",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 2,
+      "z": 7,
+      "type": "allium",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": -6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": -6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 9,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": -4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": -4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": -4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 7,
+      "z": -4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": -4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 9,
+      "z": -4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 10,
+      "z": -4,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": -3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 7,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 11,
+      "z": -3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": -2,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 7,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 12,
+      "z": -2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 7,
+      "z": -1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": -1,
+      "type": "flower",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 13,
+      "z": -1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": 0,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 7,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": 0,
+      "type": "flower",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 13,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 14,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": 1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 7,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 12,
+      "z": 1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": 2,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": 2,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 7,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 11,
+      "z": 2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 6,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 7,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 8,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 9,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 10,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 9,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 3,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 4,
+      "z": 6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 5,
+      "z": 6,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 7,
+      "type": "grass",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 2,
+      "z": 7,
+      "type": "oxeye_daisy",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 4,
+      "z": -6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": -6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 4,
+      "z": -4,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 6,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 7,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 8,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 10,
+      "z": -4,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 11,
+      "z": -4,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 11,
+      "z": -3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 12,
+      "z": -2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": -1,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 6,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 13,
+      "z": -1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 14,
+      "z": -1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 15,
+      "z": -1,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 13,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 14,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 12,
+      "z": 1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 11,
+      "z": 2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 4,
+      "z": 3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 6,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 7,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 8,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 10,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 3,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 4,
+      "z": 6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 5,
+      "z": 6,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": -3,
+      "y": 3,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": -6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": -6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 3,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 9,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": -4,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 6,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 7,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": -4,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": -4,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 12,
+      "z": -4,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": -3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 12,
+      "z": -2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": -1,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 6,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 13,
+      "z": -1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 14,
+      "z": -1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 13,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 14,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 12,
+      "z": 1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": 2,
+      "type": "stone_diorite_step",
+      "direction": 2
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": 2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": 3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 6,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 7,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 9,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 3,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": 6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": 6,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": -6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": -6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": -4,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 6,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 7,
+      "z": -4,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": -4,
+      "type": "oxeye_daisy",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 10,
+      "z": -4,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 11,
+      "z": -3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 12,
+      "z": -3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 12,
+      "z": -2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": -1,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 6,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 13,
+      "z": -1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": -1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 15,
+      "z": -1,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 0,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 6,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 13,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 1,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 6,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 12,
+      "z": 1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 2,
+      "type": "stone_diorite_step",
+      "direction": 2
+    },
+    {
+      "x": -2,
+      "y": 11,
+      "z": 2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": 3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 6,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 7,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 8,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 10,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": 6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 5,
+      "z": 6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 7,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 7,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 7,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 4,
+      "z": 7,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 8,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 8,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 8,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": -6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": -6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": -4,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 6,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 7,
+      "z": -4,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 10,
+      "z": -4,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": -3,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 11,
+      "z": -3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": -2,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 12,
+      "z": -2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 13,
+      "z": -2,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": -2,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": -1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 13,
+      "z": -1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": -1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": 0,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 13,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": 1,
+      "type": "iron",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 12,
+      "z": 1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 11,
+      "z": 2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 10,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": 4,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": 5,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 6,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 7,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 8,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": -6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": -6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": -4,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 7,
+      "z": -4,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "z": -4,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "z": -3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": -2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 13,
+      "z": -1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 13,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": 1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "z": 2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 4,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 5,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 6,
+      "type": "chest",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 6,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 7,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 8,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": -6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": -6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": -4,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 7,
+      "z": -4,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": -4,
+      "type": "oxeye_daisy",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": -4,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": -3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": -2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": -1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": 1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": 2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 7,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 4,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 5,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 6,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 7,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 8,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": -6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": -6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": -4,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 7,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": -4,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "z": -3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": -2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": -1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 14,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": 1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "z": 2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": 3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 7,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": 6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 7,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 7,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 7,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 4,
+      "z": 7,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 8,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 8,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 8,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": -6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": -6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": -4,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 7,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": -4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": -4,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "z": -3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 12,
+      "z": -2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 13,
+      "z": -1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 13,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 14,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 12,
+      "z": 1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "z": 2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": 3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 7,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 4,
+      "z": 6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 5,
+      "z": 6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 7,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "z": -6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": -6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 9,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "z": -4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": -4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 6,
+      "z": -4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 7,
+      "z": -4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": -4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 9,
+      "z": -4,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 10,
+      "z": -4,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "z": -3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 6,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 7,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 11,
+      "z": -3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "z": -2,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 12,
+      "z": -2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 13,
+      "z": -1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 13,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 14,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 12,
+      "z": 1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 6,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 7,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 11,
+      "z": 2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 6,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 7,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 9,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 10,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 9,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 3,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 4,
+      "z": 6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 5,
+      "z": 6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 4,
+      "z": -6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": -6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 9,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 9,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 10,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 8,
+      "z": -3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 9,
+      "z": -3,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 11,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 4,
+      "z": -2,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 9,
+      "z": -2,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 10,
+      "z": -2,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 11,
+      "z": -2,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 12,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 4,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 6,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 7,
+      "z": -1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 9,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 10,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 12,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 13,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 9,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 10,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 12,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 13,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 9,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 10,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 11,
+      "z": 1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 12,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 9,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 10,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 11,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 4,
+      "z": 3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": 3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 9,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 10,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 6,
+      "z": 4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 7,
+      "z": 4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 8,
+      "z": 4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 9,
+      "z": 4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 10,
+      "z": 4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 3,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 4,
+      "z": 6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 5,
+      "z": 6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 7,
+      "type": "grass",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 8,
+      "type": "grass",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 8,
+      "type": "azure_bluet",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 9,
+      "type": "grass",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 2,
+      "z": 9,
+      "type": "short_grass",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 4,
+      "z": -6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": -6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 10,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 10,
+      "z": -2,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 4,
+      "z": -1,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 6,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 7,
+      "z": -1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 10,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 10,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 10,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 4,
+      "z": 3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": 3,
+      "type": "bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 9,
+      "z": 3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 10,
+      "z": 3,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 6,
+      "z": 4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 7,
+      "z": 4,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 8,
+      "z": 4,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 10,
+      "z": 4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 1,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 2,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 3,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 4,
+      "z": 6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 5,
+      "z": 6,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": -6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "z": -6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": -6,
+      "type": "handrail",
+      "direction": 3
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": -5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "z": -5,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": -5,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": -4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "z": -4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": -4,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": -3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "z": -3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": -3,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": 7,
+      "y": 10,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": -2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": -2,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": 7,
+      "y": 10,
+      "z": -2,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": -1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 6,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 7,
+      "z": -1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 10,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": 0,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": 1,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 10,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": 2,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "z": 2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 9,
+      "z": 2,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 10,
+      "z": 2,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": 3,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 10,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": 4,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "z": 4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 4,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": 7,
+      "y": 6,
+      "z": 4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 7,
+      "z": 4,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 8,
+      "z": 4,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 10,
+      "z": 4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": 5,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "z": 5,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 5,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": 7,
+      "y": 1,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 2,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 3,
+      "z": 6,
+      "type": "stone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 4,
+      "z": 6,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 5,
+      "z": 6,
+      "type": "handrail",
+      "direction": 2
+    },
+    {
+      "x": 8,
+      "y": 10,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 10,
+      "z": -2,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 6,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 7,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 8,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 9,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 10,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 6,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 7,
+      "z": 0,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 10,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 6,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 7,
+      "z": 1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 9,
+      "z": 1,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 10,
+      "z": 1,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 6,
+      "z": 2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 7,
+      "z": 2,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 10,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 6,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 7,
+      "z": 3,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 8,
+      "z": 3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 10,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 6,
+      "z": 4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 7,
+      "z": 4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 8,
+      "z": 4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 9,
+      "z": 4,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 10,
+      "z": 4,
+      "type": "oak_planks",
+      "direction": 0
+    }
+  ],
+  "metadata": {
+    "created": "2026-03-25T06:04:30.257Z",
+    "dimensions": {
+      "width": 17,
+      "height": 15,
+      "depth": 16
+    }
+  }
+}
