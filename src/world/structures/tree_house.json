@@ -1,0 +1,6228 @@
+{
+  "blocks": [
+    {
+      "x": -7,
+      "y": 20,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 16,
+      "z": 0,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 17,
+      "z": 0,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 18,
+      "z": 0,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 19,
+      "z": 0,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 20,
+      "z": 0,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 21,
+      "z": 0,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 22,
+      "z": 0,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 20,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 20,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 19,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 20,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 21,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 19,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 20,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 21,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 19,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 20,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 21,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 20,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 15,
+      "z": 3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 16,
+      "z": 3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 17,
+      "z": 3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 18,
+      "z": 3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 19,
+      "z": 3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 20,
+      "z": 3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -6,
+      "y": 21,
+      "z": 3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 20,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 19,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 20,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 21,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 19,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 20,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 21,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 22,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 0,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 19,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 20,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 21,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 22,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 1,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -5,
+      "y": 19,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 20,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 21,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 22,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 19,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 20,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 21,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 20,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 20,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 19,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 20,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 21,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 19,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 20,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 21,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 22,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 19,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 20,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 21,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 22,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 19,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 20,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 21,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 22,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 17,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 18,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 19,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 20,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 21,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 22,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 2,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -4,
+      "y": 19,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 20,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 21,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 22,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 19,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 20,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 21,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 20,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 14,
+      "z": 6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 15,
+      "z": 6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 16,
+      "z": 6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 17,
+      "z": 6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 18,
+      "z": 6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 19,
+      "z": 6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 20,
+      "z": 6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 21,
+      "z": 6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 22,
+      "z": 6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 15,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 16,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 17,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 18,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 19,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 20,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 21,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 20,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 19,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 20,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 21,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 18,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 19,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 20,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 21,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 22,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 18,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 19,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 20,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 21,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 22,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 18,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 19,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 20,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 21,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 22,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 18,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 19,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 20,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 21,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 22,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 18,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 19,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 20,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 21,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 22,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 18,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 19,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 20,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 21,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 22,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 3,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -3,
+      "y": 18,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 19,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 20,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 21,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 22,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 18,
+      "z": 4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 19,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 20,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 21,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 20,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 20,
+      "z": -6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 19,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 20,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 21,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 19,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 20,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 21,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 22,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 18,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 19,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 20,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 21,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 22,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": -2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 15,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 16,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 17,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 18,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 19,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 20,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 21,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 22,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": -1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 15,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 16,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 17,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 18,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 19,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 20,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 21,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 22,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": 0,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 15,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 16,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 17,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 18,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 19,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 20,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 21,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 22,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": 1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 15,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 16,
+      "z": 1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 17,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 18,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 19,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 20,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 21,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 22,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": 2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 15,
+      "z": 2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 16,
+      "z": 2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 17,
+      "z": 2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 18,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 19,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 20,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 21,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 22,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 3,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 15,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 16,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 17,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 18,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 19,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 20,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 21,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 22,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 18,
+      "z": 4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 19,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 20,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 21,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 22,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 19,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 20,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 21,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 20,
+      "z": 6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 20,
+      "z": -7,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 19,
+      "z": -6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 20,
+      "z": -6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 21,
+      "z": -6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 19,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 20,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 21,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 22,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 19,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 20,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 21,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 22,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 18,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 19,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 20,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 21,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 22,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": -2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 15,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 16,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 17,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 18,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 19,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 20,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 21,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 22,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 12,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 13,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": -1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 18,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 19,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 20,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 21,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 0,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 4,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 5,
+      "z": 0,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 6,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 7,
+      "z": 0,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 8,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": 0,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 10,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 12,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": 0,
+      "type": "ochre_froglight",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 18,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 19,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 20,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 21,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": 1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 18,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 19,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 20,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 21,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": 2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 18,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 19,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 20,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 21,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 22,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 3,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 15,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 16,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 17,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 18,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 19,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 20,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 21,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 22,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 18,
+      "z": 4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 19,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 20,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 21,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 22,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 19,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 20,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 21,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 22,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 19,
+      "z": 6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 20,
+      "z": 6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 21,
+      "z": 6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 20,
+      "z": 7,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "z": -7,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 19,
+      "z": -6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "z": -6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 21,
+      "z": -6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 19,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 21,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 22,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 19,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 21,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 22,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 18,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 19,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 21,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 22,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 13,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "z": -2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 15,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 16,
+      "z": -2,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 17,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 18,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 19,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 21,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 22,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": -1,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 7,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": -1,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 18,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 19,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 21,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 7,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 13,
+      "z": 0,
+      "type": "ochre_froglight",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 18,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 19,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 21,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 5,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 6,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 7,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 13,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "z": 1,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 18,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 19,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 21,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "z": 2,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 18,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 19,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 21,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 22,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 4,
+      "z": 3,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 15,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 16,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 17,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 18,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 19,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 21,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 22,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 18,
+      "z": 4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 19,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 21,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 22,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 19,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 21,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 22,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 19,
+      "z": 6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "z": 6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 21,
+      "z": 6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 16,
+      "z": 7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 17,
+      "z": 7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 18,
+      "z": 7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 19,
+      "z": 7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 20,
+      "z": 7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 21,
+      "z": 7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 22,
+      "z": 7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 20,
+      "z": -7,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 19,
+      "z": -6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 20,
+      "z": -6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 21,
+      "z": -6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 19,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 20,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 21,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 22,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 19,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 20,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 21,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 22,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 18,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 19,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 20,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 21,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 22,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": -2,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "z": -2,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 15,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 16,
+      "z": -2,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 17,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 18,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 19,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 20,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 21,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 22,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 18,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 19,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 20,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 21,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 7,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 18,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 19,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 20,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 21,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 7,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": 1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 18,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 19,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 20,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 21,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 18,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 19,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 20,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 21,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 22,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 3,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 15,
+      "z": 3,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 16,
+      "z": 3,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 17,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 18,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 19,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 20,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 21,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 22,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 18,
+      "z": 4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 19,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 20,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 21,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 22,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 19,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 20,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 21,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 22,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 19,
+      "z": 6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 20,
+      "z": 6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 21,
+      "z": 6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 20,
+      "z": 7,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 20,
+      "z": -6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 19,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 20,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 21,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 19,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 20,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 21,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 22,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 18,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 19,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 20,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 21,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 22,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": -2,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": 2,
+      "y": 15,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 16,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 17,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 18,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 19,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 20,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 21,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 22,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 18,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 19,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 20,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 21,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 22,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 18,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 19,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 20,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 21,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 22,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": 1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 18,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 19,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 20,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 21,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 22,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 18,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 19,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 20,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 21,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 22,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 5,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 6,
+      "z": 3,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": 2,
+      "y": 14,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 15,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 16,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 17,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 18,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 19,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 20,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 21,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 22,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 18,
+      "z": 4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 19,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 20,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 21,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 22,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 17,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 18,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 19,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 20,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 21,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 20,
+      "z": 6,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 14,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 15,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 16,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 17,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 18,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 19,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 20,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 21,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 22,
+      "z": -7,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 20,
+      "z": -5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 19,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 20,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 21,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 18,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 19,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 20,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 21,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 22,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 12,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 13,
+      "z": -2,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": 3,
+      "y": 15,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 16,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 17,
+      "z": -2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 18,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 19,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 20,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 21,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 22,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": -1,
+      "type": "handrail",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "z": -1,
+      "type": "planks_step",
+      "direction": 3
+    },
+    {
+      "x": 3,
+      "y": 15,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 16,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 17,
+      "z": -1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 18,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 19,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 20,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 21,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 22,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": 0,
+      "type": "planks_step",
+      "direction": 3
+    },
+    {
+      "x": 3,
+      "y": 15,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 16,
+      "z": 0,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 17,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 18,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 19,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 20,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 21,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 22,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "z": 1,
+      "type": "planks_step",
+      "direction": 3
+    },
+    {
+      "x": 3,
+      "y": 15,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 16,
+      "z": 1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 17,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 18,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 19,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 20,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 21,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 22,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 7,
+      "z": 2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 15,
+      "z": 2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 16,
+      "z": 2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 17,
+      "z": 2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 18,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 19,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 20,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 21,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 22,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 6,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 7,
+      "z": 3,
+      "type": "planks_step",
+      "direction": 2
+    },
+    {
+      "x": 3,
+      "y": 14,
+      "z": 3,
+      "type": "dark_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 15,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 16,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 17,
+      "z": 3,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 18,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 19,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 20,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 21,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 22,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 18,
+      "z": 4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 19,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 20,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 21,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 20,
+      "z": 5,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 15,
+      "z": -6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 16,
+      "z": -6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 17,
+      "z": -6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 18,
+      "z": -6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 19,
+      "z": -6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 20,
+      "z": -6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 21,
+      "z": -6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 22,
+      "z": -6,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 20,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 18,
+      "z": -3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 19,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 20,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 21,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 12,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 13,
+      "z": -2,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": 4,
+      "y": 18,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 19,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 20,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 21,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 22,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 9,
+      "z": -1,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": 4,
+      "y": 12,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 18,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 19,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 20,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 21,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 22,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 0,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 12,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 15,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 16,
+      "z": 0,
+      "type": "handrail",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 18,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 19,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 20,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 21,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 22,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 1,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 12,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 13,
+      "z": 1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 15,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 16,
+      "z": 1,
+      "type": "handrail",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 18,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 19,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 20,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 21,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 22,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 6,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 7,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 15,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 16,
+      "z": 2,
+      "type": "handrail",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 18,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 19,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 20,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 21,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 22,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 7,
+      "z": 3,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 18,
+      "z": 3,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 19,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 20,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 21,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 18,
+      "z": 4,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 20,
+      "z": 4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 20,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 12,
+      "z": -2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 13,
+      "z": -2,
+      "type": "handrail",
+      "direction": 3
+    },
+    {
+      "x": 5,
+      "y": 19,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 20,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 21,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 8,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 9,
+      "z": -1,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": 5,
+      "y": 12,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 13,
+      "z": -1,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": 5,
+      "y": 17,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 18,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 19,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 20,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 21,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 22,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 8,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 12,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 13,
+      "z": 0,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": 5,
+      "y": 15,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 16,
+      "z": 0,
+      "type": "handrail",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 19,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 20,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 21,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 22,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 8,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 12,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 13,
+      "z": 1,
+      "type": "handrail",
+      "direction": 2
+    },
+    {
+      "x": 5,
+      "y": 15,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 19,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 20,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 21,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 22,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 8,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 15,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 16,
+      "z": 2,
+      "type": "handrail",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 19,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 20,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 21,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 7,
+      "z": 3,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 20,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 14,
+      "z": -3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 15,
+      "z": -3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 16,
+      "z": -3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 17,
+      "z": -3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 18,
+      "z": -3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 19,
+      "z": -3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 20,
+      "z": -3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 21,
+      "z": -3,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 20,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 8,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 9,
+      "z": -1,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": 6,
+      "y": 19,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 20,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 21,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 8,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 15,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 16,
+      "z": 0,
+      "type": "handrail",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 19,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 20,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 21,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 8,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 15,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 19,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 20,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 21,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 8,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 15,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 16,
+      "z": 2,
+      "type": "handrail",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 20,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 6,
+      "y": 7,
+      "z": 3,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 8,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 9,
+      "z": -1,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": 7,
+      "y": 20,
+      "z": -1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 8,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 15,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 16,
+      "z": 0,
+      "type": "handrail",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 20,
+      "z": 0,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 8,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 15,
+      "z": 1,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 16,
+      "z": 1,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 17,
+      "z": 1,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 18,
+      "z": 1,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 19,
+      "z": 1,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 20,
+      "z": 1,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 21,
+      "z": 1,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 22,
+      "z": 1,
+      "type": "vine",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 8,
+      "z": 2,
+      "type": "wood",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 9,
+      "z": 2,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 10,
+      "z": 2,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 11,
+      "z": 2,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 12,
+      "z": 2,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 13,
+      "z": 2,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 14,
+      "z": 2,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 15,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 16,
+      "z": 2,
+      "type": "handrail",
+      "direction": 0
+    },
+    {
+      "x": 7,
+      "y": 7,
+      "z": 3,
+      "type": "planks",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 1,
+      "z": -1,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 2,
+      "z": -1,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 3,
+      "z": -1,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 4,
+      "z": -1,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": -1,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 6,
+      "z": -1,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 7,
+      "z": -1,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 8,
+      "z": -1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 9,
+      "z": -1,
+      "type": "handrail",
+      "direction": 3
+    },
+    {
+      "x": 8,
+      "y": 8,
+      "z": 0,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 9,
+      "z": 0,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": 8,
+      "y": 8,
+      "z": 1,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 9,
+      "z": 1,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": 8,
+      "y": 1,
+      "z": 2,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 2,
+      "z": 2,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 3,
+      "z": 2,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 4,
+      "z": 2,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 5,
+      "z": 2,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 6,
+      "z": 2,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 7,
+      "z": 2,
+      "type": "vertical_pillar",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 8,
+      "z": 2,
+      "type": "oak_planks",
+      "direction": 0
+    },
+    {
+      "x": 8,
+      "y": 9,
+      "z": 2,
+      "type": "azalea_leaves",
+      "direction": 0
+    }
+  ],
+  "metadata": {
+    "created": "2026-03-25T08:32:22.470Z",
+    "dimensions": {
+      "width": 16,
+      "height": 22,
+      "depth": 15
+    }
+  }
+}
