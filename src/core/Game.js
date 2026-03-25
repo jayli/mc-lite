@@ -218,6 +218,7 @@ export class Game {
     this.player.inventory.add('ochre_froglight', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('oxidized_cut_copper', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('weathered_cut_copper', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('water', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('lava', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('block_of_quartz', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('quartz_bricks', DEFAULT_INVENTORY_COUNT);
