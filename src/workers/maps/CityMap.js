@@ -218,8 +218,47 @@ function isPlacementValid(candidate, existing, seed, bounds = null, requireTrans
   return true;
 }
 
-function scorePlacement(candidate, existing) {
+function scorePlacement(candidate, existing, targetSpacing = 20) {
   if (existing.length === 0) return 1e6;
+
+  // 计算8个方向上的最近建筑距离
+  const sectorAngle = Math.PI / 4; // 45度一个扇区
+
+  const dirDistances = [];
+
+  for (let i = 0; i < 8; i++) {
+    const angleStart = i * sectorAngle - sectorAngle / 2;
+    const angleEnd = i * sectorAngle + sectorAngle / 2;
+
+    let minDistInSector = Infinity;
+    for (const p of existing) {
+      const dx = p.x - candidate.x;
+      const dz = p.z - candidate.z;
+      const angle = Math.atan2(dz, dx);
+
+      // 检查是否在该扇区内
+      let normalizedAngle = angle;
+      while (normalizedAngle < angleStart) normalizedAngle += Math.PI * 2;
+      while (normalizedAngle > angleStart + Math.PI * 2) normalizedAngle -= Math.PI * 2;
+
+      if (normalizedAngle >= angleStart && normalizedAngle <= angleEnd) {
+        const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist < minDistInSector) minDistInSector = dist;
+      }
+    }
+    dirDistances.push(minDistInSector === Infinity ? targetSpacing * 3 : minDistInSector);
+  }
+
+  // 计算方向距离的统计值
+  const avgDist = dirDistances.reduce((a, b) => a + b, 0) / dirDistances.length;
+  const maxDist = Math.max(...dirDistances);
+
+  // 计算标准差（衡量方向均衡性）
+  const variance = dirDistances.reduce((sum, d) => sum + (d - avgDist) ** 2, 0) / dirDistances.length;
+  const stdDev = Math.sqrt(variance);
+
+  // 综合评分：
+  // 1. 基础分：距离最近建筑的远近（避免太近）
   let minCenterDistSq = Infinity;
   for (const p of existing) {
     const dx = candidate.x - p.x;
@@ -227,8 +266,22 @@ function scorePlacement(candidate, existing) {
     const distSq = dx * dx + dz * dz;
     if (distSq < minCenterDistSq) minCenterDistSq = distSq;
   }
+
+  // 2. 均衡性奖励：标准差越小越好（各方向距离均匀）
+  // 使用变异系数 (CV = stdDev / avg) 来归一化
+  const cv = avgDist > 0 ? stdDev / avgDist : 0;
+  const balanceBonus = (1 - Math.min(cv, 1)) * targetSpacing * targetSpacing * 2;
+
+  // 3. 填补空缺奖励：如果这个位置能填补某个方向的远距离空缺，给予奖励
+  // 当最大方向距离远大于平均距离时，说明这个位置可以填补空缺
+  const gapFillBonus = maxDist > targetSpacing * 1.5 ? (maxDist - targetSpacing) * 10 : 0;
+
+  // 4. 中心距离惩罚：避免离中心太远（轻微）
   const centerDistSq = candidate.localX * candidate.localX + candidate.localZ * candidate.localZ;
-  return minCenterDistSq - centerDistSq * 0.08;
+  const centerPenalty = centerDistSq * 0.02;
+
+  // 最终评分：基础距离分 + 均衡奖励 + 填补奖励 - 中心惩罚
+  return minCenterDistSq + balanceBonus + gapFillBonus - centerPenalty;
 }
 
 function buildCandidates(cityCx, cityCz, minR, maxR, seed, salt) {
@@ -262,10 +315,13 @@ function placeType(state, type, count, seed, minR, maxR, bounds = null) {
     let best = null;
     let bestScore = -Infinity;
 
+    // 目标间距用于方向均衡性计算
+    const targetSpacing = Math.max(15, (minR + maxR) / 8);
+
     for (const c of candidates) {
       const candidate = { ...c, type, index };
       if (!isPlacementValid(candidate, state.placements, seed, bounds, true)) continue;
-      const score = scorePlacement(candidate, state.placements);
+      const score = scorePlacement(candidate, state.placements, targetSpacing);
       if (score > bestScore) {
         bestScore = score;
         best = candidate;
