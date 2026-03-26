@@ -736,13 +736,15 @@ function buildCityLayout(seed, terrainGen) {
   }
 
   // ========== 第二步：根据实际建筑位置计算 City 边界 ==========
-  // 计算所有建筑的 footprint 边界
+  // 计算所有建筑（不包括gate）的 footprint 边界
   let buildMinX = cityCx;
   let buildMaxX = cityCx;
   let buildMinZ = cityCz;
   let buildMaxZ = cityCz;
 
   for (const p of state.placements) {
+    // 排除 gate，因为 gate 应该位于过渡带边缘
+    if (p.type === 'gate') continue;
     const fp = CITY_STRUCTURE_FOOTPRINT[p.type];
     if (!fp) continue;
     buildMinX = Math.min(buildMinX, p.x - fp.halfX);
@@ -751,21 +753,16 @@ function buildCityLayout(seed, terrainGen) {
     buildMaxZ = Math.max(buildMaxZ, p.z + fp.halfZ);
   }
 
-  // City 边界 = 建筑 footprint 边界 + 30格缓冲 + 32格过渡带
-  const buildHalfX = Math.max(
-    Math.abs(buildMaxX - cityCx),
-    Math.abs(cityCx - buildMinX)
-  );
-  const buildHalfZ = Math.max(
-    Math.abs(buildMaxZ - cityCz),
-    Math.abs(cityCz - buildMinZ)
-  );
-
-  // 计算所需半尺寸：建筑边界 + 30格缓冲到过渡带 + 32格过渡带
-  const requiredHalfX = buildHalfX + CITY_CORE_BUILD_MARGIN + CITY_TRANSITION_SIZE;
-  const requiredHalfZ = buildHalfZ + CITY_CORE_BUILD_MARGIN + CITY_TRANSITION_SIZE;
+  // City 边界 = 建筑 footprint 边界 + 30格缓冲（到过渡带内边界） + 32格过渡带
+  // 过渡带内边界距离最近建筑边界约30格
+  const requiredMinX = buildMinX - CITY_CORE_BUILD_MARGIN - CITY_TRANSITION_SIZE;
+  const requiredMaxX = buildMaxX + CITY_CORE_BUILD_MARGIN + CITY_TRANSITION_SIZE;
+  const requiredMinZ = buildMinZ - CITY_CORE_BUILD_MARGIN - CITY_TRANSITION_SIZE;
+  const requiredMaxZ = buildMaxZ + CITY_CORE_BUILD_MARGIN + CITY_TRANSITION_SIZE;
 
   // 取最大值确保正方形，同时满足最小/最大尺寸约束
+  const requiredHalfX = Math.max(Math.abs(requiredMaxX - cityCx), Math.abs(cityCx - requiredMinX));
+  const requiredHalfZ = Math.max(Math.abs(requiredMaxZ - cityCz), Math.abs(cityCz - requiredMinZ));
   const requiredHalfSize = Math.max(requiredHalfX, requiredHalfZ);
   const minHalfSize = Math.floor(CITY_SIZE_MIN / 2);
   const cityMaxHalfSize = Math.floor(CITY_SIZE_MAX / 2);
