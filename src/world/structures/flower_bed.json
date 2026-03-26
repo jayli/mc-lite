@@ -1,0 +1,1363 @@
+{
+  "blocks": [
+    {
+      "x": -26,
+      "y": 19,
+      "z": -27,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -25,
+      "y": 19,
+      "z": -27,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -25,
+      "y": 19,
+      "z": -26,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -25,
+      "y": 19,
+      "z": -25,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -24,
+      "y": 19,
+      "z": -27,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -24,
+      "y": 19,
+      "z": -26,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -24,
+      "y": 19,
+      "z": -25,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -24,
+      "y": 19,
+      "z": -24,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -23,
+      "y": 19,
+      "z": -27,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -23,
+      "y": 19,
+      "z": -25,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -23,
+      "y": 19,
+      "z": -24,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -22,
+      "y": 19,
+      "z": -27,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -22,
+      "y": 19,
+      "z": -26,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -21,
+      "y": 19,
+      "z": -27,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -21,
+      "y": 19,
+      "z": -26,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -16,
+      "y": 19,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -16,
+      "y": 19,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 19,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 19,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 19,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 19,
+      "z": -26,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 19,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 19,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 19,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 19,
+      "z": -27,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 19,
+      "z": -26,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 19,
+      "z": -25,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 19,
+      "z": -24,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 19,
+      "z": -23,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 19,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 19,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 19,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 19,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 19,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 19,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 19,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 19,
+      "z": -27,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 19,
+      "z": -26,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 19,
+      "z": -25,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 19,
+      "z": -24,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 19,
+      "z": -23,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 19,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 19,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 19,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 19,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 19,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 19,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 19,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -12,
+      "y": 19,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 19,
+      "z": -27,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 19,
+      "z": -26,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 19,
+      "z": -25,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 19,
+      "z": -24,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 19,
+      "z": -23,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 19,
+      "z": -22,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 19,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 19,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 19,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 19,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 19,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -11,
+      "y": 19,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 19,
+      "z": -27,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 19,
+      "z": -26,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 19,
+      "z": -25,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 19,
+      "z": -24,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 19,
+      "z": -23,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 19,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 19,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 19,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -10,
+      "y": 19,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 19,
+      "z": -26,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 19,
+      "z": -25,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 19,
+      "z": -23,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 19,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 19,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 19,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -9,
+      "y": 19,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 19,
+      "z": -26,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 19,
+      "z": -25,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 19,
+      "z": -24,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -8,
+      "y": 19,
+      "z": -23,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -7,
+      "y": 19,
+      "z": -24,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -1,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 0,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 1,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 0,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": 0,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": 1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 2,
+      "type": "grass",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": -1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 0,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 0,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 2,
+      "type": "grass",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 2,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -1,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 0,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 0,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 0,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 2,
+      "type": "grass",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 2,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 0,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 0,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 0,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 2,
+      "type": "grass",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 2,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 0,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 0,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 0,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 2,
+      "type": "grass",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 2,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": -1,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 0,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 0,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "z": 1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 2,
+      "type": "grass",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 2,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": -1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": -1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 0,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 0,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 0,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 3,
+      "z": 1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 2,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 2,
+      "z": 2,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": -1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 0,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 0,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 1,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 2,
+      "z": 1,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 2,
+      "type": "moss",
+      "direction": 0
+    },
+    {
+      "x": 4,
+      "y": 1,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": -1,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 0,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 1,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 5,
+      "y": 1,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 19,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 19,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 19,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 19,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 19,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 19,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 19,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 19,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 19,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 19,
+      "z": -17,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 19,
+      "z": -16,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 19,
+      "z": -15,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 19,
+      "z": -14,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 19,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    }
+  ],
+  "metadata": {
+    "created": "2026-03-26T07:00:32.263Z",
+    "dimensions": {
+      "width": 53,
+      "height": 19,
+      "depth": 31
+    }
+  }
+}

@@ -20,15 +20,31 @@ import {
   CITY_SIZE_MAX
 } from '../../constants/RegionMapConfig.js';
 
+// 延迟导入以避免循环依赖
+let PyramidModule = null;
+let FrozenMountainModule = null;
+
+function getPyramidModule() {
+  if (!PyramidModule) {
+    PyramidModule = import('./Pyramid.js').then(m => m.Pyramid || m);
+  }
+  return PyramidModule;
+}
+
+function getFrozenMountainModule() {
+  if (!FrozenMountainModule) {
+    FrozenMountainModule = import('./FrozenMountain.js').then(m => m.FrozenMountain || m);
+  }
+  return FrozenMountainModule;
+}
+
 const CITY_REGION_X = 0;
 const CITY_REGION_Z = 0;
 const CITY_GROUND_VARIANCE_MAX = 3;
 const CITY_TRANSITION_SIZE = 32;
 const CITY_TERRACE_WIDTH = 3;
-const CITY_AREA_SHRINK_SCALE = 0.82; // 面积约缩减 1/3（边长乘 sqrt(2/3)）
 const CITY_MIN_SURFACE_Y = ISLAND_SEA_LEVEL + 1;
-const CITY_INNER_SAFE_MARGIN = CITY_TRANSITION_SIZE + 8; // 建筑群与边缘的最小内侧缓冲
-const CITY_EDGE_BUFFER_MIN = CITY_TRANSITION_SIZE + 1; // 所有主建筑必须位于过渡带内侧
+const CITY_CORE_BUILD_MARGIN = 30; // 建筑群外 30 格即为过渡带内边缘
 
 // 结构占地半径（按 JSON 实测边界配置）
 const CITY_STRUCTURE_FOOTPRINT = Object.freeze({
@@ -52,14 +68,14 @@ const CITY_STRUCTURE_CONFIGS = Object.freeze([
   { type: 'whiteTower', countRange: [2, 3] },
   { type: 'bigHouse', count: 2 },
   { type: 'boxHouse', count: 2 },
-  { type: 'desertVillage', countRange: [2, 3] },
+  { type: 'desertVillage', countRange: [3, 5] },
   { type: 'doubleTower', count: 1 },
   { type: 'pyramidIsland', count: 1 },
   { type: 'smallHouse', count: 2 },
   { type: 'tower', count: 1 },
-  { type: 'treeHouse', count: 2 },
-  { type: 'uglyHouse', count: 2 },
-  { type: 'woodHouse', count: 1 }
+  { type: 'treeHouse', count: 3 },
+  { type: 'uglyHouse', count: 3 },
+  { type: 'woodHouse', count: 4 }
 ]);
 
 const layoutCache = new Map();
@@ -152,9 +168,37 @@ function getGapRequirement(typeA, typeB, seed, indexA, indexB) {
   return gap;
 }
 
-function isPlacementValid(candidate, existing, seed) {
+function isPlacementValid(candidate, existing, seed, bounds = null, requireTransitionZone = true) {
   const fpA = CITY_STRUCTURE_FOOTPRINT[candidate.type];
   if (!fpA) return false;
+
+  // 边界检查：确保建筑占地完全在 City 边界内，且在过渡带内边界内
+  if (bounds) {
+    // 计算建筑 footprint 的边界
+    const buildMinX = candidate.x - fpA.halfX;
+    const buildMaxX = candidate.x + fpA.halfX;
+    const buildMinZ = candidate.z - fpA.halfZ;
+    const buildMaxZ = candidate.z + fpA.halfZ;
+
+    // 检查是否完全在 City 边界内
+    if (buildMinX < bounds.minX || buildMaxX > bounds.maxX ||
+        buildMinZ < bounds.minZ || buildMaxZ > bounds.maxZ) {
+      return false;
+    }
+
+    // 检查是否在过渡带内边界内（距离边界至少32格）
+    if (requireTransitionZone) {
+      const innerMinX = bounds.minX + CITY_TRANSITION_SIZE;
+      const innerMaxX = bounds.maxX - CITY_TRANSITION_SIZE;
+      const innerMinZ = bounds.minZ + CITY_TRANSITION_SIZE;
+      const innerMaxZ = bounds.maxZ - CITY_TRANSITION_SIZE;
+
+      if (buildMinX < innerMinX || buildMaxX > innerMaxX ||
+          buildMinZ < innerMinZ || buildMaxZ > innerMaxZ) {
+        return false;
+      }
+    }
+  }
 
   for (let i = 0; i < existing.length; i++) {
     const p = existing[i];
@@ -208,7 +252,8 @@ function buildCandidates(cityCx, cityCz, minR, maxR, seed, salt) {
   return candidates;
 }
 
-function placeType(state, type, count, seed, minR, maxR) {
+function placeType(state, type, count, seed, minR, maxR, bounds = null) {
+  let placed = 0;
   for (let k = 0; k < count; k++) {
     const index = state.placements.length;
     const salt = index + k * 17 + type.length * 13;
@@ -218,7 +263,7 @@ function placeType(state, type, count, seed, minR, maxR) {
 
     for (const c of candidates) {
       const candidate = { ...c, type, index };
-      if (!isPlacementValid(candidate, state.placements, seed)) continue;
+      if (!isPlacementValid(candidate, state.placements, seed, bounds, true)) continue;
       const score = scorePlacement(candidate, state.placements);
       if (score > bestScore) {
         bestScore = score;
@@ -227,125 +272,220 @@ function placeType(state, type, count, seed, minR, maxR) {
     }
 
     if (!best) {
-      // 二次扩圈，避免布局失败
+      // 二次扩圈，使用放宽的边界检查
       const fallbackCandidates = buildCandidates(state.cityCx, state.cityCz, maxR + 6, maxR + 28, seed, salt + 29);
       for (const c of fallbackCandidates) {
         const candidate = { ...c, type, index };
-        if (!isPlacementValid(candidate, state.placements, seed)) continue;
+        if (!isPlacementValid(candidate, state.placements, seed, bounds, false)) continue;
         best = candidate;
         break;
       }
     }
 
     if (!best) {
-      // 三次兜底：大范围搜索，防止只剩中心城堡
+      // 三次兜底：大范围搜索
       const emergencyCandidates = buildCandidates(state.cityCx, state.cityCz, maxR + 18, maxR + 96, seed, salt + 53);
       for (const c of emergencyCandidates) {
         const candidate = { ...c, type, index };
-        if (!isPlacementValid(candidate, state.placements, seed)) continue;
+        if (!isPlacementValid(candidate, state.placements, seed, bounds, false)) continue;
         best = candidate;
         break;
       }
     }
 
     if (!best) {
-      // 四次兜底：继续扩圈，但仍使用统一间距规则（不放宽，不强塞）
+      // 四次兜底：继续扩圈
       const lastCandidates = buildCandidates(state.cityCx, state.cityCz, maxR + 96, maxR + 180, seed, salt + 71);
       for (const c of lastCandidates) {
         const candidate = { ...c, type, index };
-        if (!isPlacementValid(candidate, state.placements, seed)) continue;
+        if (!isPlacementValid(candidate, state.placements, seed, bounds, false)) continue;
         best = candidate;
         break;
       }
     }
 
     if (!best) {
-      // 最终兜底：极大范围严格搜索，确保配额不丢失
+      // 最终兜底：极大范围搜索，确保配额不丢失
       const hardCandidates = buildCandidates(state.cityCx, state.cityCz, maxR + 180, maxR + 420, seed, salt + 97);
       for (const c of hardCandidates) {
         const candidate = { ...c, type, index };
-        if (!isPlacementValid(candidate, state.placements, seed)) continue;
+        if (!isPlacementValid(candidate, state.placements, seed, bounds, false)) continue;
         best = candidate;
         break;
+      }
+    }
+
+    if (!best) {
+      // 强制放置：忽略边界检查，确保建筑一定生成
+      const forcedCandidates = buildCandidates(state.cityCx, state.cityCz, 10, 100, seed, salt + 137);
+      for (const c of forcedCandidates) {
+        const candidate = { ...c, type, index };
+        // 只检查与其他建筑的距离，忽略边界
+        let tooClose = false;
+        for (let i = 0; i < state.placements.length; i++) {
+          const p = state.placements[i];
+          const fpA = CITY_STRUCTURE_FOOTPRINT[candidate.type];
+          const fpB = CITY_STRUCTURE_FOOTPRINT[p.type];
+          if (!fpA || !fpB) continue;
+          const dx = Math.abs(candidate.x - p.x);
+          const dz = Math.abs(candidate.z - p.z);
+          const gap = getGapRequirement(candidate.type, p.type, seed, candidate.index, i);
+          if (dx <= fpA.halfX + fpB.halfX + gap && dz <= fpA.halfZ + fpB.halfZ + gap) {
+            tooClose = true;
+            break;
+          }
+        }
+        if (!tooClose) {
+          best = candidate;
+          break;
+        }
       }
     }
 
     if (!best) continue;
     state.placements.push(best);
+    placed++;
   }
+  return placed;
 }
 
-function computeBounds(placements, cityCx, cityCz) {
-  let minX = cityCx;
-  let maxX = cityCx;
-  let minZ = cityCz;
-  let maxZ = cityCz;
-
-  for (const p of placements) {
-    const fp = CITY_STRUCTURE_FOOTPRINT[p.type];
-    if (!fp) continue;
-    minX = Math.min(minX, p.x - fp.halfX);
-    maxX = Math.max(maxX, p.x + fp.halfX);
-    minZ = Math.min(minZ, p.z - fp.halfZ);
-    maxZ = Math.max(maxZ, p.z + fp.halfZ);
-  }
-
-  return { minX, maxX, minZ, maxZ };
-}
-
-function placeGates(state, seed, cityBounds) {
+function placeGates(state, _seed, cityBounds) {
   const gateCount = 2;
   const gates = [];
   const fp = CITY_STRUCTURE_FOOTPRINT.gate;
-  const gateInset = Math.max(2, Math.floor(CITY_TRANSITION_SIZE * 0.35));
-  const innerMinX = cityBounds.minX + gateInset + fp.halfX;
-  const innerMaxX = cityBounds.maxX - gateInset - fp.halfX;
-  const northZ = cityBounds.minZ + gateInset + fp.halfZ;
-  const southZ = cityBounds.maxZ - gateInset - fp.halfZ;
+
+  // gate 紧贴过渡带内边界：距离边界正好 32 格（过渡带宽度）
+  // gate footprint 必须完全在 City 边界内
+  const innerMinX = cityBounds.minX + CITY_TRANSITION_SIZE + fp.halfX;
+  const innerMaxX = cityBounds.maxX - CITY_TRANSITION_SIZE - fp.halfX;
+  const northZ = cityBounds.minZ + CITY_TRANSITION_SIZE + fp.halfZ;
+  const southZ = cityBounds.maxZ - CITY_TRANSITION_SIZE - fp.halfZ;
 
   const sideConfigs = [
-    { side: 'north', preferredZ: northZ, zStep: 1, zDir: 1 },
-    { side: 'south', preferredZ: southZ, zStep: 1, zDir: -1 }
+    { side: 'north', preferredZ: northZ, zDir: 1 },
+    { side: 'south', preferredZ: southZ, zDir: -1 }
   ];
 
   for (let i = 0; i < gateCount; i++) {
     const cfg = sideConfigs[i];
     let placed = null;
-    const zBand = Math.max(4, Math.floor(CITY_TRANSITION_SIZE * 0.6));
 
-    // 阶段1：优先在贴边内侧带搜索
-    for (let dz = 0; dz <= zBand; dz += cfg.zStep) {
-      const candidateZ = cfg.preferredZ + dz * cfg.zDir;
-      for (let scanX = innerMinX; scanX <= innerMaxX; scanX += 2) {
-        const candidate = {
-          type: 'gate',
-          x: scanX,
-          z: candidateZ,
-          localX: scanX - state.cityCx,
-          localZ: candidateZ - state.cityCz,
-          index: state.placements.length + i
-        };
-        if (!isPlacementValid(candidate, state.placements, seed)) continue;
-        placed = candidate;
-        break;
+    // 在紧贴过渡带内边界的位置搜索，允许稍微向内偏移（0-15格）以避免与其他建筑冲突
+    for (let offset = 0; offset <= 15; offset++) {
+      const candidateZ = cfg.preferredZ + offset * cfg.zDir;
+
+      // 检查 Z 是否在 City 边界内
+      if (candidateZ - fp.halfZ < cityBounds.minZ ||
+          candidateZ + fp.halfZ > cityBounds.maxZ) {
+        continue;
+      }
+
+      // X 方向扫描，优先中间位置
+      const centerX = state.cityCx;
+      // 扩大搜索范围
+      const xRange = Math.floor((innerMaxX - innerMinX) / 2);
+
+      for (let xOffset = 0; xOffset <= xRange; xOffset += 2) {
+        // 从中点向两侧扫描
+        const scanPositions = [];
+        if (xOffset === 0) {
+          scanPositions.push(centerX);
+        } else {
+          scanPositions.push(centerX + xOffset, centerX - xOffset);
+        }
+
+        for (const scanX of scanPositions) {
+          // 确保 scanX 在安全区域内
+          const safeScanX = Math.max(innerMinX, Math.min(innerMaxX, scanX));
+
+          // 检查 gate footprint 是否完全在边界内
+          if (safeScanX - fp.halfX < cityBounds.minX ||
+              safeScanX + fp.halfX > cityBounds.maxX ||
+              candidateZ - fp.halfZ < cityBounds.minZ ||
+              candidateZ + fp.halfZ > cityBounds.maxZ) {
+            continue;
+          }
+
+          const candidate = {
+            type: 'gate',
+            x: safeScanX,
+            z: candidateZ,
+            localX: safeScanX - state.cityCx,
+            localZ: candidateZ - state.cityCz,
+            index: state.placements.length + i
+          };
+
+          // 检查与其他建筑的距离（使用完整的间距检查）
+          let tooClose = false;
+          for (const p of state.placements) {
+            const pFp = CITY_STRUCTURE_FOOTPRINT[p.type];
+            if (!pFp) continue;
+            const dx = Math.abs(candidate.x - p.x);
+            const dz = Math.abs(candidate.z - p.z);
+            // 检查间距：需要满足 minGap 要求
+            const gap = Math.max(fp.minGap, pFp.minGap, 10);
+            const minDistanceX = fp.halfX + pFp.halfX + gap;
+            const minDistanceZ = fp.halfZ + pFp.halfZ + gap;
+            if (dx < minDistanceX && dz < minDistanceZ) {
+              tooClose = true;
+              break;
+            }
+          }
+          if (tooClose) continue;
+
+          placed = candidate;
+          break;
+        }
+        if (placed) break;
       }
       if (placed) break;
     }
 
-    // 阶段2：仍然找不到则扩大 x 扫描密度（保持当前侧）
+    // 如果还是找不到位置，扩大搜索范围再试一次
     if (!placed) {
-      for (let dz = 0; dz <= zBand + 10; dz += cfg.zStep) {
-        const candidateZ = cfg.preferredZ + dz * cfg.zDir;
-        for (let scanX = innerMinX; scanX <= innerMaxX; scanX += 1) {
+      for (let offset = 0; offset <= 25; offset++) {
+        const candidateZ = cfg.preferredZ + offset * cfg.zDir;
+
+        if (candidateZ - fp.halfZ < cityBounds.minZ ||
+            candidateZ + fp.halfZ > cityBounds.maxZ) {
+          continue;
+        }
+
+        // 在整个安全区域内随机尝试
+        for (let attempt = 0; attempt < 50; attempt++) {
+          const randomX = innerMinX + Math.floor(Math.random() * (innerMaxX - innerMinX));
+          const safeScanX = Math.max(innerMinX, Math.min(innerMaxX, randomX));
+
+          if (safeScanX - fp.halfX < cityBounds.minX ||
+              safeScanX + fp.halfX > cityBounds.maxX) {
+            continue;
+          }
+
           const candidate = {
             type: 'gate',
-            x: scanX,
+            x: safeScanX,
             z: candidateZ,
-            localX: scanX - state.cityCx,
+            localX: safeScanX - state.cityCx,
             localZ: candidateZ - state.cityCz,
             index: state.placements.length + i
           };
-          if (!isPlacementValid(candidate, state.placements, seed)) continue;
+
+          let tooClose = false;
+          for (const p of state.placements) {
+            const pFp = CITY_STRUCTURE_FOOTPRINT[p.type];
+            if (!pFp) continue;
+            const dx = Math.abs(candidate.x - p.x);
+            const dz = Math.abs(candidate.z - p.z);
+            const gap = Math.max(fp.minGap, pFp.minGap, 10);
+            const minDistanceX = fp.halfX + pFp.halfX + gap;
+            const minDistanceZ = fp.halfZ + pFp.halfZ + gap;
+            if (dx < minDistanceX && dz < minDistanceZ) {
+              tooClose = true;
+              break;
+            }
+          }
+          if (tooClose) continue;
+
           placed = candidate;
           break;
         }
@@ -379,6 +519,7 @@ function buildCityFillerTanks(layout, seed) {
   const tankHalfX = 20;
   const tankHalfZ = 20;
   const targetCount = 2;
+  // 确保坦克完全位于过渡带内：距离边界至少 32 + 20 + 2 = 54 格
   const minX = layout.minX + CITY_TRANSITION_SIZE + tankHalfX + 2;
   const maxX = layout.maxX - CITY_TRANSITION_SIZE - tankHalfX - 2;
   const minZ = layout.minZ + CITY_TRANSITION_SIZE + tankHalfZ + 2;
@@ -415,12 +556,23 @@ function buildCityLayout(seed, terrainGen) {
   const { cityCx, cityCz } = getCityCenter(seed);
   const baseHeight = estimateCityBaseHeight(cityCx, cityCz, seed, terrainGen);
 
+  // ========== 第一步：使用最大边界放置所有建筑，确保配额完整 ==========
   const state = {
     cityCx,
     cityCz,
     placements: []
   };
 
+  // 使用最大可能的边界进行初始布局
+  const globalMaxHalfSize = Math.floor(CITY_SIZE_MAX / 2);
+  const maxBounds = {
+    minX: cityCx - globalMaxHalfSize,
+    maxX: cityCx + globalMaxHalfSize,
+    minZ: cityCz - globalMaxHalfSize,
+    maxZ: cityCz + globalMaxHalfSize
+  };
+
+  // 放置中心城堡
   state.placements.push({
     type: 'castle',
     x: cityCx,
@@ -430,52 +582,164 @@ function buildCityLayout(seed, terrainGen) {
     index: 0
   });
 
+  // 放置其他建筑，使用最大边界，确保所有配额都能生成
   let salt = 1;
   for (const config of CITY_STRUCTURE_CONFIGS) {
     if (config.fixedCenter) continue;
     const count = getCountByConfig(config, seed, salt++);
     if (count <= 0) continue;
-    // 仍然偏向中心，但必须留出足够空间承载完整建筑配额
-    const minR = config.type === 'whiteTower' ? 18 : 12;
-    const maxR = config.type === 'whiteTower' ? 56 : 62;
-    placeType(state, config.type, count, seed, minR, maxR);
-  }
-  const preGateBounds = computeBounds(state.placements, cityCx, cityCz);
-  const width = preGateBounds.maxX - preGateBounds.minX + 1;
-  const depth = preGateBounds.maxZ - preGateBounds.minZ + 1;
-  const maxSize = Math.max(width, depth);
-  const targetSize = Math.floor((maxSize + 24) * CITY_AREA_SHRINK_SCALE);
-  const minRequiredBySafeMargin = maxSize + CITY_INNER_SAFE_MARGIN * 2;
 
-  let requiredHalfByEdgeBuffer = 0;
+    // 使用较大的搜索半径，确保能找到位置
+    const minR = config.type === 'whiteTower' ? 20 : 15;
+    const maxR = config.type === 'whiteTower' ? 120 : 150;
+
+    const placed = placeType(state, config.type, count, seed, minR, maxR, maxBounds);
+
+    // 如果放置数量不足，记录日志
+    if (placed < count) {
+      console.warn(`CityMap: ${config.type} 只放置了 ${placed}/${count} 个`);
+    }
+  }
+
+  // ========== 第二步：根据实际建筑位置计算 City 边界 ==========
+  // 计算所有建筑的 footprint 边界
+  let buildMinX = cityCx;
+  let buildMaxX = cityCx;
+  let buildMinZ = cityCz;
+  let buildMaxZ = cityCz;
+
   for (const p of state.placements) {
     const fp = CITY_STRUCTURE_FOOTPRINT[p.type];
     if (!fp) continue;
-    const reqHalfX = Math.abs(p.x - cityCx) + fp.halfX + CITY_EDGE_BUFFER_MIN;
-    const reqHalfZ = Math.abs(p.z - cityCz) + fp.halfZ + CITY_EDGE_BUFFER_MIN;
-    requiredHalfByEdgeBuffer = Math.max(requiredHalfByEdgeBuffer, reqHalfX, reqHalfZ);
+    buildMinX = Math.min(buildMinX, p.x - fp.halfX);
+    buildMaxX = Math.max(buildMaxX, p.x + fp.halfX);
+    buildMinZ = Math.min(buildMinZ, p.z - fp.halfZ);
+    buildMaxZ = Math.max(buildMaxZ, p.z + fp.halfZ);
   }
 
-  const baseHalf = Math.floor(Math.max(CITY_SIZE_MIN, Math.min(CITY_SIZE_MAX, Math.max(targetSize, minRequiredBySafeMargin))) / 2);
-  const halfSize = Math.max(baseHalf, Math.ceil(requiredHalfByEdgeBuffer));
+  // City 边界 = 建筑 footprint 边界 + 30格缓冲 + 32格过渡带
+  const buildHalfX = Math.max(
+    Math.abs(buildMaxX - cityCx),
+    Math.abs(cityCx - buildMinX)
+  );
+  const buildHalfZ = Math.max(
+    Math.abs(buildMaxZ - cityCz),
+    Math.abs(cityCz - buildMinZ)
+  );
 
-  const finalMinX = cityCx - halfSize;
-  const finalMaxX = cityCx + halfSize;
-  const finalMinZ = cityCz - halfSize;
-  const finalMaxZ = cityCz + halfSize;
-  placeGates(state, seed, {
+  // 计算所需半尺寸：建筑边界 + 30格缓冲到过渡带 + 32格过渡带
+  const requiredHalfX = buildHalfX + CITY_CORE_BUILD_MARGIN + CITY_TRANSITION_SIZE;
+  const requiredHalfZ = buildHalfZ + CITY_CORE_BUILD_MARGIN + CITY_TRANSITION_SIZE;
+
+  // 取最大值确保正方形，同时满足最小/最大尺寸约束
+  const requiredHalfSize = Math.max(requiredHalfX, requiredHalfZ);
+  const minHalfSize = Math.floor(CITY_SIZE_MIN / 2);
+  const cityMaxHalfSize = Math.floor(CITY_SIZE_MAX / 2);
+  let halfSize = Math.max(minHalfSize, Math.min(cityMaxHalfSize, requiredHalfSize));
+
+  let finalMinX = cityCx - halfSize;
+  let finalMaxX = cityCx + halfSize;
+  let finalMinZ = cityCz - halfSize;
+  let finalMaxZ = cityCz + halfSize;
+
+  // ========== 第三步：验证所有建筑都在过渡带内 ==========
+  // 计算安全区域（过渡带内部，距离边界32格）
+  const safeMinX = finalMinX + CITY_TRANSITION_SIZE;
+  const safeMaxX = finalMaxX - CITY_TRANSITION_SIZE;
+  const safeMinZ = finalMinZ + CITY_TRANSITION_SIZE;
+  const safeMaxZ = finalMaxZ - CITY_TRANSITION_SIZE;
+
+  // 检查是否有建筑 footprint 超出安全区域
+  let needExpand = false;
+  for (const p of state.placements) {
+    const fp = CITY_STRUCTURE_FOOTPRINT[p.type];
+    if (!fp) continue;
+
+    // 检查 footprint 是否完全在安全区域内
+    const pMinX = p.x - fp.halfX;
+    const pMaxX = p.x + fp.halfX;
+    const pMinZ = p.z - fp.halfZ;
+    const pMaxZ = p.z + fp.halfZ;
+
+    // 如果 footprint 超出安全区域，需要扩展边界
+    if (pMinX < safeMinX || pMaxX > safeMaxX ||
+        pMinZ < safeMinZ || pMaxZ > safeMaxZ) {
+      needExpand = true;
+      // 计算需要的额外空间
+      const expandLeft = Math.max(0, safeMinX - pMinX);
+      const expandRight = Math.max(0, pMaxX - safeMaxX);
+      const expandTop = Math.max(0, safeMinZ - pMinZ);
+      const expandBottom = Math.max(0, pMaxZ - safeMaxZ);
+
+      if (expandLeft > 0) finalMinX -= expandLeft + 2;
+      if (expandRight > 0) finalMaxX += expandRight + 2;
+      if (expandTop > 0) finalMinZ -= expandTop + 2;
+      if (expandBottom > 0) finalMaxZ += expandBottom + 2;
+    }
+  }
+
+  // 如果需要扩展，重新计算边界
+  if (needExpand) {
+    // 保持正方形
+    const width = finalMaxX - finalMinX;
+    const depth = finalMaxZ - finalMinZ;
+    const maxSize = Math.max(width, depth);
+
+    finalMinX = cityCx - Math.floor(maxSize / 2);
+    finalMaxX = cityCx + Math.floor(maxSize / 2);
+    finalMinZ = cityCz - Math.floor(maxSize / 2);
+    finalMaxZ = cityCz + Math.floor(maxSize / 2);
+    halfSize = Math.floor(maxSize / 2);
+  }
+
+  // 最终验证：如果还有建筑不在安全区域内，强制移动它
+  const finalSafeMinX = finalMinX + CITY_TRANSITION_SIZE;
+  const finalSafeMaxX = finalMaxX - CITY_TRANSITION_SIZE;
+  const finalSafeMinZ = finalMinZ + CITY_TRANSITION_SIZE;
+  const finalSafeMaxZ = finalMaxZ - CITY_TRANSITION_SIZE;
+
+  for (const p of state.placements) {
+    const fp = CITY_STRUCTURE_FOOTPRINT[p.type];
+    if (!fp) continue;
+
+    const pMinX = p.x - fp.halfX;
+    const pMaxX = p.x + fp.halfX;
+    const pMinZ = p.z - fp.halfZ;
+    const pMaxZ = p.z + fp.halfZ;
+
+    // 如果 footprint 超出安全区域，强制移动中心点
+    if (pMinX < finalSafeMinX) {
+      p.x = finalSafeMinX + fp.halfX + 2;
+    }
+    if (pMaxX > finalSafeMaxX) {
+      p.x = finalSafeMaxX - fp.halfX - 2;
+    }
+    if (pMinZ < finalSafeMinZ) {
+      p.z = finalSafeMinZ + fp.halfZ + 2;
+    }
+    if (pMaxZ > finalSafeMaxZ) {
+      p.z = finalSafeMaxZ - fp.halfZ - 2;
+    }
+  }
+
+  // ========== 第四步：放置门 ==========
+  const cityBounds = {
     minX: finalMinX,
     maxX: finalMaxX,
     minZ: finalMinZ,
     maxZ: finalMaxZ
-  });
+  };
 
+  placeGates(state, seed, cityBounds);
+
+  // ========== 第五步：生成 placementMap 和填充实体 ==========
   const placementMap = new Map();
   const placements = state.placements.map((p, idx) => {
     const withId = { ...p, id: `${p.type}_${idx}` };
     placementMap.set(`${withId.x},${withId.z}`, withId);
     return withId;
   });
+
   const fillerPlacements = buildCityFillerTanks(
     {
       centerX: cityCx,
@@ -611,23 +875,60 @@ function generateCity(wx, wz, h, cityInfo, fakeChunk, dPlaceholder, seed, terrai
   const citySurfaceY = getCitySurfaceY(wx, wz, seed, terrainGen);
   let surfaceY = citySurfaceY;
 
+  // 检测附近的地标（金字塔、FrozenMountain）用于平滑过渡
+  const nearbyLandmark = detectNearbyLandmark(wx, wz, seed, terrainGen);
+
   if (cityInfo.isTransition) {
-    // 边缘采用“阶梯过渡”：
+    // 边缘采用”阶梯过渡”：
     // 距边界每 3 格（宽台阶）才升/降 1 格，过渡更缓，不会形成 45 度斜坡
     const naturalBiome = getBaseBiome(wx, wz);
     const naturalH = terrainGen.generateHeight(wx, wz, naturalBiome);
-    const delta = citySurfaceY - naturalH;
+
+    // 如果有附近的地标，使用地标高度作为目标进行平滑
+    let targetHeight = citySurfaceY;
+    let blendFactor = 0;
+
+    if (nearbyLandmark) {
+      // 计算到地标的距离因子（0-1，越近越接近地标高度）
+      const distFactor = Math.max(0, Math.min(1, nearbyLandmark.distance / nearbyLandmark.maxDistance));
+      // 在 City 边缘且靠近地标时，向地标高度混合
+      targetHeight = nearbyLandmark.height;
+      blendFactor = (1 - distFactor) * cityInfo.transitionFactor;
+    }
+
+    const delta = targetHeight - naturalH;
     const terraceNoise = Math.sin((wx + seed * 0.23) * 0.08) + Math.cos((wz - seed * 0.29) * 0.075);
     const terraceBias = terraceNoise > 0.75 ? 1 : (terraceNoise < -0.75 ? -1 : 0);
     const effectiveEdgeDistance = cityInfo.edgeDistance <= 0
       ? 0
       : Math.max(0, cityInfo.edgeDistance + terraceBias);
     const maxDelta = Math.max(0, Math.floor(effectiveEdgeDistance / CITY_TERRACE_WIDTH));
-    const clampedDelta = Math.max(-maxDelta, Math.min(maxDelta, delta));
-    surfaceY = naturalH + clampedDelta;
+
+    let clampedDelta;
+    if (nearbyLandmark && blendFactor > 0) {
+      // 向地标高度平滑过渡，限制每步变化不超过 2 格
+      const rawDelta = targetHeight - naturalH;
+      const maxStep = 2;
+      clampedDelta = Math.max(-maxStep, Math.min(maxStep, rawDelta));
+      // 进一步根据 blendFactor 混合
+      const naturalDelta = Math.max(-maxDelta, Math.min(maxDelta, citySurfaceY - naturalH));
+      clampedDelta = naturalDelta * (1 - blendFactor) + clampedDelta * blendFactor;
+    } else {
+      clampedDelta = Math.max(-maxDelta, Math.min(maxDelta, delta));
+    }
+
+    surfaceY = naturalH + Math.round(clampedDelta);
 
     // 防止边界形成 1 格窄沟：过渡地表不低于 City 与自然地表中的较低值
     surfaceY = Math.max(surfaceY, Math.min(citySurfaceY, naturalH));
+
+    // 如果有地标，确保不会形成过高悬崖（限制与地标高度差不超过 3 格）
+    if (nearbyLandmark) {
+      const heightDiff = surfaceY - nearbyLandmark.height;
+      if (Math.abs(heightDiff) > 3) {
+        surfaceY = nearbyLandmark.height + Math.sign(heightDiff) * 3;
+      }
+    }
   }
 
   // City 群系地表强制高于海平面
@@ -651,13 +952,123 @@ function generateCity(wx, wz, h, cityInfo, fakeChunk, dPlaceholder, seed, terrai
     if (k === 11) {
       fakeChunk.add(wx, rockY, wz, 'end_stone', dPlaceholder);
     } else {
-      // City 区域（含过渡带）地下尽量延续沙/黏土，不使用碎石/石头，避免边缘裸露“碎石块”
+      // City 区域（含过渡带）地下尽量延续沙/黏土，不使用碎石/石头，避免边缘裸露”碎石块”
       fakeChunk.add(wx, rockY, wz, subType, dPlaceholder);
     }
   }
   fakeChunk.add(wx, rockBaseY - 12, wz, 'end_stone', dPlaceholder);
 
   return { surfaceY };
+}
+
+/**
+ * 检测附近是否存在金字塔或 FrozenMountain 等地标
+ * 返回地标信息用于平滑过渡
+ */
+function detectNearbyLandmark(wx, wz, _seed, terrainGen) {
+  // 使用确定性方法检测附近地标，避免异步导入问题
+  // 基于 RegionMapConfig 中的偏移量计算地标中心位置
+
+  const regionSize = REGION_SIZE;
+  const regionX = Math.floor(wx / regionSize);
+  const regionZ = Math.floor(wz / regionSize);
+
+  // 获取金字塔中心（相对于区域）
+  const pyramidOffsetX = LANDMARK_OFFSET.FROZEN_MOUNTAIN_X + 160; // 金字塔在 FrozenMountain 东侧 160
+  const pyramidOffsetZ = LANDMARK_OFFSET.FROZEN_MOUNTAIN_Z;
+
+  // 获取区域中心
+  const regionCenterX = regionX * regionSize + regionSize / 2;
+  const regionCenterZ = regionZ * regionSize + regionSize / 2;
+
+  // 计算金字塔中心（近似）
+  const pyramidCx = regionCenterX + pyramidOffsetX;
+  const pyramidCz = regionCenterZ + pyramidOffsetZ;
+
+  // 计算 FrozenMountain 中心（近似）
+  const fmCx = regionCenterX + LANDMARK_OFFSET.FROZEN_MOUNTAIN_X;
+  const fmCz = regionCenterZ + LANDMARK_OFFSET.FROZEN_MOUNTAIN_Z;
+
+  // 计算到各地标的距离
+  const distToPyramid = Math.sqrt((wx - pyramidCx) ** 2 + (wz - pyramidCz) ** 2);
+  const distToFM = Math.sqrt((wx - fmCx) ** 2 + (wz - fmCz) ** 2);
+
+  // 金字塔参数
+  const PYRAMID_SIZE = 40;
+  const PYRAMID_HALF_SIZE = PYRAMID_SIZE / 2;
+  const PYRAMID_TRANSITION_SIZE = 8;
+  const PYRAMID_TOTAL_HALF = PYRAMID_HALF_SIZE + PYRAMID_TRANSITION_SIZE;
+
+  // FrozenMountain 参数
+  const FM_SIZE = 80;
+  const FM_HALF_SIZE = FM_SIZE / 2;
+  const FM_TRANSITION_SIZE = 8;
+  const FM_TOTAL_HALF = FM_HALF_SIZE + FM_TRANSITION_SIZE;
+
+  // 检测是否在金字塔影响范围内
+  const inPyramidRange = distToPyramid <= PYRAMID_TOTAL_HALF + 32; // 额外 32 格缓冲
+  const inFMRange = distToFM <= FM_TOTAL_HALF + 32;
+
+  if (!inPyramidRange && !inFMRange) {
+    return null;
+  }
+
+  // 计算金字塔高度
+  if (inPyramidRange) {
+    const pyramidDist = Math.max(Math.abs(wx - pyramidCx), Math.abs(wz - pyramidCz));
+    if (pyramidDist <= PYRAMID_TOTAL_HALF) {
+      // 金字塔高度计算：每 2 格水平距离下降 1 格
+      const layerHeight = Math.floor((PYRAMID_HALF_SIZE - pyramidDist) / 2);
+      if (layerHeight > 0) {
+        const pyramidBiome = terrainGen.getBiome(pyramidCx, pyramidCz);
+        const pyramidBaseHeight = terrainGen.generateHeight(pyramidCx, pyramidCz, pyramidBiome);
+        const pyramidHeight = pyramidBaseHeight + layerHeight;
+        return {
+          type: 'pyramid',
+          height: pyramidHeight,
+          distance: Math.max(0, pyramidDist - PYRAMID_HALF_SIZE),
+          maxDistance: PYRAMID_TRANSITION_SIZE + 32
+        };
+      }
+    }
+  }
+
+  // 计算 FrozenMountain 高度
+  if (inFMRange) {
+    const fmDx = wx - fmCx;
+    const fmDz = wz - fmCz;
+    const fmDist = Math.sqrt(fmDx * fmDx + fmDz * fmDz);
+
+    if (fmDist <= FM_TOTAL_HALF) {
+      // FrozenMountain 高度计算（简化版）
+      const fmBiome = terrainGen.getBiome(fmCx, fmCz);
+      const fmBaseHeight = terrainGen.generateHeight(fmCx, fmCz, fmBiome);
+
+      // 如果在主体区域内，计算山峰高度
+      if (fmDist <= FM_HALF_SIZE) {
+        const summitHeight = (FM_HALF_SIZE - 10) / 1.3;
+        const slopeT = fmDist / FM_HALF_SIZE;
+        const profile = 1 - Math.pow(slopeT, 1.4);
+        const layerHeight = Math.max(0, Math.floor(summitHeight * profile));
+        return {
+          type: 'frozenMountain',
+          height: fmBaseHeight + layerHeight,
+          distance: Math.max(0, fmDist - FM_HALF_SIZE * 0.7),
+          maxDistance: FM_TRANSITION_SIZE + FM_HALF_SIZE * 0.3 + 32
+        };
+      } else {
+        // 在过渡带内，返回基础高度
+        return {
+          type: 'frozenMountain',
+          height: fmBaseHeight,
+          distance: fmDist - FM_HALF_SIZE,
+          maxDistance: FM_TRANSITION_SIZE + 32
+        };
+      }
+    }
+  }
+
+  return null;
 }
 
 export const CityMap = {
