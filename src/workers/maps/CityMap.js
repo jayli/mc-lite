@@ -65,12 +65,13 @@ const CITY_STRUCTURE_FOOTPRINT = Object.freeze({
 
 const CITY_STRUCTURE_CONFIGS = Object.freeze([
   { type: 'castle', count: 1, fixedCenter: true },
-  { type: 'whiteTower', countRange: [2, 3] },
+  // 大尺寸结构优先放置
+  { type: 'pyramidIsland', count: 1 },
   { type: 'bigHouse', count: 2 },
-  { type: 'boxHouse', count: 2 },
+  { type: 'whiteTower', countRange: [2, 3] },
   { type: 'desertVillage', countRange: [3, 5] },
   { type: 'doubleTower', count: 1 },
-  { type: 'pyramidIsland', count: 1 },
+  { type: 'boxHouse', count: 2 },
   { type: 'smallHouse', count: 2 },
   { type: 'tower', count: 1 },
   { type: 'treeHouse', count: 3 },
@@ -316,11 +317,11 @@ function placeType(state, type, count, seed, minR, maxR, bounds = null) {
     }
 
     if (!best) {
-      // 强制放置：忽略边界检查，确保建筑一定生成
-      const forcedCandidates = buildCandidates(state.cityCx, state.cityCz, 10, 100, seed, salt + 137);
+      // 强制放置：缩小间距到10，确保建筑一定生成
+      const forcedCandidates = buildCandidates(state.cityCx, state.cityCz, 10, maxR + 200, seed, salt + 137);
       for (const c of forcedCandidates) {
         const candidate = { ...c, type, index };
-        // 只检查与其他建筑的距离，忽略边界
+        // 只检查与其他建筑的距离（缩小间距到10），忽略边界
         let tooClose = false;
         for (let i = 0; i < state.placements.length; i++) {
           const p = state.placements[i];
@@ -329,8 +330,8 @@ function placeType(state, type, count, seed, minR, maxR, bounds = null) {
           if (!fpA || !fpB) continue;
           const dx = Math.abs(candidate.x - p.x);
           const dz = Math.abs(candidate.z - p.z);
-          const gap = getGapRequirement(candidate.type, p.type, seed, candidate.index, i);
-          if (dx <= fpA.halfX + fpB.halfX + gap && dz <= fpA.halfZ + fpB.halfZ + gap) {
+          // 间距缩小到10
+          if (dx <= fpA.halfX + fpB.halfX + 10 && dz <= fpA.halfZ + fpB.halfZ + 10) {
             tooClose = true;
             break;
           }
@@ -342,9 +343,84 @@ function placeType(state, type, count, seed, minR, maxR, bounds = null) {
       }
     }
 
-    if (!best) continue;
-    state.placements.push(best);
-    placed++;
+    if (!best) {
+      // 终极强制：间距缩小到5
+      const finalCandidates = buildCandidates(state.cityCx, state.cityCz, 10, maxR + 300, seed, salt + 197);
+      for (const c of finalCandidates) {
+        const candidate = { ...c, type, index };
+        let tooClose = false;
+        for (let i = 0; i < state.placements.length; i++) {
+          const p = state.placements[i];
+          const fpA = CITY_STRUCTURE_FOOTPRINT[candidate.type];
+          const fpB = CITY_STRUCTURE_FOOTPRINT[p.type];
+          if (!fpA || !fpB) continue;
+          const dx = Math.abs(candidate.x - p.x);
+          const dz = Math.abs(candidate.z - p.z);
+          // 间距缩小到5
+          if (dx <= fpA.halfX + fpB.halfX + 5 && dz <= fpA.halfZ + fpB.halfZ + 5) {
+            tooClose = true;
+            break;
+          }
+        }
+        if (!tooClose) {
+          best = candidate;
+          break;
+        }
+      }
+    }
+
+    if (!best) {
+      // 绝对强制：只要求不重叠，间距为0
+      const absoluteCandidates = buildCandidates(state.cityCx, state.cityCz, 10, maxR + 500, seed, salt + 257);
+      for (const c of absoluteCandidates) {
+        const candidate = { ...c, type, index };
+        let overlaps = false;
+        for (let i = 0; i < state.placements.length; i++) {
+          const p = state.placements[i];
+          const fpA = CITY_STRUCTURE_FOOTPRINT[candidate.type];
+          const fpB = CITY_STRUCTURE_FOOTPRINT[p.type];
+          if (!fpA || !fpB) continue;
+          const dx = Math.abs(candidate.x - p.x);
+          const dz = Math.abs(candidate.z - p.z);
+          // 只检查是否重叠（间距为0）
+          if (dx < fpA.halfX + fpB.halfX && dz < fpA.halfZ + fpB.halfZ) {
+            overlaps = true;
+            break;
+          }
+        }
+        if (!overlaps) {
+          best = candidate;
+          break;
+        }
+      }
+    }
+
+    if (!best) {
+      // 如果连不重叠都做不到，随机选择一个位置（可能会重叠，但确保生成）
+      const randomCandidates = buildCandidates(state.cityCx, state.cityCz, maxR + 100, maxR + 600, seed, salt + 317);
+      if (randomCandidates.length > 0) {
+        best = { ...randomCandidates[0], type, index };
+      }
+    }
+
+    // 强制放置：如果所有尝试都失败，直接在随机位置生成
+    if (!best) {
+      const angle = hash01(seed * 0.5 + salt * 0.3) * Math.PI * 2;
+      const dist = maxR + 50 + hash01(seed * 0.7 + salt * 0.5) * 200;
+      best = {
+        x: Math.floor(state.cityCx + Math.cos(angle) * dist),
+        z: Math.floor(state.cityCz + Math.sin(angle) * dist),
+        localX: Math.floor(Math.cos(angle) * dist),
+        localZ: Math.floor(Math.sin(angle) * dist),
+        type,
+        index
+      };
+    }
+
+    if (best) {
+      state.placements.push(best);
+      placed++;
+    }
   }
   return placed;
 }
@@ -590,8 +666,10 @@ function buildCityLayout(seed, terrainGen) {
     if (count <= 0) continue;
 
     // 使用较大的搜索半径，确保能找到位置
-    const minR = config.type === 'whiteTower' ? 20 : 15;
-    const maxR = config.type === 'whiteTower' ? 120 : 150;
+    // pyramidIsland 尺寸较大，需要更大的搜索范围
+    const isLargeStructure = config.type === 'whiteTower' || config.type === 'pyramidIsland';
+    const minR = isLargeStructure ? 30 : 15;
+    const maxR = isLargeStructure ? 180 : 150;
 
     const placed = placeType(state, config.type, count, seed, minR, maxR, maxBounds);
 

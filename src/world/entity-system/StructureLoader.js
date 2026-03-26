@@ -176,7 +176,8 @@ export const structureLoaders = {
   castle: new StructureLoader('castle', new URL('../structures/castle.json', moduleBase).href),
   gate: new StructureLoader('gate', new URL('../structures/gate.json', moduleBase).href),
   bed: new StructureLoader('bed', new URL('../structures/bed.json', moduleBase).href),
-  zombieNest: new StructureLoader('zombie_nest', new URL('../structures/zombie_nest.json', moduleBase).href)
+  zombieNest: new StructureLoader('zombie_nest', new URL('../structures/zombie_nest.json', moduleBase).href),
+  flowerBed: new StructureLoader('flower_bed', new URL('../structures/flower_bed.json', moduleBase).href)
 };
 
 /**
@@ -203,7 +204,8 @@ export async function preloadAllStructures() {
     structureLoaders.castle.load(),
     structureLoaders.gate.load(),
     structureLoaders.bed.load(),
-    structureLoaders.zombieNest.load()
+    structureLoaders.zombieNest.load(),
+    structureLoaders.flowerBed.load()
   ]);
   console.log('All structures preloaded');
 }

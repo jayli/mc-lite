@@ -44,7 +44,8 @@ const {
   tank,
   tower,
   castle,
-  gate
+  gate,
+  flowerBed
 } = structureLoaders;
 
 const CHUNK_SIZE = 16;
@@ -171,7 +172,8 @@ onmessage = async function(e) {
     tank.load(),
     tower.load(),
     castle.load(),
-    gate.load()
+    gate.load(),
+    flowerBed.load()
   ]).catch(err => console.error('Failed to load structure data:', err));
 
   // 计算当前区块的范围 - 提前定义，供 snapshot 模式使用
@@ -196,6 +198,7 @@ onmessage = async function(e) {
   const citySwampTreeCenters = new Set(); // 记录 City 沼泽树中心
   const cityYellowTreeCenters = new Set(); // 记录 City 黄叶树中心
   const cityBirchTreeCenters = new Set(); // 记录 City brich_tree(JSON)中心
+  const cityFlowerBedCenters = new Set(); // 记录 City 花坛中心
 
   // 模拟 Chunk 类的 add 方法 - 改为写入 blockMap
   const fakeChunk = {
@@ -451,6 +454,25 @@ onmessage = async function(e) {
               'static_tree',
               cityBirchTreeCenters,
               treeKey
+            );
+          }
+        }
+
+        // City 内新增：花坛（flower_bed），填充建筑间空白
+        // 概率 0.0003（原概率的三分之一），padding 减小到 1，只在核心区域生成
+        if (cityInfo.transitionFactor === 0 && seededRandom(wx, wz, seed + 823) < 0.0003) {
+          const flowerBedKey = `${wx},${wz}`;
+          // 只检查是否靠近主要建筑（1格缓冲），不与其他任何结构进行距离测算
+          const nearMajorBuilding = CityMap.isPointNearCityStructure(wx, wz, seed, terrainGen, 1);
+          if (!nearMajorBuilding) {
+            createStructureTask(
+              generateFlowerBed.bind(null, wx, cityResult.surfaceY + 1, wz, fakeChunk, dPlaceholder),
+              wx,
+              cityResult.surfaceY + 1,
+              wz,
+              'flower_bed',
+              cityFlowerBedCenters,
+              flowerBedKey
             );
           }
         }
@@ -1325,6 +1347,18 @@ function generateBirchTree(x, y, z, chunk, dObj) {
  */
 function generateBirchTreeWithSnow(x, y, z, chunk, dObj) {
   birchTreeWithSnow.generate(x, y, z, chunk, dObj, true);
+}
+
+/**
+ * 生成花坛（从 JSON 数据）
+ * @param {number} x - X 坐标
+ * @param {number} y - Y 坐标
+ * @param {number} z - Z 坐标
+ * @param {Object} chunk - 区块对象
+ * @param {Object} dObj - 数据收集对象
+ */
+function generateFlowerBed(x, y, z, chunk, dObj) {
+  flowerBed.generate(x, y, z, chunk, dObj, true);
 }
 
 /**
