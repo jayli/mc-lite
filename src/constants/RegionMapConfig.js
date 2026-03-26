@@ -29,6 +29,12 @@ export const ISLAND_SIZE = 30;
 /** 平地主体边长（格） */
 export const PLAIN_LAND_SIZE = 30;
 
+/** City 主城最小边长（格） */
+export const CITY_SIZE_MIN = 112;
+
+/** City 主城最大边长（格） */
+export const CITY_SIZE_MAX = 224;
+
 // ==================== 过渡带配置 ====================
 
 /** 地标过渡带尺寸（格）：主体边缘到完全消失的过渡区域 */
@@ -60,7 +66,11 @@ export const LANDMARK_OFFSET = {
   /** 平地相对于金字塔的 X 偏移 */
   PLAIN_LAND_X: 0,
   /** 平地相对于金字塔的 Z 偏移 */
-  PLAIN_LAND_Z: 160
+  PLAIN_LAND_Z: 160,
+  /** City 相对于金字塔的 X 偏移 */
+  CITY_X: 0,
+  /** City 相对于金字塔的 Z 偏移（南侧） */
+  CITY_Z: -170
 };
 
 /** 地标间最小距离限制（防止重叠） */
@@ -177,6 +187,8 @@ export const RegionMapConfig = {
   SNOW_LAND_SIZE,
   ISLAND_SIZE,
   PLAIN_LAND_SIZE,
+  CITY_SIZE_MIN,
+  CITY_SIZE_MAX,
   TRANSITION_SIZE,
   LANDMARK_OFFSET,
   LANDMARK_MIN_DISTANCE,
@@ -211,7 +223,8 @@ export const LANDMARK_SIZES = {
   FROZEN_MOUNTAIN: FROZEN_MOUNTAIN_SIZE,
   SNOW_LAND: SNOW_LAND_SIZE,
   ISLAND: ISLAND_SIZE,
-  PLAIN_LAND: PLAIN_LAND_SIZE
+  PLAIN_LAND: PLAIN_LAND_SIZE,
+  CITY: CITY_SIZE_MAX
 };
 
 export default RegionMapConfig;

@@ -9,7 +9,8 @@
  *
  * 使用多层噪声函数模拟自然地形，根据生物群系调整地形特征
  */
-import { noise, getBiome } from '../utils/MathUtils.js';
+import { noise, getBiome, WORLD_CONFIG } from '../utils/MathUtils.js';
+import { CityMap } from '../workers/maps/CityMap.js';
 
 /**
  * 地形生成器类
@@ -48,6 +49,10 @@ export class TerrainGen {
    * @returns {string} 生物群系类型
    */
   getBiome(x, z) {
+    // City 群系优先级最高：主城范围内直接判定为 CITY
+    if (CityMap.isPointInCity(x, z, WORLD_CONFIG.SEED, this)) {
+      return 'CITY';
+    }
     // 调用 MathUtils.js 中的生物群系判断函数
     return getBiome(x, z);
   }
@@ -62,7 +67,7 @@ export class TerrainGen {
    *
    * @param {number} x - X坐标（世界坐标）
    * @param {number} z - Z坐标（世界坐标）
-   * @param {string} biome - 生物群系类型（'FOREST', 'DESERT', 'SWAMP', 'AZALEA', 'PLAINS'）
+   * @param {string} biome - 生物群系类型（'FOREST', 'DESERT', 'SWAMP', 'AZALEA', 'PLAINS', 'CITY'）
    * @returns {number} 地形高度值（整数Y坐标）
    */
   generateHeight(x, z, biome) {
@@ -74,6 +79,7 @@ export class TerrainGen {
     // 根据生物群系调整地形高度特征
     if (biome === 'DESERT') h = Math.floor(h * 0.5 + 2);   // 沙漠：降低高度，增加平坦度
     if (biome === 'SWAMP') h = Math.floor(h * 0.3 - 2);   // 沼泽：显著降低高度，形成低洼湿地
+    if (biome === 'CITY') h = Math.floor(h * 0.25 + 1);   // City：进一步压平，细节在 CityMap 中二次整形
     // 注意：森林、杜鹃林、平原等生物群系使用默认生成的高度
 
     return h;

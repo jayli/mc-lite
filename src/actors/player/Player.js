@@ -18,6 +18,7 @@ import { terrainGen } from '../../world/TerrainGen.js';
 import { FrozenMountain } from '../../workers/maps/FrozenMountain.js';
 import { Pyramid } from '../../workers/maps/Pyramid.js';
 import { SnowLand } from '../../workers/maps/SnowLand.js';
+import { CityMap } from '../../workers/maps/CityMap.js';
 import { getRegionSeededCenter } from '../../workers/maps/RegionCenterUtils.js';
 import { PlayerInteraction } from './PlayerInteraction.js';
 
@@ -76,31 +77,39 @@ export class Player {
     this.moveCheckFrequency = 1;   // 碰撞检测频率 (每几帧检查一次)
 
     // 初始出生点逻辑
-    // 默认优先出生在 plain_land（城堡平地）
+    // 默认优先出生在 City 主城
     let spawnX, spawnZ;
 
-    // 优先在平地（plain_land）出生
-    console.log('[Spawn] 计算 plain_land 出生点，seed:', WORLD_CONFIG.SEED);
-    const plainLandSpawn = PlainLand.getPlainLandSpawnPoint(WORLD_CONFIG.SEED, terrainGen);
-    if (plainLandSpawn) {
-      spawnX = plainLandSpawn.x;
-      spawnZ = plainLandSpawn.z;
-      console.log('[Spawn] 出生在 plain_land:', spawnX, spawnZ);
-      console.log('[Spawn] plain_land 中心：', plainLandSpawn.plainLandCenterX, plainLandSpawn.plainLandCenterZ);
+    // 优先在 City 出生
+    console.log('[Spawn] 计算 City 出生点，seed:', WORLD_CONFIG.SEED);
+    const citySpawn = CityMap.getCitySpawnPoint(WORLD_CONFIG.SEED, terrainGen);
+    if (citySpawn) {
+      spawnX = citySpawn.x;
+      spawnZ = citySpawn.z;
+      console.log('[Spawn] 出生在 City:', spawnX, spawnZ);
     } else {
-      // 如果 plain_land 出生点计算失败，回退到海岛
-      console.log('[Spawn] plain_land 出生点计算失败，回退到海岛');
-      const islandSpawn = IslandMap.getIslandSpawnPoint(WORLD_CONFIG.SEED, terrainGen);
-      if (islandSpawn) {
-        spawnX = islandSpawn.x;
-        spawnZ = islandSpawn.z;
-        console.log('[Spawn] 回退出生在海岛:', spawnX, spawnZ);
+      // 回退到 plain_land
+      console.log('[Spawn] City 出生点计算失败，回退到 plain_land');
+      const plainLandSpawn = PlainLand.getPlainLandSpawnPoint(WORLD_CONFIG.SEED, terrainGen);
+      if (plainLandSpawn) {
+        spawnX = plainLandSpawn.x;
+        spawnZ = plainLandSpawn.z;
+        console.log('[Spawn] 回退出生在 plain_land:', spawnX, spawnZ);
       } else {
-        // 最后兜底：雪地
-        console.log('[Spawn] 海岛也不可用，回退到雪地');
-        const slInfo = getSnowLandCenter(0, 0, WORLD_CONFIG.SEED);
-        spawnX = slInfo.centerX;
-        spawnZ = slInfo.centerZ;
+        // 再回退到海岛
+        console.log('[Spawn] plain_land 出生点计算失败，回退到海岛');
+        const islandSpawn = IslandMap.getIslandSpawnPoint(WORLD_CONFIG.SEED, terrainGen);
+        if (islandSpawn) {
+          spawnX = islandSpawn.x;
+          spawnZ = islandSpawn.z;
+          console.log('[Spawn] 回退出生在海岛:', spawnX, spawnZ);
+        } else {
+          // 最后兜底：雪地
+          console.log('[Spawn] 海岛也不可用，回退到雪地');
+          const slInfo = getSnowLandCenter(0, 0, WORLD_CONFIG.SEED);
+          spawnX = slInfo.centerX;
+          spawnZ = slInfo.centerZ;
+        }
       }
     }
 

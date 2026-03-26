@@ -6,7 +6,14 @@
  */
 
 export const BIG_BUILDING_WHITELIST = Object.freeze([
+  'bigHouse',
+  'boxHouse',
   'castle',
+  'doubleTower',
+  'pyramidIsland',
+  'smallHouse',
+  'treeHouse',
+  'woodHouse',
   'gate',
   'tank',
   'tower',

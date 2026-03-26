@@ -21,9 +21,16 @@ import { isBigBuildingType } from '../world/entity-system/BigBuildingWhitelist.j
  * 定义了各类结构从中心点向各方向延伸的最大渲染距离
  */
 export const STRUCTURE_RENDER_DIST = {
+  bigHouse: 22,       // big_house 约 37x39
+  boxHouse: 12,       // box_house 约 18x11
   uglyHouse: 24,      // UglyHouse 最大约 40x40
   desertVillage: 10,  // DesertVillage 约 17x17，含前方台阶和平台
   desertPyramid: 16,  // DesertPyramid 约 25x25，含台阶外扩
+  doubleTower: 20,    // double_tower 约 26x15
+  pyramidIsland: 22,  // pyramid_island 约 34x39
+  smallHouse: 18,     // small_house 约 33x29
+  treeHouse: 10,      // tree_house 约 16x15
+  woodHouse: 10,      // wood_house 约 17x16
   tree: 8,            // RealisticTree 树木
   static_tree: 8,     // 静态树（白桦树、普通树等）
   house: 5,           // 普通小屋约 5x5
@@ -41,7 +48,14 @@ export const STRUCTURE_RENDER_DIST = {
  * 特殊结构的 Y 轴高度范围配置
  */
 export const STRUCTURE_HEIGHT_RANGE_SPECIAL = {
+  bigHouse: 14,
+  boxHouse: 48,
   tank: 35,       // tank 结构 Y 方向±35（共 71 格），覆盖 1-70 的范围
+  doubleTower: 48,
+  pyramidIsland: 26,
+  smallHouse: 14,
+  treeHouse: 24,
+  woodHouse: 18,
   uglyHouse: 22,  // uglyHouse 结构 Y 方向±22（共 45 格），覆盖 1-44 的范围
   desertVillage: 12, // DesertVillage 最高约 11 层，预留一定容差
   desertPyramid: 20, // DesertPyramid 最高约 16 层，预留一定容差

@@ -158,8 +158,15 @@ const moduleBase = new URL('.', import.meta.url).href;
  * 预定义的结构加载器实例
  */
 export const structureLoaders = {
+  bigHouse: new StructureLoader('big_house', new URL('../structures/big_house.json', moduleBase).href),
+  boxHouse: new StructureLoader('box_house', new URL('../structures/box_house.json', moduleBase).href),
+  doubleTower: new StructureLoader('double_tower', new URL('../structures/double_tower.json', moduleBase).href),
+  pyramidIsland: new StructureLoader('pyramid_island', new URL('../structures/pyramid_island.json', moduleBase).href),
+  smallHouse: new StructureLoader('small_house', new URL('../structures/small_house.json', moduleBase).href),
+  treeHouse: new StructureLoader('tree_house', new URL('../structures/tree_house.json', moduleBase).href),
   uglyHouse: new StructureLoader('ugly_house', new URL('../structures/ugly_house.json', moduleBase).href),
   whiteTower: new StructureLoader('white_tower', new URL('../structures/white_tower.json', moduleBase).href),
+  woodHouse: new StructureLoader('wood_house', new URL('../structures/wood_house.json', moduleBase).href),
   desertVillage: new StructureLoader('desert_village', new URL('../structures/desert_village.json', moduleBase).href),
   desertPyramid: new StructureLoader('desert_pyramid', new URL('../structures/desert_pyramid.json', moduleBase).href),
   birchTree: new StructureLoader('brich_tree', new URL('../structures/brich_tree.json', moduleBase).href),
@@ -178,8 +185,15 @@ export const structureLoaders = {
  */
 export async function preloadAllStructures() {
   await Promise.all([
+    structureLoaders.bigHouse.load(),
+    structureLoaders.boxHouse.load(),
+    structureLoaders.doubleTower.load(),
+    structureLoaders.pyramidIsland.load(),
+    structureLoaders.smallHouse.load(),
+    structureLoaders.treeHouse.load(),
     structureLoaders.uglyHouse.load(),
     structureLoaders.whiteTower.load(),
+    structureLoaders.woodHouse.load(),
     structureLoaders.desertVillage.load(),
     structureLoaders.desertPyramid.load(),
     structureLoaders.birchTree.load(),
