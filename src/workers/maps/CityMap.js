@@ -756,7 +756,16 @@ function generateCity(wx, wz, h, cityInfo, fakeChunk, dPlaceholder, seed, terrai
 
   const patch = Math.sin((wx + seed * 0.31) * 0.09) + Math.cos((wz - seed * 0.27) * 0.08);
   const patch2 = Math.sin((wx + wz + seed * 0.73) * 0.037);
-  const surfaceType = patch + patch2 > 0 ? 'sand' : 'clay';
+
+  // 三种地表类型：sand、clay、moss（moss 面积约为 clay 的 1/10）
+  let surfaceType;
+  if (patch + patch2 > 0) {
+    surfaceType = 'sand';
+  } else {
+    // 在 clay 区域内，约 1/10 区域变为 moss
+    const mossNoise = Math.sin((wx * 0.15 + seed * 0.17) * 0.5) + Math.cos((wz * 0.13 - seed * 0.19) * 0.5);
+    surfaceType = mossNoise > 1.2 ? 'moss' : 'clay';
+  }
   const subType = surfaceType === 'sand' ? 'sand' : 'clay';
 
   for (let y = fillStartY; y <= fillEndY; y++) {
