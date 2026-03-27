@@ -418,24 +418,74 @@ export class PlayerInteraction {
     if (type === 'end_stone' || type === 'playground_block' || type === 'playground_center_block') return;
 
     if (m.isInstancedMesh) {
-      m.getMatrixAt(hit.instanceId, this.player._dummyMatrix);
-      this.player._dummyMatrix.decompose(this.player._tempVector, this.player._dummyQuaternion, this.player._dummyScale);
-      // 记录方块位置和朝向到放置记忆
-      const bx = Math.floor(this.player._tempVector.x), by = Math.floor(this.player._tempVector.y), bz = Math.floor(this.player._tempVector.z);
+      // 关键修复：使用 hit.point 计算方块位置，而不是从矩阵分解
+      // 原因：如果实例矩阵被缩放为0（幽灵实例），从矩阵分解出的位置不准确
+      // hit.point 是射线实际击中点，更可靠
+      const hitPoint = hit.point;
+      const hitNormal = hit.face?.normal || new THREE.Vector3(0, 0, 0);
+
+      // 计算方块位置：击中点沿法线方向偏移0.5个单位（向方块中心方向）
+      // 这样可以确定是哪个方块被击中
+      const bx = Math.floor(hitPoint.x - hitNormal.x * 0.5);
+      const by = Math.floor(hitPoint.y - hitNormal.y * 0.5);
+      const bz = Math.floor(hitPoint.z - hitNormal.z * 0.5);
+
+      // 验证该位置确实有方块
       const entry = this.player.world.getBlockEntry(bx, by, bz);
-      if (entry) {
+      let finalBx = bx, finalBy = by, finalBz = bz;
+      if (!entry) {
+        // 如果计算出的位置没有方块，尝试从矩阵获取位置（降级方案）
+        m.getMatrixAt(hit.instanceId, this.player._dummyMatrix);
+        this.player._dummyMatrix.decompose(this.player._tempVector, this.player._dummyQuaternion, this.player._dummyScale);
+        const matrixBz = Math.floor(this.player._tempVector.z);
+        const matrixBx = Math.floor(this.player._tempVector.x);
+        const matrixBy = Math.floor(this.player._tempVector.y);
+        const matrixEntry = this.player.world.getBlockEntry(matrixBx, matrixBy, matrixBz);
+        if (matrixEntry) {
+          this.player._tempVector.set(matrixBx + 0.5, matrixBy + 0.5, matrixBz + 0.5);
+          finalBx = matrixBx; finalBy = matrixBy; finalBz = matrixBz;
+        } else {
+          return; // 无法确定方块位置，取消移除
+        }
+      } else {
+        this.player._tempVector.set(bx + 0.5, by + 0.5, bz + 0.5);
         this.recordRemovedBlock(bx, by, bz, entry.type, entry.orientation);
       }
-      this.player._dummyMatrix.scale(this.player._zeroVector);
-      m.setMatrixAt(hit.instanceId, this.player._dummyMatrix);
-      m.instanceMatrix.needsUpdate = true;
+
+      // 关键修复：根据位置查找并隐藏对应的实例，而不是使用 hit.instanceId
+      // 因为 hit.instanceId 可能指向错误的实例（当 instanceIndexMap 与实际渲染不一致时）
+      const targetKey = `${finalBx},${finalBy},${finalBz}`;
+      const targetType = entry?.type || this.player.world.getBlock(finalBx, finalBy, finalBz);
+
+      // 在所有相同类型的 InstancedMesh 中查找该位置的实例
+      let instanceHidden = false;
+      if (targetType && m.userData.type === targetType) {
+        // 如果命中的 mesh 类型匹配，直接在该 mesh 中查找
+        instanceHidden = this._hideInstancedMeshAtPosition(m, finalBx, finalBy, finalBz);
+      }
+
+      // 如果没找到，遍历该 chunk 的所有 InstancedMesh 查找
+      if (!instanceHidden) {
+        const chunk = this.player.world.getChunkAt(finalBx, finalBy, finalBz);
+        if (chunk) {
+          for (const child of chunk.group.children) {
+            if (child.isInstancedMesh && child.userData.type === targetType) {
+              if (this._hideInstancedMeshAtPosition(child, finalBx, finalBy, finalBz)) {
+                instanceHidden = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+
       // 徒手破坏时使用新的破碎特效，否则使用原有粒子特效
       if (isHandBreak) {
         this.player.world.spawnBlockCrashParticles(this.player._tempVector);
       } else {
-        this.player.spawnParticles(this.player._tempVector, type);
+        this.player.spawnParticles(this.player._tempVector, targetType || type);
       }
-      this.player.world.removeBlock(bx, by, bz);
+      this.player.world.removeBlock(finalBx, finalBy, finalBz);
       audioManager.playSound('delete_get', 0.3);
       if (type !== 'water' && type !== 'cloud') this.player.inventory.add(type === 'grass' ? 'dirt' : type, 1);
     } else {
@@ -906,5 +956,71 @@ export class PlayerInteraction {
       bz,
       type: this.player.world.getBlock(bx, by, bz)
     };
+  }
+
+  /**
+   * 在指定位置隐藏 InstancedMesh 中的实例
+   * 通过查找 instanceIndexMap 或遍历所有实例来找到对应位置的实例并缩放到0
+   * @param {THREE.InstancedMesh} mesh - InstancedMesh 对象
+   * @param {number} x - X坐标
+   * @param {number} y - Y坐标
+   * @param {number} z - Z坐标
+   * @returns {boolean} 是否成功隐藏
+   */
+  _hideInstancedMeshAtPosition(mesh, x, y, z) {
+    if (!mesh || !mesh.isInstancedMesh) return false;
+
+    const posKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const type = mesh.userData.type;
+
+    // 获取该坐标所属的 chunk
+    const cx = Math.floor(x / 16);
+    const cz = Math.floor(z / 16);
+    const chunkKey = `${cx},${cz}`;
+    const chunk = this.player.world.chunks.get(chunkKey);
+
+    // 方法1: 使用 instanceIndexMap 快速查找
+    if (chunk && chunk.instanceIndexMap && chunk.instanceIndexMap[type]) {
+      const typeMap = chunk.instanceIndexMap[type];
+      if (typeMap.has(posKey)) {
+        const idx = typeMap.get(posKey);
+        const dummy = new THREE.Matrix4();
+        mesh.getMatrixAt(idx, dummy);
+        // 检查是否已经隐藏（缩放为0）
+        const scale = new THREE.Vector3();
+        dummy.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
+        if (scale.lengthSq() < 0.001) {
+          return true; // 已经隐藏
+        }
+        dummy.scale(this.player._zeroVector);
+        mesh.setMatrixAt(idx, dummy);
+        mesh.instanceMatrix.needsUpdate = true;
+        return true;
+      }
+    }
+
+    // 方法2: 遍历所有实例查找（降级方案）
+    const dummy = new THREE.Matrix4();
+    const pos = new THREE.Vector3();
+    for (let i = 0; i < mesh.count; i++) {
+      mesh.getMatrixAt(i, dummy);
+      pos.setFromMatrixPosition(dummy);
+      if (Math.floor(pos.x) === Math.floor(x) &&
+          Math.floor(pos.y) === Math.floor(y) &&
+          Math.floor(pos.z) === Math.floor(z)) {
+        // 检查是否已经隐藏
+        const scale = new THREE.Vector3();
+        dummy.decompose(new THREE.Vector3(), new THREE.Quaternion(), scale);
+        if (scale.lengthSq() < 0.001) {
+          return true; // 已经隐藏
+        }
+        dummy.scale(this.player._zeroVector);
+        mesh.setMatrixAt(i, dummy);
+        mesh.instanceMatrix.needsUpdate = true;
+        return true;
+      }
+    }
+
+    return false;
   }
 }
