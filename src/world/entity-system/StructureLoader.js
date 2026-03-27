@@ -178,7 +178,8 @@ export const structureLoaders = {
   bed: new StructureLoader('bed', new URL('../structures/bed.json', moduleBase).href),
   zombieNest: new StructureLoader('zombie_nest', new URL('../structures/zombie_nest.json', moduleBase).href),
   flowerBed: new StructureLoader('flower_bed', new URL('../structures/flower_bed.json', moduleBase).href),
-  pavilion: new StructureLoader('pavilion', new URL('../structures/pavilion.json', moduleBase).href)
+  pavilion: new StructureLoader('pavilion', new URL('../structures/pavilion.json', moduleBase).href),
+  tallWell: new StructureLoader('tall_well', new URL('../structures/tall_well.json', moduleBase).href)
 };
 
 /**
@@ -207,7 +208,8 @@ export async function preloadAllStructures() {
     structureLoaders.bed.load(),
     structureLoaders.zombieNest.load(),
     structureLoaders.flowerBed.load(),
-    structureLoaders.pavilion.load()
+    structureLoaders.pavilion.load(),
+    structureLoaders.tallWell.load()
   ]);
   console.log('All structures preloaded');
 }

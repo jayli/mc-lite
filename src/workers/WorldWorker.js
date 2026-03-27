@@ -46,7 +46,8 @@ const {
   castle,
   gate,
   flowerBed,
-  pavilion
+  pavilion,
+  tallWell
 } = structureLoaders;
 
 const CHUNK_SIZE = 16;
@@ -55,6 +56,7 @@ const MAX_ROOM_SIZE = 5;
 const LARGE_STATIC_SCAN_PADDING = 36; // 与 castle/tank 最大渲染半径一致
 const CITY_FLOWER_BED_CHANCE = 0.0005;
 const CITY_PAVILION_CHANCE = CITY_FLOWER_BED_CHANCE * 6;
+const CITY_TALL_WELL_CHANCE = CITY_FLOWER_BED_CHANCE * 3; // 与 pavilion 相同概率
 
 /**
  * 将世界坐标转换为 Chunk 内局部坐标（0-15）
@@ -175,7 +177,8 @@ onmessage = async function(e) {
     castle.load(),
     gate.load(),
     flowerBed.load(),
-    pavilion.load()
+    pavilion.load(),
+    tallWell.load()
   ]).catch(err => console.error('Failed to load structure data:', err));
 
   // 计算当前区块的范围 - 提前定义，供 snapshot 模式使用
@@ -202,6 +205,7 @@ onmessage = async function(e) {
   const cityBirchTreeCenters = new Set(); // 记录 City brich_tree(JSON)中心
   const cityFlowerBedCenters = new Set(); // 记录 City 花坛中心
   const cityPavilionFootprintCells = new Set(); // 记录 City pavilion 预占地，防止重叠
+  const cityTallWellFootprintCells = new Set(); // 记录 City tall_well 预占地，防止重叠
   const cityCoreCandidates = []; // 记录 City 核心区候选点（用于后置填充）
 
   // 模拟 Chunk 类的 add 方法 - 改为写入 blockMap
@@ -330,6 +334,10 @@ onmessage = async function(e) {
   const pavilionHalfX = Math.ceil(Math.max(Math.abs(pavilionFootprint.minX), Math.abs(pavilionFootprint.maxX)));
   const pavilionHalfZ = Math.ceil(Math.max(Math.abs(pavilionFootprint.minZ), Math.abs(pavilionFootprint.maxZ)));
 
+  const tallWellFootprint = getLoaderBottomFootprint(tallWell) || { minX: -5, maxX: 5, minZ: -3, maxZ: 3 };
+  const tallWellHalfX = Math.ceil(Math.max(Math.abs(tallWellFootprint.minX), Math.abs(tallWellFootprint.maxX)));
+  const tallWellHalfZ = Math.ceil(Math.max(Math.abs(tallWellFootprint.minZ), Math.abs(tallWellFootprint.maxZ)));
+
   function collectPavilionFootprintCells(centerX, centerZ) {
     const cells = [];
     for (let ox = pavilionFootprint.minX; ox <= pavilionFootprint.maxX; ox++) {
@@ -405,6 +413,91 @@ onmessage = async function(e) {
     reservePavilionFootprint(centerX, centerZ);
     hasQueuedCityPavilion = true;
     return true;
+  }
+
+  // Tall Well 辅助函数
+  function collectTallWellFootprintCells(centerX, centerZ) {
+    const cells = [];
+    for (let ox = tallWellFootprint.minX; ox <= tallWellFootprint.maxX; ox++) {
+      for (let oz = tallWellFootprint.minZ; oz <= tallWellFootprint.maxZ; oz++) {
+        cells.push(`${centerX + ox},${centerZ + oz}`);
+      }
+    }
+    return cells;
+  }
+
+  function isTallWellFootprintReserved(centerX, centerZ) {
+    const cells = collectTallWellFootprintCells(centerX, centerZ);
+    for (const key of cells) {
+      if (cityTallWellFootprintCells.has(key)) return true;
+    }
+    return false;
+  }
+
+  function reserveTallWellFootprint(centerX, centerZ) {
+    const cells = collectTallWellFootprintCells(centerX, centerZ);
+    for (const key of cells) {
+      cityTallWellFootprintCells.add(key);
+    }
+  }
+
+  function isTallWellSpaceClear(centerX, centerY, centerZ) {
+    for (let ox = tallWellFootprint.minX; ox <= tallWellFootprint.maxX; ox++) {
+      for (let oz = tallWellFootprint.minZ; oz <= tallWellFootprint.maxZ; oz++) {
+        const wx = centerX + ox;
+        const wz = centerZ + oz;
+        const cellInfo = CityMap.getCityInfo(wx, wz, seed, terrainGen);
+        if (!cellInfo || cellInfo.transitionFactor > 0) return false;
+
+        const surfaceY = CityMap.getCitySurfaceY(wx, wz, seed, terrainGen);
+        if (surfaceY === null || Math.abs(surfaceY + 1 - centerY) > 1) return false;
+
+        for (let y = centerY; y <= centerY + 2; y++) {
+          if (fakeChunk.getBlockType(wx, y, wz)) return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  function canPlaceCityTallWell(centerX, centerY, centerZ) {
+    const tallWellRadius = Math.max(tallWellHalfX, tallWellHalfZ);
+    // 放宽距离检查：减小 buffer，允许更靠近其他结构
+    const nearMajorBuilding = CityMap.isPointNearCityStructure(centerX, centerZ, seed, terrainGen, tallWellRadius);
+    const nearFillerHouse = isNearRecordedCenter(cityFillerHouseCenters, centerX, centerZ, tallWellRadius + 1);
+    const nearFlowerBed = isNearRecordedCenter(cityFlowerBedCenters, centerX, centerZ, tallWellRadius + 2);
+    const nearTree = isNearRecordedCenter(cityTreeCenters, centerX, centerZ, tallWellRadius + 2) ||
+      isNearRecordedCenter(cityTallTreeCenters, centerX, centerZ, tallWellRadius + 3) ||
+      isNearRecordedCenter(citySwampTreeCenters, centerX, centerZ, tallWellRadius + 2) ||
+      isNearRecordedCenter(cityYellowTreeCenters, centerX, centerZ, tallWellRadius + 2) ||
+      isNearRecordedCenter(cityBirchTreeCenters, centerX, centerZ, tallWellRadius + 2);
+
+    // 放宽：不检查 pavilion footprint，允许 tall_well 在 pavilion 附近生成
+    // 但检查主要建筑距离避免重叠
+    if (nearMajorBuilding || nearFillerHouse || nearFlowerBed || nearTree) return false;
+    if (isTallWellFootprintReserved(centerX, centerZ)) return false;
+
+    return isTallWellSpaceClear(centerX, centerY, centerZ);
+  }
+
+  let hasQueuedCityTallWell = false;
+  function queueCityTallWell(centerX, centerY, centerZ) {
+    if (!canPlaceCityTallWell(centerX, centerY, centerZ)) return false;
+
+    createStructureTask(
+      generateTallWell.bind(null, centerX, centerY, centerZ, fakeChunk, dPlaceholder),
+      centerX,
+      centerY,
+      centerZ,
+      'tall_well'
+    );
+    reserveTallWellFootprint(centerX, centerZ);
+    hasQueuedCityTallWell = true;
+    return true;
+  }
+
+  function generateTallWell(x, y, z, chunk, dObj) {
+    tallWell.generate(x, y, z, chunk, dObj, true);
   }
 
   for (let x = 0; x < CHUNK_SIZE; x++) {
@@ -992,7 +1085,13 @@ onmessage = async function(e) {
     }
   }
 
-  // City 后置填充：在树木/花坛候选完成后，再尝试生成 pavilion（概率为花坛 2 倍）
+  // City 后置填充：在树木/花坛候选完成后，先尝试生成 tall_well（概率更高）
+  for (const candidate of cityCoreCandidates) {
+    if (seededRandom(candidate.x, candidate.z, seed + 826) >= CITY_TALL_WELL_CHANCE) continue;
+    queueCityTallWell(candidate.x, candidate.y, candidate.z);
+  }
+
+  // City 后置填充：在 tall_well 之后生成 pavilion
   for (const candidate of cityCoreCandidates) {
     if (seededRandom(candidate.x, candidate.z, seed + 824) >= CITY_PAVILION_CHANCE) continue;
     queueCityPavilion(candidate.x, candidate.y, candidate.z);
@@ -1012,6 +1111,23 @@ onmessage = async function(e) {
 
     for (const candidate of fallbackCandidates) {
       if (queueCityPavilion(candidate.x, candidate.y, candidate.z)) {
+        break;
+      }
+    }
+  }
+
+  // 兜底：若本 Chunk 未成功生成 tall_well，在 City 区块中尝试强制生成（需通过概率检查）
+  if (!hasQueuedCityTallWell && cityCoreCandidates.length > 0 &&
+      seededRandom(cx, cz, seed + 828) < CITY_TALL_WELL_CHANCE) {
+    const fallbackCandidates = cityCoreCandidates
+      .map((candidate) => ({
+        ...candidate,
+        score: seededRandom(candidate.x, candidate.z, seed + 827)
+      }))
+      .sort((a, b) => a.score - b.score);
+
+    for (const candidate of fallbackCandidates) {
+      if (queueCityTallWell(candidate.x, candidate.y, candidate.z)) {
         break;
       }
     }

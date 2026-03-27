@@ -1,0 +1,5969 @@
+{
+  "blocks": [
+    {
+      "x": -16,
+      "y": 21,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -16,
+      "y": 21,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -16,
+      "y": 21,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -16,
+      "y": 21,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -16,
+      "y": 21,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -16,
+      "y": 21,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -16,
+      "y": 21,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 21,
+      "z": -13,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 21,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 21,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 21,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 21,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 21,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 21,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 21,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -15,
+      "y": 21,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 21,
+      "z": -12,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 21,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 21,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 21,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 21,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 21,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 21,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -14,
+      "y": 21,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 21,
+      "z": -11,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 21,
+      "z": -10,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 21,
+      "z": -9,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 21,
+      "z": -8,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 21,
+      "z": -7,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 21,
+      "z": -6,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -13,
+      "y": 21,
+      "z": -5,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": -3,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 10,
+      "z": -2,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 11,
+      "z": -2,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 12,
+      "z": -2,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 13,
+      "z": -2,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 10,
+      "z": 2,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 11,
+      "z": 2,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 12,
+      "z": 2,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 13,
+      "z": 2,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": -5,
+      "y": 1,
+      "z": 3,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -3,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 11,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 12,
+      "z": -3,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 13,
+      "z": -3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -2,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": -2,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 10,
+      "z": -2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 12,
+      "z": -2,
+      "type": "cobblestone_step_updown",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 13,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": -1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 12,
+      "z": -1,
+      "type": "cobblestone_step_updown",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 13,
+      "z": -1,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 0,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 12,
+      "z": 0,
+      "type": "cobblestone_step_updown",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 13,
+      "z": 0,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 12,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 13,
+      "z": 1,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 2,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 2,
+      "z": 2,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 9,
+      "z": 2,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 10,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 11,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 12,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 13,
+      "z": 2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 3,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 12,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 13,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -4,
+      "y": 1,
+      "z": 4,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": -4,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": -4,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": -3,
+      "y": 12,
+      "z": -4,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 13,
+      "z": -4,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -3,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": -3,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": -3,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 12,
+      "z": -3,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 13,
+      "z": -3,
+      "type": "stone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -2,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": -2,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 3,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 6,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 7,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 9,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 12,
+      "z": -2,
+      "type": "ochre_froglight",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 13,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 14,
+      "z": -2,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": -1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": -1,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 9,
+      "z": -1,
+      "type": "polished_blackstone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 13,
+      "z": -1,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 14,
+      "z": -1,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 0,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": 0,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 9,
+      "z": 0,
+      "type": "polished_blackstone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 13,
+      "z": 0,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 14,
+      "z": 0,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": 1,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 9,
+      "z": 1,
+      "type": "polished_blackstone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 12,
+      "z": 1,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 13,
+      "z": 1,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 14,
+      "z": 1,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 2,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": 2,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 3,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 4,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 5,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 6,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 7,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 8,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 9,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 12,
+      "z": 2,
+      "type": "ochre_froglight",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 13,
+      "z": 2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 14,
+      "z": 2,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 1,
+      "z": 3,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 2,
+      "z": 3,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 12,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 13,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -3,
+      "y": 10,
+      "z": 4,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": -3,
+      "y": 11,
+      "z": 4,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": -3,
+      "y": 12,
+      "z": 4,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": -3,
+      "y": 13,
+      "z": 4,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -3,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 12,
+      "z": -3,
+      "type": "cobblestone_step_updown",
+      "direction": 3
+    },
+    {
+      "x": -2,
+      "y": 13,
+      "z": -3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -2,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": -2,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": -2,
+      "type": "polished_blackstone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 13,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": -2,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": -1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": -1,
+      "type": "smooth_stone_1",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": -1,
+      "type": "water",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": -1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": -1,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 15,
+      "z": -1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 0,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 0,
+      "type": "smooth_stone_1",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 0,
+      "type": "water",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": 0,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": 0,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 15,
+      "z": 0,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 1,
+      "type": "smooth_stone_1",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "z": 1,
+      "type": "water",
+      "direction": 1
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": 1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": 1,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 15,
+      "z": 1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 2,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 2,
+      "z": 2,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 9,
+      "z": 2,
+      "type": "polished_blackstone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 13,
+      "z": 2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 14,
+      "z": 2,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 1,
+      "z": 3,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -2,
+      "y": 12,
+      "z": 3,
+      "type": "cobblestone_step_updown",
+      "direction": 1
+    },
+    {
+      "x": -2,
+      "y": 13,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -3,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 12,
+      "z": -3,
+      "type": "cobblestone_step_updown",
+      "direction": 3
+    },
+    {
+      "x": -1,
+      "y": 13,
+      "z": -3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -2,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -2,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": -2,
+      "type": "polished_blackstone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 13,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": -2,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": -1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": -1,
+      "type": "smooth_stone_1",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": -1,
+      "type": "water",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": -1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": -1,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 15,
+      "z": -1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 0,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 0,
+      "type": "smooth_stone_1",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 0,
+      "type": "water",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": 0,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": 0,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 15,
+      "z": 0,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 16,
+      "z": 0,
+      "type": "deepslate_diamond_ore",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 1,
+      "type": "smooth_stone_1",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 3,
+      "z": 1,
+      "type": "water",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": 1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": 1,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 15,
+      "z": 1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 2,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 2,
+      "z": 2,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 9,
+      "z": 2,
+      "type": "polished_blackstone_bricks",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 13,
+      "z": 2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 14,
+      "z": 2,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 1,
+      "z": 3,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": -1,
+      "y": 12,
+      "z": 3,
+      "type": "cobblestone_step_updown",
+      "direction": 1
+    },
+    {
+      "x": -1,
+      "y": 13,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -3,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": -3,
+      "type": "cobblestone_step_updown",
+      "direction": 3
+    },
+    {
+      "x": 0,
+      "y": 13,
+      "z": -3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -2,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -2,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": -2,
+      "type": "polished_blackstone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": -2,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 13,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "z": -2,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": -1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": -1,
+      "type": "smooth_stone_1",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": -1,
+      "type": "water",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": -1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "z": -1,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 15,
+      "z": -1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 0,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 0,
+      "type": "smooth_stone_1",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 0,
+      "type": "water",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": 0,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "z": 0,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 15,
+      "z": 0,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 1,
+      "type": "smooth_stone_1",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 3,
+      "z": 1,
+      "type": "water",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": 1,
+      "type": "glass_block",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "z": 1,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 15,
+      "z": 1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 2,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 2,
+      "z": 2,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "z": 2,
+      "type": "polished_blackstone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 13,
+      "z": 2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "z": 2,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 1,
+      "z": 3,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "z": 3,
+      "type": "cobblestone_step_updown",
+      "direction": 1
+    },
+    {
+      "x": 0,
+      "y": 13,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": -4,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": -4,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": -4,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": -4,
+      "type": "handrailA",
+      "direction": 1
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -3,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -3,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": -3,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": -3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -2,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -2,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 7,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": -2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": -2,
+      "type": "ochre_froglight",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "z": -2,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": -1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": -1,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": -1,
+      "type": "polished_blackstone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": -1,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "z": -1,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 0,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 0,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": 0,
+      "type": "polished_blackstone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": 0,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "z": 0,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 1,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": 1,
+      "type": "polished_blackstone_bricks",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": 1,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "z": 1,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 2,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 2,
+      "type": "smooth_stone",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 3,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 4,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 5,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 6,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 7,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": 2,
+      "type": "block_of_quartz",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": 2,
+      "type": "ochre_froglight",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": 2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "z": 2,
+      "type": "weathered_cut_copper",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 1,
+      "z": 3,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 2,
+      "z": 3,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "z": 3,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "z": 3,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": 3,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "z": 4,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "z": 4,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "z": 4,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "z": 4,
+      "type": "handrailA",
+      "direction": 3
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -4,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -3,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "z": -3,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": -3,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "z": -3,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": -3,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": -3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -2,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": -2,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": -2,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": -2,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": -2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": -1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": -1,
+      "type": "cobblestone_step_updown",
+      "direction": 2
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": -1,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 0,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": 0,
+      "type": "cobblestone_step_updown",
+      "direction": 2
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": 0,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 1,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": 1,
+      "type": "cobblestone_step_updown",
+      "direction": 2
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": 1,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 2,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 2,
+      "z": 2,
+      "type": "azalea_leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "z": 2,
+      "type": "azalea_flowers",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": 2,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": 2,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 3,
+      "type": "floatato",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "z": 3,
+      "type": "light_gray_cloth",
+      "direction": 0
+    },
+    {
+      "x": 2,
+      "y": 1,
+      "z": 4,
+      "type": "yellow_leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": -3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": -2,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "z": -2,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 12,
+      "z": -2,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": 3,
+      "y": 13,
+      "z": -2,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "z": 2,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "z": 2,
+      "type": "handrailA",
+      "direction": 0
+    },
+    {
+      "x": 3,
+      "y": 12,
+      "z": 2,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": 3,
+      "y": 13,
+      "z": 2,
+      "type": "handrailA",
+      "direction": 2
+    },
+    {
+      "x": 3,
+      "y": 1,
+      "z": 3,
+      "type": "leaves",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 21,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 21,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 21,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 21,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 53,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 54,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 54,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 54,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 53,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 55,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 17,
+      "y": 54,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 21,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 21,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 21,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 21,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 50,
+      "z": 20,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 53,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 54,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 53,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 53,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 53,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 54,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 55,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 53,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 54,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 18,
+      "y": 55,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 21,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 21,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 21,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 21,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 50,
+      "z": 17,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 50,
+      "z": 18,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 50,
+      "z": 19,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 49,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 50,
+      "z": 20,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 50,
+      "z": 21,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 53,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 54,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 55,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 50,
+      "z": 22,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 53,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 54,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 55,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 50,
+      "z": 23,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 51,
+      "z": 23,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 52,
+      "z": 23,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 53,
+      "z": 23,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 54,
+      "z": 23,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 55,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 53,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 55,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 19,
+      "y": 53,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 21,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 21,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 21,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 21,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 21,
+      "z": 0,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 21,
+      "z": 1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 50,
+      "z": 16,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 49,
+      "z": 17,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 50,
+      "z": 17,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 49,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 50,
+      "z": 18,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 49,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 50,
+      "z": 19,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 48,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 49,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 50,
+      "z": 20,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 49,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 50,
+      "z": 21,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 53,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 55,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 49,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 50,
+      "z": 22,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 53,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 49,
+      "z": 23,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 50,
+      "z": 23,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 55,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 50,
+      "z": 24,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 54,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 53,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 20,
+      "y": 54,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 21,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 21,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 21,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 21,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 21,
+      "z": 1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 21,
+      "z": 2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 53,
+      "z": 13,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 55,
+      "z": 13,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 53,
+      "z": 14,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 54,
+      "z": 14,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 55,
+      "z": 14,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 50,
+      "z": 15,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 53,
+      "z": 15,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 49,
+      "z": 16,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 50,
+      "z": 16,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 53,
+      "z": 16,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 54,
+      "z": 16,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 55,
+      "z": 16,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 49,
+      "z": 17,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 50,
+      "z": 17,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 48,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 49,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 50,
+      "z": 18,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 53,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 54,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 55,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 48,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 49,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 50,
+      "z": 19,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 53,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 55,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 47,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 48,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 49,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 50,
+      "z": 20,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 55,
+      "z": 20,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 48,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 49,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 50,
+      "z": 21,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 53,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 55,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 48,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 49,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 50,
+      "z": 22,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 53,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 54,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 55,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 49,
+      "z": 23,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 50,
+      "z": 23,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 53,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 54,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 49,
+      "z": 24,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 50,
+      "z": 24,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 53,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 54,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 55,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 50,
+      "z": 25,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 53,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 54,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 21,
+      "y": 55,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 21,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 21,
+      "z": -3,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 21,
+      "z": -2,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 21,
+      "z": -1,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 53,
+      "z": 13,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 54,
+      "z": 13,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 55,
+      "z": 13,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 55,
+      "z": 14,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 50,
+      "z": 15,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 53,
+      "z": 15,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 55,
+      "z": 15,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 49,
+      "z": 16,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 50,
+      "z": 16,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 53,
+      "z": 16,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 48,
+      "z": 17,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 49,
+      "z": 17,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 50,
+      "z": 17,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 53,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 47,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 48,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 49,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 50,
+      "z": 18,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 53,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 54,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 55,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 47,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 48,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 49,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 50,
+      "z": 19,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 53,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 54,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 47,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 48,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 49,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 50,
+      "z": 20,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 53,
+      "z": 20,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 55,
+      "z": 20,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 47,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 48,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 49,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 50,
+      "z": 21,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 53,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 54,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 55,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 47,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 48,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 49,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 50,
+      "z": 22,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 53,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 54,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 55,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 48,
+      "z": 23,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 49,
+      "z": 23,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 50,
+      "z": 23,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 53,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 54,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 55,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 49,
+      "z": 24,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 50,
+      "z": 24,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 53,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 54,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 55,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 50,
+      "z": 25,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 53,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 54,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 55,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 54,
+      "z": 26,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 22,
+      "y": 55,
+      "z": 26,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 21,
+      "z": -4,
+      "type": "cloud",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 54,
+      "z": 13,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 54,
+      "z": 14,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 50,
+      "z": 15,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 51,
+      "z": 15,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 52,
+      "z": 15,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 53,
+      "z": 15,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 54,
+      "z": 15,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 55,
+      "z": 15,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 49,
+      "z": 16,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 50,
+      "z": 16,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 53,
+      "z": 16,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 54,
+      "z": 16,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 55,
+      "z": 16,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 48,
+      "z": 17,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 49,
+      "z": 17,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 50,
+      "z": 17,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 53,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 54,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 55,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 47,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 48,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 49,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 50,
+      "z": 18,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 54,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 55,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 47,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 48,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 49,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 50,
+      "z": 19,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 53,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 54,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 55,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 46,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 47,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 48,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 49,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 50,
+      "z": 20,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 51,
+      "z": 20,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 52,
+      "z": 20,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 53,
+      "z": 20,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 54,
+      "z": 20,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 47,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 48,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 49,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 50,
+      "z": 21,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 53,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 54,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 55,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 47,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 48,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 49,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 50,
+      "z": 22,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 53,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 54,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 55,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 48,
+      "z": 23,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 49,
+      "z": 23,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 50,
+      "z": 23,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 51,
+      "z": 23,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 52,
+      "z": 23,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 53,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 54,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 55,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 49,
+      "z": 24,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 50,
+      "z": 24,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 54,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 55,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 50,
+      "z": 25,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 53,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 54,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 55,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 53,
+      "z": 26,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 54,
+      "z": 26,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 23,
+      "y": 55,
+      "z": 26,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 54,
+      "z": 13,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 55,
+      "z": 13,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 50,
+      "z": 14,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 55,
+      "z": 14,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 49,
+      "z": 15,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 50,
+      "z": 15,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 53,
+      "z": 15,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 54,
+      "z": 15,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 48,
+      "z": 16,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 49,
+      "z": 16,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 50,
+      "z": 16,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 53,
+      "z": 16,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 54,
+      "z": 16,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 47,
+      "z": 17,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 48,
+      "z": 17,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 49,
+      "z": 17,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 50,
+      "z": 17,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 53,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 54,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 55,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 47,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 48,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 49,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 50,
+      "z": 18,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 53,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 55,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 46,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 47,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 48,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 49,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 50,
+      "z": 19,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 51,
+      "z": 19,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 52,
+      "z": 19,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 53,
+      "z": 19,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 54,
+      "z": 19,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 55,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 45,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 46,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 47,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 48,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 49,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 50,
+      "z": 20,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 51,
+      "z": 20,
+      "type": "chest",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 53,
+      "z": 20,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 54,
+      "z": 20,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 55,
+      "z": 20,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 46,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 47,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 48,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 49,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 50,
+      "z": 21,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 53,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 54,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 55,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 47,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 48,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 49,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 50,
+      "z": 22,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 53,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 54,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 55,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 47,
+      "z": 23,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 48,
+      "z": 23,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 49,
+      "z": 23,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 50,
+      "z": 23,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 53,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 54,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 55,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 48,
+      "z": 24,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 49,
+      "z": 24,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 50,
+      "z": 24,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 51,
+      "z": 24,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 52,
+      "z": 24,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 53,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 54,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 55,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 49,
+      "z": 25,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 50,
+      "z": 25,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 53,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 54,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 55,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 50,
+      "z": 26,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 53,
+      "z": 26,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 54,
+      "z": 26,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 24,
+      "y": 55,
+      "z": 26,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 53,
+      "z": 13,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 55,
+      "z": 13,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 54,
+      "z": 14,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 55,
+      "z": 14,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 50,
+      "z": 15,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 53,
+      "z": 15,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 54,
+      "z": 15,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 55,
+      "z": 15,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 49,
+      "z": 16,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 50,
+      "z": 16,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 54,
+      "z": 16,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 48,
+      "z": 17,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 49,
+      "z": 17,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 50,
+      "z": 17,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 53,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 54,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 55,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 47,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 48,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 49,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 50,
+      "z": 18,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 53,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 54,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 55,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 47,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 48,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 49,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 50,
+      "z": 19,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 53,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 54,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 55,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 46,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 47,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 48,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 49,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 50,
+      "z": 20,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 53,
+      "z": 20,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 54,
+      "z": 20,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 55,
+      "z": 20,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 47,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 48,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 49,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 50,
+      "z": 21,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 53,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 54,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 55,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 47,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 48,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 49,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 50,
+      "z": 22,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 53,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 54,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 55,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 48,
+      "z": 23,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 49,
+      "z": 23,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 50,
+      "z": 23,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 53,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 54,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 55,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 49,
+      "z": 24,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 50,
+      "z": 24,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 53,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 54,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 55,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 50,
+      "z": 25,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 51,
+      "z": 25,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 52,
+      "z": 25,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 53,
+      "z": 25,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 54,
+      "z": 25,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 55,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 53,
+      "z": 26,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 54,
+      "z": 26,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 25,
+      "y": 55,
+      "z": 26,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 50,
+      "z": 15,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 49,
+      "z": 16,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 50,
+      "z": 16,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 48,
+      "z": 17,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 49,
+      "z": 17,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 50,
+      "z": 17,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 53,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 55,
+      "z": 17,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 47,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 48,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 49,
+      "z": 18,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 50,
+      "z": 18,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 53,
+      "z": 18,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 47,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 48,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 49,
+      "z": 19,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 50,
+      "z": 19,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 53,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 54,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 55,
+      "z": 19,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 47,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 48,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 49,
+      "z": 20,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 50,
+      "z": 20,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 53,
+      "z": 20,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 54,
+      "z": 20,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 55,
+      "z": 20,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 47,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 48,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 49,
+      "z": 21,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 50,
+      "z": 21,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 53,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 54,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 55,
+      "z": 21,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 47,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 48,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 49,
+      "z": 22,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 50,
+      "z": 22,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 51,
+      "z": 22,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 52,
+      "z": 22,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 53,
+      "z": 22,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 54,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 55,
+      "z": 22,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 48,
+      "z": 23,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 49,
+      "z": 23,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 50,
+      "z": 23,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 53,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 54,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 55,
+      "z": 23,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 49,
+      "z": 24,
+      "type": "sky_stone",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 50,
+      "z": 24,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 53,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 54,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 55,
+      "z": 24,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 50,
+      "z": 25,
+      "type": "sky_grass",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 51,
+      "z": 25,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 52,
+      "z": 25,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 53,
+      "z": 25,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 54,
+      "z": 25,
+      "type": "sky_wood",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 55,
+      "z": 25,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 53,
+      "z": 26,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 54,
+      "z": 26,
+      "type": "sky_leaves",
+      "direction": 0
+    },
+    {
+      "x": 26,
+      "y": 55,
+      "z": 26,
+      "type": "sky_leaves",
+      "direction": 0
+    }
+  ],
+  "metadata": {
+    "created": "2026-03-27T12:42:03.200Z",
+    "dimensions": {
+      "width": 43,
+      "height": 55,
+      "depth": 40
+    }
+  }
+}
