@@ -132,11 +132,9 @@ function resolveLargeStaticStructureType(params) {
   if (!safeForStructure || occupied) return null;
 
   if (biome === 'DESERT') {
-    // gate 概率与 uglyHouse 一致（0.00008）
-    if (seededRandom(wx, wz, seed + 27) < 0.00008) return 'gate';
+    // gate 和 whiteTower 已从沙漠中移除
     if (seededRandom(wx, wz, seed + 25) < 0.00016) return 'desertPyramid';
     if (seededRandom(wx, wz, seed + 26) < 0.00016) return 'desertVillage';
-    if (seededRandom(wx, wz, seed + 28) < 0.00016) return 'whiteTower';
     if (seededRandom(wx, wz, seed + 23) < 0.00008) return 'uglyHouse';
     return null;
   }
@@ -582,18 +580,18 @@ onmessage = async function(e) {
         // 平地生成逻辑（规则正方形 + 完全平坦）
         const plainLandResult = PlainLand.generate(wx, wz, h, plainLandInfo, fakeChunk, dPlaceholder);
 
-        // 每块平地唯一生成一个城堡，固定在中心
-        const isCastleCenter = wx === plainLandInfo.centerX && wz === plainLandInfo.centerZ;
-        const castleCenterKey = `${plainLandInfo.centerX},${plainLandInfo.centerZ}`;
-        if (isCastleCenter && !plainLandCastleCenters.has(castleCenterKey)) {
+        // 每块平地唯一生成一个 pyramid_island，固定在中心
+        const isPyramidIslandCenter = wx === plainLandInfo.centerX && wz === plainLandInfo.centerZ;
+        const pyramidIslandCenterKey = `${plainLandInfo.centerX},${plainLandInfo.centerZ}`;
+        if (isPyramidIslandCenter && !plainLandCastleCenters.has(pyramidIslandCenterKey)) {
           createStructureTask(
-            generateCastle.bind(null, plainLandInfo.centerX, plainLandResult.surfaceY + 1, plainLandInfo.centerZ, fakeChunk, dPlaceholder),
+            generatePyramidIsland.bind(null, plainLandInfo.centerX, plainLandResult.surfaceY + 1, plainLandInfo.centerZ, fakeChunk, dPlaceholder),
             plainLandInfo.centerX,
             plainLandResult.surfaceY + 1,
             plainLandInfo.centerZ,
-            'castle',
+            'pyramidIsland',
             plainLandCastleCenters,
-            castleCenterKey
+            pyramidIslandCenterKey
           );
         }
       } else if (inSnowLand) {
@@ -977,7 +975,7 @@ onmessage = async function(e) {
       const plainLandInfo = PlainLand.getPlainLandInfo(wx, wz, seed, terrainGen);
       if (plainLandInfo) {
         if (wx === plainLandInfo.centerX && wz === plainLandInfo.centerZ) {
-          appendLargeStaticTask('castle', plainLandInfo.centerX, plainLandInfo.baseHeight + 1, plainLandInfo.centerZ);
+          appendLargeStaticTask('pyramidIsland', plainLandInfo.centerX, plainLandInfo.baseHeight + 1, plainLandInfo.centerZ);
         }
         continue;
       }
