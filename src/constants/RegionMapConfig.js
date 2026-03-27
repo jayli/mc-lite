@@ -75,8 +75,8 @@ export const CITY_STRUCTURE_CONFIGS = Object.freeze([
   // 大尺寸结构优先放置
   { type: 'pyramidIsland', count: 1 },
   { type: 'bigHouse', count: 2 },
-  { type: 'whiteTower', countRange: [2, 3] },
-  { type: 'desertVillage', countRange: [3, 5] },
+  // whiteTower 已移除
+  { type: 'desertVillage', countRange: [2, 3] },
   { type: 'doubleTower', count: 1 },
   { type: 'boxHouse', count: 2 },
   { type: 'smallHouse', count: 2 },
@@ -125,8 +125,8 @@ export const CITY_PLACEMENT = {
   FORCED_GAP_STRICT: 10,
   FORCED_GAP_LOOSE: 5,
   FORCED_GAP_MINIMAL: 0,
-  /** 门放置数量 */
-  GATE_COUNT: 2,
+  /** 门放置数量（已禁用） */
+  GATE_COUNT: 0,
   /** 门放置 Z 轴偏移搜索范围 */
   GATE_Z_OFFSET_MAX: 15,
   /** 门放置 X 轴搜索步长 */
