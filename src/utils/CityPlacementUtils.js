@@ -3,7 +3,7 @@
  * 提供放置计算、边界检查、距离判定等通用功能
  */
 
-import { CITY_PLACEMENT, CITY_STRUCTURE_FOOTPRINT } from '../constants/RegionMapConfig.js';
+import { CITY_PLACEMENT, CITY_STRUCTURE_FOOTPRINT, CITY_TRANSITION_SIZE } from '../constants/RegionMapConfig.js';
 
 const { HASH_MULTIPLIER } = CITY_PLACEMENT;
 
@@ -302,79 +302,58 @@ export const PlacementStrategy = {
 };
 
 /**
- * 根据策略检查放置是否有效
- * @param {Object} candidate - 候选位置 { x, z, type }
+ * 检查放置是否有效（CityMap 专用版本）
+ * @param {Object} candidate - 候选位置 { x, z, type, index }
  * @param {Array} existing - 已放置建筑列表
  * @param {number} seed - 世界种子
- * @param {string} strategy - 放置策略
  * @param {Object} [bounds=null] - City 边界
  * @param {boolean} [requireTransitionZone=true] - 是否要求在过渡带内
  * @returns {boolean} 是否有效
  */
-export function isValidPlacement(candidate, existing, seed, strategy = PlacementStrategy.NORMAL, bounds = null, requireTransitionZone = true) {
+export function isPlacementValid(candidate, existing, seed, bounds = null, requireTransitionZone = true) {
   const fpA = CITY_STRUCTURE_FOOTPRINT[candidate.type];
   if (!fpA) return false;
 
-  // 边界检查
+  // 边界检查：确保建筑占地完全在 City 边界内，且在过渡带内边界内
   if (bounds) {
-    const buildBounds = getStructureBounds(candidate.x, candidate.z, candidate.type);
-    if (!buildBounds) return false;
+    const boundsA = getStructureBounds(candidate.x, candidate.z, candidate.type);
+    if (!boundsA) return false;
 
-    // 检查是否在 City 边界内
-    if (!isPointInBounds(buildBounds.minX, buildBounds.minZ, bounds) ||
-        !isPointInBounds(buildBounds.maxX, buildBounds.maxZ, bounds)) {
+    // 检查是否完全在 City 边界内
+    if (!isPointInBounds(boundsA.minX, boundsA.minZ, bounds) ||
+        !isPointInBounds(boundsA.maxX, boundsA.maxZ, bounds)) {
       return false;
     }
 
-    // 检查是否在过渡带内
+    // 检查是否在过渡带内边界内
     if (requireTransitionZone) {
       const innerBounds = {
-        minX: bounds.minX + 32, // CITY_TRANSITION_SIZE
-        maxX: bounds.maxX - 32,
-        minZ: bounds.minZ + 32,
-        maxZ: bounds.maxZ - 32
+        minX: bounds.minX + CITY_TRANSITION_SIZE,
+        maxX: bounds.maxX - CITY_TRANSITION_SIZE,
+        minZ: bounds.minZ + CITY_TRANSITION_SIZE,
+        maxZ: bounds.maxZ - CITY_TRANSITION_SIZE
       };
-      if (!isPointInBounds(buildBounds.minX, buildBounds.minZ, innerBounds) ||
-          !isPointInBounds(buildBounds.maxX, buildBounds.maxZ, innerBounds)) {
+      if (!isPointInBounds(boundsA.minX, boundsA.minZ, innerBounds) ||
+          !isPointInBounds(boundsA.maxX, boundsA.maxZ, innerBounds)) {
         return false;
       }
     }
   }
 
-  // 根据策略检查与其他建筑的关系
+  // 检查与其他建筑的距离
   for (let i = 0; i < existing.length; i++) {
     const p = existing[i];
     const fpB = CITY_STRUCTURE_FOOTPRINT[p.type];
     if (!fpB) continue;
-
     const dx = Math.abs(candidate.x - p.x);
     const dz = Math.abs(candidate.z - p.z);
+    const gap = getGapRequirement(candidate.type, p.type, seed, candidate.index, i);
+    const limitX = fpA.halfX + fpB.halfX + gap;
+    const limitZ = fpA.halfZ + fpB.halfZ + gap;
 
-    switch (strategy) {
-      case PlacementStrategy.NORMAL: {
-        const gap = getGapRequirement(candidate.type, p.type, seed, candidate.index, i);
-        const limitX = fpA.halfX + fpB.halfX + gap;
-        const limitZ = fpA.halfZ + fpB.halfZ + gap;
-        if (dx <= limitX && dz <= limitZ) return false;
-        break;
-      }
-      case PlacementStrategy.FORCED: {
-        const limitX = fpA.halfX + fpB.halfX + CITY_PLACEMENT.FORCED_GAP_STRICT;
-        const limitZ = fpA.halfZ + fpB.halfZ + CITY_PLACEMENT.FORCED_GAP_STRICT;
-        if (dx <= limitX && dz <= limitZ) return false;
-        break;
-      }
-      case PlacementStrategy.MINIMAL: {
-        const limitX = fpA.halfX + fpB.halfX + CITY_PLACEMENT.FORCED_GAP_MINIMAL;
-        const limitZ = fpA.halfZ + fpB.halfZ + CITY_PLACEMENT.FORCED_GAP_MINIMAL;
-        if (dx < limitX && dz < limitZ) return false;
-        break;
-      }
-      case PlacementStrategy.RANDOM:
-        // 随机策略不检查距离
-        break;
+    if (dx <= limitX && dz <= limitZ) {
+      return false;
     }
   }
-
   return true;
 }

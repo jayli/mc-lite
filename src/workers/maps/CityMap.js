@@ -35,7 +35,8 @@ import {
   isPointInBounds,
   isNearPlacement,
   buildCandidates,
-  scoreDirectionalBalance
+  scoreDirectionalBalance,
+  isPlacementValid
 } from '../../utils/CityPlacementUtils.js';
 
 const CITY_MIN_SURFACE_Y = ISLAND_SEA_LEVEL + 1;
@@ -101,54 +102,6 @@ function estimateCityBaseHeight(centerX, centerZ, seed, terrainGen) {
   const { BASE_HEIGHT_SEED, BASE_HEIGHT_OFFSET_X, BASE_HEIGHT_OFFSET_Z } = CITY_PLACEMENT;
   const stableOffset = Math.floor(hash01(seed * BASE_HEIGHT_SEED + centerX * BASE_HEIGHT_OFFSET_X + centerZ * BASE_HEIGHT_OFFSET_Z) * 2);
   return Math.max(CITY_MIN_SURFACE_Y, avg + stableOffset);
-}
-
-function isPlacementValid(candidate, existing, seed, bounds = null, requireTransitionZone = true) {
-  const fpA = CITY_STRUCTURE_FOOTPRINT[candidate.type];
-  if (!fpA) return false;
-
-  // 边界检查：确保建筑占地完全在 City 边界内，且在过渡带内边界内
-  if (bounds) {
-    const boundsA = getStructureBounds(candidate.x, candidate.z, candidate.type);
-    if (!boundsA) return false;
-
-    // 检查是否完全在 City 边界内
-    if (!isPointInBounds(boundsA.minX, boundsA.minZ, bounds) ||
-        !isPointInBounds(boundsA.maxX, boundsA.maxZ, bounds)) {
-      return false;
-    }
-
-    // 检查是否在过渡带内边界内
-    if (requireTransitionZone) {
-      const innerBounds = {
-        minX: bounds.minX + CITY_TRANSITION_SIZE,
-        maxX: bounds.maxX - CITY_TRANSITION_SIZE,
-        minZ: bounds.minZ + CITY_TRANSITION_SIZE,
-        maxZ: bounds.maxZ - CITY_TRANSITION_SIZE
-      };
-      if (!isPointInBounds(boundsA.minX, boundsA.minZ, innerBounds) ||
-          !isPointInBounds(boundsA.maxX, boundsA.maxZ, innerBounds)) {
-        return false;
-      }
-    }
-  }
-
-  // 检查与其他建筑的距离
-  for (let i = 0; i < existing.length; i++) {
-    const p = existing[i];
-    const fpB = CITY_STRUCTURE_FOOTPRINT[p.type];
-    if (!fpB) continue;
-    const dx = Math.abs(candidate.x - p.x);
-    const dz = Math.abs(candidate.z - p.z);
-    const gap = getGapRequirement(candidate.type, p.type, seed, candidate.index, i);
-    const limitX = fpA.halfX + fpB.halfX + gap;
-    const limitZ = fpA.halfZ + fpB.halfZ + gap;
-
-    if (dx <= limitX && dz <= limitZ) {
-      return false;
-    }
-  }
-  return true;
 }
 
 function findPlacementWithFallback(state, type, index, k, seed, minR, maxR, bounds) {
