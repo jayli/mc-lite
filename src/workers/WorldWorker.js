@@ -219,8 +219,9 @@ onmessage = async function(e) {
         realisticTrees: snapshot.entities.realisticTrees || [],
         modGunMan: snapshot.entities.modGunMan || [],
         rovers: snapshot.entities.rovers || [],
-        zombieNests: snapshot.entities.zombieNests || []
-      } : { realisticTrees: [], modGunMan: [], rovers: [], zombieNests: [] }
+        zombieNests: snapshot.entities.zombieNests || [],
+        staticTrees: snapshot.entities.staticTrees || []
+      } : { realisticTrees: [], modGunMan: [], rovers: [], zombieNests: [], staticTrees: [] }
     };
   }
 
@@ -1071,6 +1072,16 @@ onmessage = async function(e) {
       rovers.forEach(pos => {
         if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
           structureCenters.push({ type: 'rover', ...pos });
+        }
+      });
+    }
+
+    // 修复：从 staticTrees 恢复 static_tree 结构中心，防止 City 树跨 chunk 切割
+    const staticTrees = savedSnapshot.entities.staticTrees || [];
+    if (staticTrees) {
+      staticTrees.forEach(pos => {
+        if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
+          structureCenters.push({ type: 'static_tree', ...pos });
         }
       });
     }

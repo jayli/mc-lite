@@ -49,6 +49,11 @@ export function extendChunk(Chunk) {
         // 1.1 保存结构中心列表，用于跨 Chunk 碰撞体生成
         this.structureCenters = structureCenters || [];
 
+        // 1.1.1 从 structureCenters 提取 static_tree 并保存，用于 consolidate 时恢复
+        this.entities.staticTrees = (structureCenters || [])
+          .filter(c => c.type === 'static_tree')
+          .map(c => ({ x: c.x, y: c.y, z: c.z }));
+
         // 1.2 保存实体快照，用于后续合并
         this.entities.realisticTrees = realisticTrees || [];
         this.entities.modGunMan = modGunMan || [];

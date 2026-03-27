@@ -298,7 +298,10 @@ export function extendChunk(Chunk) {
       seed: WORLD_CONFIG.SEED,
       snapshot: {
         blocks: { ...this.blockData },
-        entities: { ...this.entities }
+        entities: {
+          ...this.entities,
+          staticTrees: this.entities.staticTrees || []
+        }
       },
       structureCenters: this.structureCenters,
       isOptimization: true
