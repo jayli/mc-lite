@@ -45,13 +45,16 @@ const {
   tower,
   castle,
   gate,
-  flowerBed
+  flowerBed,
+  pavilion
 } = structureLoaders;
 
 const CHUNK_SIZE = 16;
 const ROOMS_PER_CHUNK = 2;
 const MAX_ROOM_SIZE = 5;
 const LARGE_STATIC_SCAN_PADDING = 36; // 与 castle/tank 最大渲染半径一致
+const CITY_FLOWER_BED_CHANCE = 0.0005;
+const CITY_PAVILION_CHANCE = CITY_FLOWER_BED_CHANCE * 6;
 
 /**
  * 将世界坐标转换为 Chunk 内局部坐标（0-15）
@@ -171,7 +174,8 @@ onmessage = async function(e) {
     tower.load(),
     castle.load(),
     gate.load(),
-    flowerBed.load()
+    flowerBed.load(),
+    pavilion.load()
   ]).catch(err => console.error('Failed to load structure data:', err));
 
   // 计算当前区块的范围 - 提前定义，供 snapshot 模式使用
@@ -197,6 +201,8 @@ onmessage = async function(e) {
   const cityYellowTreeCenters = new Set(); // 记录 City 黄叶树中心
   const cityBirchTreeCenters = new Set(); // 记录 City brich_tree(JSON)中心
   const cityFlowerBedCenters = new Set(); // 记录 City 花坛中心
+  const cityPavilionFootprintCells = new Set(); // 记录 City pavilion 预占地，防止重叠
+  const cityCoreCandidates = []; // 记录 City 核心区候选点（用于后置填充）
 
   // 模拟 Chunk 类的 add 方法 - 改为写入 blockMap
   const fakeChunk = {
@@ -293,6 +299,114 @@ onmessage = async function(e) {
     return false;
   }
 
+  function getLoaderBottomFootprint(loader) {
+    const data = loader?.getData?.();
+    if (!data || !Array.isArray(data.blocks) || data.blocks.length === 0) return null;
+
+    let minY = Infinity;
+    for (const block of data.blocks) {
+      if (block.y < minY) minY = block.y;
+    }
+
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    let count = 0;
+    for (const block of data.blocks) {
+      if (block.y !== minY) continue;
+      if (block.x < minX) minX = block.x;
+      if (block.x > maxX) maxX = block.x;
+      if (block.z < minZ) minZ = block.z;
+      if (block.z > maxZ) maxZ = block.z;
+      count++;
+    }
+
+    if (count === 0) return null;
+    return { minX, maxX, minZ, maxZ };
+  }
+
+  const pavilionFootprint = getLoaderBottomFootprint(pavilion) || { minX: -5, maxX: 5, minZ: -3, maxZ: 3 };
+  const pavilionHalfX = Math.ceil(Math.max(Math.abs(pavilionFootprint.minX), Math.abs(pavilionFootprint.maxX)));
+  const pavilionHalfZ = Math.ceil(Math.max(Math.abs(pavilionFootprint.minZ), Math.abs(pavilionFootprint.maxZ)));
+
+  function collectPavilionFootprintCells(centerX, centerZ) {
+    const cells = [];
+    for (let ox = pavilionFootprint.minX; ox <= pavilionFootprint.maxX; ox++) {
+      for (let oz = pavilionFootprint.minZ; oz <= pavilionFootprint.maxZ; oz++) {
+        cells.push(`${centerX + ox},${centerZ + oz}`);
+      }
+    }
+    return cells;
+  }
+
+  function isPavilionFootprintReserved(centerX, centerZ) {
+    const cells = collectPavilionFootprintCells(centerX, centerZ);
+    for (const key of cells) {
+      if (cityPavilionFootprintCells.has(key)) return true;
+    }
+    return false;
+  }
+
+  function reservePavilionFootprint(centerX, centerZ) {
+    const cells = collectPavilionFootprintCells(centerX, centerZ);
+    for (const key of cells) {
+      cityPavilionFootprintCells.add(key);
+    }
+  }
+
+  function isPavilionSpaceClear(centerX, centerY, centerZ) {
+    for (let ox = pavilionFootprint.minX; ox <= pavilionFootprint.maxX; ox++) {
+      for (let oz = pavilionFootprint.minZ; oz <= pavilionFootprint.maxZ; oz++) {
+        const wx = centerX + ox;
+        const wz = centerZ + oz;
+        const cellInfo = CityMap.getCityInfo(wx, wz, seed, terrainGen);
+        if (!cellInfo || cellInfo.transitionFactor > 0) return false;
+
+        const surfaceY = CityMap.getCitySurfaceY(wx, wz, seed, terrainGen);
+        if (surfaceY === null || Math.abs(surfaceY + 1 - centerY) > 1) return false;
+
+        for (let y = centerY; y <= centerY + 2; y++) {
+          if (fakeChunk.getBlockType(wx, y, wz)) return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  function canPlaceCityPavilion(centerX, centerY, centerZ) {
+    const pavilionRadius = Math.max(pavilionHalfX, pavilionHalfZ);
+    const nearMajorBuilding = CityMap.isPointNearCityStructure(centerX, centerZ, seed, terrainGen, pavilionRadius + 1);
+    const nearFillerHouse = isNearRecordedCenter(cityFillerHouseCenters, centerX, centerZ, pavilionRadius + 3);
+    const nearFlowerBed = isNearRecordedCenter(cityFlowerBedCenters, centerX, centerZ, pavilionRadius + 5);
+    const nearTree = isNearRecordedCenter(cityTreeCenters, centerX, centerZ, pavilionRadius + 4) ||
+      isNearRecordedCenter(cityTallTreeCenters, centerX, centerZ, pavilionRadius + 5) ||
+      isNearRecordedCenter(citySwampTreeCenters, centerX, centerZ, pavilionRadius + 4) ||
+      isNearRecordedCenter(cityYellowTreeCenters, centerX, centerZ, pavilionRadius + 4) ||
+      isNearRecordedCenter(cityBirchTreeCenters, centerX, centerZ, pavilionRadius + 4);
+
+    if (nearMajorBuilding || nearFillerHouse || nearFlowerBed || nearTree) return false;
+    if (isPavilionFootprintReserved(centerX, centerZ)) return false;
+
+    return isPavilionSpaceClear(centerX, centerY, centerZ);
+  }
+
+  let hasQueuedCityPavilion = false;
+  function queueCityPavilion(centerX, centerY, centerZ) {
+    if (!canPlaceCityPavilion(centerX, centerY, centerZ)) return false;
+
+    createStructureTask(
+      generatePavilion.bind(null, centerX, centerY, centerZ, fakeChunk, dPlaceholder),
+      centerX,
+      centerY,
+      centerZ,
+      'pavilion'
+    );
+    reservePavilionFootprint(centerX, centerZ);
+    hasQueuedCityPavilion = true;
+    return true;
+  }
+
   for (let x = 0; x < CHUNK_SIZE; x++) {
     for (let z = 0; z < CHUNK_SIZE; z++) {
       const wx = cx * CHUNK_SIZE + x;
@@ -327,6 +441,9 @@ onmessage = async function(e) {
 
       if (inCity) {
         const cityResult = CityMap.generate(wx, wz, h, cityInfo, fakeChunk, dPlaceholder, seed, terrainGen);
+        if (cityInfo.transitionFactor === 0) {
+          cityCoreCandidates.push({ x: wx, y: cityResult.surfaceY + 1, z: wz });
+        }
         const cityStructure = cityPlacementMap.get(`${wx},${wz}`) || cityFillerPlacementMap.get(`${wx},${wz}`) || null;
         if (cityStructure && !cityStructureCenters.has(cityStructure.id)) {
           const centerY = cityResult.surfaceY + 1;
@@ -459,7 +576,7 @@ onmessage = async function(e) {
 
         // City 内新增：花坛（flower_bed），填充建筑间空白
         // 概率 0.0005，padding 减小到 1，只在核心区域生成
-        if (cityInfo.transitionFactor === 0 && seededRandom(wx, wz, seed + 823) < 0.0005) {
+        if (cityInfo.transitionFactor === 0 && seededRandom(wx, wz, seed + 823) < CITY_FLOWER_BED_CHANCE) {
           const flowerBedKey = `${wx},${wz}`;
           // 只检查是否靠近主要建筑（1格缓冲），不与其他任何结构进行距离测算
           const nearMajorBuilding = CityMap.isPointNearCityStructure(wx, wz, seed, terrainGen, 1);
@@ -871,6 +988,31 @@ onmessage = async function(e) {
       }
       if (terrainGen.shouldGenerateCloud(wx, wz)) {
         Cloud.generate(wx, 55, wz, fakeChunk, dPlaceholder);
+      }
+    }
+  }
+
+  // City 后置填充：在树木/花坛候选完成后，再尝试生成 pavilion（概率为花坛 2 倍）
+  for (const candidate of cityCoreCandidates) {
+    if (seededRandom(candidate.x, candidate.z, seed + 824) >= CITY_PAVILION_CHANCE) continue;
+    queueCityPavilion(candidate.x, candidate.y, candidate.z);
+  }
+
+  // 兜底：若本 Chunk 未成功生成 pavilion，强制在核心区找一个可放置空地生成一次
+  const cityCenterChunkX = cityLayout ? Math.floor(cityLayout.centerX / CHUNK_SIZE) : null;
+  const cityCenterChunkZ = cityLayout ? Math.floor(cityLayout.centerZ / CHUNK_SIZE) : null;
+  const shouldRunCityFallback = cityCenterChunkX === cx && cityCenterChunkZ === cz;
+  if (!hasQueuedCityPavilion && cityCoreCandidates.length > 0 && shouldRunCityFallback) {
+    const fallbackCandidates = cityCoreCandidates
+      .map((candidate) => ({
+        ...candidate,
+        score: seededRandom(candidate.x, candidate.z, seed + 825)
+      }))
+      .sort((a, b) => a.score - b.score);
+
+    for (const candidate of fallbackCandidates) {
+      if (queueCityPavilion(candidate.x, candidate.y, candidate.z)) {
+        break;
       }
     }
   }
@@ -1368,6 +1510,18 @@ function generateBirchTreeWithSnow(x, y, z, chunk, dObj) {
  */
 function generateFlowerBed(x, y, z, chunk, dObj) {
   flowerBed.generate(x, y, z, chunk, dObj, true);
+}
+
+/**
+ * 生成凉亭（从 JSON 数据）
+ * @param {number} x - X 坐标
+ * @param {number} y - Y 坐标
+ * @param {number} z - Z 坐标
+ * @param {Object} chunk - 区块对象
+ * @param {Object} dObj - 数据收集对象
+ */
+function generatePavilion(x, y, z, chunk, dObj) {
+  pavilion.generate(x, y, z, chunk, dObj, true);
 }
 
 /**

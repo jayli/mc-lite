@@ -39,6 +39,7 @@ export const STRUCTURE_RENDER_DIST = {
   whiteTower: 24,     // white_tower 结构尺寸约 22x39x11（含侧边树冠）
   castle: 36,         // 城堡尺寸约 70x70，含外墙与塔楼
   gate: 20,           // 拱门尺寸约 24x22x11（含两侧塔楼与连桥）
+  pavilion: 24,       // pavilion 顶部云结构跨度较大
   rover: 3,           // 火星车
   gunman: 3,          // 模型人
   island: 16          // 空岛跨Chunk渲染距离
@@ -62,7 +63,8 @@ export const STRUCTURE_HEIGHT_RANGE_SPECIAL = {
   tower: 28,      // tower 结构 Y 方向±28，覆盖塔身与屋顶
   whiteTower: 40, // white_tower 结构 Y 方向±40，覆盖尖顶和树冠
   castle: 36,     // castle 结构 Y 方向±36，覆盖主楼与塔顶
-  gate: 24        // gate 结构 Y 方向±24，覆盖拱顶与塔楼
+  gate: 24,       // gate 结构 Y 方向±24，覆盖拱顶与塔楼
+  pavilion: 64    // pavilion 最高约 61 层，预留容差
 };
 
 /**
