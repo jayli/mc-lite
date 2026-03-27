@@ -459,8 +459,8 @@ onmessage = async function(e) {
         }
 
         // City 内新增：花坛（flower_bed），填充建筑间空白
-        // 概率 0.0003（原概率的三分之一），padding 减小到 1，只在核心区域生成
-        if (cityInfo.transitionFactor === 0 && seededRandom(wx, wz, seed + 823) < 0.0003) {
+        // 概率 0.0005，padding 减小到 1，只在核心区域生成
+        if (cityInfo.transitionFactor === 0 && seededRandom(wx, wz, seed + 823) < 0.0005) {
           const flowerBedKey = `${wx},${wz}`;
           // 只检查是否靠近主要建筑（1格缓冲），不与其他任何结构进行距离测算
           const nearMajorBuilding = CityMap.isPointNearCityStructure(wx, wz, seed, terrainGen, 1);
