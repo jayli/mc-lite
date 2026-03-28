@@ -1271,14 +1271,33 @@ onmessage = async function(e) {
     }
   }
 
-  structureQueueWithCenters.forEach(({ task, centerX, centerY, centerZ, type }) => {
+  structureQueueWithCenters.forEach(({ task }) => {
     task();
-    // 记录所有有中心点的结构，不限于当前 Chunk
-    // 这是修复跨 Chunk 截断的关键：相邻 Chunk 需要知道这些结构的信息
-    if (type && centerX !== undefined) {
-      structureCenters.push({ type, x: centerX, y: centerY, z: centerZ });
-    }
   });
+
+  // 结构中心统一去重，避免后续多阶段追加造成重复中心放大判定范围
+  const structureCenterKeySet = new Set();
+  const pushStructureCenter = (center) => {
+    if (!center || !center.type || center.x === undefined || center.y === undefined || center.z === undefined) return;
+    const centerKey = `${center.type}:${center.x},${center.y},${center.z}`;
+    if (structureCenterKeySet.has(centerKey)) return;
+    structureCenterKeySet.add(centerKey);
+    structureCenters.push(center);
+  };
+
+  // 重建当前队列生成出的结构中心（去重）
+  structureCenters.length = 0;
+  structureQueueWithCenters.forEach(({ centerX, centerY, centerZ, type }) => {
+    if (!type || centerX === undefined) return;
+    pushStructureCenter({ type, x: centerX, y: centerY, z: centerZ });
+  });
+
+  // consolidate 场景：提前合并主线程传入的结构中心，确保 ownership 判定使用的是完整集合
+  if (incomingStructureCenters && Array.isArray(incomingStructureCenters)) {
+    for (const incoming of incomingStructureCenters) {
+      pushStructureCenter(incoming);
+    }
+  }
 
   // 统一 Chunk 归属判定，避免多处重复实现
   const belongsToCrossChunkStructure = (bx, by, bz) =>
@@ -1315,21 +1334,21 @@ onmessage = async function(e) {
     if (realisticTrees) {
       realisticTrees.forEach(pos => {
         if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
-          structureCenters.push({ type: 'tree', ...pos });
+          pushStructureCenter({ type: 'tree', ...pos });
         }
       });
     }
     if (modGunMan) {
       modGunMan.forEach(pos => {
         if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
-          structureCenters.push({ type: 'gunman', ...pos });
+          pushStructureCenter({ type: 'gunman', ...pos });
         }
       });
     }
     if (rovers) {
       rovers.forEach(pos => {
         if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
-          structureCenters.push({ type: 'rover', ...pos });
+          pushStructureCenter({ type: 'rover', ...pos });
         }
       });
     }
@@ -1339,7 +1358,7 @@ onmessage = async function(e) {
     if (staticTrees) {
       staticTrees.forEach(pos => {
         if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
-          structureCenters.push({ type: 'static_tree', ...pos });
+          pushStructureCenter({ type: 'static_tree', ...pos });
         }
       });
     }
@@ -1349,7 +1368,7 @@ onmessage = async function(e) {
         const pos = nest?.position;
         if (!pos) return;
         if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
-          structureCenters.push({ type: 'zombieNest', x: pos.x, y: pos.y, z: pos.z });
+          pushStructureCenter({ type: 'zombieNest', x: pos.x, y: pos.y, z: pos.z });
         }
       });
     }
@@ -1429,45 +1448,7 @@ onmessage = async function(e) {
   const visibleKeys = [];
 
   // --- 跨区块实体渲染支持 ---
-  // 当一个结构/实体的中心在当前 Chunk 内时，渲染该结构的所有方块
-  // 即使方块位置超出 Chunk 边界
-  // structureCenters 已在上面定义
-
-  // 从实体列表中收集结构中心
-  if (realisticTrees) {
-    realisticTrees.forEach(pos => {
-      if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
-        structureCenters.push({ type: 'tree', ...pos });
-      }
-    });
-  }
-  if (modGunMan) {
-    modGunMan.forEach(pos => {
-      if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
-        structureCenters.push({ type: 'gunman', ...pos });
-      }
-    });
-  }
-  if (rovers) {
-    rovers.forEach(pos => {
-      if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
-        structureCenters.push({ type: 'rover', ...pos });
-      }
-    });
-  }
-
-  // 合并从主线程传入的结构中心（用于 consolidate 场景）
-  if (incomingStructureCenters && Array.isArray(incomingStructureCenters)) {
-    for (const incoming of incomingStructureCenters) {
-      // 检查是否已存在，避免重复
-      const exists = structureCenters.some(c =>
-        c.type === incoming.type && c.x === incoming.x && c.y === incoming.y && c.z === incoming.z
-      );
-      if (!exists) {
-        structureCenters.push(incoming);
-      }
-    }
-  }
+  // structureCenters 已在前面完成去重构建，避免重复追加导致 ownership 判定膨胀
 
   // 仅保存当前 Chunk 负责的数据（地图语义）
   const blocksForSnapshot = {};
