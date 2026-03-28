@@ -15,7 +15,9 @@ import { PlainLand } from './maps/PlainLand.js';
 import { CityMap } from './maps/CityMap.js';
 import {
   belongsToCrossChunkStructure as checkBelongsToCrossChunkStructure,
-  belongsToLargeStaticStructure as checkBelongsToLargeStaticStructure
+  CROSS_CHUNK_OWNER_BLOCKED_TYPES,
+  getStructureRenderDist,
+  isCrossChunkOwnerType
 } from '../utils/StructureUtils.js';
 import { getAOForFace } from '../utils/AOUtils.js';
 
@@ -53,10 +55,29 @@ const {
 const CHUNK_SIZE = 16;
 const ROOMS_PER_CHUNK = 2;
 const MAX_ROOM_SIZE = 5;
-const LARGE_STATIC_SCAN_PADDING = 36; // 与 castle/tank 最大渲染半径一致
+const STATIC_TREE_SCAN_PADDING = getStructureRenderDist('static_tree');
+const LARGE_STATIC_SCAN_PADDING = (() => {
+  const largeStaticTypes = [
+    'bigHouse', 'boxHouse', 'castle', 'doubleTower', 'gate',
+    'pyramidIsland', 'smallHouse', 'tank', 'tower', 'treeHouse',
+    'whiteTower', 'woodHouse', 'uglyHouse', 'desertVillage', 'desertPyramid'
+  ];
+  let maxDist = 0;
+  for (const type of largeStaticTypes) {
+    if (isCrossChunkOwnerType(type)) continue;
+    const dist = getStructureRenderDist(type);
+    if (dist > maxDist) maxDist = dist;
+  }
+  // 兜底：至少覆盖一个 chunk，避免配置缺失导致漏扫
+  return Math.max(maxDist, CHUNK_SIZE);
+})();
 const CITY_FLOWER_BED_CHANCE = 0.0005;
 const CITY_PAVILION_CHANCE = CITY_FLOWER_BED_CHANCE * 6;
 const CITY_TALL_WELL_CHANCE = CITY_FLOWER_BED_CHANCE * 3; // 与 pavilion 相同概率
+// 旧档归属迁移调试开关（默认关闭）
+const DEBUG_OWNERSHIP_MIGRATION = false;
+// 边界切割自动检测调试开关（默认关闭）
+const DEBUG_AUTO_CROSS_CHUNK_OWNER = false;
 
 /**
  * 将世界坐标转换为 Chunk 内局部坐标（0-15）
@@ -207,12 +228,18 @@ onmessage = async function(e) {
   const cityPavilionFootprintCells = new Set(); // 记录 City pavilion 预占地，防止重叠
   const cityTallWellFootprintCells = new Set(); // 记录 City tall_well 预占地，防止重叠
   const cityCoreCandidates = []; // 记录 City 核心区候选点（用于后置填充）
+  const blockSourceTypeMap = new Map(); // 记录方块来源结构类型（仅结构任务）
+  let activeStructureType = null;
+  const blockedCrossChunkOwnerTypes = new Set(CROSS_CHUNK_OWNER_BLOCKED_TYPES);
 
   // 模拟 Chunk 类的 add 方法 - 改为写入 blockMap
   const fakeChunk = {
     add: (x, y, z, type, dObj, solid = true, orientation = 0) => {
       const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
       blockMap.set(key, { x, y, z, type, solid, orientation });
+      if (activeStructureType) {
+        blockSourceTypeMap.set(key, activeStructureType);
+      }
     },
     getBlockType: (x, y, z) => {
       const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
@@ -225,6 +252,7 @@ onmessage = async function(e) {
   if (snapshot) {
     savedSnapshot = {
       blocks: snapshot.blocks ? { ...snapshot.blocks } : {},
+      meta: snapshot.meta ? { ...snapshot.meta } : {},
       entities: snapshot.entities ? {
         realisticTrees: snapshot.entities.realisticTrees || [],
         modGunMan: snapshot.entities.modGunMan || [],
@@ -1165,11 +1193,24 @@ onmessage = async function(e) {
   const scannedMaxX = maxX + LARGE_STATIC_SCAN_PADDING;
   const scannedMinZ = minZ - LARGE_STATIC_SCAN_PADDING;
   const scannedMaxZ = maxZ + LARGE_STATIC_SCAN_PADDING;
+  const scannedTreeMinX = minX - STATIC_TREE_SCAN_PADDING;
+  const scannedTreeMaxX = maxX + STATIC_TREE_SCAN_PADDING;
+  const scannedTreeMinZ = minZ - STATIC_TREE_SCAN_PADDING;
+  const scannedTreeMaxZ = maxZ + STATIC_TREE_SCAN_PADDING;
   const wLvl = -2;
   const getChunkBiomeByWorld = (wx, wz) => {
     const ownerCx = Math.floor(wx / CHUNK_SIZE);
     const ownerCz = Math.floor(wz / CHUNK_SIZE);
     return terrainGen.getBiome(ownerCx * CHUNK_SIZE, ownerCz * CHUNK_SIZE);
+  };
+  const getActiveBiomeByWorld = (wx, wz) => {
+    const ownerCx = Math.floor(wx / CHUNK_SIZE);
+    const ownerCz = Math.floor(wz / CHUNK_SIZE);
+    const ownerCenterBiome = terrainGen.getBiome(ownerCx * CHUNK_SIZE, ownerCz * CHUNK_SIZE);
+    const cityInfo = CityMap.getCityInfo(wx, wz, seed, terrainGen);
+    const inCity = cityInfo !== null;
+    const baseBiome = getBaseBiome(wx, wz);
+    return (ownerCenterBiome === 'CITY' && !inCity) ? baseBiome : ownerCenterBiome;
   };
   const largeStructureTaskKeySet = new Set(
     structureQueueWithCenters
@@ -1207,6 +1248,26 @@ onmessage = async function(e) {
     task.centerZ = centerZ;
     task.type = type;
     structureQueueWithCenters.push({ task, centerX, centerY, centerZ, type });
+  };
+  const appendStaticTreeTask = (centerX, centerY, centerZ, treeType = 'default') => {
+    const dedupeKey = `static_tree:${centerX},${centerY},${centerZ}`;
+    if (largeStructureTaskKeySet.has(dedupeKey)) return;
+    largeStructureTaskKeySet.add(dedupeKey);
+
+    let task = null;
+    if (treeType === 'azalea') {
+      task = () => Tree.generate(centerX, centerY, centerZ, fakeChunk, 'azalea', dPlaceholder);
+    } else if (treeType === 'swamp') {
+      task = () => Tree.generate(centerX, centerY, centerZ, fakeChunk, 'swamp', dPlaceholder);
+    } else {
+      task = () => Tree.generate(centerX, centerY, centerZ, fakeChunk, 'default', dPlaceholder);
+    }
+
+    task.centerX = centerX;
+    task.centerY = centerY;
+    task.centerZ = centerZ;
+    task.type = 'static_tree';
+    structureQueueWithCenters.push({ task, centerX, centerY, centerZ, type: 'static_tree' });
   };
 
   for (let wx = scannedMinX; wx < scannedMaxX; wx++) {
@@ -1271,9 +1332,36 @@ onmessage = async function(e) {
     }
   }
 
-  structureQueueWithCenters.forEach(({ task }) => {
+  // static_tree 邻域重建（先覆盖 azalea，避免杜鹃花树跨 Chunk 切割）
+  for (let wx = scannedTreeMinX; wx < scannedTreeMaxX; wx++) {
+    for (let wz = scannedTreeMinZ; wz < scannedTreeMaxZ; wz++) {
+      const pyInfo = Pyramid.getPyramidInfo(wx, wz, seed, terrainGen);
+      if (pyInfo) continue;
+      const islandInfo = IslandMap.getIslandInfo(wx, wz, seed, terrainGen);
+      if (islandInfo) continue;
+      const plainLandInfo = PlainLand.getPlainLandInfo(wx, wz, seed, terrainGen);
+      if (plainLandInfo) continue;
+      const slInfo = SnowLand.getSnowLandInfo(wx, wz, seed, terrainGen);
+      if (slInfo) continue;
+      const fmInfo = FrozenMountain.getFrozenMountainInfo(wx, wz, seed, terrainGen);
+      if (fmInfo) continue;
+
+      const activeBiomeAtPos = getActiveBiomeByWorld(wx, wz);
+      const heightAtPos = terrainGen.generateHeight(wx, wz, activeBiomeAtPos);
+      if (heightAtPos < wLvl) continue;
+
+      if (activeBiomeAtPos === 'AZALEA' && seededRandom(wx, wz, seed + 19) < 0.045) {
+        appendStaticTreeTask(wx, heightAtPos + 1, wz, 'azalea');
+      }
+    }
+  }
+
+  structureQueueWithCenters.forEach(({ task, type }) => {
+    activeStructureType = type || null;
     task();
+    activeStructureType = null;
   });
+  activeStructureType = null;
 
   // 结构中心统一去重，避免后续多阶段追加造成重复中心放大判定范围
   const structureCenterKeySet = new Set();
@@ -1299,23 +1387,38 @@ onmessage = async function(e) {
     }
   }
 
+  // 自动检测：识别“本 Chunk 结构任务写入了 Chunk 外方块”的类型，自动加入跨 Chunk owner 例外
+  const autoCrossChunkOwnerTypes = new Set();
+  for (const [key, block] of blockMap) {
+    const sourceType = blockSourceTypeMap.get(key);
+    if (!sourceType) continue;
+    if (blockedCrossChunkOwnerTypes.has(sourceType)) continue;
+    const inCurrentChunk = block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;
+    if (!inCurrentChunk) {
+      autoCrossChunkOwnerTypes.add(sourceType);
+    }
+  }
+  if (DEBUG_AUTO_CROSS_CHUNK_OWNER && autoCrossChunkOwnerTypes.size > 0) {
+    console.log(
+      `[AutoCrossChunkOwner] chunk ${cx},${cz} detected types: ${Array.from(autoCrossChunkOwnerTypes).join(',')}`
+    );
+  }
+
   // 统一 Chunk 归属判定，避免多处重复实现
   const belongsToCrossChunkStructure = (bx, by, bz) =>
-    checkBelongsToCrossChunkStructure(bx, by, bz, structureCenters);
+    checkBelongsToCrossChunkStructure(bx, by, bz, structureCenters, autoCrossChunkOwnerTypes);
   const isBlockOwnedByCurrentChunk = (block) => {
     const inCurrentChunk = block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;
     const isCrossChunkStructureBlock = !inCurrentChunk &&
       belongsToCrossChunkStructure(block.x, block.y, block.z);
     return inCurrentChunk || isCrossChunkStructureBlock;
   };
-  const isLargeStaticCrossChunkBlock = (x, y, z) => {
-    const inCurrentChunk = x >= minX && x < maxX && z >= minZ && z < maxZ;
-    if (inCurrentChunk) return false;
-    return checkBelongsToLargeStaticStructure(x, y, z, structureCenters);
-  };
 
   // 如果有 snapshot，用 snapshot 中的方块覆盖 blockMap（保留玩家修改）
   if (savedSnapshot) {
+    const incomingOwnershipVersion = Number(savedSnapshot.meta?.ownershipVersion || 1);
+    let ownershipFilteredSnapshotBlocks = 0;
+
     // 从 snapshot 恢复实体列表
     realisticTrees = savedSnapshot.entities.realisticTrees || [];
     modGunMan = savedSnapshot.entities.modGunMan || [];
@@ -1403,21 +1506,22 @@ onmessage = async function(e) {
         const [bx, by, bz] = key.split(',').map(Number);
         const snapshotBlock = { x: bx, y: by, z: bz, type: entry.type };
 
-        // 旧存档兼容纠偏：
-        // 大型静态结构跨 Chunk 历史残留方块，统一回归到坐标所属 Chunk
-        if (isLargeStaticCrossChunkBlock(bx, by, bz)) {
-          continue;
-        }
-
         // 关键修复：snapshot 回写也必须通过当前 Chunk 的“所有权”校验，
         // 否则历史遗留的跨 Chunk 重复键会被再次注入，导致同坐标多方块重叠渲染。
         if (!isBlockOwnedByCurrentChunk(snapshotBlock)) {
+          ownershipFilteredSnapshotBlocks++;
           continue;
         }
 
         const solid = getBlockProperties(entry.type).isSolid;
         blockMap.set(key, { x: bx, y: by, z: bz, type: entry.type, solid, orientation: entry.orientation });
       }
+    }
+
+    if (DEBUG_OWNERSHIP_MIGRATION && ownershipFilteredSnapshotBlocks > 0) {
+      console.log(
+        `[OwnershipMigration] chunk ${cx},${cz} filtered legacy blocks: ${ownershipFilteredSnapshotBlocks} (from v${incomingOwnershipVersion} -> v2)`
+      );
     }
   }
 
@@ -1510,6 +1614,9 @@ onmessage = async function(e) {
     cx, cz, callbackKey, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys,
     structureCenters, // 新增：当前 Chunk 负责渲染的结构中心列表
     snapshot: {
+      meta: {
+        ownershipVersion: 2
+      },
       blocks: blocksForSnapshot,
       entities: {
         realisticTrees,

@@ -294,7 +294,7 @@ describe('Chunk 真实类测试', (test) => {
     teardownEnvironment();
   });
 
-  test('removeBlock - 跨 Chunk 归属方块删除应写入 owner chunk（非大型结构）', () => {
+  test('removeBlock - 跨 Chunk 归属方块删除应写入 owner chunk（非标例外结构）', () => {
     setupEnvironment();
 
     const world = createMockWorld();
@@ -304,8 +304,8 @@ describe('Chunk 真实类测试', (test) => {
     world.chunks.set('1,0', neighborChunk);
 
     // 模拟跨区归属（当前语义）：
-    // 仅非大型结构支持跨 Chunk owner，使用 static_tree 作为测试中心
-    ownerChunk.structureCenters = [{ type: 'static_tree', x: 15, y: 10, z: 8 }];
+    // 仅非标例外类型支持跨 Chunk owner，使用 rover 作为测试中心
+    ownerChunk.structureCenters = [{ type: 'rover', x: 15, y: 10, z: 8 }];
     ownerChunk.addBlockDynamic(16, 10, 8, 'stone', 0);
     ownerChunk.removeBlock(16, 10, 8);
 
@@ -337,14 +337,14 @@ describe('Chunk 真实类测试', (test) => {
     teardownEnvironment();
   });
 
-  test('removeBlocksBatch - 跨 Chunk 归属方块批量删除应写入 owner chunk（非大型结构）', () => {
+  test('removeBlocksBatch - 跨 Chunk 归属方块批量删除应写入 owner chunk（非标例外结构）', () => {
     setupEnvironment();
 
     const world = createMockWorld();
     const ownerChunk = new Chunk(0, 0, world);
     world.chunks.set('0,0', ownerChunk);
 
-    ownerChunk.structureCenters = [{ type: 'static_tree', x: 15, y: 10, z: 8 }];
+    ownerChunk.structureCenters = [{ type: 'rover', x: 15, y: 10, z: 8 }];
     ownerChunk.addBlockDynamic(16, 10, 8, 'stone', 0);
     ownerChunk.removeBlocksBatch([{ x: 16, y: 10, z: 8 }], false);
 
@@ -796,22 +796,46 @@ describe('Chunk 真实类测试', (test) => {
     teardownEnvironment();
   });
 
-  test('_isInResponsibility - 结构中心影响', () => {
+  test('_isInResponsibility - 仅非标例外支持跨 Chunk owner', () => {
     setupEnvironment();
 
     const world = createMockWorld();
     const chunk = new Chunk(0, 0, world);
 
-    // 设置结构中心
+    // 设置结构中心：rover/static_tree/house 为例外类型，tank 为普通结构
     chunk.structureCenters = [
-      { x: 20, y: 10, z: 20, type: 'pyramid' }
+      { x: 15, y: 10, z: 8, type: 'rover' },
+      { x: 15, y: 10, z: 8, type: 'static_tree' },
+      { x: 15, y: 10, z: 8, type: 'house' },
+      { x: 15, y: 10, z: 8, type: 'tank' }
     ];
 
-    // 方块在 Chunk 外但属于结构
-    // 注意：_isInResponsibility 会检查 belongsToStructure
-    // 由于结构范围取决于 type，我们验证基本逻辑
-    const isInChunk = chunk._isInResponsibility(10, 10, 10); // 在 Chunk 内
-    assertTrue(isInChunk, 'Chunk 内的方块应该属于责任范围');
+    // 坐标 (16,10,8) 位于 chunk(1,0) 内，对 chunk(0,0) 来说属于“跨 Chunk”
+    assertTrue(
+      chunk._isInResponsibility(16, 10, 8),
+      'rover 应保留跨 Chunk owner'
+    );
+
+    // static_tree（含 brich_tree）保留跨 Chunk owner，避免树冠切割
+    chunk.structureCenters = [{ x: 15, y: 10, z: 8, type: 'static_tree' }];
+    assertTrue(
+      chunk._isInResponsibility(16, 10, 8),
+      'static_tree 应保留跨 Chunk owner'
+    );
+
+    // house 保留跨 Chunk owner，避免边界切割
+    chunk.structureCenters = [{ x: 15, y: 10, z: 8, type: 'house' }];
+    assertTrue(
+      chunk._isInResponsibility(16, 10, 8),
+      'house 应保留跨 Chunk owner'
+    );
+
+    // 普通结构不再跨 Chunk owner，统一走坐标归属
+    chunk.structureCenters = [{ x: 15, y: 10, z: 8, type: 'tank' }];
+    assertFalse(
+      chunk._isInResponsibility(16, 10, 8),
+      'tank 不应跨 Chunk owner'
+    );
 
     teardownEnvironment();
   });

@@ -1,5 +1,4 @@
 // src/utils/StructureUtils.js
-import { isBigBuildingType } from '../world/entity-system/BigBuildingWhitelist.js';
 
 /**
  * 结构处理工具模块
@@ -40,6 +39,7 @@ export const STRUCTURE_RENDER_DIST = {
   castle: 36,         // 城堡尺寸约 70x70，含外墙与塔楼
   gate: 20,           // 拱门尺寸约 24x22x11（含两侧塔楼与连桥）
   pavilion: 24,       // pavilion 顶部云结构跨度较大
+  tall_well: 12,      // tall_well 底座约 11x7，保守按 12 处理
   rover: 3,           // 火星车
   gunman: 3,          // 模型人
   island: 16          // 空岛跨Chunk渲染距离
@@ -64,7 +64,8 @@ export const STRUCTURE_HEIGHT_RANGE_SPECIAL = {
   whiteTower: 40, // white_tower 结构 Y 方向±40，覆盖尖顶和树冠
   castle: 36,     // castle 结构 Y 方向±36，覆盖主楼与塔顶
   gate: 24,       // gate 结构 Y 方向±24，覆盖拱顶与塔楼
-  pavilion: 64    // pavilion 最高约 61 层，预留容差
+  pavilion: 64,   // pavilion 最高约 61 层，预留容差
+  tall_well: 64   // tall_well 为高竖向结构，放宽 Y 范围防止上半截切割
 };
 
 /**
@@ -78,12 +79,70 @@ export const DEFAULT_RENDER_DIST = 8;
 export const STRUCTURE_HEIGHT_RANGE = 16;
 
 /**
+ * 保留跨 Chunk owner 的非标准实体类型
+ * 说明：
+ * - 这些类型存在运行时特殊生命周期或非纯方块语义，仍使用结构中心兜底
+ * - 其余结构统一采用“方块坐标归属 Chunk”
+ */
+export const CROSS_CHUNK_OWNER_TYPES = Object.freeze([
+  'tree',       // RealisticTree
+  'static_tree',// 静态树（普通树/白桦树等）
+  'house',      // 普通小屋（代码生成）
+  'tall_well',  // 高井（JSON 结构）
+  'pavilion',   // 亭子（JSON 结构）
+  'gunman',     // 模型人
+  'rover',      // 火星车
+  'zombieNest', // 丧尸巢穴
+  'turret'      // 炮塔（预留）
+]);
+
+const CROSS_CHUNK_OWNER_SET = new Set(CROSS_CHUNK_OWNER_TYPES);
+
+/**
+ * 禁止跨 Chunk owner 的结构类型（即使自动检测到越界也不启用）
+ * 这些结构依赖“按坐标归属 + 邻域重建”策略，启用跨 Chunk owner 会重引入重复 owner 风险
+ */
+export const CROSS_CHUNK_OWNER_BLOCKED_TYPES = Object.freeze([
+  'bigHouse',
+  'boxHouse',
+  'castle',
+  'doubleTower',
+  'gate',
+  'pyramidIsland',
+  'smallHouse',
+  'tank',
+  'tower',
+  'treeHouse',
+  'whiteTower',
+  'woodHouse',
+  'uglyHouse',
+  'desertVillage',
+  'desertPyramid'
+]);
+
+const CROSS_CHUNK_OWNER_BLOCKED_SET = new Set(CROSS_CHUNK_OWNER_BLOCKED_TYPES);
+
+/**
+ * 判断结构类型是否允许跨 Chunk owner
+ * @param {string} type - 结构类型
+ * @returns {boolean}
+ */
+export function isCrossChunkOwnerType(type, extraAllowedTypes = null) {
+  if (CROSS_CHUNK_OWNER_BLOCKED_SET.has(type)) return false;
+  if (CROSS_CHUNK_OWNER_SET.has(type)) return true;
+  if (extraAllowedTypes && typeof extraAllowedTypes.has === 'function') {
+    return extraAllowedTypes.has(type);
+  }
+  return false;
+}
+
+/**
  * 判断结构类型是否属于大型静态结构
  * @param {string} type - 结构类型
  * @returns {boolean}
  */
 export function isLargeStaticStructureType(type) {
-  return isBigBuildingType(type);
+  return !isCrossChunkOwnerType(type);
 }
 
 /**
@@ -132,13 +191,13 @@ export function belongsToStructure(x, y, z, structureCenters) {
  * @param {Array<{type: string, x: number, y: number, z: number}>} structureCenters - 结构中心列表
  * @returns {boolean}
  */
-export function belongsToCrossChunkStructure(x, y, z, structureCenters) {
+export function belongsToCrossChunkStructure(x, y, z, structureCenters, extraAllowedTypes = null) {
   if (!structureCenters || structureCenters.length === 0) {
     return false;
   }
 
   for (const center of structureCenters) {
-    if (isLargeStaticStructureType(center.type)) continue;
+    if (!isCrossChunkOwnerType(center.type, extraAllowedTypes)) continue;
 
     const maxDist = getStructureRenderDist(center.type);
     const heightRange = STRUCTURE_HEIGHT_RANGE_SPECIAL[center.type] ?? STRUCTURE_HEIGHT_RANGE;
@@ -168,7 +227,7 @@ export function belongsToLargeStaticStructure(x, y, z, structureCenters) {
   }
 
   for (const center of structureCenters) {
-    if (!isLargeStaticStructureType(center.type)) continue;
+    if (isCrossChunkOwnerType(center.type)) continue;
 
     const maxDist = getStructureRenderDist(center.type);
     const heightRange = STRUCTURE_HEIGHT_RANGE_SPECIAL[center.type] ?? STRUCTURE_HEIGHT_RANGE;
@@ -218,8 +277,12 @@ export const StructureUtils = {
     return isLargeStaticStructureType(type);
   },
 
-  belongsToCrossChunkStructure(x, y, z, structureCenters) {
-    return belongsToCrossChunkStructure(x, y, z, structureCenters);
+  isCrossChunkOwnerType(type) {
+    return isCrossChunkOwnerType(type);
+  },
+
+  belongsToCrossChunkStructure(x, y, z, structureCenters, extraAllowedTypes = null) {
+    return belongsToCrossChunkStructure(x, y, z, structureCenters, extraAllowedTypes);
   },
 
   belongsToLargeStaticStructure(x, y, z, structureCenters) {
