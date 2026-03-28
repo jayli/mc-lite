@@ -1382,10 +1382,17 @@ onmessage = async function(e) {
           entry.orientation = rawEntry.direction;
         }
         const [bx, by, bz] = key.split(',').map(Number);
+        const snapshotBlock = { x: bx, y: by, z: bz, type: entry.type };
 
         // 旧存档兼容纠偏：
         // 大型静态结构跨 Chunk 历史残留方块，统一回归到坐标所属 Chunk
         if (isLargeStaticCrossChunkBlock(bx, by, bz)) {
+          continue;
+        }
+
+        // 关键修复：snapshot 回写也必须通过当前 Chunk 的“所有权”校验，
+        // 否则历史遗留的跨 Chunk 重复键会被再次注入，导致同坐标多方块重叠渲染。
+        if (!isBlockOwnedByCurrentChunk(snapshotBlock)) {
           continue;
         }
 

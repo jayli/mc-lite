@@ -375,6 +375,62 @@ export class World {
   }
 
   /**
+   * 获取指定坐标在所有已加载 Chunk 中的持有者列表（用于清理历史重复 owner）
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @returns {Array<{
+   *   ownerChunk: Chunk,
+   *   ownerChunkKey: string,
+   *   coordChunk: Chunk|null,
+   *   coordChunkKey: string,
+   *   blockKey: string,
+   *   entry: string|object
+   * }>}
+   */
+  getAllBlockOwners(x, y, z) {
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    const iz = Math.floor(z);
+    const cx = Math.floor(ix / CHUNK_SIZE);
+    const cz = Math.floor(iz / CHUNK_SIZE);
+    const coordChunkKey = `${cx},${cz}`;
+    const coordChunk = this.chunks.get(coordChunkKey) || null;
+    const blockKey = `${ix},${iy},${iz}`;
+    const owners = [];
+
+    if (coordChunk) {
+      const entry = coordChunk.blockData[blockKey];
+      if (entry) {
+        owners.push({
+          ownerChunk: coordChunk,
+          ownerChunkKey: coordChunkKey,
+          coordChunk,
+          coordChunkKey,
+          blockKey,
+          entry
+        });
+      }
+    }
+
+    for (const [otherKey, otherChunk] of this.chunks) {
+      if (!otherChunk || !otherChunk.isReady || otherKey === coordChunkKey) continue;
+      const entry = otherChunk.blockData[blockKey];
+      if (!entry) continue;
+      owners.push({
+        ownerChunk: otherChunk,
+        ownerChunkKey: otherKey,
+        coordChunk,
+        coordChunkKey,
+        blockKey,
+        entry
+      });
+    }
+
+    return owners;
+  }
+
+  /**
    * 判断指定世界坐标是否为实心方块（用于物理碰撞检测）
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y
@@ -560,9 +616,10 @@ export class World {
    * @param {number} z - 世界坐标 Z
    */
   removeBlock(x, y, z) {
-    const owner = this.resolveBlockOwner(x, y, z, { allowScan: true });
-    if (!owner) return;
-    owner.ownerChunk.removeBlock(x, y, z);
+    // 防御式处理：移除该坐标在所有 Chunk 的重复 owner，避免历史脏数据导致一键只删一层
+    const owners = this.getAllBlockOwners(x, y, z);
+    if (owners.length === 0) return;
+    owners.forEach(owner => owner.ownerChunk.removeBlock(x, y, z));
     this.clearBlockLookupCaches();
   }
 
@@ -573,9 +630,9 @@ export class World {
    * @param {number} z - 世界坐标 Z
    */
   removeBlockCollider(x, y, z) {
-    const owner = this.resolveBlockOwner(x, y, z, { allowScan: true });
-    if (!owner) return;
-    owner.ownerChunk.removeCollisionKey(x, y, z);
+    const owners = this.getAllBlockOwners(x, y, z);
+    if (owners.length === 0) return;
+    owners.forEach(owner => owner.ownerChunk.removeCollisionKey(x, y, z));
     this.clearBlockLookupCaches();
   }
 
