@@ -38,6 +38,7 @@ export const STRUCTURE_RENDER_DIST = {
   whiteTower: 24,     // white_tower 结构尺寸约 22x39x11（含侧边树冠）
   castle: 36,         // 城堡尺寸约 70x70，含外墙与塔楼
   gate: 20,           // 拱门尺寸约 24x22x11（含两侧塔楼与连桥）
+  flower_bed: 8,      // flower_bed 约 10x3x6，按 8 兜底
   pavilion: 24,       // pavilion 顶部云结构跨度较大
   tall_well: 12,      // tall_well 底座约 11x7，保守按 12 处理
   rover: 3,           // 火星车
@@ -64,6 +65,7 @@ export const STRUCTURE_HEIGHT_RANGE_SPECIAL = {
   whiteTower: 40, // white_tower 结构 Y 方向±40，覆盖尖顶和树冠
   castle: 36,     // castle 结构 Y 方向±36，覆盖主楼与塔顶
   gate: 24,       // gate 结构 Y 方向±24，覆盖拱顶与塔楼
+  flower_bed: 8,  // flower_bed 高度较低，保守给 8 避免边界切割
   pavilion: 64,   // pavilion 最高约 61 层，预留容差
   tall_well: 64   // tall_well 为高竖向结构，放宽 Y 范围防止上半截切割
 };
@@ -90,6 +92,7 @@ export const CROSS_CHUNK_OWNER_TYPES = Object.freeze([
   'house',      // 普通小屋（代码生成）
   'tall_well',  // 高井（JSON 结构）
   'pavilion',   // 亭子（JSON 结构）
+  'flower_bed', // 花坛（JSON 结构）
   'gunman',     // 模型人
   'rover',      // 火星车
   'zombieNest', // 丧尸巢穴
