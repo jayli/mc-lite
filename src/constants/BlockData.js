@@ -402,7 +402,11 @@ export const BLOCK_DATA = {
     isRendered: false,
     isShadowEnabled: false,
     orientationEnabled: false
-  }
+  },
+
+  // ========== 轨道方块 ==========
+  'sand_train_track': { orientationEnabled: true },
+  'sand_train_track_corner': { orientationEnabled: true }
 };
 export function getBlockProperties(type) {
   if (!type) return { ...DEFAULT_PROPERTIES };

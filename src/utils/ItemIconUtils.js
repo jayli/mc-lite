@@ -22,7 +22,10 @@ export function getCustomIconPath(item) {
     'stone_diorite_step': 'src/assets/textures/stone_diorite_step.png',
     'turret_alias_block': 'src/assets/textures/turret.png',
     'zombie_nest_alias_block': 'src/assets/textures/zombie_nest_alias_block.png',
-    'bed_alias_block': 'src/assets/textures/bed/Bed_(front_texture)_JE2_BE2.png'
+    'bed_alias_block': 'src/assets/textures/bed/Bed_(front_texture)_JE2_BE2.png',
+    // 轨道方块
+    'sand_train_track': 'src/assets/textures/sand_train_track.png',
+    'sand_train_track_corner': 'src/assets/textures/sand_train_track_conner.png'
   };
 
   return customIcons[item] || null;

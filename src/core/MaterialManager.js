@@ -351,7 +351,11 @@ export async function initializeMaterials() {
     './src/assets/textures/bed/Bed_(top_texture)_JE1_BE1.png',
     './src/assets/textures/bed/Bed_(bottom_texture)_JE1_BE1.png',
     './src/assets/textures/bed/Bed_(top_side_texture)_JE2_BE2.png',
-    './src/assets/textures/bed/Bed_(bottom_side_texture)_JE2_BE2.png'
+    './src/assets/textures/bed/Bed_(bottom_side_texture)_JE2_BE2.png',
+
+    // ========== 轨道方块纹理 ==========
+    './src/assets/textures/sand_train_track.png',
+    './src/assets/textures/sand_train_track_conner.png'
   ];
   await materials.preloadTextures(textureUrls); // 预加载纹理
 }
@@ -541,6 +545,31 @@ materials.registerMaterial('sand', {
     5: sandSide        // 北面：沙地侧面
   }
 }); // 沙地
+
+// ========== 轨道方块材质 ==========
+const sandTrainTrackTop = { textureUrl: './src/assets/textures/sand_train_track.png' };
+const sandTrainTrackCornerTop = { textureUrl: './src/assets/textures/sand_train_track_conner.png' };
+materials.registerMaterial('sand_train_track', {
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: sandTopBottom,      // 东面：沙子
+    1: sandTopBottom,      // 西面：沙子
+    2: sandTrainTrackTop,  // 上面：直轨
+    3: sandTopBottom,      // 下面：沙子
+    4: sandTopBottom,      // 南面：沙子
+    5: sandTopBottom       // 北面：沙子
+  }
+}); // 直轨方块
+
+materials.registerMaterial('sand_train_track_corner', {
+  faces: { // 立方体六个面：0:东，1:西，2:上，3:下，4:南，5:北
+    0: sandTopBottom,          // 东面：沙子
+    1: sandTopBottom,          // 西面：沙子
+    2: sandTrainTrackCornerTop, // 上面：转弯轨道
+    3: sandTopBottom,          // 下面：沙子
+    4: sandTopBottom,          // 南面：沙子
+    5: sandTopBottom           // 北面：沙子
+  }
+}); // 转弯轨道方块
 
 const woodSide = { textureUrl: './src/assets/textures/log_big_oak.png' };
 const woodTopBottom = { textureUrl: './src/assets/textures/log_big_oak_top.png' };

@@ -172,6 +172,8 @@ export class Game {
     this.player.inventory.add('birch_log', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('obsidian', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('sand', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('sand_train_track', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('sand_train_track_corner', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('grass', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('dark_planks', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('diamond', DEFAULT_INVENTORY_COUNT);
