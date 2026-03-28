@@ -1,6 +1,18 @@
 // src/utils/BlockHitResolver.js
 
 /**
+ * 射线命中点偏移常量
+ * 用于从命中点向物体内部微移，进入被击中的体素
+ */
+const RAY_STEP_EPSILON = 0.01;
+
+/**
+ * 面法线偏移常量
+ * 从命中点沿法线反向偏移，推算被命中的方块坐标
+ */
+const FACE_NORMAL_OFFSET = 0.5;
+
+/**
  * 将浮点世界坐标转换为方块坐标
  * @param {{x:number,y:number,z:number}} p
  * @returns {{x:number,y:number,z:number}}
@@ -14,15 +26,15 @@ function toBlockPos(p) {
 }
 
 /**
- * 根据射线方向从命中点向“物体内部”微移，获取被命中的方块坐标
+ * 根据射线方向从命中点向”物体内部”微移，获取被命中的方块坐标
  * 命中点位于表面时，沿 ray.direction 的正方向前进 epsilon 可进入被击中的体素内部。
  * 该方式对台阶/斜面更稳定，避免法线方向歧义导致选中相邻方块。
  * @param {{x:number,y:number,z:number}} hitPoint
  * @param {{x:number,y:number,z:number}|null|undefined} rayDirection
- * @param {number} [epsilon=0.01]
+ * @param {number} [epsilon=RAY_STEP_EPSILON] - 微移距离，默认使用常量
  * @returns {{x:number,y:number,z:number}|null}
  */
-export function getBlockPosFromRayStepInside(hitPoint, rayDirection, epsilon = 0.01) {
+export function getBlockPosFromRayStepInside(hitPoint, rayDirection, epsilon = RAY_STEP_EPSILON) {
   if (!hitPoint || !rayDirection) return null;
   return toBlockPos({
     x: hitPoint.x + rayDirection.x * epsilon,
@@ -31,11 +43,8 @@ export function getBlockPosFromRayStepInside(hitPoint, rayDirection, epsilon = 0
   });
 }
 
-// 兼容旧命名，避免其他调用方受影响
-export const getBlockPosFromRayBackstep = getBlockPosFromRayStepInside;
-
 /**
- * 根据面法线从命中点推算被命中的方块坐标（兼容旧逻辑）
+ * 根据面法线从命中点推算被命中的方块坐标
  * @param {{x:number,y:number,z:number}} hitPoint
  * @param {{x:number,y:number,z:number}|null|undefined} faceNormal
  * @returns {{x:number,y:number,z:number}|null}
@@ -43,9 +52,9 @@ export const getBlockPosFromRayBackstep = getBlockPosFromRayStepInside;
 export function getBlockPosFromFaceNormal(hitPoint, faceNormal) {
   if (!hitPoint || !faceNormal) return null;
   return toBlockPos({
-    x: hitPoint.x - faceNormal.x * 0.5,
-    y: hitPoint.y - faceNormal.y * 0.5,
-    z: hitPoint.z - faceNormal.z * 0.5
+    x: hitPoint.x - faceNormal.x * FACE_NORMAL_OFFSET,
+    y: hitPoint.y - faceNormal.y * FACE_NORMAL_OFFSET,
+    z: hitPoint.z - faceNormal.z * FACE_NORMAL_OFFSET
   });
 }
 

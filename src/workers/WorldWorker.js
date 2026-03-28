@@ -16,8 +16,7 @@ import { CityMap } from './maps/CityMap.js';
 import {
   belongsToCrossChunkStructure as checkBelongsToCrossChunkStructure,
   CROSS_CHUNK_OWNER_BLOCKED_TYPES,
-  getStructureRenderDist,
-  isCrossChunkOwnerType
+  getStructureRenderDist
 } from '../utils/StructureUtils.js';
 import { getAOForFace } from '../utils/AOUtils.js';
 
@@ -56,15 +55,10 @@ const CHUNK_SIZE = 16;
 const ROOMS_PER_CHUNK = 2;
 const MAX_ROOM_SIZE = 5;
 const STATIC_TREE_SCAN_PADDING = getStructureRenderDist('static_tree');
+// 计算大型静态结构扫描范围，取 CROSS_CHUNK_OWNER_BLOCKED_TYPES 中最大渲染距离
 const LARGE_STATIC_SCAN_PADDING = (() => {
-  const largeStaticTypes = [
-    'bigHouse', 'boxHouse', 'castle', 'doubleTower', 'gate',
-    'pyramidIsland', 'smallHouse', 'tank', 'tower', 'treeHouse',
-    'whiteTower', 'woodHouse', 'uglyHouse', 'desertVillage', 'desertPyramid'
-  ];
   let maxDist = 0;
-  for (const type of largeStaticTypes) {
-    if (isCrossChunkOwnerType(type)) continue;
+  for (const type of CROSS_CHUNK_OWNER_BLOCKED_TYPES) {
     const dist = getStructureRenderDist(type);
     if (dist > maxDist) maxDist = dist;
   }
@@ -74,6 +68,8 @@ const LARGE_STATIC_SCAN_PADDING = (() => {
 const CITY_FLOWER_BED_CHANCE = 0.0005;
 const CITY_PAVILION_CHANCE = CITY_FLOWER_BED_CHANCE * 6;
 const CITY_TALL_WELL_CHANCE = CITY_FLOWER_BED_CHANCE * 3; // 与 pavilion 相同概率
+// 方块归属机制版本号（用于存档兼容性判断）
+const OWNERSHIP_SCHEMA_VERSION = 2;
 // 旧档归属迁移调试开关（默认关闭）
 const DEBUG_OWNERSHIP_MIGRATION = false;
 // 边界切割自动检测调试开关（默认关闭）
@@ -1615,7 +1611,7 @@ onmessage = async function(e) {
     structureCenters, // 新增：当前 Chunk 负责渲染的结构中心列表
     snapshot: {
       meta: {
-        ownershipVersion: 2
+        ownershipVersion: OWNERSHIP_SCHEMA_VERSION
       },
       blocks: blocksForSnapshot,
       entities: {
