@@ -25,7 +25,9 @@ export function getCustomIconPath(item) {
     'bed_alias_block': 'src/assets/textures/bed/Bed_(front_texture)_JE2_BE2.png',
     // 轨道方块
     'sand_train_track': 'src/assets/textures/sand_train_track.png',
-    'sand_train_track_corner': 'src/assets/textures/sand_train_track_conner.png'
+    'sand_train_track_corner': 'src/assets/textures/sand_train_track_conner.png',
+    // 矿车
+    'mine_cart': 'src/assets/textures/Invicon_Minecart.png'
   };
 
   return customIcons[item] || null;

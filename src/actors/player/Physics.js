@@ -297,6 +297,18 @@ export class Physics {
       result = !!(type && getBlockProperties(type).isSolid);
     }
 
+    // 检查矿车碰撞
+    if (!result && this.player.game?.minecartManager) {
+      const minecart = this.player.game.minecartManager.getMinecartAt(
+        Math.floor(x),
+        Math.floor(y),
+        Math.floor(z)
+      );
+      if (minecart) {
+        result = true;
+      }
+    }
+
     if (this._isFrameCacheActive) {
       this._solidQueryCache.set(cacheKey, result);
     }

@@ -805,6 +805,11 @@ materials.registerMaterial('zombie_nest_alias_block', {
   textureUrl: './src/assets/textures/zombie_nest_alias_block.png'
 }); // 丧尸巢穴别名方块
 
+// 矿车物品材质
+materials.registerMaterial('mine_cart', {
+  textureUrl: './src/assets/textures/Invicon_Minecart.png'
+}); // 矿车物品图标
+
 
 // 新增金属与宝石方块
 materials.registerMaterial('gold_block', { textureUrl: './src/assets/textures/gold_block.png' });

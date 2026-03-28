@@ -406,7 +406,16 @@ export const BLOCK_DATA = {
 
   // ========== 轨道方块 ==========
   'sand_train_track': { orientationEnabled: true },
-  'sand_train_track_corner': { orientationEnabled: true }
+  'sand_train_track_corner': { orientationEnabled: true },
+
+  // ========== 矿车物品 ==========
+  'mine_cart': {
+    isSolid: false,
+    isTransparent: true,
+    isRendered: false,
+    isShadowEnabled: false,
+    orientationEnabled: false
+  }
 };
 export function getBlockProperties(type) {
   if (!type) return { ...DEFAULT_PROPERTIES };

@@ -13,9 +13,11 @@ import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { EnemyManager } from './EnemyManager.js'; // 替换为新的敌人管理器
 import { TurretManager } from '../actors/turret/TurretManager.js';
 import { ZombieNestManager } from '../actors/zombie-nest/ZombieNestManager.js';
+import { MinecartManager } from '../actors/minecart/MinecartManager.js';
 import { EntityRegistry } from '../actors/entity-registry/EntityRegistry.js';
 import { TurretPlacementHandler } from '../actors/turret/TurretPlacementHandler.js';
 import { ZombieNestPlacementHandler } from '../actors/zombie-nest/ZombieNestPlacementHandler.js';
+import { MinecartPlacementHandler } from '../actors/minecart/MinecartPlacementHandler.js';
 import { preloadAllStructures } from '../world/entity-system/StructureLoader.js';
 import { DEFAULT_INVENTORY_COUNT } from '../constants/GameConfig.js';
 import Stats from 'stats';
@@ -47,6 +49,10 @@ export class Game {
     // 让 Chunk 生成回调可直接恢复该 Chunk 的巢穴和炮塔运行时实例
     this.world.zombieNestManager = this.zombieNestManager;
     this.world.turretManager = this.turretManager;
+
+    // 初始化矿车管理器
+    this.minecartManager = new MinecartManager(this.engine.scene, this.world);
+    this.world.minecartManager = this.minecartManager;
 
     // 初始化实体注册表
     this.entityRegistry = new EntityRegistry();
@@ -256,6 +262,9 @@ export class Game {
     // 床方块
     this.player.inventory.add('bed_alias_block', DEFAULT_INVENTORY_COUNT);
 
+    // 矿车物品
+    this.player.inventory.add('mine_cart', DEFAULT_INVENTORY_COUNT);
+
     // this.player.inventory.add('cloud', DEFAULT_INVENTORY_COUNT);
 
     // 预加载 JSON 结构数据
@@ -309,6 +318,14 @@ export class Game {
       world: this.world,
       game: this,
       zombieNestManager: this.zombieNestManager
+    }));
+
+    // 注册矿车放置处理器
+    this.entityRegistry.register('mine_cart', new MinecartPlacementHandler({
+      player: this.player,
+      world: this.world,
+      game: this,
+      minecartManager: this.minecartManager
     }));
 
     console.log('[Game] EntityRegistry 初始化完成，已注册', this.entityRegistry.getRegistrationCount(), '个实体类型');
@@ -369,6 +386,11 @@ export class Game {
     // 更新炮塔管理器
     if (this.turretManager) {
       this.turretManager.update(dt);
+    }
+
+    // 更新矿车管理器
+    if (this.minecartManager) {
+      this.minecartManager.update(dt);
     }
 
     // 更新丧尸巢穴管理器

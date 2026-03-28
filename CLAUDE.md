@@ -221,3 +221,10 @@ npm run lint
 ## 代码提交
 任何修改都不能自动提交代码，必须等待明确的指令才能提交。
 
+
+## Active Technologies
+- JavaScript (ES6+), Three.js r128+ + Three.js (WebGL 渲染引擎) (001-minecart-feature)
+- IndexedDB (通过 PersistenceWorker/ManualSaveWorker) (001-minecart-feature)
+
+## Recent Changes
+- 001-minecart-feature: Added JavaScript (ES6+), Three.js r128+ + Three.js (WebGL 渲染引擎)

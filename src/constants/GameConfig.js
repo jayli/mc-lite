@@ -20,6 +20,10 @@ export const GameConfig = {
   /** 丧尸巢穴数量上限 */
   ZOMBIE_NEST_LIMIT: 8,
 
+  // ==================== 矿车配置 ====================
+  /** 矿车数量上限 */
+  MAX_MINECARTS: 50,
+
   // ==================== 地图配置 ====================
   /** 地图偏移量（用于避免浮点精度问题） */
   MAP_OFFSET: 300,
@@ -49,6 +53,9 @@ export const ZOMBIE_LIMIT_HIGH = GameConfig.ZOMBIE_LIMIT_HIGH;
 
 /** 丧尸巢穴数量上限 */
 export const ZOMBIE_NEST_LIMIT = GameConfig.ZOMBIE_NEST_LIMIT;
+
+/** 矿车数量上限 */
+export const MAX_MINECARTS = GameConfig.MAX_MINECARTS;
 
 /** 地图偏移量（用于避免浮点精度问题） */
 export const MAP_OFFSET = GameConfig.MAP_OFFSET;

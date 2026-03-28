@@ -78,6 +78,14 @@ export class PlayerInteraction {
     chestManager.chestAnimations.forEach(anim => {
       if (anim.mesh) pushTarget(anim.mesh);
     });
+
+    // 添加矿车作为交互目标
+    if (this.player.game && this.player.game.minecartManager) {
+      for (const minecart of this.player.game.minecartManager.minecarts.values()) {
+        if (minecart.mesh) pushTarget(minecart.mesh);
+      }
+    }
+
     return targets;
   }
 
@@ -105,6 +113,13 @@ export class PlayerInteraction {
       const heldItem = this.player.inventory.getSelected()?.item;
       if (hits.length > 0 && hits[0].distance < 15) {
         const hit = hits[0], m = hit.object, instanceId = hit.instanceId;
+
+        // 检查是否点击了矿车
+        if (this.tryPickUpMinecart(hit)) {
+          this.swing();
+          return;
+        }
+
         if (m.userData.type === 'chest' && m.isInstancedMesh) {
           m.getMatrixAt(instanceId, this.player._dummyMatrix);
           this.player._dummyMatrix.decompose(this.player._tempVector, this.player._dummyQuaternion, this.player._dummyScale);
@@ -138,6 +153,13 @@ export class PlayerInteraction {
       }
       if (hits.length > 0 && hits[0].distance < 15) {
         const hit = hits[0], m = hit.object, type = m.userData.type || 'unknown';
+
+        // 检查是否点击了矿车（左键挖掘也可以消除矿车）
+        if (this.tryPickUpMinecart(hit)) {
+          this.swing();
+          return;
+        }
+
         if (e.ctrlKey) {
           if (type === 'tnt') {
             if (m.isInstancedMesh) {
@@ -566,6 +588,32 @@ export class PlayerInteraction {
         }
       }
 
+      // 新增：TNT爆炸摧毁范围内的矿车
+      if (this.player.game && this.player.game.minecartManager) {
+        const explosionCenter = new THREE.Vector3(center.x + 0.5, center.y + 0.5, center.z + 0.5);
+        const explosionRadius = 4; // 爆炸范围（方块单位）
+
+        const minecartsToDestroy = [];
+        for (const minecart of this.player.game.minecartManager.minecarts.values()) {
+          const minecartPos = new THREE.Vector3(
+            minecart.position.x + 0.5,
+            minecart.position.y + 0.3,
+            minecart.position.z + 0.5
+          );
+          const distance = explosionCenter.distanceTo(minecartPos);
+
+          if (distance <= explosionRadius) {
+            minecartsToDestroy.push(minecart.id);
+            console.log(`[Explosion] 矿车在爆炸范围内，即将销毁！`);
+          }
+        }
+
+        // 销毁矿车（不产生物品掉落）
+        for (const id of minecartsToDestroy) {
+          this.player.game.minecartManager.removeMinecart(id);
+        }
+      }
+
       this.player._tempVector.set(center.x + 0.5, center.y + 0.5, center.z + 0.5);
       if (this.player.world.spawnExplosionParticles) this.player.world.spawnExplosionParticles(this.player._tempVector);
       audioManager.playSound('explosion', 0.4);
@@ -602,6 +650,39 @@ export class PlayerInteraction {
    */
   spawnParticles(pos, type) {
     if (this.player.world.spawnParticles) this.player.world.spawnParticles(pos, type);
+  }
+
+  /**
+   * 尝试拾取矿车
+   * @param {Object} hit - 射线检测击中信息
+   * @returns {boolean} 是否成功拾取
+   */
+  tryPickUpMinecart(hit) {
+    const game = this.player.game;
+    if (!game?.minecartManager) return false;
+
+    // 从击中对象向上查找矿车 mesh
+    let current = hit.object;
+    while (current) {
+      // 检查是否是矿车的 mesh
+      for (const minecart of game.minecartManager.minecarts.values()) {
+        if (minecart.mesh === current || (current.parent && minecart.mesh === current.parent)) {
+          // 找到矿车，执行拾取
+          const pos = minecart.position;
+          const success = game.minecartManager.pickUp(
+            pos.x, pos.y, pos.z,
+            this.player.inventory
+          );
+          if (success) {
+            audioManager.playSound('delete_get', 0.3);
+          }
+          return success;
+        }
+      }
+      current = current.parent;
+    }
+
+    return false;
   }
 
   /**
