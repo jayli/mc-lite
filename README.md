@@ -6,7 +6,7 @@ npm run start
 
 architechure
 
-![](./docs/architechure-2026-03-28.png)
+![./docs/architechure-2026-03-28.png]()
 
 live images
 
