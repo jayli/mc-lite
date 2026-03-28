@@ -6,7 +6,7 @@ npm run start
 
 architechure
 
-![docs/architechure-2026-03-28.png]()
+<img width="8192" height="4310" alt="architechure-2026-03-28" src="https://github.com/user-attachments/assets/17cfb6a5-2011-4f62-8136-2071c9702efc" />
 
 live images
 
