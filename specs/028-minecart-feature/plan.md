@@ -1,7 +1,7 @@
 # Implementation Plan: Minecart (矿车系统)
 
-**Branch**: `001-minecart-feature` | **Date**: 2026-03-28 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `/specs/001-minecart-feature/spec.md`
+**Branch**: `028-minecart-feature` | **Date**: 2026-03-28 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/028-minecart-feature/spec.md`
 
 ## Summary
 
@@ -44,7 +44,7 @@
 ### Documentation (this feature)
 
 ```text
-specs/001-minecart-feature/
+specs/028-minecart-feature/
 ├── spec.md              # 功能规格 (已完成)
 ├── plan.md              # 本文件
 ├── research.md          # Phase 0 研究输出

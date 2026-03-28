@@ -1,6 +1,6 @@
 # Quickstart: Minecart (矿车系统)
 
-**Branch**: `001-minecart-feature` | **Date**: 2026-03-28
+**Branch**: `028-minecart-feature` | **Date**: 2026-03-28
 
 ## 概述
 

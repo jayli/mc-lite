@@ -1,6 +1,6 @@
 # Tasks: Minecart (矿车系统)
 
-**Input**: Design documents from `/specs/001-minecart-feature/`
+**Input**: Design documents from `/specs/028-minecart-feature/`
 **Prerequisites**: plan.md, spec.md, research.md, data-model.md, quickstart.md
 
 **Tests**: 手动测试，访问 http://localhost:8080/src/tests/index.html

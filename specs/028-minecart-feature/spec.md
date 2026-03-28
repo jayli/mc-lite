@@ -1,6 +1,6 @@
 # Feature Specification: Minecart (矿车系统)
 
-**Feature Branch**: `001-minecart-feature`
+**Feature Branch**: `028-minecart-feature`
 **Created**: 2026-03-28
 **Status**: Draft
 **Input**: User description: "矿车是可以在铁轨上移动的小车，长宽高都是一个方格尺寸，透明实心，可参与碰撞，和树叶方块一样。矿车的造型是一个车斗加四个小轮，不参与 faceculling 和 instancedMesh管理，车轮的轴距是8/10个方块宽度单位。矿车可以被玩家放置，但只能放置在sand_train_track方块上，且矿车的方向要跟sand_train_track方向相同。"
