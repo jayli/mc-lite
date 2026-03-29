@@ -75,6 +75,22 @@ export class Physics {
   }
 
   /**
+   * 检查指定位置是否有矿车，并返回矿车对象
+   * @param {number} x - X 坐标
+   * @param {number} y - Y 坐标（用于检测矿车所在格子）
+   * @param {number} z - Z 坐标
+   * @returns {Object|null} 矿车对象或 null
+   */
+  getMinecartAt(x, y, z) {
+    if (!this.player.game?.minecartManager) return null;
+    return this.player.game.minecartManager.getMinecartAt(
+      Math.floor(x),
+      Math.floor(y),
+      Math.floor(z)
+    );
+  }
+
+  /**
    * 检查 AABB 碰撞
    */
   checkAABB(x, y, z, excludeFeet = false) {
@@ -168,6 +184,20 @@ export class Physics {
 
     const maxStep = (this.player.jumping && this.player.velocity.y > 0) ? 2.0 : 1.0;
     const currentFloorY = feetY + 1;
+
+    // 首先检查目标位置是否有矿车，矿车可以踩上去
+    const targetMinecart = this.getMinecartAt(nx, feetY, nz);
+    if (targetMinecart) {
+      const minecartTopY = targetMinecart.position.y + 0.9;
+      // 检查矿车顶部是否有空间
+      if (!this.checkAABB(nx, minecartTopY, nz)) {
+        this.player.position.y = minecartTopY;
+        this.player.position.x = nx;
+        this.player.position.z = nz;
+        this.player.velocity.y = 0;
+        return true;
+      }
+    }
 
     for (let h = 1; h <= maxStep; h++) {
       const stepY = currentFloorY + h;

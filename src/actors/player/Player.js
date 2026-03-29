@@ -201,6 +201,10 @@ export class Player {
 
     this.mag7Timeouts = [];
 
+    // 矿车乘坐状态
+    this.ridingMinecart = null;           // 当前乘坐的矿车引用
+    this.lastMinecartPosition = null;     // 上一帧矿车位置，用于计算位移增量
+
     // 初始化交互系统
     this.interaction = new PlayerInteraction(this);
   }
@@ -266,162 +270,199 @@ export class Player {
     dt = Math.min(dt, 0.1);
     this.physics.beginFrame();
 
+    // 更新矿车乘坐状态（在玩家自主移动之前）
+    const minecartDelta = this.updateMinecartRiding(dt);
+
+    // 如果玩家正在乘坐矿车，跳过自主移动逻辑（只有空格跳跃才能下车）
+    const isRidingMinecart = !!this.ridingMinecart;
+
     const oldX = this.position.x;
     const oldZ = this.position.z;
 
-    const speed = this.physics.speed;
-    let inputX = 0;
-    let inputZ = 0;
+    // 只有不在矿车上时才处理自主移动
+    if (!isRidingMinecart) {
+      const speed = this.physics.speed;
+      let inputX = 0;
+      let inputZ = 0;
 
-    if (this.keys['ArrowUp'] || this.keys['KeyW']) {
-      inputX -= Math.sin(this.rotation.y);
-      inputZ -= Math.cos(this.rotation.y);
-    }
-    if (this.keys['ArrowDown'] || this.keys['KeyS']) {
-      inputX += Math.sin(this.rotation.y);
-      inputZ += Math.cos(this.rotation.y);
-    }
-    if (this.keys['KeyA'] || this.keys['ArrowLeft']) {
-      inputX -= Math.cos(this.rotation.y);
-      inputZ += Math.sin(this.rotation.y);
-    }
-    if (this.keys['KeyD'] || this.keys['ArrowRight']) {
-      inputX += Math.cos(this.rotation.y);
-      inputZ -= Math.sin(this.rotation.y);
-    }
+      if (this.keys['ArrowUp'] || this.keys['KeyW']) {
+        inputX -= Math.sin(this.rotation.y);
+        inputZ -= Math.cos(this.rotation.y);
+      }
+      if (this.keys['ArrowDown'] || this.keys['KeyS']) {
+        inputX += Math.sin(this.rotation.y);
+        inputZ += Math.cos(this.rotation.y);
+      }
+      if (this.keys['KeyA'] || this.keys['ArrowLeft']) {
+        inputX -= Math.cos(this.rotation.y);
+        inputZ += Math.sin(this.rotation.y);
+      }
+      if (this.keys['KeyD'] || this.keys['ArrowRight']) {
+        inputX += Math.cos(this.rotation.y);
+        inputZ -= Math.sin(this.rotation.y);
+      }
 
-    const inputLen = Math.sqrt(inputX * inputX + inputZ * inputZ);
-    if (inputLen > 0) {
-      this.velocity.x = (inputX / inputLen) * speed;
-      this.velocity.z = (inputZ / inputLen) * speed;
-      this.lastInputDirection.set(inputX / inputLen, 0, inputZ / inputLen);
-    } else {
-      this.velocity.x = 0;
-      this.velocity.z = 0;
-    }
+      const inputLen = Math.sqrt(inputX * inputX + inputZ * inputZ);
+      if (inputLen > 0) {
+        this.velocity.x = (inputX / inputLen) * speed;
+        this.velocity.z = (inputZ / inputLen) * speed;
+        this.lastInputDirection.set(inputX / inputLen, 0, inputZ / inputLen);
+      } else {
+        this.velocity.x = 0;
+        this.velocity.z = 0;
+      }
 
-    // 检查玩家是否移动
-    const positionDiff = this.position.distanceTo(this.lastPosition);
-    const movementThreshold = 0.01;
-    this.isMoving = positionDiff > movementThreshold || Math.abs(this.velocity.x) > 0.01 || Math.abs(this.velocity.z) > 0.01;
+      // 检查玩家是否移动
+      const positionDiff = this.position.distanceTo(this.lastPosition);
+      const movementThreshold = 0.01;
+      this.isMoving = positionDiff > movementThreshold || Math.abs(this.velocity.x) > 0.01 || Math.abs(this.velocity.z) > 0.01;
 
-    // 更新位置用于下一次比较
-    this.lastPosition.copy(this.position);
+      // 更新位置用于下一次比较
+      this.lastPosition.copy(this.position);
 
-    // 每隔一定帧数才进行一次碰撞检测（如果玩家未移动）
-    const shouldCheckCollision = this.isMoving || (this.moveCheckInterval % this.moveCheckFrequency === 0);
-    let isCurrentlyStuck = false;
-
-    if (shouldCheckCollision) {
-      isCurrentlyStuck = this.physics.checkAABB(this.position.x, this.position.y, this.position.z);
-    }
-    this.isStuck = isCurrentlyStuck;
-
-    if (!isCurrentlyStuck) {
-      let nextX = this.position.x + this.velocity.x * dt;
-      let nextZ = this.position.z + this.velocity.z * dt;
+      // 每隔一定帧数才进行一次碰撞检测（如果玩家未移动）
+      const shouldCheckCollision = this.isMoving || (this.moveCheckInterval % this.moveCheckFrequency === 0);
+      let isCurrentlyStuck = false;
 
       if (shouldCheckCollision) {
-        const hasCollisionFull = this.physics.checkAABB(nextX, this.position.y, nextZ, true);
+        isCurrentlyStuck = this.physics.checkAABB(this.position.x, this.position.y, this.position.z);
+      }
+      this.isStuck = isCurrentlyStuck;
 
-        if (hasCollisionFull) {
-          const penalty = this.physics.getCornerPenalty(this.velocity.x, this.velocity.z);
-          if (!this.physics.checkAABB(nextX, this.position.y, this.position.z, true)) {
+      if (!isCurrentlyStuck) {
+        let nextX = this.position.x + this.velocity.x * dt;
+        let nextZ = this.position.z + this.velocity.z * dt;
+
+        if (shouldCheckCollision) {
+          const hasCollisionFull = this.physics.checkAABB(nextX, this.position.y, nextZ, true);
+
+          if (hasCollisionFull) {
+            const penalty = this.physics.getCornerPenalty(this.velocity.x, this.velocity.z);
+            if (!this.physics.checkAABB(nextX, this.position.y, this.position.z, true)) {
+              this.position.x = nextX;
+              this.velocity.x = this.physics.applyFriction(this.velocity.x);
+            } else if (!this.physics.tryStepUp(nextX, this.position.z)) {
+              this.velocity.x = 0;
+            }
+
+            if (!this.physics.checkAABB(this.position.x, this.position.y, nextZ, true)) {
+              this.position.z = nextZ;
+              this.velocity.z = this.physics.applyFriction(this.velocity.z);
+            } else if (!this.physics.tryStepUp(this.position.x, nextZ)) {
+              this.velocity.z = 0;
+            }
+
+            if (penalty < 1.0) {
+              this.position.x = oldX + (this.position.x - oldX) * penalty;
+              this.position.z = oldZ + (this.position.z - oldZ) * penalty;
+            }
+          } else {
             this.position.x = nextX;
-            this.velocity.x = this.physics.applyFriction(this.velocity.x);
-          } else if (!this.physics.tryStepUp(nextX, this.position.z)) {
-            this.velocity.x = 0;
-          }
-
-          if (!this.physics.checkAABB(this.position.x, this.position.y, nextZ, true)) {
             this.position.z = nextZ;
-            this.velocity.z = this.physics.applyFriction(this.velocity.z);
-          } else if (!this.physics.tryStepUp(this.position.x, nextZ)) {
-            this.velocity.z = 0;
-          }
-
-          if (penalty < 1.0) {
-            this.position.x = oldX + (this.position.x - oldX) * penalty;
-            this.position.z = oldZ + (this.position.z - oldZ) * penalty;
           }
         } else {
+          // 如果不需要碰撞检测，直接更新位置
           this.position.x = nextX;
           this.position.z = nextZ;
         }
       } else {
-        // 如果不需要碰撞检测，直接更新位置
-        this.position.x = nextX;
-        this.position.z = nextZ;
+        this.position.x += this.velocity.x * dt;
+        this.position.z += this.velocity.z * dt;
+      }
+
+      // 只在移动时才应用隧道自动居中
+      const inputLenCheck = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z);
+      if (inputLenCheck > 0) this.physics.applyTunnelCentering();
+
+      // 只在移动时才应用相机避碰检查，除非玩家卡住
+      if (this.isMoving || this.isStuck) {
+        this.physics.applyCameraBumper();
+      }
+      this.physics.checkCeilingBump();
+
+      // 只在移动时或卡住时才应用推挤修正
+      if (this.isMoving || this.isStuck) {
+        this.physics.applyPushOut();
       }
     } else {
-      this.position.x += this.velocity.x * dt;
-      this.position.z += this.velocity.z * dt;
+      // 在移动矿车上时，更新 lastPosition 用于后续计算
+      this.lastPosition.copy(this.position);
+      this.isMoving = true; // 标记为移动状态以保持动画效果
+      this.isStuck = false;
+      this.velocity.x = 0;
+      this.velocity.z = 0;
     }
 
-    // 只在移动时才应用隧道自动居中
-    if (inputLen > 0) this.physics.applyTunnelCentering();
+    // 重力与地面检测（乘坐矿车时跳过）
+    if (!isRidingMinecart) {
+      let gy = -100;
+      const px = Math.floor(this.position.x);
+      const pz = Math.floor(this.position.z);
+      const py = Math.floor(this.position.y);
 
-    // 只在移动时才应用相机避碰检查，除非玩家卡住
-    if (this.isMoving || this.isStuck) {
-      this.physics.applyCameraBumper();
-    }
-    this.physics.checkCeilingBump();
-
-    let gy = -100;
-    const px = Math.floor(this.position.x);
-    const pz = Math.floor(this.position.z);
-    const py = Math.floor(this.position.y);
-
-    // 向下检查固体方块（最多 10 格，增加检查深度以应对海底沙块填充）
-    for(let k=0; k<=10; k++) {
-      const blockType = this.world.getBlock(px, py - k, pz);
-      if(this.physics.isSolid(px, py - k, pz) || blockType === 'cloud') {
-        gy = py - k + 1;
-        break;
-      }
-    }
-
-    // 如果没有检测到固体，且玩家在海洋区域（y < -1），使用海平面作为支撑
-    if(gy === -100 && py < -1) {
-      // 检查是否在海岛或海洋区域：使用海平面（y=-2）作为基准
-      // 海底沙块从 y=-3 开始填充，所以地面高度应该是 y=-2
-      const seaLevel = -2;
-      // 检查海平面附近是否有沙块支撑
-      for(let k=0; k<=5; k++) {
-        const checkY = seaLevel - k;
-        const blockType = this.world.getBlock(px, checkY, pz);
-        if(this.physics.isSolid(px, checkY, pz)) {
-          // 找到支撑，地面高度为支撑方块上方
-          gy = checkY + 1;
+      // 向下检查固体方块（最多 10 格，增加检查深度以应对海底沙块填充）
+      for(let k=0; k<=10; k++) {
+        const blockType = this.world.getBlock(px, py - k, pz);
+        if(this.physics.isSolid(px, py - k, pz) || blockType === 'cloud') {
+          gy = py - k + 1;
           break;
         }
       }
-    }
 
-    // 如果仍然没有检测到地面，回退到噪声地形高度
-    if(gy === -100) gy = Math.floor(noise(px, pz) * 0.5) + 1;
+      // 如果没有检测到固体，且玩家在海洋区域（y < -1），使用海平面作为支撑
+      if(gy === -100 && py < -1) {
+        // 检查是否在海岛或海洋区域：使用海平面（y=-2）作为基准
+        // 海底沙块从 y=-3 开始填充，所以地面高度应该是 y=-2
+        const seaLevel = -2;
+        // 检查海平面附近是否有沙块支撑
+        for(let k=0; k<=5; k++) {
+          const checkY = seaLevel - k;
+          const blockType = this.world.getBlock(px, checkY, pz);
+          if(this.physics.isSolid(px, checkY, pz)) {
+            // 找到支撑，地面高度为支撑方块上方
+            gy = checkY + 1;
+            break;
+          }
+        }
+      }
 
-    this.position.y += this.velocity.y * dt;
-    if (this.position.y < gy) {
-      this.position.y = gy;
-      this.velocity.y = 0;
-      this.jumping = false;
+      // 如果仍然没有检测到地面，回退到噪声地形高度
+      if(gy === -100) gy = Math.floor(noise(px, pz) * 0.5) + 1;
+
+      this.position.y += this.velocity.y * dt;
+      if (this.position.y < gy) {
+        this.position.y = gy;
+        this.velocity.y = 0;
+        this.jumping = false;
+      } else {
+        this.velocity.y += this.physics.gravity * dt;
+        if (this.velocity.y < this.physics.terminalVelocity) this.velocity.y = this.physics.terminalVelocity;
+      }
+
+      if (this.jumpCooldown > 0) this.jumpCooldown -= dt;
+      if (this.keys['Space'] && !this.jumping && this.jumpCooldown <= 0 && this.spaceKeyReleased) {
+        this.velocity.y = this.physics.jumpForce;
+        this.jumping = true;
+        this.jumpCooldown = this.jumpInterval;
+        this.spaceKeyReleased = false;
+      }
+
+      if (this.position.y < -20) {
+        this.position.y = 60;
+        this.velocity.y = 0;
+      }
     } else {
-      this.velocity.y += this.physics.gravity * dt;
-      if (this.velocity.y < this.physics.terminalVelocity) this.velocity.y = this.physics.terminalVelocity;
-    }
-
-    if (this.jumpCooldown > 0) this.jumpCooldown -= dt;
-    if (this.keys['Space'] && !this.jumping && this.jumpCooldown <= 0 && this.spaceKeyReleased) {
-      this.velocity.y = this.physics.jumpForce;
-      this.jumping = true;
-      this.jumpCooldown = this.jumpInterval;
-      this.spaceKeyReleased = false;
-    }
-
-    if (this.position.y < -20) {
-      this.position.y = 60;
-      this.velocity.y = 0;
+      // 乘坐矿车时，只能通过跳跃下车
+      if (this.jumpCooldown > 0) this.jumpCooldown -= dt;
+      if (this.keys['Space'] && this.jumpCooldown <= 0 && this.spaceKeyReleased) {
+        this.velocity.y = this.physics.jumpForce;
+        this.jumping = true;
+        this.jumpCooldown = this.jumpInterval;
+        this.spaceKeyReleased = false;
+        // 解除乘坐绑定
+        this.ridingMinecart = null;
+        this.lastMinecartPosition = null;
+      }
     }
 
     this.camera.position.x = this.position.x;
@@ -443,9 +484,65 @@ export class Player {
     this.updateArm(dt);
     this.updateWeapon(dt);
     this.handleShooting(dt);
-    this.updateCameraBob(actualDx, actualDz, dt, isCurrentlyStuck);
+    this.updateCameraBob(actualDx, actualDz, dt, this.isStuck);
     this.updateTracers(dt);
     this.physics.endFrame();
+  }
+
+  /**
+   * 更新矿车乘坐状态
+   * 检测玩家是否站在矿车上，若在矿车上则同步玩家位置
+   * @param {number} dt - 时间步长
+   * @returns {{dx: number, dz: number}} 矿车位移增量（用于后续物理计算）
+   */
+  updateMinecartRiding(dt) {
+    const result = { dx: 0, dz: 0 };
+
+    // 如果已经绑定矿车，持续跟随
+    if (this.ridingMinecart) {
+      const dx = this.ridingMinecart.position.x - this.lastMinecartPosition.x;
+      const dz = this.ridingMinecart.position.z - this.lastMinecartPosition.z;
+
+      // 更新玩家位置
+      this.position.x += dx;
+      this.position.z += dz;
+
+      // 更新 Y 位置到矿车顶部
+      this.position.y = this.ridingMinecart.position.y + 0.9;
+
+      // 记录新位置
+      this.lastMinecartPosition = {
+        x: this.ridingMinecart.position.x,
+        z: this.ridingMinecart.position.z
+      };
+
+      result.dx = dx;
+      result.dz = dz;
+      return result;
+    }
+
+    // 未绑定矿车时，检测脚下是否有矿车
+    const feetY = Math.floor(this.position.y - 0.1);
+    const px = Math.floor(this.position.x);
+    const pz = Math.floor(this.position.z);
+    const minecart = this.game?.minecartManager?.getMinecartAt(px, feetY, pz);
+
+    // 矿车高度为 0.9，玩家站在矿车上时 Y 应在矿车顶部附近
+    if (minecart) {
+      const minecartTopY = minecart.position.y + 0.9;
+      const isOnMinecart = Math.abs(this.position.y - minecartTopY) < 0.3;
+
+      if (isOnMinecart) {
+        // 站在矿车上，自动绑定
+        this.ridingMinecart = minecart;
+        this.lastMinecartPosition = {
+          x: minecart.position.x,
+          z: minecart.position.z
+        };
+      }
+    }
+
+    return result;
   }
 
   /**

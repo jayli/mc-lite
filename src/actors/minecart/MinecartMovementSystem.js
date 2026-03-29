@@ -37,6 +37,81 @@ export class MinecartMovementSystem {
   }
 
   /**
+   * 检测矿车是否与玩家碰撞，并处理玩家抬起逻辑
+   * @param {Minecart} minecart - 矿车对象
+   * @param {Player} player - 玩家对象
+   * @param {number} frontX - 矿车前方 X 坐标
+   * @param {number} frontZ - 矿车前方 Z 坐标
+   * @param {number} currentY - 矿车当前 Y 坐标
+   * @returns {boolean} 是否可以继续移动（true=可以移动，false=应停止）
+   */
+  checkPlayerCollision(minecart, player, frontX, frontZ, currentY) {
+    if (!player) return true;
+
+    // 矿车顶部 Y 坐标
+    const minecartTopY = minecart.position.y + 0.9;
+
+    // 检测玩家是否在矿车前方格子内（考虑玩家宽度）
+    const playerMinX = player.position.x - 0.3;
+    const playerMaxX = player.position.x + 0.3;
+    const playerMinZ = player.position.z - 0.3;
+    const playerMaxZ = player.position.z + 0.3;
+
+    // 矿车前方格子范围
+    const cartMinX = frontX;
+    const cartMaxX = frontX + 1;
+    const cartMinZ = frontZ;
+    const cartMaxZ = frontZ + 1;
+
+    // 检测 X-Z 平面是否重叠
+    const overlapsX = playerMinX < cartMaxX && playerMaxX > cartMinX;
+    const overlapsZ = playerMinZ < cartMaxZ && playerMaxZ > cartMinZ;
+
+    if (!overlapsX || !overlapsZ) return true; // 玩家不在前方
+
+    // 检测 Y 轴是否重叠（玩家脚底到头顶）
+    const playerFeetY = player.position.y;
+    const playerHeadY = player.position.y + 1.8;
+
+    // 如果玩家在矿车上方，不需要处理
+    if (playerFeetY >= minecartTopY - 0.1) return true;
+
+    // 玩家与矿车碰撞，尝试把玩家抬到矿车顶部
+    const newPlayerY = minecartTopY;
+
+    // 检查玩家头顶是否有空间（newPlayerY + 1.8 高度处）
+    const headCheckY = Math.floor(newPlayerY + 1.8);
+    const playerFloorX = Math.floor(player.position.x);
+    const playerFloorZ = Math.floor(player.position.z);
+
+    // 检查头顶是否有实心方块
+    let hasHeadSpace = true;
+    for (let dy = 0; dy <= 2; dy++) {
+      const checkY = Math.floor(newPlayerY + dy);
+      if (this.hasSolidBlockAt(playerFloorX, checkY, playerFloorZ)) {
+        // 检查是否是矿车自己（矿车不算障碍）
+        const minecartAtPos = this.world.minecartManager?.getMinecartAt(playerFloorX, checkY, playerFloorZ);
+        if (!minecartAtPos || minecartAtPos.id === minecart.id) {
+          continue;
+        }
+        hasHeadSpace = false;
+        break;
+      }
+    }
+
+    if (hasHeadSpace) {
+      // 有空间，把玩家抬到矿车顶部
+      player.position.y = newPlayerY;
+      player.velocity.y = 0;
+      player.jumping = false;
+      return true; // 允许矿车继续移动
+    } else {
+      // 没有空间，停止矿车
+      return false;
+    }
+  }
+
+  /**
    * 获取方向向量
    * @param {number} orientation - 朝向 (0-3)
    * @param {string} movementState - 移动状态
@@ -388,8 +463,9 @@ export class MinecartMovementSystem {
    * @param {number} deltaTime - 时间增量（秒）
    * @param {Map<string, Minecart>} allMinecarts - 所有矿车集合（用于链接矿车同步）
    * @param {MinecartManager} manager - 矿车管理器（用于碰撞检测）
+   * @param {Player} player - 玩家对象（用于碰撞检测）
    */
-  update(minecart, deltaTime, allMinecarts, manager, frameReservations = null) {
+  update(minecart, deltaTime, allMinecarts, manager, frameReservations = null, player = null) {
     // 静止状态不更新
     if (minecart.movementState === 'IDLE') {
       minecart.pendingTargetCell = null;
@@ -516,6 +592,14 @@ export class MinecartMovementSystem {
         }
 
         // 其他情况（激活失败或不同向追尾）：当前矿车停止
+        this.stopMinecartAtCell(minecart, currentTrackX, currentY, currentTrackZ, manager);
+        return;
+      }
+
+      // 检查玩家碰撞
+      if (player && !this.checkPlayerCollision(minecart, player, frontX, frontZ, currentY)) {
+        // 玩家头顶没有空间，停止矿车
+        minecart.pendingTargetCell = null;
         this.stopMinecartAtCell(minecart, currentTrackX, currentY, currentTrackZ, manager);
         return;
       }
@@ -675,11 +759,12 @@ export class MinecartMovementSystem {
    * @param {Map<string, Minecart>} minecarts - 矿车集合
    * @param {number} deltaTime - 时间增量（秒）
    * @param {MinecartManager} manager - 矿车管理器（用于碰撞检测）
+   * @param {Player} player - 玩家对象（用于碰撞检测）
    */
-  updateAll(minecarts, deltaTime, manager) {
+  updateAll(minecarts, deltaTime, manager, player = null) {
     const frameReservations = new Map();
     for (const minecart of minecarts.values()) {
-      this.update(minecart, deltaTime, minecarts, manager, frameReservations);
+      this.update(minecart, deltaTime, minecarts, manager, frameReservations, player);
     }
   }
 }

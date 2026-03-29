@@ -393,7 +393,7 @@ export class Game {
 
     // 更新矿车管理器
     if (this.minecartManager) {
-      this.minecartManager.update(dt, getRotationAngle);
+      this.minecartManager.update(dt, getRotationAngle, this.player);
     }
 
     // 更新丧尸巢穴管理器

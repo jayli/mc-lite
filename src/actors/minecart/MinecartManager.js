@@ -420,11 +420,12 @@ export class MinecartManager {
    * 更新所有矿车
    * @param {number} deltaTime - 时间增量（秒）
    * @param {Function} getRotationAngle - 获取旋转角度的函数
+   * @param {Player} player - 玩家对象（用于碰撞检测）
    */
-  update(deltaTime, getRotationAngle) {
+  update(deltaTime, getRotationAngle, player = null) {
     // 更新移动系统
     if (this.movementSystem) {
-      this.movementSystem.updateAll(this.minecarts, deltaTime, this);
+      this.movementSystem.updateAll(this.minecarts, deltaTime, this, player);
     }
 
     // 更新所有矿车状态
