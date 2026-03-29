@@ -128,6 +128,97 @@ export class MinecartMovementSystem {
   }
 
   /**
+   * 检测指定轨道格在当前运动状态下，左右两侧是否存在可转向轨道
+   * @param {number} orientation - 当前朝向
+   * @param {string} movementState - 当前运动状态
+   * @param {{x:number,y:number,z:number}} trackPos - 当前轨道格
+   * @returns {boolean}
+   */
+  hasSideTrackForMovement(orientation, movementState, trackPos) {
+    const isMovingForward = movementState === 'MOVING_FORWARD';
+    let leftDir;
+    let rightDir;
+
+    if (isMovingForward) {
+      leftDir = this.getLeftDirection(orientation);
+      rightDir = this.getRightDirection(orientation);
+    } else {
+      leftDir = this.getRightDirection(orientation);
+      rightDir = this.getLeftDirection(orientation);
+    }
+
+    const trackY = trackPos.y - 1;
+    const hasLeftTrack = this.hasTrackAt(trackPos.x + leftDir.x, trackY, trackPos.z + leftDir.z);
+    const hasRightTrack = this.hasTrackAt(trackPos.x + rightDir.x, trackY, trackPos.z + rightDir.z);
+
+    return hasLeftTrack || hasRightTrack;
+  }
+
+  /**
+   * 判断静止矿车是否可被碰撞激活
+   * 规则：
+   * 1. 继承碰撞矿车运动方向后，前方不能有实心方块
+   * 2. 前方存在轨道，或左右任一侧存在轨道
+   * @param {Minecart} movingCart - 运动矿车
+   * @param {Minecart} staticCart - 静止矿车
+   * @returns {boolean}
+   */
+  canActivateStaticMinecart(movingCart, staticCart) {
+    const orientation = movingCart.orientation;
+    const movementState = movingCart.movementState;
+    const direction = this.getDirectionVector(orientation, movementState);
+
+    const trackX = Math.round(staticCart.position.x);
+    const trackY = Math.floor(staticCart.position.y);
+    const trackZ = Math.round(staticCart.position.z);
+
+    const frontX = trackX + direction.x;
+    const frontZ = trackZ + direction.z;
+    const railY = trackY - 1;
+
+    // 前方有实心阻挡不可激活
+    if (this.hasSolidBlockAt(frontX, trackY, frontZ)) {
+      return false;
+    }
+
+    // 前方有轨道可走，或者可左右转向
+    if (this.hasTrackAt(frontX, railY, frontZ)) {
+      return true;
+    }
+
+    return this.hasSideTrackForMovement(orientation, movementState, {
+      x: trackX,
+      y: trackY,
+      z: trackZ
+    });
+  }
+
+  /**
+   * 激活静止矿车，使其按碰撞矿车方向开始运动
+   * @param {Minecart} movingCart - 运动矿车
+   * @param {Minecart} staticCart - 静止矿车
+   * @returns {boolean} 是否激活成功
+   */
+  tryActivateStaticMinecart(movingCart, staticCart) {
+    if (staticCart.movementState !== 'IDLE') return false;
+    if (!this.canActivateStaticMinecart(movingCart, staticCart)) return false;
+
+    staticCart.orientation = movingCart.orientation;
+    staticCart.movementState = movingCart.movementState;
+    staticCart.velocity = { ...movingCart.velocity };
+
+    if (!staticCart.lastTrackPosition) {
+      staticCart.lastTrackPosition = {
+        x: Math.floor(staticCart.position.x),
+        y: Math.floor(staticCart.position.y),
+        z: Math.floor(staticCart.position.z)
+      };
+    }
+
+    return true;
+  }
+
+  /**
    * 获取矿车当前位置可用的轨道方向
    * @param {Minecart} minecart - 矿车对象
    * @returns {Array<number>} 可用的方向数组（orientation 0-3）
@@ -261,13 +352,7 @@ export class MinecartMovementSystem {
       trackPos.z + rightDir.z
     );
 
-    if (hasLeftTrack && hasRightTrack) {
-      // 两侧都有铁轨，随机选择
-      const turnLeft = Math.random() < 0.5;
-      const newOrientation = this.calculateNewOrientation(minecart.orientation, turnLeft ? 'left' : 'right');
-      return { turn: turnLeft ? 'left' : 'right', newOrientation };
-    }
-
+    // 统一转向优先级：左优先，只有左侧不可走时才尝试右侧
     if (hasLeftTrack) {
       const newOrientation = this.calculateNewOrientation(minecart.orientation, 'left');
       return { turn: 'left', newOrientation };
@@ -304,9 +389,10 @@ export class MinecartMovementSystem {
    * @param {Map<string, Minecart>} allMinecarts - 所有矿车集合（用于链接矿车同步）
    * @param {MinecartManager} manager - 矿车管理器（用于碰撞检测）
    */
-  update(minecart, deltaTime, allMinecarts, manager) {
+  update(minecart, deltaTime, allMinecarts, manager, frameReservations = null) {
     // 静止状态不更新
     if (minecart.movementState === 'IDLE') {
+      minecart.pendingTargetCell = null;
       return;
     }
 
@@ -323,6 +409,16 @@ export class MinecartMovementSystem {
     const currentZ = Math.floor(minecart.position.z);
     const trackY = currentY - 1;
 
+    // 到达已声明目标格后清除声明，避免长期占位
+    if (
+      minecart.pendingTargetCell &&
+      minecart.pendingTargetCell.x === currentX &&
+      minecart.pendingTargetCell.y === currentY &&
+      minecart.pendingTargetCell.z === currentZ
+    ) {
+      minecart.pendingTargetCell = null;
+    }
+
     // 计算矿车相对当前轨道中心的位置（范围约为 [-0.5, 0.5]）
     const localX = minecart.position.x - currentTrackX;
     const localZ = minecart.position.z - currentTrackZ;
@@ -330,6 +426,8 @@ export class MinecartMovementSystem {
     // 计算移动后的新位置
     const newX = minecart.position.x + direction.x * speed * deltaTime;
     const newZ = minecart.position.z + direction.z * speed * deltaTime;
+    const nextCellX = Math.floor(newX);
+    const nextCellZ = Math.floor(newZ);
 
     // 使用当前轨道中心为基准计算新位置相对坐标
     const newLocalX = newX - currentTrackX;
@@ -357,6 +455,7 @@ export class MinecartMovementSystem {
       const hasFrontTrack = this.hasTrackAt(frontX, trackY, frontZ);
 
       if (!hasFrontTrack) {
+        minecart.pendingTargetCell = null;
         // 前方没有轨道，检查是否可以转弯
         const turnResult = this.checkTurn(minecart, { x: currentTrackX, y: currentY, z: currentTrackZ });
 
@@ -372,19 +471,74 @@ export class MinecartMovementSystem {
         }
       }
 
+      // 跨帧目标格声明冲突检查：前方格被其他运动矿车声明为下一目标时，本帧等待
+      if (allMinecarts) {
+        for (const other of allMinecarts.values()) {
+          if (!other || other.id === minecart.id) continue;
+          if (other.movementState === 'IDLE') continue;
+          const claim = other.pendingTargetCell;
+          if (!claim) continue;
+          if (claim.x === frontX && claim.y === currentY && claim.z === frontZ) {
+            return;
+          }
+        }
+      }
+
       // 检查前方是否有矿车阻挡
       const otherMinecart = manager ? manager.getMinecartAt(frontX, currentY, frontZ) : null;
-      if (otherMinecart && !minecart.linkedMinecarts.has(otherMinecart.id)) {
-        // 有阻挡，停止并吸附到当前轨道格中心
+      if (otherMinecart) {
+        // 相向运动碰撞：两车都停止
+        if (minecartCollisionSystem.isHeadOn(minecart, otherMinecart)) {
+          this.stopMinecartAtCell(minecart, currentTrackX, currentY, currentTrackZ, manager);
+          this.stopMinecartAtCell(
+            otherMinecart,
+            Math.round(otherMinecart.position.x),
+            Math.floor(otherMinecart.position.y),
+            Math.round(otherMinecart.position.z),
+            manager
+          );
+          return;
+        }
+
+        // 运动矿车碰撞静止矿车：尝试激活静止矿车
+        if (otherMinecart.movementState === 'IDLE') {
+          const activated = this.tryActivateStaticMinecart(minecart, otherMinecart);
+          if (activated) {
+            // 本帧不再推进 A，避免与刚激活的 B 重叠进同一格
+            return;
+          }
+        }
+
+        // 前车只要还在运动（且非相向），后车应等待而不是被置停。
+        // 这样当前车转向时，后车可以在后续帧继续前进并完成自己的转向。
+        if (otherMinecart.movementState !== 'IDLE') {
+          return;
+        }
+
+        // 其他情况（激活失败或不同向追尾）：当前矿车停止
         this.stopMinecartAtCell(minecart, currentTrackX, currentY, currentTrackZ, manager);
         return;
       }
 
       // 检查前方是否有实心方块阻挡（即使有轨道也不能穿过）
       if (this.hasSolidBlockAt(frontX, currentY, frontZ)) {
+        minecart.pendingTargetCell = null;
         this.stopMinecartAtCell(minecart, currentTrackX, currentY, currentTrackZ, manager);
         return;
       }
+
+      // 当前矿车声明“下一目标格”，用于跨帧避免并发入同格
+      minecart.pendingTargetCell = { x: frontX, y: currentY, z: frontZ };
+    }
+
+    // 同一帧预占位：避免多矿车同时进入同一目标格（尤其是转角并发入格穿模）
+    if (frameReservations && (nextCellX !== currentX || nextCellZ !== currentZ)) {
+      const reservationKey = `${nextCellX},${currentY},${nextCellZ}`;
+      const holder = frameReservations.get(reservationKey);
+      if (holder && holder !== minecart.id) {
+        return;
+      }
+      frameReservations.set(reservationKey, minecart.id);
     }
 
     // 没有阻挡，继续移动
@@ -523,8 +677,9 @@ export class MinecartMovementSystem {
    * @param {MinecartManager} manager - 矿车管理器（用于碰撞检测）
    */
   updateAll(minecarts, deltaTime, manager) {
+    const frameReservations = new Map();
     for (const minecart of minecarts.values()) {
-      this.update(minecart, deltaTime, minecarts, manager);
+      this.update(minecart, deltaTime, minecarts, manager, frameReservations);
     }
   }
 }
