@@ -26,7 +26,7 @@ export const GameConfig = {
 
   // ==================== 矿车移动配置 ====================
   /** 矿车移动速度（方块/秒） */
-  MINECART_SPEED: 1.0,
+  MINECART_SPEED: 2.0,
   /** 矿车最大链接数量 */
   MAX_LINKED_MINECARTS: 10,
   /** 铁轨方块类型 */
