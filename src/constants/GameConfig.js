@@ -24,6 +24,14 @@ export const GameConfig = {
   /** 矿车数量上限 */
   MAX_MINECARTS: 50,
 
+  // ==================== 矿车移动配置 ====================
+  /** 矿车移动速度（方块/秒） */
+  MINECART_SPEED: 1.0,
+  /** 矿车最大链接数量 */
+  MAX_LINKED_MINECARTS: 10,
+  /** 铁轨方块类型 */
+  TRACK_BLOCK_TYPES: ['sand_train_track', 'sand_train_track_corner'],
+
   // ==================== 地图配置 ====================
   /** 地图偏移量（用于避免浮点精度问题） */
   MAP_OFFSET: 300,
@@ -56,6 +64,15 @@ export const ZOMBIE_NEST_LIMIT = GameConfig.ZOMBIE_NEST_LIMIT;
 
 /** 矿车数量上限 */
 export const MAX_MINECARTS = GameConfig.MAX_MINECARTS;
+
+/** 矿车移动速度（方块/秒） */
+export const MINECART_SPEED = GameConfig.MINECART_SPEED;
+
+/** 矿车最大链接数量 */
+export const MAX_LINKED_MINECARTS = GameConfig.MAX_LINKED_MINECARTS;
+
+/** 铁轨方块类型 */
+export const TRACK_BLOCK_TYPES = GameConfig.TRACK_BLOCK_TYPES;
 
 /** 地图偏移量（用于避免浮点精度问题） */
 export const MAP_OFFSET = GameConfig.MAP_OFFSET;

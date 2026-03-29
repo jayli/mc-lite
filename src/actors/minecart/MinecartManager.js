@@ -4,6 +4,8 @@
  */
 
 import { Minecart } from './Minecart.js';
+import { MinecartMovementSystem } from './MinecartMovementSystem.js';
+import { minecartLinkDetector } from './MinecartLinkDetector.js';
 import { MAX_MINECARTS } from '../../constants/GameConfig.js';
 import { PERSISTENCE_CONFIG } from '../../constants/PersistenceConfig.js';
 import * as THREE from 'three';
@@ -12,10 +14,12 @@ export class MinecartManager {
   /**
    * @param {THREE.Scene} scene - Three.js 场景
    * @param {World} world - 世界引用
+   * @param {MinecartInstancedRenderer} renderer - 可选的渲染器实例
    */
-  constructor(scene, world) {
+  constructor(scene, world, renderer = null) {
     this.scene = scene;
     this.world = world;
+    this.renderer = renderer;
 
     // 存储所有矿车 Map<id, Minecart>
     this.minecarts = new Map();
@@ -25,6 +29,17 @@ export class MinecartManager {
 
     // 配置
     this.maxMinecarts = MAX_MINECARTS;
+
+    // 移动系统
+    this.movementSystem = new MinecartMovementSystem(world);
+  }
+
+  /**
+   * 设置渲染器
+   * @param {MinecartInstancedRenderer} renderer
+   */
+  setRenderer(renderer) {
+    this.renderer = renderer;
   }
 
   /**
@@ -117,6 +132,21 @@ export class MinecartManager {
   }
 
   /**
+   * 更新矿车的位置索引（移动后调用）
+   * @param {Minecart} minecart - 矿车对象
+   * @param {{x: number, y: number, z: number}} oldPos - 旧位置
+   */
+  updateMinecartPositionIndex(minecart, oldPos) {
+    // 移除旧位置索引
+    const oldPosKey = this.getPositionKey(oldPos);
+    this.positionIndex.delete(oldPosKey);
+
+    // 添加新位置索引
+    const newPosKey = this.getPositionKey(minecart.position);
+    this.positionIndex.set(newPosKey, minecart.id);
+  }
+
+  /**
    * 创建矿车
    * @param {THREE.Vector3|{x:number,y:number,z:number}} position - 位置
    * @param {number} orientation - 朝向 (0-3)
@@ -132,15 +162,32 @@ export class MinecartManager {
       return null;
     }
 
-    // 创建矿车实例
+    // 创建矿车实例（不再需要 scene 参数）
     const minecart = new Minecart({
       id: this.generateId(),
       position: new THREE.Vector3(pos.x, pos.y, pos.z),
       orientation: orientation,
-      scene: this.scene,
       world: this.world,
       onDestroy: (id) => this.onMinecartDestroyed(id)
     });
+
+    // 根据轨道方向自动调整矿车朝向
+    if (this.movementSystem) {
+      const availableDirs = this.movementSystem.getAvailableTrackDirections(minecart);
+      if (availableDirs.length > 0) {
+        // 优先选择与传入朝向最接近的方向
+        let bestDir = availableDirs[0];
+        let minDiff = 4;
+        for (const dir of availableDirs) {
+          const diff = Math.min(Math.abs(dir - orientation), 4 - Math.abs(dir - orientation));
+          if (diff < minDiff) {
+            minDiff = diff;
+            bestDir = dir;
+          }
+        }
+        minecart.orientation = bestDir;
+      }
+    }
 
     // 设置归属 chunk
     minecart.chunkKey = this.getChunkKeyByPosition(pos);
@@ -197,6 +244,14 @@ export class MinecartManager {
     if (!minecart) {
       return false;
     }
+
+    // 使用 MinecartLinkDetector 断开链接关系
+    // 这会停止所有链接矿车并清理链接关系
+    minecartLinkDetector.breakLinks(minecart, this);
+
+    // 确保当前矿车也已停止
+    minecart.movementState = 'IDLE';
+    minecart.velocity = { x: 0, z: 0 };
 
     // 添加到背包
     if (inventory && typeof inventory.add === 'function') {
@@ -308,8 +363,8 @@ export class MinecartManager {
       const posKey = this.getPositionKey(data);
       if (this.positionIndex.has(posKey)) continue;
 
-      // 创建矿车实例
-      const minecart = Minecart.fromJSON(data, this.scene, this.world);
+      // 创建矿车实例（不再需要 scene 参数）
+      const minecart = Minecart.fromJSON(data, this.world);
       minecart.chunkKey = chunkKey;
       minecart.onDestroy = (id) => this.onMinecartDestroyed(id);
 
@@ -322,10 +377,22 @@ export class MinecartManager {
   /**
    * 更新所有矿车
    * @param {number} deltaTime - 时间增量（秒）
+   * @param {Function} getRotationAngle - 获取旋转角度的函数
    */
-  update(deltaTime) {
+  update(deltaTime, getRotationAngle) {
+    // 更新移动系统
+    if (this.movementSystem) {
+      this.movementSystem.updateAll(this.minecarts, deltaTime, this);
+    }
+
+    // 更新所有矿车状态
     for (const minecart of this.minecarts.values()) {
       minecart.update(deltaTime);
+    }
+
+    // 更新渲染器
+    if (this.renderer && getRotationAngle) {
+      this.renderer.update(this.minecarts, getRotationAngle);
     }
   }
 

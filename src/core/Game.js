@@ -14,6 +14,8 @@ import { EnemyManager } from './EnemyManager.js'; // 替换为新的敌人管理
 import { TurretManager } from '../actors/turret/TurretManager.js';
 import { ZombieNestManager } from '../actors/zombie-nest/ZombieNestManager.js';
 import { MinecartManager } from '../actors/minecart/MinecartManager.js';
+import { MinecartInstancedRenderer } from '../actors/minecart/MinecartInstancedRenderer.js';
+import { getRotationAngle } from '../utils/OrientationUtils.js';
 import { EntityRegistry } from '../actors/entity-registry/EntityRegistry.js';
 import { TurretPlacementHandler } from '../actors/turret/TurretPlacementHandler.js';
 import { ZombieNestPlacementHandler } from '../actors/zombie-nest/ZombieNestPlacementHandler.js';
@@ -51,7 +53,8 @@ export class Game {
     this.world.turretManager = this.turretManager;
 
     // 初始化矿车管理器
-    this.minecartManager = new MinecartManager(this.engine.scene, this.world);
+    this.minecartRenderer = new MinecartInstancedRenderer(this.engine.scene);
+    this.minecartManager = new MinecartManager(this.engine.scene, this.world, this.minecartRenderer);
     this.world.minecartManager = this.minecartManager;
 
     // 初始化实体注册表
@@ -390,7 +393,7 @@ export class Game {
 
     // 更新矿车管理器
     if (this.minecartManager) {
-      this.minecartManager.update(dt);
+      this.minecartManager.update(dt, getRotationAngle);
     }
 
     // 更新丧尸巢穴管理器

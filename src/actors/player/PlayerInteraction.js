@@ -11,6 +11,7 @@ import { nextOrientation } from '../../utils/OrientationUtils.js';
 import { resolveBreakBlockPos } from '../../utils/BlockHitResolver.js';
 import { Gun, WEAPON_TYPES } from '../weapon/Gun.js';
 import { gunModel, mag7Model, minigunModel } from '../../core/Engine.js';
+import { minecartLinkDetector } from '../minecart/MinecartLinkDetector.js';
 
 /**
  * 从对象向上查找特殊实体
@@ -79,11 +80,12 @@ export class PlayerInteraction {
       if (anim.mesh) pushTarget(anim.mesh);
     });
 
-    // 添加矿车作为交互目标
-    if (this.player.game && this.player.game.minecartManager) {
-      for (const minecart of this.player.game.minecartManager.minecarts.values()) {
-        if (minecart.mesh) pushTarget(minecart.mesh);
-      }
+    // 添加矿车作为交互目标（使用 InstancedMesh）
+    if (this.player.game && this.player.game.minecartRenderer) {
+      const renderer = this.player.game.minecartRenderer;
+      // 添加车身和车轮网格作为交互目标
+      if (renderer.bodyMesh) pushTarget(renderer.bodyMesh);
+      if (renderer.wheelMesh) pushTarget(renderer.wheelMesh);
     }
 
     return targets;
@@ -152,13 +154,13 @@ export class PlayerInteraction {
       if (hits.length > 0 && hits[0].distance < 15) {
         const hit = hits[0], m = hit.object, type = m.userData.type || 'unknown';
 
-        // 检查是否点击了矿车（左键挖掘也可以消除矿车）
-        if (this.tryPickUpMinecart(hit)) {
-          this.swing();
-          return;
-        }
-
+        // ctrl+左键：激活矿车移动
         if (e.ctrlKey) {
+          if (this.tryActivateMinecart(hit, e.shiftKey ? 'backward' : 'forward')) {
+            this.swing();
+            return;
+          }
+
           if (type === 'tnt') {
             if (m.isInstancedMesh) {
               m.getMatrixAt(hit.instanceId, this.player._dummyMatrix);
@@ -174,6 +176,13 @@ export class PlayerInteraction {
           }
           return;
         }
+
+        // 普通左键：拾取矿车或挖掘方块
+        if (this.tryPickUpMinecart(hit)) {
+          this.swing();
+          return;
+        }
+
         if (type === 'chest' && m.isInstancedMesh) {
           m.getMatrixAt(hit.instanceId, this.player._dummyMatrix);
           this.player._dummyMatrix.decompose(this.player._tempVector, this.player._dummyQuaternion, this.player._dummyScale);
@@ -659,25 +668,60 @@ export class PlayerInteraction {
     const game = this.player.game;
     if (!game?.minecartManager) return false;
 
-    // 从击中对象向上查找矿车 mesh
-    let current = hit.object;
-    while (current) {
-      // 检查是否是矿车的 mesh
-      for (const minecart of game.minecartManager.minecarts.values()) {
-        if (minecart.mesh === current || (current.parent && minecart.mesh === current.parent)) {
-          // 找到矿车，执行拾取
-          const pos = minecart.position;
-          const success = game.minecartManager.pickUp(
-            pos.x, pos.y, pos.z,
-            this.player.inventory
-          );
-          if (success) {
-            audioManager.playSound('delete_get', 0.3);
-          }
-          return success;
+    // 使用 InstancedMesh 渲染，检查 hit.object 是否是矿车部件
+    const m = hit.object;
+    if (m.userData?.isMinecartPart && m.userData?.renderer) {
+      // 通过渲染器获取矿车实例
+      const renderer = m.userData.renderer;
+      const instanceId = hit.instanceId;
+
+      // bodyMesh 的实例索引直接对应矿车，wheelMesh 需要转换
+      const minecart = renderer.getMinecartAt(instanceId, m);
+      if (minecart) {
+        const pos = minecart.position;
+        const success = game.minecartManager.pickUp(
+          pos.x, pos.y, pos.z,
+          this.player.inventory
+        );
+        if (success) {
+          audioManager.playSound('delete_get', 0.3);
         }
+        return success;
       }
-      current = current.parent;
+    }
+
+    return false;
+  }
+
+  /**
+   * 尝试激活矿车移动
+   * @param {Object} hit - 射线检测击中信息
+   * @param {string} direction - 移动方向 ('forward' | 'backward')
+   * @returns {boolean} 是否成功激活
+   */
+  tryActivateMinecart(hit, direction) {
+    const game = this.player.game;
+    if (!game?.minecartManager || !game?.minecartRenderer) return false;
+
+    // 检查 hit.object 是否是矿车部件
+    const m = hit.object;
+    if (m.userData?.isMinecartPart && m.userData?.renderer) {
+      const renderer = m.userData.renderer;
+      const instanceId = hit.instanceId;
+
+      // 获取矿车实例（传入网格对象以正确处理车轮索引）
+      const minecart = renderer.getMinecartAt(instanceId, m);
+      if (minecart) {
+        const movementState = direction === 'forward' ? 'MOVING_FORWARD' : 'MOVING_BACKWARD';
+
+        // 使用链接检测器激活所有链接的矿车
+        minecartLinkDetector.activateLinkedMinecarts(minecart, game.minecartManager, movementState);
+
+        // 播放音效
+        audioManager.playSound('put', 0.3);
+
+        return true;
+      }
     }
 
     return false;
