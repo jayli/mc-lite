@@ -9,18 +9,18 @@ import { getRotationAngle } from '../../utils/OrientationUtils.js';
 // 矿车配置常量
 export const MINECART_CONFIG = {
   // 车斗尺寸 (约 0.8x0.4x0.8 方块)
-  BODY_SIZE: { width: 0.8, height: 0.4, depth: 0.8 },
+  BODY_SIZE: { width: 0.9, height: 0.8, depth: 0.9 },
   // 车轮尺寸
-  WHEEL_RADIUS: 0.1,
+  WHEEL_RADIUS: 0.2,
   WHEEL_HEIGHT: 0.1,
   // 车轮轴距 (前后轮间距)
-  WHEELBASE: 0.8,
+  WHEELBASE: 0.6,
   // 轮距 (左右轮间距)
   TRACK_WIDTH: 0.6,
   // 整体高度 (车斗底部到车轮底部)
-  TOTAL_HEIGHT: 0.5,
+  TOTAL_HEIGHT: 0.9,
   // 碰撞盒尺寸
-  BOUNDING_BOX: { width: 1.0, height: 0.6, depth: 1.0 }
+  BOUNDING_BOX: { width: 1.0, height: 0.9, depth: 1.0 }
 };
 
 export class Minecart {
@@ -78,22 +78,32 @@ export class Minecart {
   }
 
   /**
-   * 创建车斗几何体
+   * 创建车斗几何体 - 倒梯形形状（上宽下窄）
    */
   createBody() {
     const { width, height, depth } = MINECART_CONFIG.BODY_SIZE;
+
+    // 倒梯形参数：顶部尺寸保持不变，底部往内收缩
+    const shrinkRatio = 0.8; // 底部收缩比例（底部宽度 = 顶部宽度 * shrinkRatio）
+    const topWidth = width;
+    const topDepth = depth;
+    const bottomWidth = width * shrinkRatio;
+    const bottomDepth = depth * shrinkRatio;
+
+    // 创建倒梯形几何体
+    const bodyGeometry = this.createTrapezoidGeometry(
+      topWidth, topDepth, bottomWidth, bottomDepth, height
+    );
 
     // 车斗材质 - 木质棕色
     const bodyMaterial = new THREE.MeshLambertMaterial({
       color: 0x8B4513,
       transparent: true,
-      opacity: 0.9
+      opacity: 0.9,
+      side: THREE.DoubleSide // 确保内外都可见
     });
 
-    // 创建车斗几何体 (上开口箱形)
-    const bodyGeometry = new THREE.BoxGeometry(width, height, depth);
-
-    // 车斗底部
+    // 车斗
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
     body.position.set(0, height / 2 + MINECART_CONFIG.WHEEL_RADIUS, 0);
 
@@ -102,6 +112,72 @@ export class Minecart {
     // 存储以便后续清理
     if (!this._meshes) this._meshes = [];
     this._meshes.push({ mesh: body, geometry: bodyGeometry, material: bodyMaterial });
+  }
+
+  /**
+   * 创建倒梯形几何体
+   * @param {number} topWidth - 顶部宽度
+   * @param {number} topDepth - 顶部深度
+   * @param {number} bottomWidth - 底部宽度
+   * @param {number} bottomDepth - 底部深度
+   * @param {number} height - 高度
+   * @returns {THREE.BufferGeometry}
+   */
+  createTrapezoidGeometry(topWidth, topDepth, bottomWidth, bottomDepth, height) {
+    const geometry = new THREE.BufferGeometry();
+
+    // 计算半宽/半深，使几何体中心在原点
+    const tw = topWidth / 2;   // 顶部半宽
+    const td = topDepth / 2;   // 顶部半深
+    const bw = bottomWidth / 2; // 底部半宽
+    const bd = bottomDepth / 2; // 底部半深
+    const h = height / 2;       // 半高
+
+    // 8个顶点：底部4个 + 顶部4个
+    // 底部顶点（y = -h，即底部）
+    // 顶部顶点（y = +h，即顶部，开口）
+    const vertices = new Float32Array([
+      // 底部四个顶点
+      -bw, -h, -bd,  // 0: 底部后左
+       bw, -h, -bd,  // 1: 底部后右
+       bw, -h,  bd,  // 2: 底部前右
+      -bw, -h,  bd,  // 3: 底部前左
+      // 顶部四个顶点
+      -tw,  h, -td,  // 4: 顶部后左
+       tw,  h, -td,  // 5: 顶部后右
+       tw,  h,  td,  // 6: 顶部前右
+      -tw,  h,  td,  // 7: 顶部前左
+    ]);
+
+    // 定义面的顶点索引（使用逆时针顺序，从外部看）
+    // 每个面由两个三角形组成
+    const indices = [
+      // 底部面（顺时针从下往上看，即逆时针从外部看）
+      0, 2, 1,
+      0, 3, 2,
+
+      // 前面（z+方向，顶点 3,2,6,7）
+      3, 6, 7,
+      3, 2, 6,
+
+      // 后面（z-方向，顶点 1,0,4,5）
+      1, 4, 5,
+      1, 0, 4,
+
+      // 左面（x-方向，顶点 0,3,7,4）
+      0, 7, 4,
+      0, 3, 7,
+
+      // 右面（x+方向，顶点 2,1,5,6）
+      2, 5, 6,
+      2, 1, 5,
+    ];
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    geometry.setIndex(indices);
+    geometry.computeVertexNormals();
+
+    return geometry;
   }
 
   /**
