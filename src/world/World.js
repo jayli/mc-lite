@@ -107,6 +107,10 @@ export class World {
     // 遍历已加载区块，卸载超出渲染距离（额外加1作为缓冲）的区块
     for (const [key, chunk] of this.chunks) {
       if (Math.abs(chunk.cx - cx) > RENDER_DIST + 1 || Math.abs(chunk.cz - cz) > RENDER_DIST + 1) {
+        // 重要：在卸载前通知 MinecartManager 停止该 Chunk 内的矿车运动并保存状态
+        if (this.minecartManager) {
+          this.minecartManager.stopMinecartsForChunk(chunk.cx, chunk.cz);
+        }
         this.scene.remove(chunk.group);
         // 重要：在卸载前请求持久化，确保修改不丢失
         getPersistenceService().saveChunkData(chunk.cx, chunk.cz);

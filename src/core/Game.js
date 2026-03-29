@@ -606,6 +606,12 @@ export class Game {
           console.log(`[Save] 恢复炮塔: chunk ${key}, 数量:`, entities.turrets.length);
           this.turretManager.restoreTurretsForChunk(cx, cz, entities.turrets);
         }
+
+        // 恢复矿车
+        if (Array.isArray(entities.minecarts) && entities.minecarts.length > 0) {
+          console.log(`[Save] 恢复矿车: chunk ${key}, 数量:`, entities.minecarts.length);
+          this.minecartManager.restoreMinecartsForChunk(cx, cz, entities.minecarts);
+        }
       }
     }
 

@@ -350,28 +350,70 @@ export class MinecartManager {
   }
 
   /**
-   * 从快照恢复矿车
-   * @param {string} chunkKey - Chunk 键
-   * @param {Object} chunkData - Chunk 数据
+   * 从 Chunk 快照恢复矿车实例（直接按记录重建）
+   * @param {number} cx - Chunk X
+   * @param {number} cz - Chunk Z
+   * @param {Array} minecarts - 快照中的矿车列表
+   * @returns {void}
    */
-  restoreFromSnapshot(chunkKey, chunkData) {
-    if (!chunkData?.entities?.minecarts) return;
+  restoreMinecartsForChunk(cx, cz, minecarts) {
+    if (!Array.isArray(minecarts) || minecarts.length === 0) return;
+    const currentChunkKey = `${cx},${cz}`;
 
-    const minecartsData = chunkData.entities.minecarts;
-    for (const data of minecartsData) {
-      // 检查是否已存在
-      const posKey = this.getPositionKey(data);
+    for (const item of minecarts) {
+      if (!item?.position) continue;
+      if (this.getChunkKeyByPosition(item.position) !== currentChunkKey) continue;
+
+      // 检查是否已存在（避免重复恢复）
+      const posKey = this.getPositionKey(item.position);
       if (this.positionIndex.has(posKey)) continue;
 
-      // 创建矿车实例（不再需要 scene 参数）
-      const minecart = Minecart.fromJSON(data, this.world);
-      minecart.chunkKey = chunkKey;
+      // 创建矿车实例
+      const minecart = Minecart.fromJSON(item, this.world);
+      minecart.chunkKey = currentChunkKey;
       minecart.onDestroy = (id) => this.onMinecartDestroyed(id);
 
       // 添加到管理结构
       this.minecarts.set(minecart.id, minecart);
       this.positionIndex.set(posKey, minecart.id);
+
+      console.log(`[MinecartManager] 恢复矿车: ${minecart.id} 位置: (${item.x}, ${item.y}, ${item.z})`);
     }
+  }
+
+  /**
+   * 停止指定 Chunk 内所有矿车的运动并保存状态
+   * Chunk 卸载时调用，确保矿车状态被持久化
+   * @param {number} cx - Chunk X
+   * @param {number} cz - Chunk Z
+   */
+  stopMinecartsForChunk(cx, cz) {
+    const chunkKey = `${cx},${cz}`;
+    const minecartsToStop = [];
+
+    // 找出属于该 Chunk 的所有矿车
+    for (const minecart of this.minecarts.values()) {
+      if (minecart.chunkKey === chunkKey) {
+        minecartsToStop.push(minecart);
+      }
+    }
+
+    if (minecartsToStop.length === 0) return;
+
+    // 停止每个矿车的运动并保存状态
+    for (const minecart of minecartsToStop) {
+      // 如果矿车正在运动，停止它
+      if (minecart.movementState !== 'IDLE') {
+        minecart.movementState = 'IDLE';
+        minecart.velocity = { x: 0, z: 0 };
+        console.log(`[MinecartManager] 停止矿车 ${minecart.id} 运动，Chunk ${chunkKey} 卸载`);
+      }
+
+      // 确保矿车状态被保存到快照
+      this.saveMinecartToSnapshot(minecart);
+    }
+
+    console.log(`[MinecartManager] Chunk ${chunkKey} 卸载，已停止 ${minecartsToStop.length} 个矿车`);
   }
 
   /**

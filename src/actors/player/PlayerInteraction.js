@@ -947,9 +947,18 @@ export class PlayerInteraction {
       const hit = hits[i];
       const obj = hit.object;
 
-      // 1. Check if Zombie
+      // 1. Check if Minecart (子弹穿透矿车，不做任何处理)
+      const isMinecart = obj.userData?.isMinecartPart === true;
+      if (isMinecart) {
+        // 矿车不阻止子弹，继续检查后续命中
+        continue;
+      }
+
+      // 2. Check if Zombie
       let isZombie = false;
-      if (obj.userData?.renderer || obj.userData?.isZombie || obj.parent?.userData?.isZombie) {
+      // 注意：矿车的 userData.renderer 是 MinecartInstancedRenderer，不是丧尸渲染器
+      // 所以要先排除矿车的情况
+      if ((obj.userData?.renderer && !obj.userData?.isMinecartPart) || obj.userData?.isZombie || obj.parent?.userData?.isZombie) {
         isZombie = true;
       }
 
@@ -980,7 +989,7 @@ export class PlayerInteraction {
         break;
       }
 
-      // 2. Check if Block (Terrain/Other)
+      // 3. Check if Block (Terrain/Other)
       const blockHit = this._resolveBlockHitFromRaycast(hit);
       const blockType = blockHit?.type;
 

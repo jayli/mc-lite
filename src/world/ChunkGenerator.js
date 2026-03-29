@@ -171,6 +171,12 @@ export function extendChunk(Chunk) {
           this.world?.turretManager?.restoreTurretsForChunk?.(this.cx, this.cz, turrets);
         }
 
+        // 7. 恢复该 Chunk 中的矿车运行时实例（直接按快照记录重建，无需扫描）
+        const minecarts = newSnapshot?.entities?.minecarts;
+        if (Array.isArray(minecarts) && minecarts.length > 0) {
+          this.world?.minecartManager?.restoreMinecartsForChunk?.(this.cx, this.cz, minecarts);
+        }
+
         this.isReady = true;
         resolve();
       });
