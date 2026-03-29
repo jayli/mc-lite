@@ -114,11 +114,9 @@ export class PlayerInteraction {
       if (hits.length > 0 && hits[0].distance < 15) {
         const hit = hits[0], m = hit.object, instanceId = hit.instanceId;
 
-        // 检查是否点击了矿车
-        if (this.tryPickUpMinecart(hit)) {
-          this.swing();
-          return;
-        }
+        // 右键是放置动作，不应拾取矿车。
+        // 如果点击矿车位置，后续放置检查会因位置已占用而失败。
+        // 不调用 tryPickUpMinecart，避免误消除矿车。
 
         if (m.userData.type === 'chest' && m.isInstancedMesh) {
           m.getMatrixAt(instanceId, this.player._dummyMatrix);

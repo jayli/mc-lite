@@ -8,7 +8,6 @@
  */
 
 import { EntityPlacementHandler } from '../entity-registry/EntityPlacementHandler.js';
-import { parseBlockEntry } from '../../utils/OrientationUtils.js';
 import * as THREE from 'three';
 
 // 铁轨方块类型
@@ -58,7 +57,7 @@ export class MinecartPlacementHandler extends EntityPlacementHandler {
 
     // 检查目标位置是否为空气
     const targetBlock = this.getBlockAt(x, y, z);
-    if (targetBlock && targetBlock !== 'air') {
+    if (targetBlock && targetBlock.type !== 'air') {
       return false;
     }
 
@@ -100,15 +99,13 @@ export class MinecartPlacementHandler extends EntityPlacementHandler {
 
   /**
    * 检查方块是否为铁轨
-   * @param {string|object|null} block - 方块类型或条目
+   * @param {{ type: string, orientation: number }|null} block - 方块条目
    * @returns {boolean}
    */
   isTrackBlock(block) {
     if (!block) return false;
-
-    // 解析方块条目
-    const { type } = parseBlockEntry(block);
-    return TRACK_BLOCKS.includes(type);
+    // getBlockAt 返回的是已解析格式，直接使用 type
+    return TRACK_BLOCKS.includes(block.type);
   }
 
   /**
@@ -119,41 +116,32 @@ export class MinecartPlacementHandler extends EntityPlacementHandler {
    * @returns {number} orientation (0-3)
    */
   getTrackOrientation(x, y, z) {
-    if (!this.world) return 0;
-
-    // 尝试获取带 orientation 的方块数据
-    if (typeof this.world.getBlockWithOrientation === 'function') {
-      const entry = this.world.getBlockWithOrientation(x, y, z);
-      if (entry) {
-        const { orientation } = parseBlockEntry(entry);
-        return orientation || 0;
-      }
+    // 使用 getBlockAt 获取完整信息
+    const blockEntry = this.getBlockAt(x, y, z);
+    if (blockEntry) {
+      return blockEntry.orientation || 0;
     }
-
-    // 回退到普通获取
-    const block = this.world.getBlock(x, y, z);
-    if (typeof block === 'object' && block !== null && 'orientation' in block) {
-      return block.orientation;
-    }
-
     return 0;
   }
 
   /**
-   * 获取指定位置的方块类型
+   * 获取指定位置的方块完整信息（包含朝向）
    * @param {number} x - X坐标
    * @param {number} y - Y坐标
    * @param {number} z - Z坐标
-   * @returns {string|object|null}
+   * @returns {{ type: string, orientation: number }|null}
    */
   getBlockAt(x, y, z) {
     if (!this.world) return null;
 
-    if (typeof this.world.getBlockWithOrientation === 'function') {
-      return this.world.getBlockWithOrientation(x, y, z);
+    // 使用 getBlockEntry 获取完整的方块信息（包含 orientation）
+    if (typeof this.world.getBlockEntry === 'function') {
+      return this.world.getBlockEntry(x, y, z);
     }
 
-    return this.world.getBlock ? this.world.getBlock(x, y, z) : null;
+    // 回退：仅返回类型信息
+    const type = this.world.getBlock ? this.world.getBlock(x, y, z) : null;
+    return type ? { type, orientation: 0 } : null;
   }
 
   /**
