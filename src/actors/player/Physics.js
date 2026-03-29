@@ -114,6 +114,41 @@ export class Physics {
   }
 
   /**
+   * 检查 AABB 碰撞（排除矿车）
+   * 用于矿车乘坐时的障碍物检测
+   */
+  checkAABBExcludeMinecart(x, y, z, excludeMinecartId = null) {
+    const halfW = this.playerWidth / 2;
+    const minX = x - halfW;
+    const maxX = x + halfW;
+    const minZ = z - halfW;
+    const maxZ = z + halfW;
+
+    const startY = y + 0.1;
+    const endY = y + this.playerHeight - 0.1;
+
+    for (let bx = Math.floor(minX); bx <= Math.floor(maxX); bx++) {
+      for (let bz = Math.floor(minZ); bz <= Math.floor(maxZ); bz++) {
+        for (let by = Math.floor(startY); by <= Math.floor(endY); by++) {
+          // 检查方块
+          if (this.world.isSolid(bx, by, bz)) return true;
+          const type = this.world.getBlock(bx, by, bz);
+          if (type && getBlockProperties(type).isSolid) return true;
+
+          // 检查矿车（排除指定的矿车）
+          if (this.player.game?.minecartManager) {
+            const minecart = this.player.game.minecartManager.getMinecartAt(bx, by, bz);
+            if (minecart && minecart.id !== excludeMinecartId) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
    * 处理滑动摩擦力
    */
   applyFriction(velocity) {

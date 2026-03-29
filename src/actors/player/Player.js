@@ -503,21 +503,50 @@ export class Player {
       const dx = this.ridingMinecart.position.x - this.lastMinecartPosition.x;
       const dz = this.ridingMinecart.position.z - this.lastMinecartPosition.z;
 
-      // 更新玩家位置
-      this.position.x += dx;
-      this.position.z += dz;
+      // 计算新位置
+      const newX = this.position.x + dx;
+      const newZ = this.position.z + dz;
+      const newY = this.ridingMinecart.position.y + 0.9;
 
-      // 更新 Y 位置到矿车顶部
-      this.position.y = this.ridingMinecart.position.y + 0.9;
+      // 检查新位置是否有障碍物碰撞（排除当前乘坐的矿车）
+      let canMoveX = true;
+      let canMoveZ = true;
 
-      // 记录新位置
+      // 检查 X 方向是否有障碍
+      if (dx !== 0 && this.physics.checkAABBExcludeMinecart(newX, this.position.y, this.position.z, this.ridingMinecart.id)) {
+        canMoveX = false;
+      }
+      // 检查 Z 方向是否有障碍
+      if (dz !== 0 && this.physics.checkAABBExcludeMinecart(this.position.x, this.position.y, newZ, this.ridingMinecart.id)) {
+        canMoveZ = false;
+      }
+
+      // 更新玩家位置（只更新未被阻挡的方向）
+      if (canMoveX) {
+        this.position.x = newX;
+      }
+      if (canMoveZ) {
+        this.position.z = newZ;
+      }
+      this.position.y = newY;
+
+      // 记录矿车新位置
       this.lastMinecartPosition = {
         x: this.ridingMinecart.position.x,
         z: this.ridingMinecart.position.z
       };
 
-      result.dx = dx;
-      result.dz = dz;
+      // 检测玩家与矿车的位置偏差，超过阈值则自动下车
+      const deviationX = Math.abs(this.position.x - this.ridingMinecart.position.x);
+      const deviationZ = Math.abs(this.position.z - this.ridingMinecart.position.z);
+      if (deviationX > 0.6 || deviationZ > 0.6) {
+        // 玩家远离矿车，自动下车
+        this.ridingMinecart = null;
+        this.lastMinecartPosition = null;
+      }
+
+      result.dx = canMoveX ? dx : 0;
+      result.dz = canMoveZ ? dz : 0;
       return result;
     }
 
