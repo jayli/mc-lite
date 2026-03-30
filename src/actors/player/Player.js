@@ -204,6 +204,7 @@ export class Player {
     // 矿车乘坐状态
     this.ridingMinecart = null;           // 当前乘坐的矿车引用
     this.lastMinecartPosition = null;     // 上一帧矿车位置，用于计算位移增量
+    this.minecartRemountCooldown = 0;     // 下车后短暂禁止自动重绑，避免空格下车被立即重新绑定
 
     // 初始化交互系统
     this.interaction = new PlayerInteraction(this);
@@ -269,6 +270,7 @@ export class Player {
     this.camera.rotation.x = this.cameraPitch;
     dt = Math.min(dt, 0.1);
     this.physics.beginFrame();
+    if (this.minecartRemountCooldown > 0) this.minecartRemountCooldown -= dt;
 
     // 更新矿车乘坐状态（在玩家自主移动之前）
     const minecartDelta = this.updateMinecartRiding(dt);
@@ -462,6 +464,7 @@ export class Player {
         // 解除乘坐绑定
         this.ridingMinecart = null;
         this.lastMinecartPosition = null;
+        this.minecartRemountCooldown = 0.25;
       }
     }
 
@@ -557,7 +560,7 @@ export class Player {
     const minecart = this.game?.minecartManager?.getMinecartAt(px, feetY, pz);
 
     // 矿车高度为 0.9，玩家站在矿车上时 Y 应在矿车顶部附近
-    if (minecart) {
+    if (minecart && this.minecartRemountCooldown <= 0) {
       const minecartTopY = minecart.position.y + 0.9;
       const isOnMinecart = Math.abs(this.position.y - minecartTopY) < 0.3;
 
