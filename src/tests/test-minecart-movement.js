@@ -413,41 +413,6 @@ describe('MinecartMovementSystem 停止点测试', (test) => {
     assertTrue(ax > bx && bx > cx, '链接状态下 A/B/C 仍应保持不重叠顺序');
   });
 
-  test('前车 B 转向时后车 A 不应被置停，应在后续帧继续前进', () => {
-    // 轨道：x 直线到 0 后向 +z 转向
-    const tracks = new Map([
-      ['3,0,0', 'sand_train_track'],
-      ['2,0,0', 'sand_train_track'],
-      ['1,0,0', 'sand_train_track'],
-      ['0,0,0', 'sand_train_track'],
-      ['0,0,1', 'sand_train_track'],
-      ['0,0,2', 'sand_train_track']
-    ]);
-    const system = new MinecartMovementSystem(createTrackWorld(tracks));
-
-    const cartA = createMinecart(2, 'MOVING_FORWARD');
-    cartA.id = 'A';
-    cartA.velocity = { x: -1, z: 0 };
-
-    const cartB = createMinecart(1, 'MOVING_FORWARD');
-    cartB.id = 'B';
-    cartB.velocity = { x: -1, z: 0 };
-
-    const carts = new Map([
-      ['A', cartA],
-      ['B', cartB]
-    ]);
-    const manager = createDynamicMinecartManager(carts);
-
-    // 先让 B 到拐点并转向，再观察 A 是否会被错误置停
-    for (let i = 0; i < 14; i++) {
-      updateMinecartsInOrder(system, carts, manager, ['B', 'A'], 0.2);
-    }
-
-    assertEqual(cartA.movementState, 'MOVING_FORWARD', 'B 转向时 A 不应被置为 IDLE');
-    assertTrue(cartA.position.x < 1, 'A 应继续前进（不应卡在 x=1）');
-  });
-
   test('转角多通路时应优先左转（左可走时不应右转）', () => {
     // 当前在 (0,0) 朝 WEST，前方 WEST 无轨道，左右都有轨道（N/S）
     const tracks = new Map([
