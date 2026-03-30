@@ -184,6 +184,7 @@ export class MaterialManager {
         attribute float aVertexId;
         attribute float aAoLow;
         attribute float aAoHigh;
+        attribute float aOrientation;
         varying float vAo;
       ` + shader.vertexShader;
 
@@ -192,12 +193,98 @@ export class MaterialManager {
         '#include <common>',
         `
         #include <common>
+        float remapTopCorner(float corner, float orientationIdx) {
+          // orientation=0: [0,1,2,3]
+          if (orientationIdx < 0.5) return corner;
+          // orientation=1: [2,0,3,1]
+          if (orientationIdx < 1.5) {
+            if (corner < 0.5) return 2.0;
+            if (corner < 1.5) return 0.0;
+            if (corner < 2.5) return 3.0;
+            return 1.0;
+          }
+          // orientation=2: [3,2,1,0]
+          if (orientationIdx < 2.5) {
+            if (corner < 0.5) return 3.0;
+            if (corner < 1.5) return 2.0;
+            if (corner < 2.5) return 1.0;
+            return 0.0;
+          }
+          // orientation=3: [1,3,0,2]
+          if (corner < 0.5) return 1.0;
+          if (corner < 1.5) return 3.0;
+          if (corner < 2.5) return 0.0;
+          return 2.0;
+        }
+
+        float remapBottomCorner(float corner, float orientationIdx) {
+          // orientation=0: [0,1,2,3]
+          if (orientationIdx < 0.5) return corner;
+          // orientation=1: [1,3,0,2]
+          if (orientationIdx < 1.5) {
+            if (corner < 0.5) return 1.0;
+            if (corner < 1.5) return 3.0;
+            if (corner < 2.5) return 0.0;
+            return 2.0;
+          }
+          // orientation=2: [3,2,1,0]
+          if (orientationIdx < 2.5) {
+            if (corner < 0.5) return 3.0;
+            if (corner < 1.5) return 2.0;
+            if (corner < 2.5) return 1.0;
+            return 0.0;
+          }
+          // orientation=3: [2,0,3,1]
+          if (corner < 0.5) return 2.0;
+          if (corner < 1.5) return 0.0;
+          if (corner < 2.5) return 3.0;
+          return 1.0;
+        }
+
+        float remapSideFace(float face, float orientationIdx) {
+          // 将侧面归一化到顺序：+X(0), +Z(1), -X(2), -Z(3)
+          float sideIdx;
+          if (face < 0.5) sideIdx = 0.0;       // +X
+          else if (face < 1.5) sideIdx = 2.0;  // -X
+          else if (face < 4.5) sideIdx = 1.0;  // +Z
+          else sideIdx = 3.0;                  // -Z
+
+          // 与实例旋转保持一致：orientation=1 表示绕 Y 轴 +90°
+          float worldSideIdx = mod(sideIdx - orientationIdx + 4.0, 4.0);
+
+          // 还原到 AO 面索引：+X(0), -X(1), +Z(4), -Z(5)
+          if (worldSideIdx < 0.5) return 0.0;
+          if (worldSideIdx < 1.5) return 4.0;
+          if (worldSideIdx < 2.5) return 1.0;
+          return 5.0;
+        }
+
+        float remapAoVertexId(float vertexId, float orientation) {
+          float orientationIdx = mod(floor(orientation + 0.5), 4.0);
+          float face = floor(vertexId / 4.0);
+          float corner = mod(vertexId, 4.0);
+
+          // +Y
+          if (face > 1.5 && face < 2.5) {
+            return 8.0 + remapTopCorner(corner, orientationIdx);
+          }
+
+          // -Y
+          if (face > 2.5 && face < 3.5) {
+            return 12.0 + remapBottomCorner(corner, orientationIdx);
+          }
+
+          // 四个侧面角落顺序不变，仅重映射世界面
+          return remapSideFace(face, orientationIdx) * 4.0 + corner;
+        }
+
         float getAo(float id, float low, float high) {
+          float remappedId = remapAoVertexId(id, aOrientation);
           float aoRaw;
-          if (id < 12.0) { // 前12个顶点（0-11）的AO数据存储在low中，后12个顶点（12-23）存储在high中
-            aoRaw = mod(floor(low / pow(4.0, id)), 4.0); // 每个顶点AO值用2位存储（0-3），4.0表示4种可能值
+          if (remappedId < 12.0) { // 前12个顶点（0-11）的AO数据存储在low中，后12个顶点（12-23）存储在high中
+            aoRaw = mod(floor(low / pow(4.0, remappedId)), 4.0); // 每个顶点AO值用2位存储（0-3），4.0表示4种可能值
           } else {
-            aoRaw = mod(floor(high / pow(4.0, id - 12.0)), 4.0);
+            aoRaw = mod(floor(high / pow(4.0, remappedId - 12.0)), 4.0);
           }
           return 1.0 - (3.0 - aoRaw) / 3.0 * 0.9; // 0.9 为阴影强度，3.0为最大AO值，将0-3映射到亮度系数
         }

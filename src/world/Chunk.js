@@ -301,6 +301,35 @@ export class Chunk {
   }
 
   /**
+   * 刷新已存在方块的渲染网格（仅刷新渲染，不改逻辑数据/持久化）
+   * 用于方块被挖掉后，邻居方块立即补面，避免等待 consolidation。
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @param {string} key - 方块键
+   * @param {string|object} entryOrType - 方块条目或类型
+   */
+  _refreshBlockRenderMesh(x, y, z, key, entryOrType) {
+    const parsed = parseBlockEntry(entryOrType);
+    const type = parsed.type;
+    if (!type || type === 'air' || type === 'collider') return;
+
+    // 先移除该位置已有网格（实例网格或动态网格）
+    this._removeInstancedMeshBlock(key, x, y, z, type);
+    this._removeDynamicMesh(x, y, z, key);
+
+    // 立即创建动态网格，保证暴露面立刻可见
+    const mesh = this._createDynamicBlockMesh(x, y, z, key, type, parsed.orientation || 0);
+    if (!mesh) return;
+
+    this.group.add(mesh);
+    this.dynamicMeshes.set(key, mesh);
+    mesh.updateMatrix();
+    mesh.updateMatrixWorld();
+    this.visibleKeys.add(key);
+  }
+
+  /**
    * 当方块被移除时，唤醒周围被隐藏的邻居方块
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y
@@ -327,7 +356,7 @@ export class Chunk {
           if (!this.visibleKeys.has(nKey)) {
             this.addBlockDynamic(nx, ny, nz, this.blockData[nKey]);
           } else {
-            this._triggerFaceCullingUpdate(nx, ny, nz, this.blockData[nKey]);
+            this._refreshBlockRenderMesh(nx, ny, nz, nKey, this.blockData[nKey]);
           }
         }
       } else {
@@ -388,9 +417,15 @@ export class Chunk {
 
       const aoLowArray = new Float32Array(count);
       const aoHighArray = new Float32Array(count);
+      const orientationArray = new Float32Array(count);
+
+      aoLowArray.fill(aoLow);
+      aoHighArray.fill(aoHigh);
+      orientationArray.fill(orientation || 0);
 
       mesh.geometry.setAttribute('aAoLow', new THREE.BufferAttribute(aoLowArray, 1));
       mesh.geometry.setAttribute('aAoHigh', new THREE.BufferAttribute(aoHighArray, 1));
+      mesh.geometry.setAttribute('aOrientation', new THREE.BufferAttribute(orientationArray, 1));
     }
 
     // 设置阴影
@@ -577,8 +612,8 @@ export class Chunk {
     if (!targetChunk.visibleKeys.has(blockKey)) {
       targetChunk.addBlockDynamic(x, y, z, entry);
     } else {
-      // 如果原本可见，跨区块暴露也需要触发 Face Culling 更新
-      targetChunk._triggerFaceCullingUpdate(x, y, z, entry);
+      // 如果原本可见，跨区块暴露时也要立即刷新网格补面
+      targetChunk._refreshBlockRenderMesh(x, y, z, blockKey, entry);
     }
   }
 
@@ -772,8 +807,8 @@ export class Chunk {
               // 启动防抖定时器，在最后一批删除完成后统一处理
               this._scheduleBatchFaceCullingUpdate();
             } else {
-              // 非批量模式：立即更新
-              this._triggerFaceCullingUpdate(nx, ny, nz, this.blockData[nKey]);
+              // 非批量模式：立即刷新网格补面
+              this._refreshBlockRenderMesh(nx, ny, nz, nKey, this.blockData[nKey]);
             }
           }
         }

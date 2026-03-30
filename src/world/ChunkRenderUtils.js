@@ -219,10 +219,12 @@ export function extendChunk(Chunk) {
         const mesh = this.dynamicMeshes?.get(key);
         if (!mesh) continue;
 
-        const type = this.blockData[key];
-        if (!type) continue;
+        const entry = this.blockData[key];
+        if (!entry) continue;
 
-        const typeStr = typeof type === 'string' ? type : type.type;
+        const parsed = parseBlockEntry(entry);
+        const typeStr = parsed.type;
+        const orientation = parsed.orientation || 0;
         const props = getBlockProps(typeStr);
         if (!props.isSolid || props.isTransparent) continue;
 
@@ -233,12 +235,15 @@ export function extendChunk(Chunk) {
         const count = mesh.geometry.attributes.position.count;
         const aoLowArray = new Float32Array(count);
         const aoHighArray = new Float32Array(count);
+        const orientationArray = new Float32Array(count);
 
         aoLowArray.fill(aoLow);
         aoHighArray.fill(aoHigh);
+        orientationArray.fill(orientation);
 
         mesh.geometry.setAttribute('aAoLow', new THREE.BufferAttribute(aoLowArray, 1));
         mesh.geometry.setAttribute('aAoHigh', new THREE.BufferAttribute(aoHighArray, 1));
+        mesh.geometry.setAttribute('aOrientation', new THREE.BufferAttribute(orientationArray, 1));
       }
     };
 

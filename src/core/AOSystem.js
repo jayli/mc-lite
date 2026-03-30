@@ -251,6 +251,7 @@ export class AOSystem {
 
     let aoLowAttr = mesh.geometry.getAttribute('aAoLow');
     let aoHighAttr = mesh.geometry.getAttribute('aAoHigh');
+    let orientationAttr = mesh.geometry.getAttribute('aOrientation');
 
     if (!aoLowAttr) {
       mesh.geometry.setAttribute('aAoLow', new THREE.BufferAttribute(aoLowArray, 1));
@@ -264,6 +265,14 @@ export class AOSystem {
     } else {
       aoHighAttr.array.set(aoHighArray);
       aoHighAttr.needsUpdate = true;
+    }
+
+    // 保证旋转方块在后续 AO 更新时不会丢失朝向属性
+    if (!orientationAttr) {
+      const orientationArray = new Float32Array(count);
+      const orientation = mesh.userData?.orientation || 0;
+      orientationArray.fill(orientation);
+      mesh.geometry.setAttribute('aOrientation', new THREE.BufferAttribute(orientationArray, 1));
     }
   }
 

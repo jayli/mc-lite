@@ -244,9 +244,11 @@ export function extendChunk(Chunk) {
       if (props.isSolid && !props.isTransparent) {
         const aoLowArray = new Float32Array(d[type].length);
         const aoHighArray = new Float32Array(d[type].length);
+        const orientationArray = new Float32Array(d[type].length);
         d[type].forEach((pos, i) => {
           aoLowArray[i] = pos.aoLow || 0;
           aoHighArray[i] = pos.aoHigh || 0;
+          orientationArray[i] = pos.orientation || 0;
         });
         // 必须在 geometry 上克隆或者直接设置，InstancedMesh 共享 geometry 会有问题
         // 但这里我们使用的是共享几何体，所以我们需要为每个 InstancedMesh 唯一的属性
@@ -254,6 +256,7 @@ export function extendChunk(Chunk) {
         mesh.geometry = geometry.clone(); // 克隆几何体以拥有独立的属性
         mesh.geometry.setAttribute('aAoLow', new THREE.InstancedBufferAttribute(aoLowArray, 1));
         mesh.geometry.setAttribute('aAoHigh', new THREE.InstancedBufferAttribute(aoHighArray, 1));
+        mesh.geometry.setAttribute('aOrientation', new THREE.InstancedBufferAttribute(orientationArray, 1));
       }
 
       // 存储元数据，便于后续通过 Raycaster 进行交互识别
