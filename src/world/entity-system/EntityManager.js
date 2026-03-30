@@ -317,6 +317,16 @@ class EntityManagerClass {
       categories: ['structure', 'vehicle']
     }));
 
+    // regular_house_1（JSON 加载，作为大型建筑）
+    this.register('regular_house_1', new JsonEntity({
+      id: 'regular_house_1',
+      biomes: ['CITY'],
+      probability: 0,
+      loader: null,  // 将在 initSpecial 中设置
+      crossChunkDist: 16,
+      categories: ['structure', 'building', 'city', 'large']
+    }));
+
     // 沉船
     this.register('ship', new CodeEntity({
       id: 'ship',
@@ -449,6 +459,7 @@ class EntityManagerClass {
     this.setLoader('white_tower', structureLoaders.whiteTower);
     this.setLoader('desert_village', structureLoaders.desertVillage);
     this.setLoader('tank', structureLoaders.tank);
+    this.setLoader('regular_house_1', structureLoaders.regularHouse1);
 
     // 模因人（gun_man.glb）
     this.register('gun_man', new CodeEntity({

@@ -30,6 +30,7 @@ self.onerror = (e) => {
 // 结构数据加载器实例
 const {
   bigHouse,
+  regularHouse1,
   boxHouse,
   doubleTower,
   pyramidIsland,
@@ -177,6 +178,7 @@ onmessage = async function(e) {
   // 预加载所有结构数据（等待完成后再生成地形）
   await Promise.all([
     bigHouse.load(),
+    regularHouse1.load(),
     boxHouse.load(),
     doubleTower.load(),
     pyramidIsland.load(),
@@ -568,6 +570,7 @@ onmessage = async function(e) {
           const taskFactories = {
             castle: generateCastle,
             bigHouse: generateBigHouse,
+            regularHouse1: generateRegularHouse1,
             boxHouse: generateBoxHouse,
             desertVillage: generateDesertVillage,
             doubleTower: generateDoubleTower,
@@ -1215,6 +1218,7 @@ onmessage = async function(e) {
   );
   const largeStaticTaskFactories = {
     bigHouse: (x, y, z) => () => generateBigHouse(x, y, z, fakeChunk, dPlaceholder),
+    regularHouse1: (x, y, z) => () => generateRegularHouse1(x, y, z, fakeChunk, dPlaceholder),
     boxHouse: (x, y, z) => () => generateBoxHouse(x, y, z, fakeChunk, dPlaceholder),
     castle: (x, y, z) => () => generateCastle(x, y, z, fakeChunk, dPlaceholder),
     doubleTower: (x, y, z) => () => generateDoubleTower(x, y, z, fakeChunk, dPlaceholder),
@@ -1863,6 +1867,10 @@ function generateStructureWithGroundSupport(loader, x, y, z, chunk, dObj) {
 
 function generateBigHouse(x, y, z, chunk, dObj) {
   generateStructureWithGroundSupport(bigHouse, x, y, z, chunk, dObj);
+}
+
+function generateRegularHouse1(x, y, z, chunk, dObj) {
+  generateStructureWithGroundSupport(regularHouse1, x, y, z, chunk, dObj);
 }
 
 function generateBoxHouse(x, y, z, chunk, dObj) {

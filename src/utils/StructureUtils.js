@@ -21,6 +21,7 @@
  */
 export const STRUCTURE_RENDER_DIST = {
   bigHouse: 22,       // big_house 约 37x39
+  regularHouse1: 10,  // regular_house_1 约 9x13x9
   boxHouse: 12,       // box_house 约 18x11
   uglyHouse: 24,      // UglyHouse 最大约 40x40
   desertVillage: 10,  // DesertVillage 约 17x17，含前方台阶和平台
@@ -51,6 +52,7 @@ export const STRUCTURE_RENDER_DIST = {
  */
 export const STRUCTURE_HEIGHT_RANGE_SPECIAL = {
   bigHouse: 14,
+  regularHouse1: 14,
   boxHouse: 48,
   tank: 35,       // tank 结构 Y 方向±35（共 71 格），覆盖 1-70 的范围
   doubleTower: 48,
@@ -107,6 +109,7 @@ const CROSS_CHUNK_OWNER_SET = new Set(CROSS_CHUNK_OWNER_TYPES);
  */
 export const CROSS_CHUNK_OWNER_BLOCKED_TYPES = Object.freeze([
   'bigHouse',
+  'regularHouse1',
   'boxHouse',
   'castle',
   'doubleTower',

@@ -159,6 +159,7 @@ const moduleBase = new URL('.', import.meta.url).href;
  */
 export const structureLoaders = {
   bigHouse: new StructureLoader('big_house', new URL('../structures/big_house.json', moduleBase).href),
+  regularHouse1: new StructureLoader('regular_house_1', new URL('../structures/regular_house_1.json', moduleBase).href),
   boxHouse: new StructureLoader('box_house', new URL('../structures/box_house.json', moduleBase).href),
   doubleTower: new StructureLoader('double_tower', new URL('../structures/double_tower.json', moduleBase).href),
   pyramidIsland: new StructureLoader('pyramid_island', new URL('../structures/pyramid_island.json', moduleBase).href),
@@ -189,6 +190,7 @@ export const structureLoaders = {
 export async function preloadAllStructures() {
   await Promise.all([
     structureLoaders.bigHouse.load(),
+    structureLoaders.regularHouse1.load(),
     structureLoaders.boxHouse.load(),
     structureLoaders.doubleTower.load(),
     structureLoaders.pyramidIsland.load(),

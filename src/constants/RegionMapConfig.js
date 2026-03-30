@@ -57,6 +57,7 @@ export const CITY_STRUCTURE_FOOTPRINT = Object.freeze({
   castle: { halfX: 23, halfZ: 26, minGap: 10 },
   whiteTower: { halfX: 15, halfZ: 6, minGap: 12 },
   bigHouse: { halfX: 18, halfZ: 20, minGap: 10 },
+  regularHouse1: { halfX: 8, halfZ: 8, minGap: 10 },
   boxHouse: { halfX: 9, halfZ: 5, minGap: 10 },
   desertVillage: { halfX: 13, halfZ: 14, minGap: 10 },
   doubleTower: { halfX: 18, halfZ: 7, minGap: 10 },
@@ -75,6 +76,7 @@ export const CITY_STRUCTURE_CONFIGS = Object.freeze([
   // 大尺寸结构优先放置
   { type: 'pyramidIsland', count: 1 },
   { type: 'bigHouse', count: 2 },
+  { type: 'regularHouse1', count: 2 },
   { type: 'whiteTower', countRange: [2, 3] },
   { type: 'desertVillage', countRange: [2, 3] },
   { type: 'doubleTower', count: 1 },

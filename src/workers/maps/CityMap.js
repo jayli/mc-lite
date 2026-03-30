@@ -503,7 +503,7 @@ function buildCityLayout(seed, terrainGen) {
     const count = getStructureCount(config, seed, salt++);
     if (count <= 0) continue;
 
-    const isLarge = config.type === 'whiteTower' || config.type === 'pyramidIsland';
+    const isLarge = config.type === 'whiteTower' || config.type === 'pyramidIsland' || config.type === 'regularHouse1';
     const minR = isLarge ? CITY_PLACEMENT.LARGE_STRUCT_MIN_RADIUS : CITY_PLACEMENT.NORMAL_STRUCT_MIN_RADIUS;
     const maxR = isLarge ? CITY_PLACEMENT.LARGE_STRUCT_MAX_RADIUS : CITY_PLACEMENT.NORMAL_STRUCT_MAX_RADIUS;
 
