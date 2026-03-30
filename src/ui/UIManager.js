@@ -266,7 +266,7 @@ export class UIManager {
           }
         } else {
           // 创建创造台
-          const removeLoading = this.showBlockingLoading('创造台生成中，正在进行合并与面剔除优化，请稍候...');
+          const removeLoading = this.showBlockingLoading('创造台生成中，请稍候...');
           let optimizationDone = false;
           try {
             const result = playgroundService.createPlayground(playerPos);
@@ -339,7 +339,7 @@ export class UIManager {
 
           try {
             const jsonText = await file.text();
-            const removeLoading = this.showBlockingLoading('模型导入中，正在进行合并与面剔除优化，请稍候...');
+            const removeLoading = this.showBlockingLoading('模型导入中，请稍候...');
             let optimizationDone = false;
             try {
               const result = await playgroundService.importModelFromJson(jsonText);
