@@ -42,10 +42,10 @@ const MINECART_SIZES = {
  * 矿车颜色配置
  */
 const MINECART_COLORS = {
-  /** 车斗颜色 - 木质棕色 */
-  body: 0x8B4513,
-  /** 车轮颜色 - 金属灰色 */
-  wheel: 0x555555
+  /** 车斗颜色 - 铁质灰色 */
+  body: 0xb8bec6,
+  /** 车轮颜色 - 深金属灰 */
+  wheel: 0x2f3238
 };
 
 // ============================================================================
@@ -95,6 +95,7 @@ export class MinecartInstancedRenderer {
   initResources() {
     // 创建车斗几何体（倒梯形）
     this.bodyGeometry = this.createTrapezoidGeometry();
+    this.bodyTexture = this.createMinecartBodyTexture();
 
     // 创建车轮几何体（圆柱体）
     this.wheelGeometry = new THREE.CylinderGeometry(
@@ -105,14 +106,15 @@ export class MinecartInstancedRenderer {
     );
 
     // 创建材质
-    this.bodyMaterial = new THREE.MeshLambertMaterial({
+    this.bodyMaterial = new THREE.MeshStandardMaterial({
       color: MINECART_COLORS.body,
-      transparent: true,
-      opacity: 0.9,
+      map: this.bodyTexture,
+      metalness: 0.22,
+      roughness: 0.72,
       side: THREE.DoubleSide
     });
 
-    this.wheelMaterial = new THREE.MeshLambertMaterial({
+    this.wheelMaterial = new THREE.MeshStandardMaterial({
       color: MINECART_COLORS.wheel
     });
   }
@@ -131,8 +133,6 @@ export class MinecartInstancedRenderer {
     const bottomWidth = width * shrinkRatio;
     const bottomDepth = depth * shrinkRatio;
 
-    const geometry = new THREE.BufferGeometry();
-
     // 计算半宽/半深，使几何体中心在原点
     const tw = topWidth / 2;
     const td = topDepth / 2;
@@ -140,44 +140,122 @@ export class MinecartInstancedRenderer {
     const bd = bottomDepth / 2;
     const h = height / 2;
 
-    // 8个顶点：底部4个 + 顶部4个
-    const vertices = new Float32Array([
-      // 底部四个顶点
-      -bw, -h, -bd,  // 0: 底部后左
-       bw, -h, -bd,  // 1: 底部后右
-       bw, -h,  bd,  // 2: 底部前右
-      -bw, -h,  bd,  // 3: 底部前左
-      // 顶部四个顶点
-      -tw,  h, -td,  // 4: 顶部后左
-       tw,  h, -td,  // 5: 顶部后右
-       tw,  h,  td,  // 6: 顶部前右
-      -tw,  h,  td,  // 7: 顶部前左
-    ]);
+    // 顶点：底部四点 + 顶部四点（开口车斗，无顶面）
+    const p = {
+      bbl: new THREE.Vector3(-bw, -h, -bd), // bottom back left
+      bbr: new THREE.Vector3(bw, -h, -bd),  // bottom back right
+      bfr: new THREE.Vector3(bw, -h, bd),   // bottom front right
+      bfl: new THREE.Vector3(-bw, -h, bd),  // bottom front left
+      tbl: new THREE.Vector3(-tw, h, -td),  // top back left
+      tbr: new THREE.Vector3(tw, h, -td),   // top back right
+      tfr: new THREE.Vector3(tw, h, td),    // top front right
+      tfl: new THREE.Vector3(-tw, h, td)    // top front left
+    };
 
-    // 定义面的顶点索引
-    const indices = [
-      // 底部面
-      0, 2, 1,
-      0, 3, 2,
-      // 前面
-      3, 6, 7,
-      3, 2, 6,
-      // 后面
-      1, 4, 5,
-      1, 0, 4,
-      // 左面
-      0, 7, 4,
-      0, 3, 7,
-      // 右面
-      2, 5, 6,
-      2, 1, 5,
-    ];
+    const positions = [];
+    const uvs = [];
+    const indices = [];
 
-    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    const addFace = (a, b, c, d) => {
+      const base = positions.length / 3;
+      positions.push(
+        a.x, a.y, a.z,
+        b.x, b.y, b.z,
+        c.x, c.y, c.z,
+        d.x, d.y, d.z
+      );
+
+      // 统一四边形 UV，便于展示金属噪点与上沿压暗效果
+      uvs.push(
+        0, 0,
+        1, 0,
+        1, 1,
+        0, 1
+      );
+
+      indices.push(
+        base, base + 1, base + 2,
+        base, base + 2, base + 3
+      );
+    };
+
+    // 底部
+    addFace(p.bbl, p.bbr, p.bfr, p.bfl);
+    // 前、后、左、右（不含顶面）
+    addFace(p.bfl, p.bfr, p.tfr, p.tfl);
+    addFace(p.bbr, p.bbl, p.tbl, p.tbr);
+    addFace(p.bbl, p.bfl, p.tfl, p.tbl);
+    addFace(p.bfr, p.bbr, p.tbr, p.tfr);
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     geometry.setIndex(indices);
     geometry.computeVertexNormals();
 
     return geometry;
+  }
+
+  /**
+   * 创建矿车车斗纹理（参照原版矿车的灰色金属质感）
+   * @returns {THREE.CanvasTexture}
+   */
+  createMinecartBodyTexture() {
+    const size = 128;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      return null;
+    }
+
+    // 基础灰色渐变：中间略亮，边缘略暗
+    const gradient = ctx.createLinearGradient(0, 0, 0, size);
+    gradient.addColorStop(0, '#a7afb8');
+    gradient.addColorStop(0.5, '#c0c6ce');
+    gradient.addColorStop(1, '#8f98a2');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, size, size);
+
+    // 顶部深色压边，贴近参考图车斗上沿效果
+    ctx.fillStyle = 'rgba(58, 63, 70, 0.8)';
+    ctx.fillRect(0, 0, size, Math.floor(size * 0.14));
+
+    // 底部轻微阴影，增强金属厚度感
+    ctx.fillStyle = 'rgba(40, 45, 52, 0.2)';
+    ctx.fillRect(0, Math.floor(size * 0.85), size, Math.floor(size * 0.15));
+
+    // 金属噪点
+    for (let i = 0; i < 420; i++) {
+      const x = (Math.random() * size) | 0;
+      const y = (Math.random() * size) | 0;
+      const v = 155 + ((Math.random() * 60) | 0);
+      const alpha = 0.1 + Math.random() * 0.2;
+      ctx.fillStyle = `rgba(${v}, ${v}, ${v}, ${alpha.toFixed(3)})`;
+      ctx.fillRect(x, y, 1, 1);
+    }
+
+    // 轻微竖向拉丝纹理
+    ctx.strokeStyle = 'rgba(235, 240, 245, 0.08)';
+    for (let x = 0; x < size; x += 6) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, size);
+      ctx.stroke();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = THREE.RepeatWrapping;
+    texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(1, 1);
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.generateMipmaps = true;
+    texture.needsUpdate = true;
+    return texture;
   }
 
   /**
@@ -326,7 +404,7 @@ export class MinecartInstancedRenderer {
    * 更新4个车轮矩阵
    */
   updateWheelMatrices(index, px, py, pz, ry) {
-    const { wheelRadius, wheelHeight, wheelbase, trackWidth } = MINECART_SIZES;
+    const { wheelRadius, wheelbase, trackWidth } = MINECART_SIZES;
 
     // 四个车轮的相对位置
     const wheelOffsets = [
@@ -399,6 +477,7 @@ export class MinecartInstancedRenderer {
       mesh.geometry.dispose();
       mesh.material.dispose();
     });
+    this.bodyTexture?.dispose();
 
     // 清空引用
     this.instanceMap = [];
