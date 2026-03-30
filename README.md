@@ -32,15 +32,11 @@ src/
 
 ## 代码结构
 
-![Architecture 2026-03-30](docs/architechure-2026-03-30.png)
+<img width="8192" height="5817" alt="architechure-2026-03-30" src="https://github.com/user-attachments/assets/c6e6b0a9-6bfa-4d08-aec8-b3a755159de0" />
 
 ### 游戏截图
 
-<img width="3256" height="1528" alt="历史截图 1" src="https://github.com/user-attachments/assets/753eea26-bde8-40c0-92ab-a6a3306e422c" />
-
-<img width="3256" height="1534" alt="历史截图 2" src="https://github.com/user-attachments/assets/2743b7e4-0c6a-4f4b-bc6b-8dd44c3bc60f" />
-
-<img width="3308" height="1864" alt="历史截图 3" src="https://github.com/user-attachments/assets/b4487031-0cbf-41b0-b0da-a9d05f0560a0" />
+<img width="2564" height="1154" alt="image" src="https://github.com/user-attachments/assets/fbee19c7-f5bc-4479-8034-b9758d2fc0dd" />
 
 ## license
 
