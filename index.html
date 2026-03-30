@@ -27,8 +27,8 @@
     <!-- 启动存档提示模态框 -->
     <div id="load-save-modal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:100; justify-content:center; align-items:center; flex-direction:column; color:white;">
       <div style="background:#c6c6c6; border:4px solid #555; padding:30px; border-radius:4px; box-shadow:5px 5px 0 #000; text-align:center; color:#333; width:400px;">
-        <h2 style="margin-top:0;">发现现有存档</h2>
-        <p>检测到您之前手动保存的游戏进度，请选择：</p>
+        <img src="./src/style/Minecraft-Logo.png" alt="Minecraft Logo" style="width:260px; height:48px; max-width:100%; object-fit:cover; object-position:center; margin:0 auto 12px auto; display:block;" />
+        <p>请选择启动方式：</p>
         <div style="display:flex; gap:15px; margin-top:25px; justify-content:center;">
           <button id="btn-load-save" style="background:#559944; flex:1;">加载存档(IndexedDB)</button>
           <button id="btn-new-world" style="background:#8b8b8b; flex:1;">开启新世界</button>
@@ -159,10 +159,9 @@ import { Game } from './src/core/Game.js';
                 initializeAudio()
             ]);
 
-            const hasSave = await manualSaveService.checkSaveExists();
             const modal = document.getElementById('load-save-modal');
 
-            if (hasSave && modal) {
+            if (modal) {
               modal.style.display = 'flex';
 
               const loadBtn = document.getElementById('btn-load-save');
@@ -188,7 +187,17 @@ import { Game } from './src/core/Game.js';
               };
 
               loadBtn.onclick = async () => {
+                const hasSave = await manualSaveService.checkSaveExists();
+                if (!hasSave) {
+                  alert('没有发现 IndexedDB 存档');
+                  return;
+                }
+
                 const saveData = await manualSaveService.load();
+                if (!saveData) {
+                  alert('没有发现 IndexedDB 存档');
+                  return;
+                }
                 startGame(saveData);
               };
 
