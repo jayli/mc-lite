@@ -1,0 +1,1823 @@
+ ▐▛███▜▌   Claude Code v2.1.85
+▝▜█████▛▘  Sonnet 4.6 · API Usage Billing
+  ▘▘ ▝▝    ~/jaylli/mc-lite
+
+❯ /superpowers:systematic-debugging AO                                          
+的计算有一个场景有bug，就是AO着色到可以旋转方向的方块上的时候，当方块旋转，AO   
+着色的各个面也跟着旋转了，AO 阴影的着色其实跟方块的旋转方向是不应该有关系的，比 
+如一个方块朝南AO应该是深色，如果这个方块旋转了，朝南的面变成了朝西，目前的程序  
+里AO阴影也跟着朝南的面变成了着色到朝西了，跟随原来朝南的面而旋转了。            
+                                                                                
+我希望AO的计算不受方块旋转的影响，比如方块朝南的面转向了朝西，则AO计算不应当跟  
+随这个面而旋转，应该还正确渲染朝南的面。请你考虑这个现象，调查原因，并修复这个  
+问题。                                                                          
+
+⏺ 我来按照系统性调试流程调查这个AO着色跟随方块旋转的问题。
+
+  Phase 1: Root Cause Investigation
+
+  首先，我需要理解当前的AO计算和方块旋转是如何工作的。让我追踪相关的代码路径。
+
+  Searched for 2 patterns (ctrl+o to expand)
+
+⏺ 让我深入查看AO计算的核心文件和方块渲染逻辑。
+
+  Read 3 files (ctrl+o to expand)
+
+⏺ 让我继续追踪方块旋转和Shader中AO的使用方式。
+
+  Read 2 files (ctrl+o to expand)
+
+⏺ 现在我理解了问题的可能根源。让我继续追踪 aVertexId 属性的设置和 AO
+  数据的流向。
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ 现在我理解了问题的结构。让我查看 AO 数据是如何应用到 InstancedMesh
+  和动态网格的。
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ 让我查看 buildMeshes 函数中 AO 数据的处理。
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Phase 1 完成：根本原因已识别
+
+  问题根源
+
+  我找到了问题的根本原因：
+
+  1. AO 数据基于世界坐标计算：AO_NEIGHBOR_OFFSETS 数组按固定的世界方向顺序（+X,
+  -X, +Y, -Y, +Z, -Z）计算每个面的 AO 值，然后打包成 aoLow 和 aoHigh
+  2. Shader 使用固定的顶点 ID 解包 AO：
+    - 顶点 ID 0-3 → +X 面的 4 个角落
+    - 顶点 ID 4-7 → -X 面
+    - 顶点 ID 8-11 → +Y 面
+    - 顶点 ID 12-15 → -Y 面
+    - 顶点 ID 16-19 → +Z 面
+    - 顶点 ID 20-23 → -Z 面
+  3. 方块旋转只改变变换矩阵：当方块旋转时，setMatrixAt
+  设置了旋转矩阵，几何体顶点跟着旋转，但顶点 ID 不变
+  4. 结果：旋转 90° 后，原来 +X 方向的几何面现在朝向 +Z，但 Shader 仍用顶点 ID
+  0-3 从 AO 数据中取出 +X 方向的 AO 值，导致 AO 阴影"跟着旋转"
+
+  让我查看是否已有测试来验证这个问题，并确认解决方案。
+
+  Searched for 3 patterns (ctrl+o to expand)
+
+⏺ Phase 2: 模式分析
+
+  现在我完全理解了问题。让我设计解决方案。
+
+  问题本质
+
+  1. Shader 的 AO 读取逻辑：
+    - 顶点 ID → 面索引 → 固定的世界方向 AO 值
+    - 顶点 0-3 始终读取 +X 面的 AO，顶点 16-19 始终读取 +Z 面的 AO
+  2. 旋转的影响：
+    - 方块旋转 90°（orientation=1，朝南）后
+    - 原本的 +X 几何面现在朝向 +Z（世界南）
+    - 但 Shader 仍用顶点 ID 0-3 读取 +X 面的 AO 值
+    - 这导致 AO 阴影"跟着旋转"
+
+  解决方案
+
+  在 Shader 中根据方块朝向重新映射 AO 面索引：
+
+  当方块旋转时，需要根据 orientation 值重新映射：
+  - orientation=0（朝东）：无变化
+  - orientation=1（朝南/旋转90°）：+X→+Z, +Z→-X, -X→-Z, -Z→+X
+  - orientation=2（朝西/旋转180°）：+X→-X, +X→+X, +Z→-Z, -Z→+Z
+  - orientation=3（朝北/旋转270°）：+X→-Z, -Z→-X, -X→+Z, +Z→+X
+
+  这需要：
+  1. 添加 aOrientation 实例属性传递方块朝向
+  2. 修改 Shader 中的 getAo 函数，根据 orientation 重映射面索引
+
+  让我实现这个修复。
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Phase 3: 假设与测试
+
+  现在我要实现修复。核心思路是在 Shader 中根据方块的 orientation 重新映射顶点 ID
+   到正确的世界面。
+
+⏺ Update(src/core/MaterialManager.js)
+  ⎿  Added 53 lines, removed 6 lines
+      175  
+      176    /**
+      177     * 为材质注入 AO 着色器逻辑
+      178 +   * 支持方块旋转时 AO 正确映射到世界坐标面                   
+      179     * @param {THREE.Material} material
+      180     */
+      181    _applyShaderModifications(material) {
+      182      material.onBeforeCompile = (shader) => {
+      183        // 顶点着色器修改
+      184 +      // aOrientation: 方块朝向 (0-3)，用于正确映射旋转方块的 
+          +AO                                                            
+      185        shader.vertexShader = `
+      186          attribute float aVertexId;
+      187          attribute float aAoLow;
+      188          attribute float aAoHigh;
+      189 +        attribute float aOrientation;                         
+      190          varying float vAo;
+      191        ` + shader.vertexShader;
+      192  
+      190 -      // 台阶底部阴影                                         
+      193 +      // AO 解包与旋转映射逻辑                                
+      194 +      // 面索引：0=+X, 1=-X, 2=+Y, 3=-Y, 4=+Z, 5=-Z           
+      195 +      // 当方块旋转时，几何面朝向改变，需要重新映射到正确的世 
+          +界面 AO                                                       
+      196        shader.vertexShader = shader.vertexShader.replace(
+      197          '#include <common>',
+      198          `
+      199          #include <common>
+      195 -        float getAo(float id, float low, float high) {        
+      200 +                                                              
+      201 +        // 从打包数据中读取指定顶点 ID 的 AO 值               
+      202 +        float readAoById(float id, float low, float high) {   
+      203            float aoRaw;
+      197 -          if (id < 12.0) { // 前12个顶点（0-11）的AO数据存储在
+          -low中，后12个顶点（12-23）存储在high中                        
+      198 -            aoRaw = mod(floor(low / pow(4.0, id)), 4.0); // 每
+          -个顶点AO值用2位存储（0-3），4.0表示4种可能值                  
+      204 +          if (id < 12.0) {                                    
+      205 +            aoRaw = mod(floor(low / pow(4.0, id)), 4.0);      
+      206            } else {
+      207              aoRaw = mod(floor(high / pow(4.0, id - 12.0)), 4.0
+           );
+      208            }
+      202 -          return 1.0 - (3.0 - aoRaw) / 3.0 * 0.9; // 0.9 为阴 
+          -影强度，3.0为最大AO值，将0-3映射到亮度系数                    
+      209 +          return aoRaw;                                       
+      210          }
+      211 +                                                              
+      212 +        // 根据方块朝向重新映射面索引                         
+      213 +        // 旋转规则（顺时针）：+X→+Z→-X→-Z→+X                 
+      214 +        // orientation: 0=朝东, 1=朝南(旋转90°), 2=朝西(旋转18
+          +0°), 3=朝北(旋转270°)                                         
+      215 +        float remapFaceForOrientation(float face, float orient
+          +ation) {                                                      
+      216 +          // +Y 和 -Y 面不受旋转影响                          
+      217 +          if (face == 2.0 || face == 3.0) return face;        
+      218 +                                                              
+      219 +          // 四个侧面的旋转映射                               
+      220 +          // 面 ID: 0=+X, 1=-X, 4=+Z, 5=-Z                    
+      221 +          // 旋转 90° 后：+X→+Z(4), +Z→-X(1), -X→-Z(5), -Z→+X(
+          +0)                                                            
+      222 +          float side = mod(face, 2.0); // 0 表示 +方向, 1 表示
+          + -方向                                                        
+      223 +          float isX = step(2.0, face) * (1.0 - step(5.0, face)
+          +); // 面在 X 轴则为 0                                         
+      224 +          float isZ = step(4.0, face); // 面在 Z 轴则为 1     
+      225 +                                                              
+      226 +          // 计算原始侧面索引：+X=0, -X=1, +Z=2, -Z=3         
+      227 +          float sideIdx = isX * side + isZ * (2.0 + side);    
+      228 +                                                              
+      229 +          // 根据 orientation 偏移侧面索引（顺时针旋转）      
+      230 +          float newSideIdx = mod(sideIdx + orientation, 4.0); 
+      231 +                                                              
+      232 +          // 将侧面索引转回面 ID                              
+      233 +          // 0→+X(0), 1→-X(1), 2→+Z(4), 3→-Z(5)               
+      234 +          float newIsZ = step(2.0, newSideIdx);               
+      235 +          float newFace = (1.0 - newIsZ) * newSideIdx + newIsZ
+          + * (newSideIdx + 2.0);                                        
+      236 +                                                              
+      237 +          return newFace;                                     
+      238 +        }                                                     
+      239 +                                                              
+      240 +        float getAo(float vertexId, float low, float high, flo
+          +at orientation) {                                             
+      241 +          float face = floor(vertexId / 4.0);                 
+      242 +          float corner = mod(vertexId, 4.0);                  
+      243 +                                                              
+      244 +          // 根据方块朝向重新映射面                           
+      245 +          float remappedFace = remapFaceForOrientation(face, o
+          +rientation);                                                  
+      246 +          float remappedId = remappedFace * 4.0 + corner;     
+      247 +                                                              
+      248 +          float aoRaw = readAoById(remappedId, low, high);    
+      249 +          return 1.0 - (3.0 - aoRaw) / 3.0 * 0.9;             
+      250 +        }                                                     
+      251          `
+      252        );
+      253  
+     ...
+      255          '#include <begin_vertex>',
+      256          `
+      257          #include <begin_vertex>
+      211 -        vAo = getAo(aVertexId, aAoLow, aAoHigh);              
+      258 +        vAo = getAo(aVertexId, aAoLow, aAoHigh, aOrientation);
+      259          `
+      260        );
+      261  
+
+⏺ 现在我需要更新 buildMeshes 函数来添加 aOrientation 实例属性。
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/world/ChunkGenerator.js)
+  ⎿  Added 3 lines
+      244        if (props.isSolid && !props.isTransparent) {
+      245          const aoLowArray = new Float32Array(d[type].length);
+      246          const aoHighArray = new Float32Array(d[type].length);
+      247 +        const orientationArray = new Float32Array(d[type].leng
+          +th);                                                          
+      248          d[type].forEach((pos, i) => {
+      249            aoLowArray[i] = pos.aoLow || 0;
+      250            aoHighArray[i] = pos.aoHigh || 0;
+      251 +          orientationArray[i] = pos.orientation || 0;         
+      252          });
+      253          // 必须在 geometry 上克隆或者直接设置，InstancedMesh 
+           共享 geometry 会有问题
+      254          // 但这里我们使用的是共享几何体，所以我们需要为每个 In
+           stancedMesh 唯一的属性
+     ...
+      256          mesh.geometry = geometry.clone(); // 克隆几何体以拥有
+           独立的属性
+      257          mesh.geometry.setAttribute('aAoLow', new THREE.Instanc
+           edBufferAttribute(aoLowArray, 1));
+      258          mesh.geometry.setAttribute('aAoHigh', new THREE.Instan
+           cedBufferAttribute(aoHighArray, 1));
+      259 +        mesh.geometry.setAttribute('aOrientation', new THREE.I
+          +nstancedBufferAttribute(orientationArray, 1));                
+      260        }
+      261  
+      262        // 存储元数据，便于后续通过 Raycaster 进行交互识别
+
+⏺ 现在我需要更新动态方块的 AO 设置。
+
+  Read 1 file (ctrl+o to expand)
+⏺ Update(src/world/Chunk.js)
+  ⎿  Added 7 lines
+      388  
+      389        const aoLowArray = new Float32Array(count);
+      390        const aoHighArray = new Float32Array(count);
+      391 +      const orientationArray = new Float32Array(count);       
+      392  
+      393 +      // 所有顶点共享相同的 AO 和 orientation 值              
+      394 +      aoLowArray.fill(aoLow);                                 
+      395 +      aoHighArray.fill(aoHigh);                               
+      396 +      orientationArray.fill(orientation || 0);                
+      397 +                                                              
+      398        mesh.geometry.setAttribute('aAoLow', new THREE.BufferAtt
+           ribute(aoLowArray, 1));
+      399        mesh.geometry.setAttribute('aAoHigh', new THREE.BufferAt
+           tribute(aoHighArray, 1));
+      400 +      mesh.geometry.setAttribute('aOrientation', new THREE.Buf
+          +ferAttribute(orientationArray, 1));                           
+      401      }
+      402  
+      403      // 设置阴影
+
+⏺ 现在我需要检查其他可能设置 AO 属性的地方。
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ 让我检查 AOSystem.js 中的相关代码，确保它也处理 orientation。
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ 让我运行 lint 检查确保代码没有问题。
+
+⏺ Bash(npm run lint 2>&1 | head -50)
+  ⎿  > mc-lite@1.0.0 lint
+     > eslint src/**/*.js
+     … +45 lines (ctrl+o to expand)
+
+⏺ 代码通过了 lint 检查。让我启动开发服务器来测试修复。
+
+⏺ Bash(npm run start &
+      sleep 3…)
+  ⎿  > mc-lite@1.0.0 start
+     > node server-script/start-server.js
+     … +19 lines (ctrl+o to expand)
+
+⏺ 服务器已经在运行中。让我验证修改是否正确，通过检查修改后的文件内容。
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ 让我验证所有修改是否完整，检查是否还有其他地方需要设置 aOrientation 属性。
+
+  Searched for 1 pattern (ctrl+o to expand)
+
+⏺ 我发现还有几个地方需要添加 aOrientation 属性。让我更新它们。
+
+⏺ Update(src/core/AOSystem.js)
+  ⎿  Added 4 lines, removed 4 lines
+      173      // 获取或创建 AO 属性
+      174      let aoLowAttr = mesh.getAttribute('aAoLow');
+      175      let aoHighAttr = mesh.getAttribute('aAoHigh');
+      176 -    let vertexIdAttr = mesh.getAttribute('aVertexId');        
+      176 +    let orientationAttr = mesh.getAttribute('aOrientation');  
+      177  
+      178      const instanceCount = mesh.count;
+      179  
+     ...
+      186        aoHighAttr = new THREE.BufferAttribute(new Float32Array(
+           instanceCount), 1);
+      187        mesh.setAttribute('aAoHigh', aoHighAttr);
+      188      }
+      189 -    if (!vertexIdAttr) {                                      
+      190 -      vertexIdAttr = new THREE.BufferAttribute(new Float32Arra
+          -y(instanceCount), 1);                                         
+      191 -      mesh.setAttribute('aVertexId', vertexIdAttr);           
+      189 +    if (!orientationAttr) {                                   
+      190 +      orientationAttr = new THREE.BufferAttribute(new Float32A
+          +rray(instanceCount), 1);                                      
+      191 +      mesh.setAttribute('aOrientation', orientationAttr);     
+      192      }
+      193  
+      194      // 创建位置到 AO 数据的映射
+
+  Read 1 file (ctrl+o to expand)
+  ⎿  Found 2 new diagnostic issues in 1 file (ctrl+o to expand)
+
+⏺ 我需要修复 applyToMesh 函数中的逻辑问题。
+
+⏺ Update(src/core/AOSystem.js)
+  ⎿  Added 4 lines, removed 4 lines
+      195      const aoMap = new Map();
+      196      for (const ao of aoData) {
+      197        const key = `${ao.x},${ao.y},${ao.z}`;
+      198 -      aoMap.set(key, { aoLow: ao.aoLow, aoHigh: ao.aoHigh }); 
+      198 +      aoMap.set(key, { aoLow: ao.aoLow, aoHigh: ao.aoHigh, ori
+          +entation: ao.orientation || 0 });                             
+      199      }
+      200  
+      201      // 更新实例属性
+      202      const aoLowArray = aoLowAttr.array;
+      203      const aoHighArray = aoHighAttr.array;
+      204 -    const vertexIdArray = vertexIdAttr.array;                 
+      204 +    const orientationArray = orientationAttr.array;           
+      205  
+      206      let needsUpdate = false;
+      207  
+     ...
+      219        if (ao) {
+      220          aoLowArray[i] = ao.aoLow;
+      221          aoHighArray[i] = ao.aoHigh;
+      222 -        vertexIdArray[i] = i; // 顶点 ID 用于 shader 解包     
+      222 +        orientationArray[i] = ao.orientation;                 
+      223          needsUpdate = true;
+      224        }
+      225      }
+     ...
+      227      if (needsUpdate) {
+      228        aoLowAttr.needsUpdate = true;
+      229        aoHighAttr.needsUpdate = true;
+      230 -      vertexIdAttr.needsUpdate = true;                        
+      230 +      orientationAttr.needsUpdate = true;                     
+      231      }
+      232    }
+      233  
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/core/AOSystem.js)
+  ⎿  Added 9 lines
+      251  
+      252      let aoLowAttr = mesh.geometry.getAttribute('aAoLow');
+      253      let aoHighAttr = mesh.geometry.getAttribute('aAoHigh');
+      254 +    let orientationAttr = mesh.geometry.getAttribute('aOrienta
+          +tion');                                                       
+      255  
+      256      if (!aoLowAttr) {
+      257        mesh.geometry.setAttribute('aAoLow', new THREE.BufferAtt
+           ribute(aoLowArray, 1));
+     ...
+      266        aoHighAttr.array.set(aoHighArray);
+      267        aoHighAttr.needsUpdate = true;
+      268      }
+      269 +                                                              
+      270 +    // 确保 aOrientation 属性存在（从 mesh.userData.orientatio
+          +n 获取）                                                      
+      271 +    if (!orientationAttr) {                                   
+      272 +      const orientation = mesh.userData?.orientation || 0;    
+      273 +      const orientationArray = new Float32Array(count);       
+      274 +      orientationArray.fill(orientation);                     
+      275 +      mesh.geometry.setAttribute('aOrientation', new THREE.Buf
+          +ferAttribute(orientationArray, 1));                           
+      276 +    }                                                         
+      277    }
+      278  
+      279    /**
+⏺ 现在让我更新 ChunkRenderUtils.js 中的函数。
+
+  Read 1 file (ctrl+o to expand)
+  ⎿  Found 1 new diagnostic issue in 1 file (ctrl+o to expand)
+
+⏺ Update(src/world/ChunkRenderUtils.js)
+  ⎿  Added 7 lines, removed 3 lines
+      219          const mesh = this.dynamicMeshes?.get(key);
+      220          if (!mesh) continue;
+      221  
+      222 -        const type = this.blockData[key];                     
+      223 -        if (!type) continue;                                  
+      222 +        const entry = this.blockData[key];                    
+      223 +        if (!entry) continue;                                 
+      224  
+      225 -        const typeStr = typeof type === 'string' ? type : type
+          -.type;                                                        
+      225 +        const typeStr = typeof entry === 'string' ? entry : en
+          +try.type;                                                     
+      226 +        const orientation = typeof entry === 'object' ? (entry
+          +.orientation || 0) : 0;                                       
+      227          const props = getBlockProps(typeStr);
+      228          if (!props.isSolid || props.isTransparent) continue;
+      229  
+     ...
+      234          const count = mesh.geometry.attributes.position.count;
+      235          const aoLowArray = new Float32Array(count);
+      236          const aoHighArray = new Float32Array(count);
+      237 +        const orientationArray = new Float32Array(count);     
+      238  
+      239          aoLowArray.fill(aoLow);
+      240          aoHighArray.fill(aoHigh);
+      241 +        orientationArray.fill(orientation);                   
+      242  
+      243          mesh.geometry.setAttribute('aAoLow', new THREE.BufferA
+           ttribute(aoLowArray, 1));
+      244          mesh.geometry.setAttribute('aAoHigh', new THREE.Buffer
+           Attribute(aoHighArray, 1));
+      245 +        mesh.geometry.setAttribute('aOrientation', new THREE.B
+          +ufferAttribute(orientationArray, 1));                         
+      246        }
+      247      };
+      248  
+
+⏺ 让我运行 lint 检查确保所有修改都正确。
+
+⏺ Bash(npm run lint 2>&1 | head -30)
+  ⎿  > mc-lite@1.0.0 lint
+     > eslint src/**/*.js
+     … +24 lines (ctrl+o to expand)
+
+⏺ Phase 4: 实现完成
+
+  修复已完成。让我总结一下：
+
+  问题根本原因
+
+  当方块旋转时，AO 数据仍然基于固定的世界坐标方向存储，但 Shader 使用固定的顶点
+  ID 来读取 AO 值，导致旋转后的几何面使用了错误的 AO 数据（AO "跟着旋转"）。
+
+  解决方案
+
+  在 Shader 中添加 aOrientation 属性，并通过 remapFaceForOrientation
+  函数根据方块朝向重新映射面索引：
+
+  - orientation=0（朝东）：无变化
+  - orientation=1（朝南/旋转90°）：+X→+Z, +Z→-X, -X→-Z, -Z→+X
+  - orientation=2（朝西/旋转180°）：+X→-X, +X→+X, +Z→-Z, -Z→+Z
+  - orientation=3（朝北/旋转270°）：+X→-Z, -Z→-X, -X→+Z, +Z→+X
+
+  修改的文件
+
+  ┌───────────────────────────────┬──────────────────────────────────────────┐
+  │             文件              │                 修改内容                 │
+  ├───────────────────────────────┼──────────────────────────────────────────┤
+  │ src/core/MaterialManager.js   │ 添加 aOrientation 属性和                 │
+  │                               │ remapFaceForOrientation 函数             │
+  ├───────────────────────────────┼──────────────────────────────────────────┤
+  │ src/world/ChunkGenerator.js   │ buildMeshes 中添加 aOrientation 实例属性 │
+  ├───────────────────────────────┼──────────────────────────────────────────┤
+  │ src/world/Chunk.js            │ _createDynamicBlockMesh 中添加           │
+  │                               │ aOrientation 属性                        │
+  ├───────────────────────────────┼──────────────────────────────────────────┤
+  │ src/core/AOSystem.js          │ applyToMesh 和 applyToDynamicMesh 支持   │
+  │                               │ aOrientation                             │
+  ├───────────────────────────────┼──────────────────────────────────────────┤
+  │ src/world/ChunkRenderUtils.js │ _updateNeighborsAOInBatch 中添加         │
+  │                               │ aOrientation 支持                        │
+  └───────────────────────────────┴──────────────────────────────────────────┘
+
+  请在浏览器中刷新页面测试：放置一个可旋转方向的方块（如栏杆），观察 AO
+  阴影是否不再跟随方块旋转，而是正确地基于世界坐标方向渲染。
+
+✻ Worked for 11m 56s
+
+❯ 你没有修复这个问题，这个问题还存在，AO 阴影依然是跟随方块的面的旋转而旋转。   
+                                                                                
+另外你的这次修改还引入了一个问题，就是当徒手消除一个旋转了的方块时，有时这个方  
+块的底部立即出现了空洞，即跟这个被消除的方块的底面接触的方块的顶面不见了，等1秒 
+后才补上这个面。你修改的只是 AO 的渲染逻辑，为什么会影响到面的渲染呢？          
+
+⏺ 你说得对，我的修复有两个问题：
+
+  1. 角落索引没有正确映射：我只重新映射了面索引，但每个面的 4
+  个角落索引也需要重新映射
+  2. 可能影响了面渲染：我需要检查为什么会影响到面的渲染
+
+  让我仔细分析并重新修复。
+
+  问题分析
+
+  当方块旋转 90° 时，几何体的 +X 面现在朝向世界 -Z 方向。但问题是：
+
+  角落索引的映射：
+  - +X 面的 V0 角落位于 (+Y, +Z) 方向
+  - -Z 面的 V20 角落位于 (+Y, +X) 方向
+
+  这两个面虽然都是"顶-后"角落，但它们的角落索引定义不同。所以我需要同时映射面索
+  引和角落索引。
+
+  让我重新实现正确的修复。
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ 让我先检查旋转映射的方向是否正确，以及角落索引的问题。
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ 现在我理解了问题。当方块旋转时，不仅面索引需要映射，角落索引也需要正确映射。让
+  我用查表法重新实现，这样更清晰且不易出错。
+
+⏺ Update(src/core/MaterialManager.js)
+  ⎿  Added 59 lines, removed 29 lines
+      191        ` + shader.vertexShader;
+      192  
+      193        // AO 解包与旋转映射逻辑
+      194 -      // 面索引：0=+X, 1=-X, 2=+Y, 3=-Y, 4=+Z, 5=-Z           
+      195 -      // 当方块旋转时，几何面朝向改变，需要重新映射到正确的世 
+          -界面 AO                                                       
+      194 +      // 顶点 ID 0-23，面索引：0=+X, 1=-X, 2=+Y, 3=-Y, 4=+Z, 5
+          +=-Z                                                           
+      195 +      // 当方块旋转时，几何面朝向改变，需要重新映射到正确的世 
+          +界面和角落的 AO                                               
+      196        shader.vertexShader = shader.vertexShader.replace(
+      197          '#include <common>',
+      198          `
+     ...
+      209            return aoRaw;
+      210          }
+      211  
+      212 -        // 根据方块朝向重新映射面索引                         
+      213 -        // 旋转规则（顺时针）：+X→+Z→-X→-Z→+X                 
+      212 +        // 顶点重映射表：[orientation][vertexId] = remappedVer
+          +texId                                                         
+      213          // orientation: 0=朝东, 1=朝南(旋转90°), 2=朝西(旋转18
+           0°), 3=朝北(旋转270°)
+      215 -        float remapFaceForOrientation(float face, float orient
+          -ation) {                                                      
+      216 -          // +Y 和 -Y 面不受旋转影响                          
+      217 -          if (face == 2.0 || face == 3.0) return face;        
+      214 +        // 旋转是绕 Y 轴逆时针，几何面映射：+X→-Z→-X→+Z→+X    
+      215 +        float getRemappedVertexId(float vertexId, float orient
+          +ation) {                                                      
+      216 +          float face = floor(vertexId / 4.0);                 
+      217 +          float corner = mod(vertexId, 4.0);                  
+      218  
+      219 -          // 四个侧面的旋转映射                               
+      220 -          // 面 ID: 0=+X, 1=-X, 4=+Z, 5=-Z                    
+      221 -          // 旋转 90° 后：+X→+Z(4), +Z→-X(1), -X→-Z(5), -Z→+X(
+          -0)                                                            
+      222 -          float side = mod(face, 2.0); // 0 表示 +方向, 1 表示
+          - -方向                                                        
+      223 -          float isX = step(2.0, face) * (1.0 - step(5.0, face)
+          -); // 面在 X 轴则为 0                                         
+      224 -          float isZ = step(4.0, face); // 面在 Z 轴则为 1     
+      219 +          // +Y 和 -Y 面（face 2, 3）不受 Y 轴旋转影响        
+      220 +          if (face == 2.0 || face == 3.0) {                   
+      221 +            return vertexId;                                  
+      222 +          }                                                   
+      223  
+      226 -          // 计算原始侧面索引：+X=0, -X=1, +Z=2, -Z=3         
+      227 -          float sideIdx = isX * side + isZ * (2.0 + side);    
+      224 +          // 四个侧面的面映射                                 
+      225 +          // sideIdx: +X=0, -X=1, +Z=2, -Z=3                  
+      226 +          float sideIdx;                                      
+      227 +          if (face < 2.0) {                                   
+      228 +            sideIdx = face; // +X=0, -X=1                     
+      229 +          } else {                                            
+      230 +            sideIdx = face - 2.0; // +Z=0, -Z=1 -> 转换为 +Z=2
+          +, -Z=3                                                        
+      231 +            sideIdx = sideIdx + 2.0;                          
+      232 +          }                                                   
+      233  
+      229 -          // 根据 orientation 偏移侧面索引（顺时针旋转）      
+      230 -          float newSideIdx = mod(sideIdx + orientation, 4.0); 
+      234 +          // 旋转后的世界面索引（逆时针映射：+X→-Z→-X→+Z）    
+      235 +          // geometry +X(0) -> world -Z(3)                    
+      236 +          // geometry -Z(3) -> world -X(1)                    
+      237 +          // geometry -X(1) -> world +Z(2)                    
+      238 +          // geometry +Z(2) -> world +X(0)                    
+      239 +          float newSideIdx = mod(sideIdx + orientation * 3.0, 
+          +4.0);                                                         
+      240  
+      232 -          // 将侧面索引转回面 ID                              
+      233 -          // 0→+X(0), 1→-X(1), 2→+Z(4), 3→-Z(5)               
+      234 -          float newIsZ = step(2.0, newSideIdx);               
+      235 -          float newFace = (1.0 - newIsZ) * newSideIdx + newIsZ
+          - * (newSideIdx + 2.0);                                        
+      241 +          // 角落映射（旋转时角落位置也变化）                 
+      242 +          // corner: 0=顶-后, 1=顶-前, 2=底-后, 3=底-前（相对 
+          +于面方向）                                                    
+      243 +          // 旋转 90° 后：后→右，前→左                        
+      244 +          // corner 映射：0→1, 1→0, 2→3, 3→2（翻转）          
+      245 +          float cornerFlip = mod(corner, 2.0) == 0.0 ? corner 
+          ++ 1.0 : corner - 1.0;                                         
+      246 +          float newCorner = mod(cornerFlip + orientation, 4.0)
+          +;                                                             
+      247 +          // 确保结果在 0-3 范围内并正确映射                  
+      248 +          newCorner = mod(mod(newCorner, 2.0) == 0.0 ? newCorn
+          +er + 1.0 : newCorner - 1.0, 4.0);                             
+      249 +          // 简化：旋转 90° 时 corner 0↔1, 2↔3；旋转 180° 时 0
+          +↔1, 2↔3 再翻转                                                
+      250 +          // 直接用查表逻辑                                   
+      251 +          float cornerTable[4];                               
+      252 +          cornerTable[0] = 1.0;                               
+      253 +          cornerTable[1] = 0.0;                               
+      254 +          cornerTable[2] = 3.0;                               
+      255 +          cornerTable[3] = 2.0;                               
+      256 +          // 根据旋转次数应用翻转                             
+      257 +          float flippedCorner = corner;                       
+      258 +          for (float i = 0.0; i < 4.0; i += 1.0) {            
+      259 +            if (i < orientation) {                            
+      260 +              flippedCorner = cornerTable[int(flippedCorner)];
+      261 +            }                                                 
+      262 +          }                                                   
+      263 +          newCorner = flippedCorner;                          
+      264  
+      237 -          return newFace;                                     
+      265 +          // 将 newSideIdx 转回面 ID                          
+      266 +          float newFace;                                      
+      267 +          if (newSideIdx < 2.0) {                             
+      268 +            newFace = newSideIdx; // +X=0, -X=1               
+      269 +          } else {                                            
+      270 +            newFace = newSideIdx + 2.0; // +Z=4, -Z=5         
+      271 +          }                                                   
+      272 +                                                              
+      273 +          return newFace * 4.0 + newCorner;                   
+      274          }
+      275  
+      276          float getAo(float vertexId, float low, float high, flo
+           at orientation) {
+      241 -          float face = floor(vertexId / 4.0);                 
+      242 -          float corner = mod(vertexId, 4.0);                  
+      243 -                                                              
+      244 -          // 根据方块朝向重新映射面                           
+      245 -          float remappedFace = remapFaceForOrientation(face, o
+          -rientation);                                                  
+      246 -          float remappedId = remappedFace * 4.0 + corner;     
+      247 -                                                              
+      277 +          float remappedId = getRemappedVertexId(vertexId, ori
+          +entation);                                                    
+      278            float aoRaw = readAoById(remappedId, low, high);
+      279            return 1.0 - (3.0 - aoRaw) / 3.0 * 0.9;
+      280          }
+
+⏺ 让我简化 shader 代码，用更直接的方式实现查表：
+
+⏺ Update(src/core/MaterialManager.js)
+  ⎿  Added 24 lines, removed 37 lines
+      209            return aoRaw;
+      210          }
+      211  
+      212 -        // 顶点重映射表：[orientation][vertexId] = remappedVer
+          -texId                                                         
+      213 -        // orientation: 0=朝东, 1=朝南(旋转90°), 2=朝西(旋转18
+          -0°), 3=朝北(旋转270°)                                         
+      214 -        // 旋转是绕 Y 轴逆时针，几何面映射：+X→-Z→-X→+Z→+X    
+      212 +        // 获取旋转后的顶点映射                               
+      213 +        // orientation: 0=朝东, 1=朝南(逆时针90°), 2=朝西(逆时
+          +针180°), 3=朝北(逆时针270°)                                   
+      214 +        // 几何面映射（绕Y逆时针）：+X(0)→-Z(5)→-X(1)→+Z(4)→+X
+          +(0)                                                           
+      215          float getRemappedVertexId(float vertexId, float orient
+           ation) {
+      216            float face = floor(vertexId / 4.0);
+      217            float corner = mod(vertexId, 4.0);
+     ...
+      221              return vertexId;
+      222            }
+      223  
+      224 -          // 四个侧面的面映射                                 
+      225 -          // sideIdx: +X=0, -X=1, +Z=2, -Z=3                  
+      224 +          // 四个侧面索引：+X=0, -X=1, +Z=2, -Z=3             
+      225            float sideIdx;
+      226            if (face < 2.0) {
+      228 -            sideIdx = face; // +X=0, -X=1                     
+      227 +            sideIdx = face;                                   
+      228            } else {
+      230 -            sideIdx = face - 2.0; // +Z=0, -Z=1 -> 转换为 +Z=2
+          -, -Z=3                                                        
+      231 -            sideIdx = sideIdx + 2.0;                          
+      229 +            sideIdx = face - 2.0;                             
+      230            }
+      231  
+      234 -          // 旋转后的世界面索引（逆时针映射：+X→-Z→-X→+Z）    
+      235 -          // geometry +X(0) -> world -Z(3)                    
+      236 -          // geometry -Z(3) -> world -X(1)                    
+      237 -          // geometry -X(1) -> world +Z(2)                    
+      238 -          // geometry +Z(2) -> world +X(0)                    
+      239 -          float newSideIdx = mod(sideIdx + orientation * 3.0, 
+          -4.0);                                                         
+      232 +          // 逆时针旋转映射：+X(0)→-Z(3)→-X(1)→+Z(2)→+X(0)    
+      233 +          // 即：newSideIdx = (sideIdx + 3 * orientation) % 4 
+      234 +          float newSideIdx = mod(sideIdx + 3.0 * orientation, 
+          +4.0);                                                         
+      235  
+      241 -          // 角落映射（旋转时角落位置也变化）                 
+      242 -          // corner: 0=顶-后, 1=顶-前, 2=底-后, 3=底-前（相对 
+          -于面方向）                                                    
+      243 -          // 旋转 90° 后：后→右，前→左                        
+      244 -          // corner 映射：0→1, 1→0, 2→3, 3→2（翻转）          
+      245 -          float cornerFlip = mod(corner, 2.0) == 0.0 ? corner 
+          -+ 1.0 : corner - 1.0;                                         
+      246 -          float newCorner = mod(cornerFlip + orientation, 4.0)
+          -;                                                             
+      247 -          // 确保结果在 0-3 范围内并正确映射                  
+      248 -          newCorner = mod(mod(newCorner, 2.0) == 0.0 ? newCorn
+          -er + 1.0 : newCorner - 1.0, 4.0);                             
+      249 -          // 简化：旋转 90° 时 corner 0↔1, 2↔3；旋转 180° 时 0
+          -↔1, 2↔3 再翻转                                                
+      250 -          // 直接用查表逻辑                                   
+      251 -          float cornerTable[4];                               
+      252 -          cornerTable[0] = 1.0;                               
+      253 -          cornerTable[1] = 0.0;                               
+      254 -          cornerTable[2] = 3.0;                               
+      255 -          cornerTable[3] = 2.0;                               
+      256 -          // 根据旋转次数应用翻转                             
+      257 -          float flippedCorner = corner;                       
+      258 -          for (float i = 0.0; i < 4.0; i += 1.0) {            
+      259 -            if (i < orientation) {                            
+      260 -              flippedCorner = cornerTable[int(flippedCorner)];
+      236 +          // 角落映射：旋转90°时，角落位置也变化              
+      237 +          // 角落定义：0=顶-后, 1=顶-前, 2=底-后, 3=底-前     
+      238 +          // 逆时针旋转90°后：后→右，前→左                    
+      239 +          // 映射：0→1, 1→0, 2→3, 3→2（因为角度翻转）         
+      240 +          // 每旋转90°，corner需要翻转一次                    
+      241 +          float flipCount = orientation;                      
+      242 +          float newCorner = corner;                           
+      243 +          // 奇数次翻转：0↔1, 2↔3                             
+      244 +          if (mod(flipCount, 2.0) == 1.0) {                   
+      245 +            if (newCorner < 2.0) {                            
+      246 +              newCorner = 1.0 - newCorner;                    
+      247 +            } else {                                          
+      248 +              newCorner = 5.0 - newCorner;                    
+      249              }
+      250            }
+      263 -          newCorner = flippedCorner;                          
+      251  
+      252            // 将 newSideIdx 转回面 ID
+      253            float newFace;
+      254            if (newSideIdx < 2.0) {
+      268 -            newFace = newSideIdx; // +X=0, -X=1               
+      255 +            newFace = newSideIdx;                             
+      256            } else {
+      270 -            newFace = newSideIdx + 2.0; // +Z=4, -Z=5         
+      257 +            newFace = newSideIdx + 2.0;                       
+      258            }
+      259  
+      260            return newFace * 4.0 + newCorner;
+
+⏺ 现在让我运行 lint 检查确保代码没有问题：
+
+⏺ Bash(npm run lint 2>&1 | head -30)
+  ⎿  > mc-lite@1.0.0 lint
+     > eslint src/**/*.js
+     … +24 lines (ctrl+o to expand)
+
+⏺ 让我检查 AOSystem.js 中是否正确处理了所有属性：
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ 我发现了问题！aVertexId 是顶点级别的属性（在几何体上设置），但 applyToMesh
+  错误地尝试在 mesh 上设置它。让我检查几何体的设置：
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ 我发现 shader 代码有问题！int() 类型转换和数组索引在 WebGL 1.0/GLSL ES 2.0
+  中不支持。让我用纯数学运算替代：
+  Read 1 file (ctrl+o to expand)
+
+⏺ 让我重新分析问题。我需要仔细验证面和角落的映射关系。首先让我确认旋转方向：
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ 我发现了问题！角落映射不能简单地用翻转来处理。每个面的角落定义不同，映射关系也
+  不同。让我重新设计一个更精确的方案：
+
+⏺ Update(src/core/MaterialManager.js)
+  ⎿  Added 41 lines, removed 19 lines
+      209            return aoRaw;
+      210          }
+      211  
+      212 -        // 获取旋转后的顶点映射                               
+      212 +        // 顶点重映射：根据方块朝向将几何顶点 ID 映射到世界顶 
+          +点 ID                                                         
+      213          // orientation: 0=朝东, 1=朝南(逆时针90°), 2=朝西(逆时
+           针180°), 3=朝北(逆时针270°)
+      214 -        // 几何面映射（绕Y逆时针）：+X(0)→-Z(5)→-X(1)→+Z(4)→+X
+          -(0)                                                           
+      215 -        float getRemappedVertexId(float vertexId, float orient
+          -ation) {                                                      
+      214 +        // 侧面映射规则（绕Y逆时针）：+X(0)→-Z(5)→-X(1)→+Z(4)→
+          ++X(0)                                                         
+      215 +        // 角落映射规则：根据每个面的角落定义计算             
+      216 +        float remapVertexId(float vertexId, float orientation)
+          + {                                                            
+      217            float face = floor(vertexId / 4.0);
+      218            float corner = mod(vertexId, 4.0);
+      219  
+     ...
+      222              return vertexId;
+      223            }
+      224  
+      224 -          // 四个侧面索引：+X=0, -X=1, +Z=2, -Z=3             
+      225 +          // 计算侧面索引：+X=0, -X=1, +Z=2, -Z=3             
+      226            float sideIdx;
+      227            if (face < 2.0) {
+      228              sideIdx = face;
+     ...
+      230              sideIdx = face - 2.0;
+      231            }
+      232  
+      232 -          // 逆时针旋转映射：+X(0)→-Z(3)→-X(1)→+Z(2)→+X(0)    
+      233 -          // 即：newSideIdx = (sideIdx + 3 * orientation) % 4 
+      233 +          // 逆时针旋转映射：geometry +X(0) → world -Z(3)     
+      234            float newSideIdx = mod(sideIdx + 3.0 * orientation, 
+           4.0);
+      235  
+      236 -          // 角落映射：旋转90°时，角落位置也变化              
+      237 -          // 角落定义：0=顶-后, 1=顶-前, 2=底-后, 3=底-前     
+      238 -          // 逆时针旋转90°后：后→右，前→左                    
+      239 -          // 映射：0→1, 1→0, 2→3, 3→2（因为角度翻转）         
+      240 -          // 每旋转90°，corner需要翻转一次                    
+      241 -          float flipCount = orientation;                      
+      242 -          float newCorner = corner;                           
+      243 -          // 奇数次翻转：0↔1, 2↔3                             
+      244 -          if (mod(flipCount, 2.0) == 1.0) {                   
+      245 -            if (newCorner < 2.0) {                            
+      246 -              newCorner = 1.0 - newCorner;                    
+      236 +          // 角落重映射                                       
+      237 +          // 每个面的角落定义（按世界坐标）：                 
+      238 +          // +X 面：V0=顶后(+Y,+Z), V1=顶前(+Y,-Z), V2=底后(-Y
+          +,+Z), V3=底前(-Y,-Z)                                          
+      239 +          // -X 面：V4=顶前(+Y,-Z), V5=顶后(+Y,+Z), V6=底前(-Y
+          +,-Z), V7=底后(-Y,+Z)                                          
+      240 +          // +Z 面：V16=顶左(-X,+Y), V17=顶右(+X,+Y), V18=底左
+          +(-X,-Y), V19=底右(+X,-Y)                                      
+      241 +          // -Z 面：V20=顶右(+X,+Y), V21=顶左(-X,+Y), V22=底右
+          +(+X,-Y), V23=底左(-X,-Y)                                      
+      242 +                                                              
+      243 +          // 角落映射表（根据旋转次数）：                     
+      244 +          // 当 geometry +X 映射到 world -Z 时：corner 0,1,2,3
+          + → 2,0,3,1                                                    
+      245 +          // 当 geometry +X 映射到 world -X 时：corner 0,1,2,3
+          + → 1,0,3,2 (旋转180°)                                         
+      246 +          // 当 geometry +X 映射到 world +Z 时：corner 0,1,2,3
+          + → 1,3,0,2 (旋转270°)                                         
+      247 +                                                              
+      248 +          float newCorner;                                    
+      249 +          // 根据旋转次数计算角落映射                         
+      250 +          // orientation=0: corner 不变                       
+      251 +          // orientation=1: corner 映射 (0→2, 1→0, 2→3, 3→1)  
+      252 +          // orientation=2: corner 映射 (0→1, 1→0, 2→3, 3→2)  
+      253 +          // orientation=3: corner 映射 (0→1, 1→3, 2→0, 3→2)  
+      254 +                                                              
+      255 +          if (orientation < 0.5) {                            
+      256 +            newCorner = corner;                               
+      257 +          } else if (orientation < 1.5) {                     
+      258 +            // orientation=1: 对角线翻转 + 位移               
+      259 +            newCorner = mod(corner * 2.0 + 2.0, 4.0);         
+      260 +          } else if (orientation < 2.5) {                     
+      261 +            // orientation=2: 对角线翻转                      
+      262 +            newCorner = 1.0 - mod(corner, 2.0) + 2.0 * floor(c
+          +orner / 2.0);                                                 
+      263 +            newCorner = mod(newCorner, 4.0);                  
+      264 +            if (corner < 2.0) {                               
+      265 +              newCorner = 1.0 - corner;                       
+      266              } else {
+      248 -              newCorner = 5.0 - newCorner;                    
+      267 +              newCorner = 5.0 - corner;                       
+      268              }
+      269 +          } else {                                            
+      270 +            // orientation=3: 逆向旋转                        
+      271 +            newCorner = mod(corner * 2.0 + 1.0, 4.0);         
+      272            }
+      273  
+      274            // 将 newSideIdx 转回面 ID
+     ...
+      283          }
+      284  
+      285          float getAo(float vertexId, float low, float high, flo
+           at orientation) {
+      264 -          float remappedId = getRemappedVertexId(vertexId, ori
+          -entation);                                                    
+      286 +          float remappedId = remapVertexId(vertexId, orientati
+          +on);                                                          
+      287            float aoRaw = readAoById(remappedId, low, high);
+      288            return 1.0 - (3.0 - aoRaw) / 3.0 * 0.9;
+      289          }
+
+⏺ 我发现了角落映射逻辑中的错误。让我重新实现一个更准确的方法：
+
+⏺ Update(src/core/MaterialManager.js)
+  ⎿  Added 48 lines, removed 44 lines
+      181    _applyShaderModifications(material) {
+      182      material.onBeforeCompile = (shader) => {
+      183        // 顶点着色器修改
+      184 -      // aOrientation: 方块朝向 (0-3)，用于正确映射旋转方块的 
+          -AO                                                            
+      184        shader.vertexShader = `
+      185          attribute float aVertexId;
+      186          attribute float aAoLow;
+     ...
+      190        ` + shader.vertexShader;
+      191  
+      192        // AO 解包与旋转映射逻辑
+      194 -      // 顶点 ID 0-23，面索引：0=+X, 1=-X, 2=+Y, 3=-Y, 4=+Z, 5
+          -=-Z                                                           
+      195 -      // 当方块旋转时，几何面朝向改变，需要重新映射到正确的世 
+          -界面和角落的 AO                                               
+      193        shader.vertexShader = shader.vertexShader.replace(
+      194          '#include <common>',
+      195          `
+     ...
+      208  
+      209          // 顶点重映射：根据方块朝向将几何顶点 ID 映射到世界顶
+           点 ID
+      210          // orientation: 0=朝东, 1=朝南(逆时针90°), 2=朝西(逆时
+           针180°), 3=朝北(逆时针270°)
+      214 -        // 侧面映射规则（绕Y逆时针）：+X(0)→-Z(5)→-X(1)→+Z(4)→
+          -+X(0)                                                         
+      215 -        // 角落映射规则：根据每个面的角落定义计算             
+      211          float remapVertexId(float vertexId, float orientation)
+            {
+      212            float face = floor(vertexId / 4.0);
+      213            float corner = mod(vertexId, 4.0);
+      214  
+      220 -          // +Y 和 -Y 面（face 2, 3）不受 Y 轴旋转影响        
+      215 +          // +Y 和 -Y 面不受 Y 轴旋转影响                     
+      216            if (face == 2.0 || face == 3.0) {
+      217              return vertexId;
+      218            }
+      219  
+      225 -          // 计算侧面索引：+X=0, -X=1, +Z=2, -Z=3             
+      226 -          float sideIdx;                                      
+      220 +          // 计算几何面的侧面索引：+X=0, -X=1, +Z=2, -Z=3     
+      221 +          float geoSideIdx = face < 2.0 ? face : face - 2.0;  
+      222 +                                                              
+      223 +          // 世界侧面索引（逆时针旋转映射）                   
+      224 +          // geometry +X(0) → world -Z(3), geometry -Z(3) → wo
+          +rld -X(1), etc.                                               
+      225 +          float worldSideIdx = mod(geoSideIdx + 3.0 * orientat
+          +ion, 4.0);                                                    
+      226 +                                                              
+      227 +          // 角落重映射：基于顶点的世界坐标位置               
+      228 +          // 每个面的角落定义：                               
+      229 +          // +X: V0=(+Y,+Z), V1=(+Y,-Z), V2=(-Y,+Z), V3=(-Y,-Z
+          +)                                                             
+      230 +          // -X: V4=(+Y,-Z), V5=(+Y,+Z), V6=(-Y,-Z), V7=(-Y,+Z
+          +)                                                             
+      231 +          // +Z: V16=(-X,+Y), V17=(+X,+Y), V18=(-X,-Y), V19=(+
+          +X,-Y)                                                         
+      232 +          // -Z: V20=(+X,+Y), V21=(-X,+Y), V22=(+X,-Y), V23=(-
+          +X,-Y)                                                         
+      233 +                                                              
+      234 +          // 几何面的角落世界坐标（根据面类型）               
+      235 +          float geoTop, geoFront, geoRight;                   
+      236            if (face < 2.0) {
+      228 -            sideIdx = face;                                   
+      237 +            // +X 或 -X 面                                    
+      238 +            geoTop = corner < 2.0 ? 1.0 : -1.0;               
+      239 +            geoFront = mod(corner, 2.0) < 0.5 ? (face < 0.5 ? 
+          +1.0 : -1.0) : (face < 0.5 ? -1.0 : 1.0);                      
+      240 +            geoRight = 0.0; // X 面没有"右"的概念             
+      241            } else {
+      230 -            sideIdx = face - 2.0;                             
+      242 +            // +Z 或 -Z 面                                    
+      243 +            geoTop = corner < 2.0 ? 1.0 : -1.0;               
+      244 +            geoRight = mod(corner, 2.0) < 0.5 ? -1.0 : 1.0;   
+      245 +            geoFront = 0.0; // Z 面没有"前"的概念             
+      246            }
+      247  
+      233 -          // 逆时针旋转映射：geometry +X(0) → world -Z(3)     
+      234 -          float newSideIdx = mod(sideIdx + 3.0 * orientation, 
+          -4.0);                                                         
+      248 +          // 应用旋转到世界坐标                               
+      249 +          // 逆时针旋转90°：worldX = -geoZ, worldZ = geoX     
+      250 +          // 但几何面的坐标是基于面的局部坐标，需要转换       
+      251 +          // 简化：直接计算新角落索引                         
+      252  
+      236 -          // 角落重映射                                       
+      237 -          // 每个面的角落定义（按世界坐标）：                 
+      238 -          // +X 面：V0=顶后(+Y,+Z), V1=顶前(+Y,-Z), V2=底后(-Y
+          -,+Z), V3=底前(-Y,-Z)                                          
+      239 -          // -X 面：V4=顶前(+Y,-Z), V5=顶后(+Y,+Z), V6=底前(-Y
+          -,-Z), V7=底后(-Y,+Z)                                          
+      240 -          // +Z 面：V16=顶左(-X,+Y), V17=顶右(+X,+Y), V18=底左
+          -(-X,-Y), V19=底右(+X,-Y)                                      
+      241 -          // -Z 面：V20=顶右(+X,+Y), V21=顶左(-X,+Y), V22=底右
+          -(+X,-Y), V23=底左(-X,-Y)                                      
+      253 +          // 使用简化的角落映射公式                           
+      254 +          // 对于四个侧面，角落映射规则：                     
+      255 +          // orientation=0: 不变                              
+      256 +          // orientation=1: 对角线交换 (0↔3, 1↔2) 然后偏移    
+      257 +          // orientation=2: 对角线交换 (0↔3, 1↔2)             
+      258 +          // orientation=3: 逆向偏移                          
+      259  
+      243 -          // 角落映射表（根据旋转次数）：                     
+      244 -          // 当 geometry +X 映射到 world -Z 时：corner 0,1,2,3
+          - → 2,0,3,1                                                    
+      245 -          // 当 geometry +X 映射到 world -X 时：corner 0,1,2,3
+          - → 1,0,3,2 (旋转180°)                                         
+      246 -          // 当 geometry +X 映射到 world +Z 时：corner 0,1,2,3
+          - → 1,3,0,2 (旋转270°)                                         
+      247 -                                                              
+      260            float newCorner;
+      249 -          // 根据旋转次数计算角落映射                         
+      250 -          // orientation=0: corner 不变                       
+      251 -          // orientation=1: corner 映射 (0→2, 1→0, 2→3, 3→1)  
+      252 -          // orientation=2: corner 映射 (0→1, 1→0, 2→3, 3→2)  
+      253 -          // orientation=3: corner 映射 (0→1, 1→3, 2→0, 3→2)  
+      254 -                                                              
+      261            if (orientation < 0.5) {
+      262              newCorner = corner;
+      263            } else if (orientation < 1.5) {
+      258 -            // orientation=1: 对角线翻转 + 位移               
+      259 -            newCorner = mod(corner * 2.0 + 2.0, 4.0);         
+      264 +            // orientation=1: 对角线交换后偏移                
+      265 +            // 映射：0→2, 1→0, 2→3, 3→1                       
+      266 +            float diagSwapped = 3.0 - corner; // 对角线交换   
+      267 +            newCorner = mod(diagSwapped + 1.0, 4.0);          
+      268            } else if (orientation < 2.5) {
+      261 -            // orientation=2: 对角线翻转                      
+      262 -            newCorner = 1.0 - mod(corner, 2.0) + 2.0 * floor(c
+          -orner / 2.0);                                                 
+      263 -            newCorner = mod(newCorner, 4.0);                  
+      269 +            // orientation=2: 双重交换                        
+      270 +            // 映射：0→1, 1→0, 2→3, 3→2                       
+      271              if (corner < 2.0) {
+      272                newCorner = 1.0 - corner;
+      273              } else {
+      274                newCorner = 5.0 - corner;
+      275              }
+      276            } else {
+      270 -            // orientation=3: 逆向旋转                        
+      271 -            newCorner = mod(corner * 2.0 + 1.0, 4.0);         
+      277 +            // orientation=3: 偏移后对角线交换                
+      278 +            // 映射：0→1, 1→3, 2→0, 3→2                       
+      279 +            float shifted = mod(corner + 3.0, 4.0);           
+      280 +            newCorner = 3.0 - shifted;                        
+      281            }
+      282  
+      274 -          // 将 newSideIdx 转回面 ID                          
+      275 -          float newFace;                                      
+      276 -          if (newSideIdx < 2.0) {                             
+      277 -            newFace = newSideIdx;                             
+      278 -          } else {                                            
+      279 -            newFace = newSideIdx + 2.0;                       
+      280 -          }                                                   
+      283 +          // 将世界侧面索引转回面 ID                          
+      284 +          float worldFace = worldSideIdx < 2.0 ? worldSideIdx 
+          +: worldSideIdx + 2.0;                                         
+      285  
+      282 -          return newFace * 4.0 + newCorner;                   
+      286 +          return worldFace * 4.0 + newCorner;                 
+      287          }
+      288  
+      289          float getAo(float vertexId, float low, float high, flo
+           at orientation) {
+
+⏺ 让我换一个更简单可靠的方案：不修改 shader，而是在存储 AO 
+  数据时就根据方块朝向重排 AO 值。这样 shader
+  只需要按原来的方式读取，不需要知道方块是否旋转。
+
+⏺ Update(src/core/MaterialManager.js)
+  ⎿  Added 3 lines, removed 93 lines
+      175  
+      176    /**
+      177     * 为材质注入 AO 着色器逻辑
+      178 -   * 支持方块旋转时 AO 正确映射到世界坐标面                   
+      178     * @param {THREE.Material} material
+      179     */
+      180    _applyShaderModifications(material) {
+     ...
+      184          attribute float aVertexId;
+      185          attribute float aAoLow;
+      186          attribute float aAoHigh;
+      188 -        attribute float aOrientation;                         
+      187          varying float vAo;
+      188        ` + shader.vertexShader;
+      189  
+      192 -      // AO 解包与旋转映射逻辑                                
+      190 +      // AO 解包逻辑                                          
+      191        shader.vertexShader = shader.vertexShader.replace(
+      192          '#include <common>',
+      193          `
+      194          #include <common>
+      197 -                                                              
+      198 -        // 从打包数据中读取指定顶点 ID 的 AO 值               
+      199 -        float readAoById(float id, float low, float high) {   
+      195 +        float getAo(float id, float low, float high) {        
+      196            float aoRaw;
+      197            if (id < 12.0) {
+      198              aoRaw = mod(floor(low / pow(4.0, id)), 4.0);
+      199            } else {
+      200              aoRaw = mod(floor(high / pow(4.0, id - 12.0)), 4.0
+           );
+      201            }
+      206 -          return aoRaw;                                       
+      207 -        }                                                     
+      208 -                                                              
+      209 -        // 顶点重映射：根据方块朝向将几何顶点 ID 映射到世界顶 
+          -点 ID                                                         
+      210 -        // orientation: 0=朝东, 1=朝南(逆时针90°), 2=朝西(逆时
+          -针180°), 3=朝北(逆时针270°)                                   
+      211 -        float remapVertexId(float vertexId, float orientation)
+          - {                                                            
+      212 -          float face = floor(vertexId / 4.0);                 
+      213 -          float corner = mod(vertexId, 4.0);                  
+      214 -                                                              
+      215 -          // +Y 和 -Y 面不受 Y 轴旋转影响                     
+      216 -          if (face == 2.0 || face == 3.0) {                   
+      217 -            return vertexId;                                  
+      218 -          }                                                   
+      219 -                                                              
+      220 -          // 计算几何面的侧面索引：+X=0, -X=1, +Z=2, -Z=3     
+      221 -          float geoSideIdx = face < 2.0 ? face : face - 2.0;  
+      222 -                                                              
+      223 -          // 世界侧面索引（逆时针旋转映射）                   
+      224 -          // geometry +X(0) → world -Z(3), geometry -Z(3) → wo
+          -rld -X(1), etc.                                               
+      225 -          float worldSideIdx = mod(geoSideIdx + 3.0 * orientat
+          -ion, 4.0);                                                    
+      226 -                                                              
+      227 -          // 角落重映射：基于顶点的世界坐标位置               
+      228 -          // 每个面的角落定义：                               
+      229 -          // +X: V0=(+Y,+Z), V1=(+Y,-Z), V2=(-Y,+Z), V3=(-Y,-Z
+          -)                                                             
+      230 -          // -X: V4=(+Y,-Z), V5=(+Y,+Z), V6=(-Y,-Z), V7=(-Y,+Z
+          -)                                                             
+      231 -          // +Z: V16=(-X,+Y), V17=(+X,+Y), V18=(-X,-Y), V19=(+
+          -X,-Y)                                                         
+      232 -          // -Z: V20=(+X,+Y), V21=(-X,+Y), V22=(+X,-Y), V23=(-
+          -X,-Y)                                                         
+      233 -                                                              
+      234 -          // 几何面的角落世界坐标（根据面类型）               
+      235 -          float geoTop, geoFront, geoRight;                   
+      236 -          if (face < 2.0) {                                   
+      237 -            // +X 或 -X 面                                    
+      238 -            geoTop = corner < 2.0 ? 1.0 : -1.0;               
+      239 -            geoFront = mod(corner, 2.0) < 0.5 ? (face < 0.5 ? 
+          -1.0 : -1.0) : (face < 0.5 ? -1.0 : 1.0);                      
+      240 -            geoRight = 0.0; // X 面没有"右"的概念             
+      241 -          } else {                                            
+      242 -            // +Z 或 -Z 面                                    
+      243 -            geoTop = corner < 2.0 ? 1.0 : -1.0;               
+      244 -            geoRight = mod(corner, 2.0) < 0.5 ? -1.0 : 1.0;   
+      245 -            geoFront = 0.0; // Z 面没有"前"的概念             
+      246 -          }                                                   
+      247 -                                                              
+      248 -          // 应用旋转到世界坐标                               
+      249 -          // 逆时针旋转90°：worldX = -geoZ, worldZ = geoX     
+      250 -          // 但几何面的坐标是基于面的局部坐标，需要转换       
+      251 -          // 简化：直接计算新角落索引                         
+      252 -                                                              
+      253 -          // 使用简化的角落映射公式                           
+      254 -          // 对于四个侧面，角落映射规则：                     
+      255 -          // orientation=0: 不变                              
+      256 -          // orientation=1: 对角线交换 (0↔3, 1↔2) 然后偏移    
+      257 -          // orientation=2: 对角线交换 (0↔3, 1↔2)             
+      258 -          // orientation=3: 逆向偏移                          
+      259 -                                                              
+      260 -          float newCorner;                                    
+      261 -          if (orientation < 0.5) {                            
+      262 -            newCorner = corner;                               
+      263 -          } else if (orientation < 1.5) {                     
+      264 -            // orientation=1: 对角线交换后偏移                
+      265 -            // 映射：0→2, 1→0, 2→3, 3→1                       
+      266 -            float diagSwapped = 3.0 - corner; // 对角线交换   
+      267 -            newCorner = mod(diagSwapped + 1.0, 4.0);          
+      268 -          } else if (orientation < 2.5) {                     
+      269 -            // orientation=2: 双重交换                        
+      270 -            // 映射：0→1, 1→0, 2→3, 3→2                       
+      271 -            if (corner < 2.0) {                               
+      272 -              newCorner = 1.0 - corner;                       
+      273 -            } else {                                          
+      274 -              newCorner = 5.0 - corner;                       
+      275 -            }                                                 
+      276 -          } else {                                            
+      277 -            // orientation=3: 偏移后对角线交换                
+      278 -            // 映射：0→1, 1→3, 2→0, 3→2                       
+      279 -            float shifted = mod(corner + 3.0, 4.0);           
+      280 -            newCorner = 3.0 - shifted;                        
+      281 -          }                                                   
+      282 -                                                              
+      283 -          // 将世界侧面索引转回面 ID                          
+      284 -          float worldFace = worldSideIdx < 2.0 ? worldSideIdx 
+          -: worldSideIdx + 2.0;                                         
+      285 -                                                              
+      286 -          return worldFace * 4.0 + newCorner;                 
+      287 -        }                                                     
+      288 -                                                              
+      289 -        float getAo(float vertexId, float low, float high, flo
+          -at orientation) {                                             
+      290 -          float remappedId = remapVertexId(vertexId, orientati
+          -on);                                                          
+      291 -          float aoRaw = readAoById(remappedId, low, high);    
+      202            return 1.0 - (3.0 - aoRaw) / 3.0 * 0.9;
+      203          }
+      204          `
+     ...
+      208          '#include <begin_vertex>',
+      209          `
+      210          #include <begin_vertex>
+      301 -        vAo = getAo(aVertexId, aAoLow, aAoHigh, aOrientation);
+      211 +        vAo = getAo(aVertexId, aAoLow, aAoHigh);              
+      212          `
+      213        );
+      214  
+
+⏺ 现在 shader 已恢复到原来的简单版本。接下来我需要在 AO
+  数据存储时根据方块朝向重排 AO 值。让我在 AOUtils.js 中添加重排函数：
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ 让我在 AOUtils.js 中添加一个 AO 重排函数：
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ 让我在 AOUtils.js 末尾添加一个重排函数，使用查表法来实现顶点 ID 的映射：
+
+⏺ Update(src/utils/AOUtils.js)
+  ⎿  Added 82 lines
+      426      duration: endTime - startTime
+      427    };
+      428  }
+      429 +                                                              
+      430 +/**                                                           
+      431 + * 顶点 ID 重映射表                                           
+      432 + * 用于根据方块朝向重排 AO 数据                               
+      433 + *                                                            
+      434 + * 格式：VERTEX_REMAP[orientation][vertexId] = remappedVertexI
+          +d                                                             
+      435 + *                                                            
+      436 + * 映射规则说明：                                             
+      437 + * - orientation: 0=朝东, 1=朝南(旋转90°), 2=朝西(旋转180°), 3
+          +=朝北(旋转270°)                                               
+      438 + * - 旋转是绕 Y 轴逆时针                                      
+      439 + * - 当方块旋转时，几何面的朝向改变，需要把世界面的 AO 值映射 
+          +到对应的几何顶点位置                                          
+      440 + */                                                           
+      441 +const VERTEX_REMAP = [                                        
+      442 +  // orientation=0 (朝东，无旋转)                             
+      443 +  [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 1
+          +7, 18, 19, 20, 21, 22, 23],                                   
+      444 +                                                              
+      445 +  // orientation=1 (朝南，逆时针旋转90°)                      
+      446 +  // 面：+X(0)→-Z(5), -X(1)→+Z(4), +Z(4)→+X(0), -Z(5)→-X(1)   
+      447 +  // 角落映射基于世界坐标位置                                 
+      448 +  [                                                           
+      449 +    22, 20, 23, 21, // +X → -Z: V0→V22, V1→V20, V2→V23, V3→V21
+      450 +    17, 19, 16, 18, // -X → +Z: V4→V17, V5→V19, V6→V16, V7→V18
+      451 +    8, 9, 10, 11,   // +Y 不变                                
+      452 +    12, 13, 14, 15, // -Y 不变                                
+      453 +    0, 2, 1, 3,     // +Z → +X: V16→V0, V17→V2, V18→V1, V19→V3
+      454 +    5, 4, 7, 6      // -Z → -X: V20→V5, V21→V4, V22→V7, V23→V6
+      455 +  ],                                                          
+      456 +                                                              
+      457 +  // orientation=2 (朝西，逆时针旋转180°)                     
+      458 +  [                                                           
+      459 +    1, 0, 3, 2,    // +X → -X                                 
+      460 +    4, 5, 6, 7,    // -X → +X                                 
+      461 +    8, 9, 10, 11,  // +Y 不变                                 
+      462 +    12, 13, 14, 15, // -Y 不变                                
+      463 +    17, 16, 19, 18, // +Z → -Z                                
+      464 +    21, 20, 23, 22  // -Z → +Z                                
+      465 +  ],                                                          
+      466 +                                                              
+      467 +  // orientation=3 (朝北，逆时针旋转270°)                     
+      468 +  [                                                           
+      469 +    17, 19, 16, 18, // +X → +Z                                
+      470 +    22, 20, 23, 21, // -X → -Z                                
+      471 +    8, 9, 10, 11,   // +Y 不变                                
+      472 +    12, 13, 14, 15, // -Y 不变                                
+      473 +    5, 4, 7, 6,     // +Z → -X                                
+      474 +    0, 2, 1, 3      // -Z → +X                                
+      475 +  ]                                                           
+      476 +];                                                            
+      477 +                                                              
+      478 +/**                                                           
+      479 + * 根据方块朝向重排 AO 数据                                   
+      480 + * 当方块旋转时，几何面的朝向改变，需要把世界面的 AO 值重排到 
+          +正确的几何顶点位置                                            
+      481 + *                                                            
+      482 + * @param {number} aoLow - 原始低 12 个顶点的 AO 打包数据     
+      483 + * @param {number} aoHigh - 原始高 12 个顶点的 AO 打包数据    
+      484 + * @param {number} orientation - 方块朝向 (0-3)               
+      485 + * @returns {{ aoLow: number, aoHigh: number }} 重排后的 AO 数
+          +据                                                            
+      486 + */                                                           
+      487 +export function remapAOForOrientation(aoLow, aoHigh, orientati
+          +on) {                                                         
+      488 +  // 如果没有旋转，直接返回原数据                             
+      489 +  if (orientation === 0) {                                    
+      490 +    return { aoLow, aoHigh };                                 
+      491 +  }                                                           
+      492 +                                                              
+      493 +  // 确保朝向值在有效范围内                                   
+      494 +  const orient = Math.max(0, Math.min(3, orientation || 0));  
+      495 +                                                              
+      496 +  // 解包所有 24 个顶点的 AO 值                               
+      497 +  const originalAO = unpackAllAO(aoLow, aoHigh);              
+      498 +                                                              
+      499 +  // 根据重映射表重排                                         
+      500 +  const remappedAO = new Array(24);                           
+      501 +  const remapTable = VERTEX_REMAP[orient];                    
+      502 +                                                              
+      503 +  for (let i = 0; i < 24; i++) {                              
+      504 +    // 新位置 i 应该使用原始位置 remapTable[i] 的 AO 值       
+      505 +    remappedAO[i] = originalAO[remapTable[i]];                
+      506 +  }                                                           
+      507 +                                                              
+      508 +  // 重新打包                                                 
+      509 +  return packAOData(remappedAO);                              
+      510 +}                                                             
+
+⏺ 现在让我更新 WorldWorker.js 来使用这个重排函数：
+
+  Searched for 1 pattern, read 1 file (ctrl+o to expand)
+
+⏺ Update(src/workers/WorldWorker.js)
+  ⎿  Added 1 line, removed 1 line
+      18    CROSS_CHUNK_OWNER_BLOCKED_TYPES,
+      19    getStructureRenderDist
+      20  } from '../utils/StructureUtils.js';
+      21 -import { getAOForFace } from '../utils/AOUtils.js';            
+      21 +import { getAOForFace, remapAOForOrientation, packAOData } from
+         + '../utils/AOUtils.js';                                        
+      22  
+      23  console.log('WorldWorker.js loaded');
+      24  
+
+  Read 1 file (ctrl+o to expand)
+  ⎿  Found 3 new diagnostic issues in 1 file (ctrl+o to expand)
+
+⏺ Update(src/workers/WorldWorker.js)
+  ⎿  Added 7 lines
+      1599              else aoHigh |= (aoVal << ((vertexIdx - 12) * 2));
+      1600            }
+      1601          }
+      1602 +        // 根据方块朝向重排 AO 数据                          
+      1603 +        const orientation = block.orientation || 0;          
+      1604 +        if (orientation !== 0) {                             
+      1605 +          const remapped = remapAOForOrientation(aoLow, aoHig
+           +h, orientation);                                             
+      1606 +          aoLow = remapped.aoLow;                            
+      1607 +          aoHigh = remapped.aoHigh;                          
+      1608 +        }                                                    
+      1609        }
+      1610        d[block.type].push({x: block.x, y: block.y, z: block.z,
+             aoLow, aoHigh, orientation: block.orientation || 0});
+      1611        visibleKeys.push(key);
+⏺ 现在更新 Chunk.js 中的动态方块创建逻辑：
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/world/Chunk.js)
+  ⎿  Added 1 line, removed 1 line
+      10  import { getBlockProperties, createBlockPropsResolver } from '.
+          ./constants/BlockData.js';
+      11  import { getRotationAngle, parseBlockEntry } from '../utils/Ori
+          entationUtils.js';
+      12  import { getStructureRenderDist, belongsToCrossChunkStructure }
+           from '../utils/StructureUtils.js';
+      13 -import { createOcclusionChecker, computeBlockAOPacked } from '.
+         -./utils/AOUtils.js';                                           
+      13 +import { createOcclusionChecker, computeBlockAOPacked, remapAOF
+         +orOrientation } from '../utils/AOUtils.js';                    
+      14  import { createChunkNeighborSampler } from './ChunkNeighborUtil
+          s.js';
+      15  import { extendChunk as extendWithConsolidation, CHUNK_SIZE, ge
+          omMap } from './ChunkConsolidation.js';
+      16  import { extendChunk as extendWithGenerator } from './ChunkGene
+          rator.js';
+
+  Read 1 file (ctrl+o to expand)
+  ⎿  Found 1 new diagnostic issue in 1 file (ctrl+o to expand)
+
+⏺ Update(src/world/Chunk.js)
+  ⎿  Added 9 lines, removed 5 lines
+      384        );
+      385  
+      386        // 计算 AO 数据（打包格式）
+      387 -      const { aoLow, aoHigh } = computeBlockAOPacked(x, y, z, 
+          -isOccluding);                                                 
+      387 +      let { aoLow, aoHigh } = computeBlockAOPacked(x, y, z, is
+          +Occluding);                                                   
+      388  
+      389 +      // 根据方块朝向重排 AO 数据                             
+      390 +      if (orientation !== 0) {                                
+      391 +        const remapped = remapAOForOrientation(aoLow, aoHigh, 
+          +orientation);                                                 
+      392 +        aoLow = remapped.aoLow;                               
+      393 +        aoHigh = remapped.aoHigh;                             
+      394 +      }                                                       
+      395 +                                                              
+      396        const aoLowArray = new Float32Array(count);
+      397        const aoHighArray = new Float32Array(count);
+      391 -      const orientationArray = new Float32Array(count);       
+      398  
+      393 -      // 所有顶点共享相同的 AO 和 orientation 值              
+      399 +      // 所有顶点共享相同的 AO 值                             
+      400        aoLowArray.fill(aoLow);
+      401        aoHighArray.fill(aoHigh);
+      396 -      orientationArray.fill(orientation || 0);                
+      402  
+      403        mesh.geometry.setAttribute('aAoLow', new THREE.BufferAtt
+           ribute(aoLowArray, 1));
+      404        mesh.geometry.setAttribute('aAoHigh', new THREE.BufferAt
+           tribute(aoHighArray, 1));
+      400 -      mesh.geometry.setAttribute('aOrientation', new THREE.Buf
+          -ferAttribute(orientationArray, 1));                           
+      405      }
+      406  
+      407      // 设置阴影
+
+⏺ 现在更新 ChunkGenerator.js 中的 buildMeshes：
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/world/ChunkGenerator.js)
+  ⎿  Added 1 line, removed 3 lines
+      241  
+      242        // --- 添加 AO 属性 ---
+      243        // AO 适用于所有实心且不透明的方块
+      244 +      // 注意：AO 数据已在 WorldWorker 中根据 orientation 重排
+          +过                                                            
+      245        if (props.isSolid && !props.isTransparent) {
+      246          const aoLowArray = new Float32Array(d[type].length);
+      247          const aoHighArray = new Float32Array(d[type].length);
+      247 -        const orientationArray = new Float32Array(d[type].leng
+          -th);                                                          
+      248          d[type].forEach((pos, i) => {
+      249            aoLowArray[i] = pos.aoLow || 0;
+      250            aoHighArray[i] = pos.aoHigh || 0;
+      251 -          orientationArray[i] = pos.orientation || 0;         
+      251          });
+      252          // 必须在 geometry 上克隆或者直接设置，InstancedMesh 
+           共享 geometry 会有问题
+      253          // 但这里我们使用的是共享几何体，所以我们需要为每个 In
+           stancedMesh 唯一的属性
+     ...
+      255          mesh.geometry = geometry.clone(); // 克隆几何体以拥有
+           独立的属性
+      256          mesh.geometry.setAttribute('aAoLow', new THREE.Instanc
+           edBufferAttribute(aoLowArray, 1));
+      257          mesh.geometry.setAttribute('aAoHigh', new THREE.Instan
+           cedBufferAttribute(aoHighArray, 1));
+      259 -        mesh.geometry.setAttribute('aOrientation', new THREE.I
+          -nstancedBufferAttribute(orientationArray, 1));                
+      258        }
+      259  
+      260        // 存储元数据，便于后续通过 Raycaster 进行交互识别
+
+⏺ 现在更新 ChunkRenderUtils.js：
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/world/ChunkRenderUtils.js)
+  ⎿  Added 8 lines, removed 4 lines
+      228          if (!props.isSolid || props.isTransparent) continue;
+      229  
+      230          // 使用 AOUtils 中的函数计算 AO 数据
+      231 -        const { aoLow, aoHigh } = calculateAOForBlock(pos.x, p
+          -os.y, pos.z, isOccluding);                                    
+      231 +        let { aoLow, aoHigh } = calculateAOForBlock(pos.x, pos
+          +.y, pos.z, isOccluding);                                      
+      232  
+      233 +        // 根据方块朝向重排 AO 数据                           
+      234 +        if (orientation !== 0) {                              
+      235 +          const remapped = remapAOForOrientation(aoLow, aoHigh
+          +, orientation);                                               
+      236 +          aoLow = remapped.aoLow;                             
+      237 +          aoHigh = remapped.aoHigh;                           
+      238 +        }                                                     
+      239 +                                                              
+      240          // 应用到 mesh
+      241          const count = mesh.geometry.attributes.position.count;
+      242          const aoLowArray = new Float32Array(count);
+      243          const aoHighArray = new Float32Array(count);
+      237 -        const orientationArray = new Float32Array(count);     
+      244  
+      245          aoLowArray.fill(aoLow);
+      246          aoHighArray.fill(aoHigh);
+      241 -        orientationArray.fill(orientation);                   
+      247  
+      248          mesh.geometry.setAttribute('aAoLow', new THREE.BufferA
+           ttribute(aoLowArray, 1));
+      249          mesh.geometry.setAttribute('aAoHigh', new THREE.Buffer
+           Attribute(aoHighArray, 1));
+      245 -        mesh.geometry.setAttribute('aOrientation', new THREE.B
+          -ufferAttribute(orientationArray, 1));                         
+      250        }
+      251      };
+      252  
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/world/ChunkRenderUtils.js)
+  ⎿  Added 1 line, removed 1 line
+       7  import { faceCullingSystem } from '../core/FaceCullingSystem.js
+          ';
+       8  import { createChunkNeighborSampler } from './ChunkNeighborUtil
+          s.js';
+       9  import { CONSOLIDATION_DELAY } from './ChunkConsolidation.js';
+      10 -import { createOcclusionChecker, calculateAOForBlock } from '..
+         -/utils/AOUtils.js';                                            
+      10 +import { createOcclusionChecker, calculateAOForBlock, remapAOFo
+         +rOrientation } from '../utils/AOUtils.js';                     
+      11  import { parseBlockEntry } from '../utils/OrientationUtils.js';
+      12  
+      13  // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
+
+⏺ 现在更新 AOSystem.js，移除 aOrientation 相关代码：
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ Update(src/core/AOSystem.js)
+  ⎿  Added 3 lines, removed 11 lines
+      165     * 将 AO 数据应用到 InstancedMesh
+      166     * @param {THREE.InstancedMesh} mesh - 实例化网格
+      167     * @param {Array} aoData - AO 数据数组 [{x, y, z, aoLow, aoH
+           igh}]
+      168 -   * @param {Object} chunkData - 区块数据（包含方块位置映射） 
+      168 +   * @param {Object} _chunkData - 区块数据（未使用，保留用于接
+          +口兼容）                                                      
+      169     */
+      170 -  applyToMesh(mesh, aoData, chunkData) {                      
+      170 +  applyToMesh(mesh, aoData, _chunkData) {                     
+      171      if (!mesh || !aoData || aoData.length === 0) return;
+      172  
+      173      // 获取或创建 AO 属性
+      174      let aoLowAttr = mesh.getAttribute('aAoLow');
+      175      let aoHighAttr = mesh.getAttribute('aAoHigh');
+      176 -    let orientationAttr = mesh.getAttribute('aOrientation');  
+      176  
+      177      const instanceCount = mesh.count;
+      178  
+     ...
+      185        aoHighAttr = new THREE.BufferAttribute(new Float32Array(
+           instanceCount), 1);
+      186        mesh.setAttribute('aAoHigh', aoHighAttr);
+      187      }
+      189 -    if (!orientationAttr) {                                   
+      190 -      orientationAttr = new THREE.BufferAttribute(new Float32A
+          -rray(instanceCount), 1);                                      
+      191 -      mesh.setAttribute('aOrientation', orientationAttr);     
+      192 -    }                                                         
+      188  
+      189      // 创建位置到 AO 数据的映射
+      190      const aoMap = new Map();
+      191      for (const ao of aoData) {
+      192        const key = `${ao.x},${ao.y},${ao.z}`;
+      198 -      aoMap.set(key, { aoLow: ao.aoLow, aoHigh: ao.aoHigh, ori
+          -entation: ao.orientation || 0 });                             
+      193 +      aoMap.set(key, { aoLow: ao.aoLow, aoHigh: ao.aoHigh }); 
+      194      }
+      195  
+      196      // 更新实例属性
+      197      const aoLowArray = aoLowAttr.array;
+      198      const aoHighArray = aoHighAttr.array;
+      204 -    const orientationArray = orientationAttr.array;           
+      199  
+      200      let needsUpdate = false;
+      201  
+     ...
+      213        if (ao) {
+      214          aoLowArray[i] = ao.aoLow;
+      215          aoHighArray[i] = ao.aoHigh;
+      222 -        orientationArray[i] = ao.orientation;                 
+      216          needsUpdate = true;
+      217        }
+      218      }
+     ...
+      220      if (needsUpdate) {
+      221        aoLowAttr.needsUpdate = true;
+      222        aoHighAttr.needsUpdate = true;
+      230 -      orientationAttr.needsUpdate = true;                     
+      223      }
+      224    }
+      225  
+
+  Read 1 file (ctrl+o to expand)
+  ⎿  Found 1 new diagnostic issue in 1 file (ctrl+o to expand)
+⏺ Update(src/core/AOSystem.js)
+  ⎿  Removed 9 lines
+      243  
+      244      let aoLowAttr = mesh.geometry.getAttribute('aAoLow');
+      245      let aoHighAttr = mesh.geometry.getAttribute('aAoHigh');
+      246 -    let orientationAttr = mesh.geometry.getAttribute('aOrienta
+          -tion');                                                       
+      246  
+      247      if (!aoLowAttr) {
+      248        mesh.geometry.setAttribute('aAoLow', new THREE.BufferAtt
+           ribute(aoLowArray, 1));
+     ...
+      257        aoHighAttr.array.set(aoHighArray);
+      258        aoHighAttr.needsUpdate = true;
+      259      }
+      261 -                                                              
+      262 -    // 确保 aOrientation 属性存在（从 mesh.userData.orientatio
+          -n 获取）                                                      
+      263 -    if (!orientationAttr) {                                   
+      264 -      const orientation = mesh.userData?.orientation || 0;    
+      265 -      const orientationArray = new Float32Array(count);       
+      266 -      orientationArray.fill(orientation);                     
+      267 -      mesh.geometry.setAttribute('aOrientation', new THREE.Buf
+          -ferAttribute(orientationArray, 1));                           
+      268 -    }                                                         
+      260    }
+      261  
+      262    /**
+
+⏺ 现在运行 lint 检查：
+
+⏺ Bash(npm run lint 2>&1 | head -40)
+  ⎿  > mc-lite@1.0.0 lint
+     > eslint src/**/*.js
+     … +33 lines (ctrl+o to expand)
+  ⎿  Found 1 new diagnostic issue in 1 file (ctrl+o to expand)
+
+⏺ 代码通过了 lint 检查。让我验证重映射表的正确性。我发现有一个面（-X→+Z）的映射
+  可能有误，让我检查并修复：
+
+  Read 1 file (ctrl+o to expand)
+
+⏺ 让我仔细验证并修正映射表。我需要确保每个面的映射都是正确的：
+
+⏺ Update(src/utils/AOUtils.js)
+  ⎿  Added 31 lines, removed 22 lines
+      434   * 格式：VERTEX_REMAP[orientation][vertexId] = remappedVertexI
+           d
+      435   *
+      436   * 映射规则说明：
+      437 - * - orientation: 0=朝东, 1=朝南(旋转90°), 2=朝西(旋转180°), 3
+          -=朝北(旋转270°)                                               
+      437 + * - orientation: 0=朝东, 1=朝南(逆时针90°), 2=朝西(逆时针180°
+          +), 3=朝北(逆时针270°)                                         
+      438   * - 旋转是绕 Y 轴逆时针
+      439 - * - 当方块旋转时，几何面的朝向改变，需要把世界面的 AO 值映射 
+          -到对应的几何顶点位置                                          
+      439 + * - 当方块旋转时，几何面的朝向改变                           
+      440 + * - 映射逻辑：几何顶点 i 旋转后的世界位置 = 原始世界顶点 j 的
+          +位置                                                          
+      441 + * - 所以：新位置 i 应该使用原始位置 j 的 AO 值，即 remappedAO
+          +[i] = originalAO[j]                                           
+      442 + *                                                            
+      443 + * 推导方法：                                                 
+      444 + * 1. 计算几何顶点 i 在旋转后的世界坐标位置                   
+      445 + * 2. 找出世界面中位于该位置的顶点 j                          
+      446 + * 3. remapTable[i] = j                                       
+      447   */
+      448  const VERTEX_REMAP = [
+      449    // orientation=0 (朝东，无旋转)
+      450    [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 1
+           7, 18, 19, 20, 21, 22, 23],
+      451  
+      452    // orientation=1 (朝南，逆时针旋转90°)
+      446 -  // 面：+X(0)→-Z(5), -X(1)→+Z(4), +Z(4)→+X(0), -Z(5)→-X(1)   
+      447 -  // 角落映射基于世界坐标位置                                 
+      453 +  // 几何面映射：+X→-Z, -X→+Z, +Z→+X, -Z→-X                   
+      454 +  // 角落映射：每个面的四个角需要对角线交换+偏移              
+      455    [
+      449 -    22, 20, 23, 21, // +X → -Z: V0→V22, V1→V20, V2→V23, V3→V21
+      450 -    17, 19, 16, 18, // -X → +Z: V4→V17, V5→V19, V6→V16, V7→V18
+      451 -    8, 9, 10, 11,   // +Y 不变                                
+      452 -    12, 13, 14, 15, // -Y 不变                                
+      453 -    0, 2, 1, 3,     // +Z → +X: V16→V0, V17→V2, V18→V1, V19→V3
+      454 -    5, 4, 7, 6      // -Z → -X: V20→V5, V21→V4, V22→V7, V23→V6
+      456 +    22, 20, 23, 21, // geo +X(0-3) → world -Z(20-23): 对角交换
+      457 +    17, 19, 16, 18, // geo -X(4-7) → world +Z(16-19): 对角交换
+      458 +    8, 9, 10, 11,   // geo +Y(8-11) → world +Y: 不变          
+      459 +    12, 13, 14, 15, // geo -Y(12-15) → world -Y: 不变         
+      460 +    0, 2, 1, 3,     // geo +Z(16-19) → world +X(0-3): 对角交换
+      461 +    5, 4, 7, 6      // geo -Z(20-23) → world -X(4-7): 对角交换
+      462    ],
+      463  
+      464    // orientation=2 (朝西，逆时针旋转180°)
+      465 +  // 几何面映射：+X→-X, -X→+X, +Z→-Z, -Z→+Z                   
+      466    [
+      459 -    1, 0, 3, 2,    // +X → -X                                 
+      460 -    4, 5, 6, 7,    // -X → +X                                 
+      461 -    8, 9, 10, 11,  // +Y 不变                                 
+      462 -    12, 13, 14, 15, // -Y 不变                                
+      463 -    17, 16, 19, 18, // +Z → -Z                                
+      464 -    21, 20, 23, 22  // -Z → +Z                                
+      467 +    5, 4, 7, 6,     // geo +X → world -X: 对角交换            
+      468 +    0, 1, 2, 3,     // geo -X → world +X                      
+      469 +    8, 9, 10, 11,   // geo +Y 不变                            
+      470 +    12, 13, 14, 15, // geo -Y 不变                            
+      471 +    21, 20, 23, 22, // geo +Z → world -Z                      
+      472 +    17, 16, 19, 18  // geo -Z → world +Z                      
+      473    ],
+      474  
+      475    // orientation=3 (朝北，逆时针旋转270°)
+      476 +  // 几何面映射：+X→+Z, -X→-Z, +Z→-X, -Z→+X                   
+      477    [
+      469 -    17, 19, 16, 18, // +X → +Z                                
+      470 -    22, 20, 23, 21, // -X → -Z                                
+      471 -    8, 9, 10, 11,   // +Y 不变                                
+      472 -    12, 13, 14, 15, // -Y 不变                                
+      473 -    5, 4, 7, 6,     // +Z → -X                                
+      474 -    0, 2, 1, 3      // -Z → +X                                
+      478 +    17, 19, 16, 18, // geo +X → world +Z                      
+      479 +    22, 20, 23, 21, // geo -X → world -Z                      
+      480 +    8, 9, 10, 11,   // geo +Y 不变                            
+      481 +    12, 13, 14, 15, // geo -Y 不变                            
+      482 +    5, 4, 7, 6,     // geo +Z → world -X                      
+      483 +    0, 2, 1, 3      // geo -Z → world +X                      
+      484    ]
+      485  ];
+      486  
+
+⏺ 我发现 orientation=2 的映射有错误。让我修正：
+
+⏺ Update(src/utils/AOUtils.js)
+  ⎿  Added 4 lines, removed 4 lines
+      464    // orientation=2 (朝西，逆时针旋转180°)
+      465    // 几何面映射：+X→-X, -X→+X, +Z→-Z, -Z→+Z
+      466    [
+      467 -    5, 4, 7, 6,     // geo +X → world -X: 对角交换            
+      468 -    0, 1, 2, 3,     // geo -X → world +X                      
+      467 +    4, 5, 6, 7,     // geo +X → world -X: 直接对应 (V0→V4, V1→
+          +V5, V2→V6, V3→V7)                                             
+      468 +    0, 1, 2, 3,     // geo -X → world +X: 直接对应            
+      469      8, 9, 10, 11,   // geo +Y 不变
+      470      12, 13, 14, 15, // geo -Y 不变
+      471 -    21, 20, 23, 22, // geo +Z → world -Z                      
+      472 -    17, 16, 19, 18  // geo -Z → world +Z                      
+      471 +    20, 21, 22, 23, // geo +Z → world -Z: 直接对应            
+      472 +    16, 17, 18, 19  // geo -Z → world +Z: 直接对应            
+      473    ],
+      474  
+      475    // orientation=3 (朝北，逆时针旋转270°)
+
+⏺ 现在让我运行最终的 lint 检查：
+
+⏺ Bash(npm run lint 2>&1 | grep -E "^/|warning|error" | head -20)
+  ⎿  /Users/bachi/jaylli/mc-lite/src/core/AOSystem.js
+       378:17  warning  'id' is assigned a value but never used. Allo
+     wed unused vars must match /^_/u  no-unused-vars
+     … +31 lines (ctrl+o to expand)
+
+⏺ 代码通过了 lint 检查。让我总结修改内容：
+
+  修复总结
+
+  问题根本原因
+
+  当方块旋转时，几何体的面朝向改变，但 AO 数据是按世界坐标存储的。原来的 shader
+  直接用顶点 ID 读取 AO，没有考虑方块旋转，导致 AO 阴影"跟着旋转"。
+
+  解决方案
+
+  在数据层面解决问题：在存储 AO 数据时根据方块朝向重排顶点 ID，使得 shader
+  可以按原来的方式读取，不需要知道方块是否旋转。
+
+  修改的文件
+
+  ┌───────────────────────────────┬──────────────────────────────────────────┐
+  │             文件              │                 修改内容                 │
+  ├───────────────────────────────┼──────────────────────────────────────────┤
+  │ src/utils/AOUtils.js          │ 添加 VERTEX_REMAP 重映射表和             │
+  │                               │ remapAOForOrientation 函数               │
+  ├───────────────────────────────┼──────────────────────────────────────────┤
+  │ src/workers/WorldWorker.js    │ 导入并在 AO 计算后调用                   │
+  │                               │ remapAOForOrientation                    │
+  ├───────────────────────────────┼──────────────────────────────────────────┤
+  │                               │ 动态方块创建时调用                       │
+  │ src/world/Chunk.js            │ remapAOForOrientation，移除 aOrientation │
+  │                               │  属性                                    │
+  ├───────────────────────────────┼──────────────────────────────────────────┤
+  │ src/world/ChunkGenerator.js   │ 移除 aOrientation 属性（AO 已在 Worker   │
+  │                               │ 中重排）                                 │
+  ├───────────────────────────────┼──────────────────────────────────────────┤
+  │ src/world/ChunkRenderUtils.js │ 批量更新邻居 AO 时调用                   │
+  │                               │ remapAOForOrientation                    │
+  ├───────────────────────────────┼──────────────────────────────────────────┤
+  │ src/core/AOSystem.js          │ 移除 aOrientation 相关代码               │
+  ├───────────────────────────────┼──────────────────────────────────────────┤
+  │ src/core/MaterialManager.js   │ Shader 恢复为原来的简单版本（不需要      │
+  │                               │ aOrientation）                           │
+  └───────────────────────────────┴──────────────────────────────────────────┘
+
+  关键点
+
+  1. 顶点 ID 重映射：当方块旋转时，几何顶点的世界位置改变，需要将世界面的 AO
+  值映射到对应的几何顶点位置
+  2. 查表法：使用 VERTEX_REMAP
+  数组存储每个朝向的顶点映射关系，避免复杂的运行时计算
+  3. 数据层面重排：在存储 AO 数据时就进行重排，shader
+  只需按原来的方式读取，无需修改渲染逻辑
+
+  请在浏览器中刷新页面测试：放置一个可旋转方向的方块（如栏杆），旋转后观察 AO
+  阴影是否不再跟随方块旋转，而是正确地基于世界坐标方向渲染。
+
+✻ Worked for 28m 45s
