@@ -298,8 +298,9 @@ export function createOcclusionChecker(world, CHUNK_SIZE, getBlockPropsFn) {
       ? world.chunk
       : world.chunks.get(`${cx},${cz}`);
 
-    // 邻居 Chunk 不存在，默认为实体 (遮挡)，避免死白
-    if (!chunk) return true;
+    // 邻居 Chunk 不存在时按空气处理，保持与 Worker 侧 AO 一致，
+    // 避免动态网格 AO 与合并后 AO 出现深浅跳变。
+    if (!chunk) return false;
 
     const key = `${Math.floor(ox)},${Math.floor(oy)},${Math.floor(oz)}`;
     const entry = chunk.blockData[key];
@@ -311,14 +312,8 @@ export function createOcclusionChecker(world, CHUNK_SIZE, getBlockPropsFn) {
     }
 
     // blockData 中没有该方块
-    if (chunk.isReady) {
-      // Chunk 已加载完成且没有该记录 -> 确实是空气
-      return false;
-    } else {
-      // Chunk 未加载完成且没有该记录 -> 未知区域
-      // 在山体和地下默认为实体遮挡，视觉效果更好
-      return true;
-    }
+    // 无记录时统一按空气处理，消除主线程与 Worker 的 AO 规则差异
+    return false;
   };
 }
 

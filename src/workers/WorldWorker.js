@@ -1530,14 +1530,14 @@ onmessage = async function(e) {
   const d = {};
   const solidBlocks = [];
 
-  // 辅助函数：判断指定位置的方块是否遮挡视线（简化版）
-  // 简化：只有非透明方块才遮挡，透明方块不遮挡
+  // 辅助函数：判断指定位置的方块是否遮挡视线
+  // 与主线程 AO 规则保持一致：仅“实心且非透明”方块才遮挡
   const isOccluding = (x, y, z) => {
     const k = `${x},${y},${z}`;
     const b = blockMap.get(k);
     if (!b) return false;
-    // 简化：只有非透明方块才遮挡
-    return !getBlockProperties(b.type).isTransparent;
+    const props = getBlockProperties(b.type);
+    return props.isSolid && !props.isTransparent;
   };
 
   // 初始化所有可能的类型数组
