@@ -345,6 +345,7 @@ export async function initializeMaterials() {
     './src/assets/textures/stone_diorite.png',
     './src/assets/textures/log_big_oak.png',
     './src/assets/textures/log_big_oak_top.png',
+    './src/assets/textures/Stripped_Dark_Oak_Log_(texture)_JE1.png',
     './src/assets/textures/leaves.png',
     './src/assets/textures/box_side.png',
     './src/assets/textures/box_top.png',
@@ -670,6 +671,8 @@ materials.registerMaterial('wood', {
     5: woodSide        // 北面：木头侧面（树干纹理）
   }
 }); // 木头
+
+materials.registerMaterial('dark_oak', { textureUrl: './src/assets/textures/Stripped_Dark_Oak_Log_(texture)_JE1.png' }); // 深色橡木（六面同纹理）
 
 const birchLogSide = { textureUrl: './src/assets/textures/Birch_Log_side.png' };
 const birchLogTopBottom = { textureUrl: './src/assets/textures/Birch_Log_top.png' };

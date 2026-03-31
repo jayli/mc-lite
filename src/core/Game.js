@@ -164,6 +164,7 @@ export class Game {
     this.player.inventory.add('cobblestone_step_updown', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('stone_diorite_step', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('wood', DEFAULT_INVENTORY_COUNT);
+    this.player.inventory.add('dark_oak', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('glass_block', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('cobblestone', DEFAULT_INVENTORY_COUNT);
     this.player.inventory.add('blue_planks', DEFAULT_INVENTORY_COUNT);

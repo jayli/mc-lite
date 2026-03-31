@@ -72,6 +72,11 @@ export const BLOCK_DATA = {
     isTransparent: false,
     orientationEnabled: false
   },
+  'dark_oak': {
+    isSolid: true,
+    isTransparent: false,
+    orientationEnabled: false
+  },
   'sky_wood': {
     isSolid: true,
     isTransparent: false,
