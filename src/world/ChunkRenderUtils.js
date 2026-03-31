@@ -7,7 +7,6 @@ import { getBlockProperties } from '../constants/BlockData.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
 import { createChunkNeighborSampler } from './ChunkNeighborUtils.js';
 import { CONSOLIDATION_DELAY } from './ChunkConsolidation.js';
-import { createOcclusionChecker, calculateAOForBlock } from '../utils/AOUtils.js';
 import { parseBlockEntry } from '../utils/OrientationUtils.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
@@ -207,43 +206,15 @@ export function extendChunk(Chunk) {
    */
   Chunk.prototype._updateNeighborsAOInBatch = function(positions) {
     const updateAO = () => {
-      // 创建统一的遮挡检测函数（复用 AOUtils 中的逻辑）
-      const isOccluding = createOcclusionChecker(
-        { chunk: this, chunks: this.world.chunks },
-        16,
-        getBlockProps
-      );
-
       for (const pos of positions) {
         const key = `${pos.x},${pos.y},${pos.z}`;
-        const mesh = this.dynamicMeshes?.get(key);
-        if (!mesh) continue;
-
         const entry = this.blockData[key];
         if (!entry) continue;
 
-        const parsed = parseBlockEntry(entry);
-        const typeStr = parsed.type;
-        const orientation = parsed.orientation || 0;
-        const props = getBlockProps(typeStr);
-        if (!props.isSolid || props.isTransparent) continue;
-
-        // 使用 AOUtils 中的函数计算 AO 数据
-        const { aoLow, aoHigh } = calculateAOForBlock(pos.x, pos.y, pos.z, isOccluding);
-
-        // 应用到 mesh
-        const count = mesh.geometry.attributes.position.count;
-        const aoLowArray = new Float32Array(count);
-        const aoHighArray = new Float32Array(count);
-        const orientationArray = new Float32Array(count);
-
-        aoLowArray.fill(aoLow);
-        aoHighArray.fill(aoHigh);
-        orientationArray.fill(orientation);
-
-        mesh.geometry.setAttribute('aAoLow', new THREE.BufferAttribute(aoLowArray, 1));
-        mesh.geometry.setAttribute('aAoHigh', new THREE.BufferAttribute(aoHighArray, 1));
-        mesh.geometry.setAttribute('aOrientation', new THREE.BufferAttribute(orientationArray, 1));
+        // 轻量优先：优先原位更新 AO（动态网格或 InstancedMesh），仅异常时回退到重建
+        if (typeof this._refreshBlockRenderLightweight === 'function') {
+          this._refreshBlockRenderLightweight(pos.x, pos.y, pos.z, key, entry);
+        }
       }
     };
 

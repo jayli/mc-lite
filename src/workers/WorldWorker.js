@@ -5,7 +5,7 @@ import { terrainGen } from '../world/TerrainGen.js';
 import { Tree } from '../world/entities/Tree.js';
 import { Cloud } from '../world/entities/Cloud.js';
 import { Island } from '../world/entities/Island.js';
-import { getBlockProperties, BLOCK_DATA } from '../constants/BlockData.js';
+import { getBlockProperties, BLOCK_DATA, isFullCubeOccluder } from '../constants/BlockData.js';
 import { structureLoaders } from '../world/entity-system/StructureLoader.js';
 import { Pyramid } from './maps/Pyramid.js';
 import { SnowLand } from './maps/SnowLand.js';
@@ -170,7 +170,15 @@ function resolveLargeStaticStructureType(params) {
 }
 
 onmessage = async function(e) {
-  const { cx, cz, seed, snapshot, structureCenters: incomingStructureCenters, callbackKey } = e.data;
+  const {
+    cx,
+    cz,
+    seed,
+    snapshot,
+    structureCenters: incomingStructureCenters,
+    callbackKey,
+    isOptimization = false
+  } = e.data;
 
   // 同步种子
   setSeed(seed);
@@ -1536,8 +1544,10 @@ onmessage = async function(e) {
     const k = `${x},${y},${z}`;
     const b = blockMap.get(k);
     if (!b) return false;
-    const props = getBlockProperties(b.type);
-    return props.isSolid && !props.isTransparent;
+    // consolidate 优化场景：只信任当前 Chunk 归属方块作为遮挡体，
+    // 防止跨 Chunk 历史残留方块在 1s 后回包中误参与遮挡，导致“延迟出洞”。
+    if (isOptimization && savedSnapshot && !isBlockOwnedByCurrentChunk(b)) return false;
+    return isFullCubeOccluder(b.type);
   };
 
   // 初始化所有可能的类型数组
@@ -1567,7 +1577,7 @@ onmessage = async function(e) {
     // 固体方块：只要在 Chunk 内或者是跨区结构方块，都添加到 solidBlocks
     if (block.solid && shouldOwnBlock) solidBlocks.push(key);
     let visible = true;
-    if (block.solid) {
+    if (isFullCubeOccluder(block.type)) {
       const { x, y, z } = block;
       const covered =
         isOccluding(x + 1, y, z) &&

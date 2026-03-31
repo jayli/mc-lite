@@ -330,6 +330,128 @@ export class Chunk {
   }
 
   /**
+   * 轻量刷新方块渲染（优先原位更新，不做删旧重建）
+   * 1. 动态网格：原位更新 AO attribute
+   * 2. InstancedMesh：按实例索引更新 AO attribute
+   * 3. 异常兜底：回退到重建路径，保证补面及时可见
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @param {string} key - 方块键
+   * @param {string|object} entryOrType - 方块条目或类型
+   */
+  _refreshBlockRenderLightweight(x, y, z, key, entryOrType) {
+    const parsed = parseBlockEntry(entryOrType);
+    const type = parsed.type;
+    const orientation = parsed.orientation || 0;
+    if (!type || type === 'air' || type === 'collider') return;
+
+    const props = getBlockProps(type);
+    if (!props.isRendered) return;
+
+    // 轻量路径 1：动态网格原位更新
+    const dynamicMesh = this.dynamicMeshes.get(key);
+    if (dynamicMesh) {
+      if (!props.isSolid || props.isTransparent) return;
+
+      const isOccluding = createOcclusionChecker(
+        { chunk: this, chunks: this.world.chunks },
+        CHUNK_SIZE,
+        getBlockProps
+      );
+      const { aoLow, aoHigh } = computeBlockAOPacked(x, y, z, isOccluding);
+      const geometry = dynamicMesh.geometry;
+      const count = geometry?.attributes?.position?.count || 0;
+      if (count > 0) {
+        let aoLowAttr = geometry.getAttribute('aAoLow');
+        let aoHighAttr = geometry.getAttribute('aAoHigh');
+        let orientationAttr = geometry.getAttribute('aOrientation');
+
+        if (!aoLowAttr || aoLowAttr.array.length !== count) {
+          aoLowAttr = new THREE.BufferAttribute(new Float32Array(count), 1);
+          geometry.setAttribute('aAoLow', aoLowAttr);
+        }
+        if (!aoHighAttr || aoHighAttr.array.length !== count) {
+          aoHighAttr = new THREE.BufferAttribute(new Float32Array(count), 1);
+          geometry.setAttribute('aAoHigh', aoHighAttr);
+        }
+        if (!orientationAttr || orientationAttr.array.length !== count) {
+          orientationAttr = new THREE.BufferAttribute(new Float32Array(count), 1);
+          geometry.setAttribute('aOrientation', orientationAttr);
+        }
+
+        aoLowAttr.array.fill(aoLow);
+        aoHighAttr.array.fill(aoHigh);
+        orientationAttr.array.fill(orientation);
+        aoLowAttr.needsUpdate = true;
+        aoHighAttr.needsUpdate = true;
+        orientationAttr.needsUpdate = true;
+        dynamicMesh.userData = { ...(dynamicMesh.userData || {}), type, orientation };
+        return;
+      }
+    }
+
+    // 轻量路径 2：InstancedMesh 原位更新
+    if (this._updateInstancedBlockAO(x, y, z, key, type, orientation)) {
+      return;
+    }
+
+    // 兜底：异常场景回退到重建，确保视觉正确性
+    this._refreshBlockRenderMesh(x, y, z, key, entryOrType);
+  }
+
+  /**
+   * 原位更新 InstancedMesh 中单个实例的 AO/朝向属性
+   * @returns {boolean} 是否更新成功
+   */
+  _updateInstancedBlockAO(x, y, z, key, type, orientation = 0) {
+    const typeMap = this.instanceIndexMap[type];
+    if (!typeMap || !typeMap.has(key)) return false;
+
+    const idx = typeMap.get(key);
+    if (idx === undefined || idx < 0) return false;
+
+    const props = getBlockProps(type);
+    if (!props.isSolid || props.isTransparent) return true;
+
+    const mesh = this.group.children.find(c => c.isInstancedMesh && c.userData?.type === type);
+    if (!mesh || !mesh.geometry) return false;
+
+    const isOccluding = createOcclusionChecker(
+      { chunk: this, chunks: this.world.chunks },
+      CHUNK_SIZE,
+      getBlockProps
+    );
+    const { aoLow, aoHigh } = computeBlockAOPacked(x, y, z, isOccluding);
+
+    let aoLowAttr = mesh.geometry.getAttribute('aAoLow');
+    let aoHighAttr = mesh.geometry.getAttribute('aAoHigh');
+    let orientationAttr = mesh.geometry.getAttribute('aOrientation');
+    const instanceCount = mesh.count;
+
+    if (!aoLowAttr || aoLowAttr.array.length !== instanceCount) {
+      aoLowAttr = new THREE.InstancedBufferAttribute(new Float32Array(instanceCount), 1);
+      mesh.geometry.setAttribute('aAoLow', aoLowAttr);
+    }
+    if (!aoHighAttr || aoHighAttr.array.length !== instanceCount) {
+      aoHighAttr = new THREE.InstancedBufferAttribute(new Float32Array(instanceCount), 1);
+      mesh.geometry.setAttribute('aAoHigh', aoHighAttr);
+    }
+    if (!orientationAttr || orientationAttr.array.length !== instanceCount) {
+      orientationAttr = new THREE.InstancedBufferAttribute(new Float32Array(instanceCount), 1);
+      mesh.geometry.setAttribute('aOrientation', orientationAttr);
+    }
+
+    aoLowAttr.array[idx] = aoLow;
+    aoHighAttr.array[idx] = aoHigh;
+    orientationAttr.array[idx] = orientation;
+    aoLowAttr.needsUpdate = true;
+    aoHighAttr.needsUpdate = true;
+    orientationAttr.needsUpdate = true;
+    return true;
+  }
+
+  /**
    * 当方块被移除时，唤醒周围被隐藏的邻居方块
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y
@@ -356,7 +478,7 @@ export class Chunk {
           if (!this.visibleKeys.has(nKey)) {
             this.addBlockDynamic(nx, ny, nz, this.blockData[nKey]);
           } else {
-            this._refreshBlockRenderMesh(nx, ny, nz, nKey, this.blockData[nKey]);
+            this._refreshBlockRenderLightweight(nx, ny, nz, nKey, this.blockData[nKey]);
           }
         }
       } else {
@@ -613,7 +735,7 @@ export class Chunk {
       targetChunk.addBlockDynamic(x, y, z, entry);
     } else {
       // 如果原本可见，跨区块暴露时也要立即刷新网格补面
-      targetChunk._refreshBlockRenderMesh(x, y, z, blockKey, entry);
+      targetChunk._refreshBlockRenderLightweight(x, y, z, blockKey, entry);
     }
   }
 
@@ -808,7 +930,7 @@ export class Chunk {
               this._scheduleBatchFaceCullingUpdate();
             } else {
               // 非批量模式：立即刷新网格补面
-              this._refreshBlockRenderMesh(nx, ny, nz, nKey, this.blockData[nKey]);
+              this._refreshBlockRenderLightweight(nx, ny, nz, nKey, this.blockData[nKey]);
             }
           }
         }

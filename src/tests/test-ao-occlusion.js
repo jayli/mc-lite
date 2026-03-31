@@ -48,4 +48,25 @@ describe('AO 遮挡判定一致性测试', (test) => {
     assertTrue(isOccluding(1, 0, 0), 'stone 应遮挡');
     assertFalse(isOccluding(2, 0, 0), 'glass_block 不应遮挡');
   });
+
+  test('非完整立方体不应作为遮挡体', () => {
+    const currentChunk = {
+      cx: 0,
+      cz: 0,
+      isReady: true,
+      blockData: {
+        '1,0,0': { type: 'bed_head', orientation: 0 }, // geometryType=half_block
+        '2,0,0': { type: 'stone', orientation: 0 }
+      }
+    };
+
+    const isOccluding = createOcclusionChecker(
+      { chunk: currentChunk, chunks: new Map() },
+      16,
+      getBlockProperties
+    );
+
+    assertFalse(isOccluding(1, 0, 0), 'half_block 不应遮挡完整面判定');
+    assertTrue(isOccluding(2, 0, 0), 'box 方块应继续遮挡');
+  });
 });

@@ -481,6 +481,21 @@ export function getNonSolidTypes() {
 }
 
 /**
+ * 判断方块是否可作为“完整遮挡体”（用于 AO/可见性判定）
+ * 规则：必须是非透明、实心、可渲染，且几何为完整 box。
+ * @param {string|Object} typeOrProps - 方块类型或方块属性对象
+ * @returns {boolean}
+ */
+export function isFullCubeOccluder(typeOrProps) {
+  const props = (typeof typeOrProps === 'string' || !typeOrProps || typeof typeOrProps !== 'object')
+    ? getBlockProperties(typeOrProps)
+    : typeOrProps;
+
+  const geometryType = props.geometryType || 'box';
+  return props.isSolid && !props.isTransparent && props.isRendered !== false && geometryType === 'box';
+}
+
+/**
  * 创建支持测试环境 mock 的方块属性解析函数
  * 统一处理 globalThis._blockData 的依赖注入逻辑
  *

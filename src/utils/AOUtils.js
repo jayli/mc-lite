@@ -1,7 +1,7 @@
 // src/utils/AOUtils.js
 // AO（环境光遮蔽）计算辅助函数
 
-import { getBlockProperties } from '../constants/BlockData.js';
+import { getBlockProperties, isFullCubeOccluder } from '../constants/BlockData.js';
 import { AO_VERTICES_COUNT } from '../constants/GameConfig.js';
 
 /**
@@ -308,7 +308,7 @@ export function createOcclusionChecker(world, CHUNK_SIZE, getBlockPropsFn) {
     if (entry) {
       const type = typeof entry === 'string' ? entry : entry.type;
       const props = getBlockPropsFn(type);
-      return props.isSolid && !props.isTransparent;
+      return isFullCubeOccluder(props);
     }
 
     // blockData 中没有该方块
