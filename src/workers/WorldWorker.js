@@ -49,7 +49,8 @@ const {
   gate,
   flowerBed,
   pavilion,
-  tallWell
+  tallWell,
+  desertTempleTube
 } = structureLoaders;
 
 const CHUNK_SIZE = 16;
@@ -205,7 +206,8 @@ onmessage = async function(e) {
     gate.load(),
     flowerBed.load(),
     pavilion.load(),
-    tallWell.load()
+    tallWell.load(),
+    desertTempleTube.load()
   ]).catch(err => console.error('Failed to load structure data:', err));
 
   // 计算当前区块的范围 - 提前定义，供 snapshot 模式使用
@@ -579,6 +581,7 @@ onmessage = async function(e) {
             castle: generateCastle,
             bigHouse: generateBigHouse,
             regularHouse1: generateRegularHouse1,
+            desertTempleTube: generateDesertTempleTube,
             boxHouse: generateBoxHouse,
             desertVillage: generateDesertVillage,
             doubleTower: generateDoubleTower,
@@ -1227,6 +1230,7 @@ onmessage = async function(e) {
   const largeStaticTaskFactories = {
     bigHouse: (x, y, z) => () => generateBigHouse(x, y, z, fakeChunk, dPlaceholder),
     regularHouse1: (x, y, z) => () => generateRegularHouse1(x, y, z, fakeChunk, dPlaceholder),
+    desertTempleTube: (x, y, z) => () => generateDesertTempleTube(x, y, z, fakeChunk, dPlaceholder),
     boxHouse: (x, y, z) => () => generateBoxHouse(x, y, z, fakeChunk, dPlaceholder),
     castle: (x, y, z) => () => generateCastle(x, y, z, fakeChunk, dPlaceholder),
     doubleTower: (x, y, z) => () => generateDoubleTower(x, y, z, fakeChunk, dPlaceholder),
@@ -1881,6 +1885,10 @@ function generateBigHouse(x, y, z, chunk, dObj) {
 
 function generateRegularHouse1(x, y, z, chunk, dObj) {
   generateStructureWithGroundSupport(regularHouse1, x, y, z, chunk, dObj);
+}
+
+function generateDesertTempleTube(x, y, z, chunk, dObj) {
+  generateStructureWithGroundSupport(desertTempleTube, x, y, z, chunk, dObj);
 }
 
 function generateBoxHouse(x, y, z, chunk, dObj) {
