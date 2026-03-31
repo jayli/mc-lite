@@ -29,6 +29,7 @@ export const STRUCTURE_RENDER_DIST = {
   desertPyramid: 16,  // DesertPyramid 约 25x25，含台阶外扩
   doubleTower: 20,    // double_tower 约 26x15
   treeTower: 20,      // tree_tower 约 21x22，含树冠外扩
+  junglePyramid: 16,  // jungle_pyramid 约 25x25
   pyramidIsland: 22,  // pyramid_island 约 34x39
   smallHouse: 18,     // small_house 约 33x29
   treeHouse: 10,      // tree_house 约 16x15
@@ -60,6 +61,7 @@ export const STRUCTURE_HEIGHT_RANGE_SPECIAL = {
   tank: 35,       // tank 结构 Y 方向±35（共 71 格），覆盖 1-70 的范围
   doubleTower: 48,
   treeTower: 42,
+  junglePyramid: 20,
   pyramidIsland: 26,
   smallHouse: 14,
   treeHouse: 24,
@@ -119,6 +121,7 @@ export const CROSS_CHUNK_OWNER_BLOCKED_TYPES = Object.freeze([
   'castle',
   'doubleTower',
   'treeTower',
+  'junglePyramid',
   'gate',
   'pyramidIsland',
   'smallHouse',

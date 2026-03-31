@@ -34,6 +34,7 @@ const {
   boxHouse,
   doubleTower,
   treeTower,
+  junglePyramid,
   pyramidIsland,
   smallHouse,
   treeHouse,
@@ -192,6 +193,7 @@ onmessage = async function(e) {
     boxHouse.load(),
     doubleTower.load(),
     treeTower.load(),
+    junglePyramid.load(),
     pyramidIsland.load(),
     smallHouse.load(),
     treeHouse.load(),
@@ -588,6 +590,7 @@ onmessage = async function(e) {
             desertVillage: generateDesertVillage,
             doubleTower: generateDoubleTower,
             treeTower: generateTreeTower,
+            junglePyramid: generateJunglePyramid,
             tank: generateTank,
             gate: generateGate,
             pyramidIsland: generatePyramidIsland,
@@ -1238,6 +1241,7 @@ onmessage = async function(e) {
     castle: (x, y, z) => () => generateCastle(x, y, z, fakeChunk, dPlaceholder),
     doubleTower: (x, y, z) => () => generateDoubleTower(x, y, z, fakeChunk, dPlaceholder),
     treeTower: (x, y, z) => () => generateTreeTower(x, y, z, fakeChunk, dPlaceholder),
+    junglePyramid: (x, y, z) => () => generateJunglePyramid(x, y, z, fakeChunk, dPlaceholder),
     gate: (x, y, z) => () => generateGate(x, y, z, fakeChunk, dPlaceholder),
     pyramidIsland: (x, y, z) => () => generatePyramidIsland(x, y, z, fakeChunk, dPlaceholder),
     smallHouse: (x, y, z) => () => generateSmallHouse(x, y, z, fakeChunk, dPlaceholder),
@@ -1905,6 +1909,10 @@ function generateDoubleTower(x, y, z, chunk, dObj) {
 
 function generateTreeTower(x, y, z, chunk, dObj) {
   generateStructureWithGroundSupport(treeTower, x, y, z, chunk, dObj);
+}
+
+function generateJunglePyramid(x, y, z, chunk, dObj) {
+  generateStructureWithGroundSupport(junglePyramid, x, y, z, chunk, dObj);
 }
 
 function generatePyramidIsland(x, y, z, chunk, dObj) {
