@@ -44,6 +44,18 @@ export const GameConfig = {
   /** 贴图像素模糊程度（0=清晰像素风，1=最大模糊） */
   DEFAULT_TEXTURE_BLUR_LEVEL: 0,
 
+  // ==================== 色彩分级配置 ====================
+  /** 默认色调偏移值（度数，0=无偏移） */
+  DEFAULT_COLOR_HUE_SHIFT: 0,
+  /** 色调偏移预设：正常（无偏移） */
+  COLOR_HUE_SHIFT_NORMAL: 0,
+  /** 色调偏移预设：暖色调（偏橙红） */
+  COLOR_HUE_SHIFT_WARM: 15,
+  /** 色调偏移预设：冷色调（偏蓝） */
+  COLOR_HUE_SHIFT_COOL: -15,
+  /** 色调偏移预设：复古（偏褐黄） */
+  COLOR_HUE_SHIFT_RETRO: 25,
+
   // ==================== 方块面掩码配置 ====================
   /** 面掩码 - 所有面都可见（二进制 00111111） */
   FACE_MASK_ALL: 63,
@@ -86,6 +98,21 @@ export const AO_VERTICES_COUNT = GameConfig.AO_VERTICES_COUNT;
 
 /** 贴图像素模糊程度（0=清晰像素风，1=最大模糊） */
 export const DEFAULT_TEXTURE_BLUR_LEVEL = GameConfig.DEFAULT_TEXTURE_BLUR_LEVEL;
+
+/** 默认色调偏移值（度数，0=无偏移） */
+export const DEFAULT_COLOR_HUE_SHIFT = GameConfig.DEFAULT_COLOR_HUE_SHIFT;
+
+/** 色调偏移预设：正常（无偏移） */
+export const COLOR_HUE_SHIFT_NORMAL = GameConfig.COLOR_HUE_SHIFT_NORMAL;
+
+/** 色调偏移预设：暖色调（偏橙红） */
+export const COLOR_HUE_SHIFT_WARM = GameConfig.COLOR_HUE_SHIFT_WARM;
+
+/** 色调偏移预设：冷色调（偏蓝） */
+export const COLOR_HUE_SHIFT_COOL = GameConfig.COLOR_HUE_SHIFT_COOL;
+
+/** 色调偏移预设：复古（偏褐黄） */
+export const COLOR_HUE_SHIFT_RETRO = GameConfig.COLOR_HUE_SHIFT_RETRO;
 
 /** 面掩码 - 所有面都可见（二进制 00111111） */
 export const FACE_MASK_ALL = GameConfig.FACE_MASK_ALL;

@@ -173,14 +173,11 @@ button.active {
   padding-right: 0;
 }
 
-/* 贴图模糊设置：保持按钮尺寸与“白天/阴天”一致，并给按钮到右侧竖线留空 */
-.texture-blur-btn-group button.btn-small {
-  padding: 6px 4px;
-  font-size: 12px;
-}
-
-.texture-blur-btn-group {
-  width: calc(100% - 10px);
+/* 色调偏移按钮：两行布局 */
+.color-grading-btn-group {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
 }
 
 .btn-status-toggle {

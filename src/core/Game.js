@@ -21,7 +21,7 @@ import { TurretPlacementHandler } from '../actors/turret/TurretPlacementHandler.
 import { ZombieNestPlacementHandler } from '../actors/zombie-nest/ZombieNestPlacementHandler.js';
 import { MinecartPlacementHandler } from '../actors/minecart/MinecartPlacementHandler.js';
 import { preloadAllStructures } from '../world/entity-system/StructureLoader.js';
-import { DEFAULT_INVENTORY_COUNT, DEFAULT_TEXTURE_BLUR_LEVEL } from '../constants/GameConfig.js';
+import { DEFAULT_INVENTORY_COUNT, DEFAULT_TEXTURE_BLUR_LEVEL, DEFAULT_COLOR_HUE_SHIFT } from '../constants/GameConfig.js';
 import { materials } from './MaterialManager.js';
 import Stats from 'stats';
 
@@ -74,6 +74,7 @@ export class Game {
     this.canTntDestroyBlocks = false; // 是否允许 TNT 爆炸破坏方块
     this.maxActiveZombies = 20; // 最大活跃丧尸数
     this.textureBlurLevel = materials.getTextureBlurLevel();
+    this.colorHueShift = this.engine.getColorHueShift(); // 色调偏移值
 
     this.isRunning = false; // 游戏运行状态标志
     this.perfStats = { player: 0, world: 0, ui: 0, render: 0 }; // 性能统计数据
@@ -493,7 +494,8 @@ export class Game {
         canTntDestroyBlocks: this.canTntDestroyBlocks,
         maxActiveZombies: this.maxActiveZombies,
         visualStyle: this.engine.currentVisualStyle,
-        textureBlurLevel: this.textureBlurLevel
+        textureBlurLevel: this.textureBlurLevel,
+        colorHueShift: this.colorHueShift
       }
     };
   }
@@ -505,6 +507,15 @@ export class Game {
   setTextureBlurLevel(blurLevel) {
     materials.setTextureBlurLevel(blurLevel);
     this.textureBlurLevel = materials.getTextureBlurLevel();
+  }
+
+  /**
+   * 设置色调偏移值（度数）
+   * @param {number} hueShift - 色调偏移度数（正值偏暖，负值偏冷）
+   */
+  setColorHueShift(hueShift) {
+    this.engine.setColorHueShift(hueShift);
+    this.colorHueShift = this.engine.getColorHueShift();
   }
 
   /**
@@ -602,6 +613,10 @@ export class Game {
         ? saveData.settings.textureBlurLevel
         : DEFAULT_TEXTURE_BLUR_LEVEL;
       this.setTextureBlurLevel(textureBlurLevel);
+      const colorHueShift = saveData.settings.colorHueShift !== undefined
+        ? saveData.settings.colorHueShift
+        : DEFAULT_COLOR_HUE_SHIFT;
+      this.setColorHueShift(colorHueShift);
     }
 
     // 4. 从存档恢复丧尸巢穴和炮塔实例

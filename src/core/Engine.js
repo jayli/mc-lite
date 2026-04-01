@@ -543,6 +543,38 @@ export class Engine {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(this.renderer.domElement);
     window.addEventListener('resize', () => this.onResize());
+
+    // 初始化色彩分级（色调偏移）
+    this.colorHueShift = 0;
+    this._applyColorGrading();
+  }
+
+  /**
+   * 应用色彩分级效果到渲染画布
+   * 使用 CSS filter 实现色调偏移
+   */
+  _applyColorGrading() {
+    const canvas = this.renderer.domElement;
+    if (canvas) {
+      canvas.style.filter = `hue-rotate(${this.colorHueShift}deg)`;
+    }
+  }
+
+  /**
+   * 设置色调偏移值
+   * @param {number} hueShift - 色调偏移度数（正值偏暖，负值偏冷）
+   */
+  setColorHueShift(hueShift) {
+    this.colorHueShift = hueShift;
+    this._applyColorGrading();
+  }
+
+  /**
+   * 获取当前色调偏移值
+   * @returns {number}
+   */
+  getColorHueShift() {
+    return this.colorHueShift;
   }
 
   onResize() {
