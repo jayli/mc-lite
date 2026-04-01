@@ -29,6 +29,8 @@ export const FOG_FAR = 70;
 export const SHADOW_MAP_SIZE = 512;
 // 阴影相机的覆盖范围大小（米）
 export const SHADOW_CAMERA_SIZE = 30;
+// 阴影相机远裁剪面：收紧覆盖范围，降低阴影渲染开销
+export const SHADOW_CAMERA_FAR = 250;
 // 环境风格配置键
 export const VISUAL_STYLE_KEYS = {
   DAY: 'day',
@@ -92,6 +94,9 @@ export class Engine {
     });
     this.renderer.shadowMap.enabled = true; // 启用阴影系统
     this.renderer.shadowMap.type = THREE.PCFShadowMap; // 设置阴影映射类型为PCF（Percentage-Closer Filtering）软阴影
+    // 性能优化：关闭每帧自动更新阴影，仅在场景关键变化时按需刷新
+    this.renderer.shadowMap.autoUpdate = false;
+    this.renderer.shadowMap.needsUpdate = true;
     this.resolutionScale = 0.7;        // 初始渲染分辨率缩放系数
     this.renderer.setPixelRatio(this.resolutionScale); // 设置渲染器的像素比例，用于控制输出分辨率
 
@@ -116,7 +121,7 @@ export class Engine {
     light.shadow.camera.top = SHADOW_CAMERA_SIZE;     // 设置阴影相机顶部范围
     light.shadow.camera.bottom = -SHADOW_CAMERA_SIZE; // 设置阴影相机底部范围
     light.shadow.camera.near = 0.1;                   // 设置阴影相机近裁剪面
-    light.shadow.camera.far = 400;                    // 设置阴影相机远裁剪面
+    light.shadow.camera.far = SHADOW_CAMERA_FAR;      // 设置阴影相机远裁剪面（收紧至玩家活动核心区域）
     light.shadow.bias = 0.0001;                       // 设置阴影偏移，防止阴影自遮挡伪影
     light.shadow.normalBias = 0.078;                  // 设置法线偏移，改善斜面阴影质量
 
@@ -651,6 +656,14 @@ export class Engine {
     }
 
     this.renderer.render(this.scene, this.camera);
+  }
+
+  /**
+   * 请求下一帧刷新阴影贴图（按需刷新）
+   */
+  requestShadowMapUpdate() {
+    if (!this.renderer?.shadowMap?.enabled) return;
+    this.renderer.shadowMap.needsUpdate = true;
   }
 
   /**

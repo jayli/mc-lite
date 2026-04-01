@@ -79,6 +79,26 @@ export class World {
     // --- 重复 owner 清理状态 ---
     // 当已就绪 Chunk 数变化时触发一次数据层去重，清理历史重复 owner
     this._lastReadyChunkCount = 0;
+
+    // 阴影按需刷新回调（由 Game/Engine 注入）
+    this.shadowUpdateCallback = null;
+  }
+
+  /**
+   * 注入阴影刷新回调
+   * @param {(reason?: string) => void} callback - 阴影刷新函数
+   */
+  setShadowUpdateCallback(callback) {
+    this.shadowUpdateCallback = typeof callback === 'function' ? callback : null;
+  }
+
+  /**
+   * 请求刷新阴影贴图（按需刷新）
+   * @param {string} [reason='world-change'] - 触发原因
+   */
+  requestShadowMapUpdate(reason = 'world-change') {
+    if (!this.shadowUpdateCallback) return;
+    this.shadowUpdateCallback(reason);
   }
 
   /**
@@ -132,6 +152,7 @@ export class World {
 
     if (chunkTopologyChanged) {
       this.clearBlockLookupCaches();
+      this.requestShadowMapUpdate('chunk-topology-changed');
     }
 
     // Chunk 就绪数量变化时执行一次去重，避免历史重复 owner 长期存在
@@ -142,6 +163,7 @@ export class World {
     if (readyChunkCount !== this._lastReadyChunkCount) {
       this._dedupeLoadedChunkOwners();
       this._lastReadyChunkCount = readyChunkCount;
+      this.requestShadowMapUpdate('chunk-ready-count-changed');
     }
 
     // 更新粒子系统逻辑（运动、透明度衰减等）
@@ -346,6 +368,7 @@ export class World {
 
     // 批量删除会修改多个 chunk 的 blockData，统一清理查询缓存
     this.clearBlockLookupCaches();
+    this.requestShadowMapUpdate('remove-blocks-batch');
   }
 
   /**
@@ -611,6 +634,7 @@ export class World {
     // 逻辑委托：调用区块的动态添加方法，处理网格生成和邻居面更新
     chunk.addBlockDynamic(x, y, z, typeOrEntry, orientation);
     this.clearBlockLookupCaches();
+    this.requestShadowMapUpdate('set-block');
   }
 
   /**
@@ -657,6 +681,9 @@ export class World {
     }
 
     this.clearBlockLookupCaches();
+    if (placed > 0) {
+      this.requestShadowMapUpdate('set-blocks-batch');
+    }
     return { placed, skipped, touchedChunks };
   }
 
@@ -685,6 +712,7 @@ export class World {
     if (owners.length === 0) return;
     owners.forEach(owner => owner.ownerChunk.removeBlock(x, y, z));
     this.clearBlockLookupCaches();
+    this.requestShadowMapUpdate('remove-block');
   }
 
   /**

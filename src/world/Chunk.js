@@ -18,6 +18,10 @@ import { extendChunk as extendWithPersistence } from './ChunkPersistence.js';
 import { extendChunk as extendWithRenderUtils } from './ChunkRenderUtils.js';
 import { FACE_MASK_ALL } from '../constants/GameConfig.js';
 
+// 阴影投射白名单规则：所有“实心且可渲染”的方块都允许投射阴影
+const isSolidShadowCaster = (props) => props.isSolid && props.isRendered !== false;
+const isGlassType = (type) => typeof type === 'string' && type.includes('glass');
+
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
 const getFaceCullingSystem = () => globalThis._faceCullingSystem || faceCullingSystem;
@@ -552,8 +556,13 @@ export class Chunk {
 
     // 设置阴影
     if (props.isShadowEnabled) {
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
+      if (isGlassType(type)) {
+        mesh.castShadow = false;
+        mesh.receiveShadow = false;
+      } else {
+        mesh.castShadow = isSolidShadowCaster(props);
+        mesh.receiveShadow = true;
+      }
     }
 
     return mesh;

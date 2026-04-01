@@ -38,6 +38,8 @@ export class Game {
     // 初始化游戏世界（地形、区块等）
     this.world = new World(this.engine.scene);
     this.world.persistenceService = persistenceService;
+    // 阴影按需刷新：由 World 在区块/方块变化时请求
+    this.world.setShadowUpdateCallback(() => this.engine.requestShadowMapUpdate());
     // 初始化玩家角色
     this.player = new Player(this.world, this.engine.camera);
     this.player.game = this; // 将游戏实例传递给玩家对象
@@ -438,6 +440,8 @@ export class Game {
 
           // 更新记录位置，用于下一次距离检测
           this.engine._lastUpdatePos.copy(this.player.position);
+          // 玩家移动超过阈值后，请求刷新阴影贴图
+          this.engine.requestShadowMapUpdate();
         }
       }
     }

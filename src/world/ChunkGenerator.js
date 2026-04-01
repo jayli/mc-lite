@@ -20,6 +20,9 @@ const getGunManModel = () => globalThis._gunManModel || gunManModel;
 
 // 获取方块属性函数 - 优先使用测试环境的模拟
 const getBlockProps = createBlockPropsResolver(getBlockProperties);
+// 阴影投射白名单规则：所有“实心且可渲染”的方块都允许投射阴影
+const isSolidShadowCaster = (props) => props.isSolid && props.isRendered !== false;
+const isGlassType = (type) => typeof type === 'string' && type.includes('glass');
 
 export function extendChunk(Chunk) {
   /**
@@ -322,8 +325,13 @@ export function extendChunk(Chunk) {
 
       // 阴影配置优化
       if(props.isShadowEnabled) {
-        mesh.castShadow = true;    // 开启实时阴影投射
-        mesh.receiveShadow = true; // 开启实时阴影接收
+        if (isGlassType(type)) {
+          mesh.castShadow = false;
+          mesh.receiveShadow = false;
+        } else {
+          mesh.castShadow = isSolidShadowCaster(props);
+          mesh.receiveShadow = true; // 开启实时阴影接收
+        }
       }
 
       // 将实例化网格添加到区块的分S组中
