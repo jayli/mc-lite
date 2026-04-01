@@ -227,25 +227,55 @@ export function extendChunk(Chunk) {
   Chunk.prototype.buildMeshes = function(d) {
     // 创建一个虚拟对象用于计算每个实例的变换矩阵 (Matrix4)
     const dummy = new THREE.Object3D();
+    const currentChunkKey = `${this.cx},${this.cz}`;
+
+    // 渲染去重：同坐标若已由坐标所属 Chunk 持有，则当前 Chunk 不再重复渲染
+    // 这样可避免重复网格引起的深度竞争（表现为 AO/明暗随视角闪烁）
+    const shouldRenderPos = (pos) => {
+      const ix = Math.floor(pos.x);
+      const iy = Math.floor(pos.y);
+      const iz = Math.floor(pos.z);
+      const coordCx = Math.floor(ix / 16);
+      const coordCz = Math.floor(iz / 16);
+      const coordChunkKey = `${coordCx},${coordCz}`;
+
+      // 坐标归属当前 Chunk：始终渲染
+      if (coordChunkKey === currentChunkKey) return true;
+
+      // 跨 Chunk 方块：若坐标所属 Chunk 已就绪且存在同坐标方块，则跳过当前重复渲染
+      const coordChunk = this.world?.chunks?.get(coordChunkKey);
+      if (coordChunk?.isReady) {
+        const key = `${ix},${iy},${iz}`;
+        if (coordChunk.blockData?.[key] !== undefined) {
+          return false;
+        }
+      }
+
+      // 坐标所属 Chunk 未加载时保留渲染，避免结构边缘临时缺块
+      return true;
+    };
 
     // 遍历每种方块类型，为每种类型创建一个 InstancedMesh
     for (const type in d) {
       const props = getBlockProps(type);
       if (d[type].length === 0 || !props.isRendered) continue;  // 跳过没有任何实例或不需渲染的方块类型
+      const renderPositions = d[type].filter(shouldRenderPos);
+      if (renderPositions.length === 0) continue;
 
       // 从材质管理器和几何体映射表获取资源
       const geometry = geomMap[props.geometryType] || geomMap['default'];
       const material = getMaterials().getMaterial(type);
       // 创建实例化网格：指定几何体、材质和实例总数
-      const mesh = new THREE.InstancedMesh(geometry, material, d[type].length);
+      const mesh = new THREE.InstancedMesh(geometry, material, renderPositions.length);
+      mesh.frustumCulled = false;
 
       // --- 添加 AO 属性 ---
       // AO 适用于所有实心且不透明的方块
       if (props.isSolid && !props.isTransparent) {
-        const aoLowArray = new Float32Array(d[type].length);
-        const aoHighArray = new Float32Array(d[type].length);
-        const orientationArray = new Float32Array(d[type].length);
-        d[type].forEach((pos, i) => {
+        const aoLowArray = new Float32Array(renderPositions.length);
+        const aoHighArray = new Float32Array(renderPositions.length);
+        const orientationArray = new Float32Array(renderPositions.length);
+        renderPositions.forEach((pos, i) => {
           aoLowArray[i] = pos.aoLow || 0;
           aoHighArray[i] = pos.aoHigh || 0;
           orientationArray[i] = pos.orientation || 0;
@@ -270,7 +300,7 @@ export function extendChunk(Chunk) {
       if (type !== 'realistic_trunk' && type !== 'realistic_leaves') {
         this.instanceIndexMap[type] = new Map();
       }
-      d[type].forEach((pos, i) => {
+      renderPositions.forEach((pos, i) => {
         // 核心偏移：将模型中心对齐到方块中心 (增加 0.5 偏移)
         dummy.position.set(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
         // 应用朝向旋转（如果有）

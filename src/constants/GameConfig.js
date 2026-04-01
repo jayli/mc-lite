@@ -40,6 +40,10 @@ export const GameConfig = {
   /** AO 顶点数（每个方块面的顶点数量） */
   AO_VERTICES_COUNT: 24,
 
+  // ==================== 贴图采样配置 ====================
+  /** 贴图像素模糊程度（0=清晰像素风，1=最大模糊） */
+  DEFAULT_TEXTURE_BLUR_LEVEL: 0,
+
   // ==================== 方块面掩码配置 ====================
   /** 面掩码 - 所有面都可见（二进制 00111111） */
   FACE_MASK_ALL: 63,
@@ -79,6 +83,9 @@ export const MAP_OFFSET = GameConfig.MAP_OFFSET;
 
 /** AO 顶点数（每个方块面的顶点数量） */
 export const AO_VERTICES_COUNT = GameConfig.AO_VERTICES_COUNT;
+
+/** 贴图像素模糊程度（0=清晰像素风，1=最大模糊） */
+export const DEFAULT_TEXTURE_BLUR_LEVEL = GameConfig.DEFAULT_TEXTURE_BLUR_LEVEL;
 
 /** 面掩码 - 所有面都可见（二进制 00111111） */
 export const FACE_MASK_ALL = GameConfig.FACE_MASK_ALL;

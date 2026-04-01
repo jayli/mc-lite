@@ -2,8 +2,15 @@
 import { HUD } from './HUD.js';
 import { InventoryUI } from './Inventory.js';
 import { playgroundService } from '../services/PlaygroundService.js';
-import { ZOMBIE_LIMIT_LOW, ZOMBIE_LIMIT_MED, ZOMBIE_LIMIT_HIGH } from '../constants/GameConfig.js';
+import {
+  ZOMBIE_LIMIT_LOW,
+  ZOMBIE_LIMIT_MED,
+  ZOMBIE_LIMIT_HIGH
+} from '../constants/GameConfig.js';
 import { VISUAL_STYLE_KEYS } from '../core/Engine.js';
+
+const TEXTURE_BLUR_LEVEL_CLEAR = 0;
+const TEXTURE_BLUR_LEVEL_SOFT = 0.35;
 
 /**
  * UI 管理器 - 负责协调所有 UI 组件的初始化和更新
@@ -45,6 +52,8 @@ export class UIManager {
     const btnZombie20 = document.getElementById('btn-zombie-20');
     const btnZombie30 = document.getElementById('btn-zombie-30');
     const btnZombie50 = document.getElementById('btn-zombie-50');
+    const btnTextureBlurClear = document.getElementById('btn-texture-blur-clear');
+    const btnTextureBlurSoft = document.getElementById('btn-texture-blur-soft');
     const btnTntDestroyToggle = document.getElementById('btn-tnt-destroy-toggle');
     const btnCreatePlayground = document.getElementById('btn-create-playground');
     const btnExportModel = document.getElementById('btn-export-model');
@@ -175,6 +184,22 @@ export class UIManager {
         e.stopPropagation();
         this.game.canTntDestroyBlocks = !this.game.canTntDestroyBlocks;
         this.hud.showMessage(this.game.canTntDestroyBlocks ? '已开启 TNT 爆炸破坏方块' : '已关闭 TNT 爆炸破坏方块');
+        this.updateActiveButtons();
+      };
+    }
+
+    // 方块贴图模糊设置
+    if (btnTextureBlurClear && btnTextureBlurSoft) {
+      btnTextureBlurClear.onclick = (e) => {
+        e.stopPropagation();
+        this.game.setTextureBlurLevel(TEXTURE_BLUR_LEVEL_CLEAR);
+        this.hud.showMessage('贴图模糊已设为：清晰');
+        this.updateActiveButtons();
+      };
+      btnTextureBlurSoft.onclick = (e) => {
+        e.stopPropagation();
+        this.game.setTextureBlurLevel(TEXTURE_BLUR_LEVEL_SOFT);
+        this.hud.showMessage('贴图模糊已设为：模糊');
         this.updateActiveButtons();
       };
     }
@@ -481,6 +506,8 @@ export class UIManager {
     const btnZombie20 = document.getElementById('btn-zombie-20');
     const btnZombie30 = document.getElementById('btn-zombie-30');
     const btnZombie50 = document.getElementById('btn-zombie-50');
+    const btnTextureBlurClear = document.getElementById('btn-texture-blur-clear');
+    const btnTextureBlurSoft = document.getElementById('btn-texture-blur-soft');
     const btnTntDestroyToggle = document.getElementById('btn-tnt-destroy-toggle');
 
     if (!btnPerf || !btnMid || !btnQuality) return;
@@ -504,6 +531,12 @@ export class UIManager {
       btnZombie20.classList.toggle('active', this.game.maxActiveZombies === ZOMBIE_LIMIT_LOW);
       btnZombie30.classList.toggle('active', this.game.maxActiveZombies === ZOMBIE_LIMIT_MED);
       btnZombie50.classList.toggle('active', this.game.maxActiveZombies === ZOMBIE_LIMIT_HIGH);
+    }
+
+    if (btnTextureBlurClear && btnTextureBlurSoft) {
+      const blurLevel = this.game.textureBlurLevel || 0;
+      btnTextureBlurClear.classList.toggle('active', Math.abs(blurLevel - TEXTURE_BLUR_LEVEL_CLEAR) < 0.01);
+      btnTextureBlurSoft.classList.toggle('active', Math.abs(blurLevel - TEXTURE_BLUR_LEVEL_SOFT) < 0.01);
     }
 
     if (btnTntDestroyToggle) {

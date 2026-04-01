@@ -21,7 +21,8 @@ import { TurretPlacementHandler } from '../actors/turret/TurretPlacementHandler.
 import { ZombieNestPlacementHandler } from '../actors/zombie-nest/ZombieNestPlacementHandler.js';
 import { MinecartPlacementHandler } from '../actors/minecart/MinecartPlacementHandler.js';
 import { preloadAllStructures } from '../world/entity-system/StructureLoader.js';
-import { DEFAULT_INVENTORY_COUNT } from '../constants/GameConfig.js';
+import { DEFAULT_INVENTORY_COUNT, DEFAULT_TEXTURE_BLUR_LEVEL } from '../constants/GameConfig.js';
+import { materials } from './MaterialManager.js';
 import Stats from 'stats';
 
 /**
@@ -72,6 +73,7 @@ export class Game {
     this.canGunsDestroyBlocks = false; // 是否允许枪械破坏方块
     this.canTntDestroyBlocks = false; // 是否允许 TNT 爆炸破坏方块
     this.maxActiveZombies = 20; // 最大活跃丧尸数
+    this.textureBlurLevel = materials.getTextureBlurLevel();
 
     this.isRunning = false; // 游戏运行状态标志
     this.perfStats = { player: 0, world: 0, ui: 0, render: 0 }; // 性能统计数据
@@ -490,9 +492,19 @@ export class Game {
         canGunsDestroyBlocks: this.canGunsDestroyBlocks,
         canTntDestroyBlocks: this.canTntDestroyBlocks,
         maxActiveZombies: this.maxActiveZombies,
-        visualStyle: this.engine.currentVisualStyle
+        visualStyle: this.engine.currentVisualStyle,
+        textureBlurLevel: this.textureBlurLevel
       }
     };
+  }
+
+  /**
+   * 设置全局贴图像素模糊程度（0~1）
+   * @param {number} blurLevel - 0为清晰像素风，1为最大模糊
+   */
+  setTextureBlurLevel(blurLevel) {
+    materials.setTextureBlurLevel(blurLevel);
+    this.textureBlurLevel = materials.getTextureBlurLevel();
   }
 
   /**
@@ -586,6 +598,10 @@ export class Game {
       this.enemyManager.maxActiveZombies = this.maxActiveZombies; // 同步到敌人管理器
       const visualStyle = saveData.settings.visualStyle || VISUAL_STYLE_KEYS.DAY;
       this.engine.setVisualStyle(visualStyle);
+      const textureBlurLevel = saveData.settings.textureBlurLevel !== undefined
+        ? saveData.settings.textureBlurLevel
+        : DEFAULT_TEXTURE_BLUR_LEVEL;
+      this.setTextureBlurLevel(textureBlurLevel);
     }
 
     // 4. 从存档恢复丧尸巢穴和炮塔实例

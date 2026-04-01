@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { getBlockProperties } from '../constants/BlockData.js';
+import { DEFAULT_TEXTURE_BLUR_LEVEL } from '../constants/GameConfig.js';
 
 /**
  * 材质管理器类，负责管理游戏中的所有材质
@@ -18,7 +19,80 @@ export class MaterialManager {
     this.definitions = new Map();      // 材质定义注册表
     this.textureLoader = new THREE.TextureLoader(); // Three.js 纹理加载器
     this.textureCache = new Map();     // 纹理缓存
+    this.textureBlurLevel = DEFAULT_TEXTURE_BLUR_LEVEL; // 贴图模糊参数（0-1）
     this.defaultMaterial = new THREE.MeshStandardMaterial({ color: 0xff00ff }); // 默认材质（洋红色，用于调试）
+  }
+
+  /**
+   * 将输入值钳制到 [0, 1]
+   * @param {number} level - 模糊程度
+   * @returns {number}
+   */
+  _clampBlurLevel(level) {
+    return Math.min(1, Math.max(0, Number(level) || 0));
+  }
+
+  /**
+   * 根据模糊参数应用纹理采样策略
+   * @param {THREE.Texture} texture - 目标纹理
+   */
+  _applyTextureSampling(texture) {
+    if (!texture) return;
+
+    const blurLevel = this._clampBlurLevel(this.textureBlurLevel);
+    if (blurLevel <= 0) {
+      // 纯像素风：最近邻采样 + 关闭 mipmaps
+      texture.magFilter = THREE.NearestFilter;
+      texture.minFilter = THREE.NearestFilter;
+      texture.generateMipmaps = false;
+    } else if (blurLevel < 0.5) {
+      // 轻微模糊：保留锐度，远处使用较平滑采样
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearMipmapNearestFilter;
+      texture.generateMipmaps = true;
+    } else {
+      // 明显模糊：近远处都更平滑
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.generateMipmaps = true;
+    }
+
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.needsUpdate = true;
+  }
+
+  /**
+   * 设置全局贴图像素模糊程度
+   * @param {number} level - 0~1，0为清晰像素风，1为最大模糊
+   */
+  setTextureBlurLevel(level) {
+    const nextLevel = this._clampBlurLevel(level);
+    if (Math.abs(nextLevel - this.textureBlurLevel) < 0.001) return;
+
+    this.textureBlurLevel = nextLevel;
+
+    // 更新缓存纹理
+    for (const texture of this.textureCache.values()) {
+      this._applyTextureSampling(texture);
+    }
+
+    // 更新所有已创建材质中的纹理（包括 repeat 克隆纹理）
+    for (const matOrMats of this.materials.values()) {
+      const mats = Array.isArray(matOrMats) ? matOrMats : [matOrMats];
+      for (const mat of mats) {
+        if (!mat || !mat.map) continue;
+        this._applyTextureSampling(mat.map);
+        mat.needsUpdate = true;
+      }
+    }
+  }
+
+  /**
+   * 获取当前贴图像素模糊程度
+   * @returns {number}
+   */
+  getTextureBlurLevel() {
+    return this.textureBlurLevel;
   }
 
   /**
@@ -29,13 +103,7 @@ export class MaterialManager {
   preloadTextures(urls) {
     return Promise.all(urls.map(url =>
       this.textureLoader.loadAsync(url).then(texture => {
-        // NearestFilter: 最近邻过滤，禁用插值，实现干净的像素风效果 (Minecraft 风格)
-        texture.magFilter = THREE.NearestFilter;
-        texture.minFilter = THREE.NearestFilter;
-        // 性能优化：禁用 Mipmaps 减少 GPU 显存占用，并避免在像素风材质上产生模糊效果
-        texture.generateMipmaps = false;
-        // SRGBColorSpace: 确保颜色在 WebGL2 中渲染正确，符合现代颜色工作流
-        texture.colorSpace = THREE.SRGBColorSpace;
+        this._applyTextureSampling(texture);
         this.textureCache.set(url, texture); // 将加载完成的纹理存入缓存
       })
     ));
@@ -112,11 +180,7 @@ export class MaterialManager {
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.RepeatWrapping;
         texture.repeat.set(def.repeat[0], def.repeat[1]); // 设置纹理重复次数，[0]为U方向，[1]为V方向
-        texture.magFilter = THREE.NearestFilter;
-        texture.minFilter = THREE.NearestFilter;
-        texture.generateMipmaps = false;
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.needsUpdate = true;
+        this._applyTextureSampling(texture);
       }
 
       const mat = new THREE.MeshStandardMaterial({
@@ -147,10 +211,7 @@ export class MaterialManager {
       def.textureGenerator(ctx);
 
       const texture = new THREE.CanvasTexture(canvas);
-      texture.magFilter = THREE.NearestFilter;
-      texture.minFilter = THREE.NearestFilter;
-      texture.generateMipmaps = false;
-      texture.colorSpace = THREE.SRGBColorSpace;
+      this._applyTextureSampling(texture);
 
       const mat = new THREE.MeshStandardMaterial({
         map: texture,

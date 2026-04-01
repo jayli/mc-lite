@@ -75,6 +75,10 @@ export class World {
     // --- 方块查询缓存 ---
     // 命中缓存：blockKey -> 所属 chunkKey（仅缓存跨区块命中）
     this.crossChunkOwnerCache = new Map();
+
+    // --- 重复 owner 清理状态 ---
+    // 当已就绪 Chunk 数变化时触发一次数据层去重，清理历史重复 owner
+    this._lastReadyChunkCount = 0;
   }
 
   /**
@@ -130,6 +134,16 @@ export class World {
       this.clearBlockLookupCaches();
     }
 
+    // Chunk 就绪数量变化时执行一次去重，避免历史重复 owner 长期存在
+    let readyChunkCount = 0;
+    for (const [, chunk] of this.chunks) {
+      if (chunk?.isReady) readyChunkCount++;
+    }
+    if (readyChunkCount !== this._lastReadyChunkCount) {
+      this._dedupeLoadedChunkOwners();
+      this._lastReadyChunkCount = readyChunkCount;
+    }
+
     // 更新粒子系统逻辑（运动、透明度衰减等）
     this.particles.update(dt);
 
@@ -152,6 +166,68 @@ export class World {
 
     // 更新宝箱打开/关闭动画
     getChestManager().update(dt);
+  }
+
+  /**
+   * 清理已加载 Chunk 中的重复 owner：
+   * 当“坐标所属 Chunk”已加载并包含该方块时，移除其他 Chunk 的同坐标副本。
+   * 目的：消除同坐标双重渲染导致的深度竞争（AO/明暗随视角闪烁）。
+   */
+  _dedupeLoadedChunkOwners() {
+    let removedCount = 0;
+    const touchedChunks = new Map(); // chunkKey -> removedCount
+
+    for (const [chunkKey, chunk] of this.chunks) {
+      if (!chunk || !chunk.isReady) continue;
+
+      for (const key in chunk.blockData) {
+        const [x, y, z] = key.split(',').map(Number);
+        const ownerCx = Math.floor(x / CHUNK_SIZE);
+        const ownerCz = Math.floor(z / CHUNK_SIZE);
+        const coordChunkKey = `${ownerCx},${ownerCz}`;
+
+        // 当前就是坐标所属 Chunk，无需处理
+        if (coordChunkKey === chunkKey) continue;
+
+        const coordChunk = this.chunks.get(coordChunkKey);
+        // 坐标所属 Chunk 未加载/未就绪时，不做删除，避免结构边缘暂时缺块
+        if (!coordChunk || !coordChunk.isReady) continue;
+
+        // 坐标所属 Chunk 没有该方块，不删
+        if (coordChunk.blockData[key] === undefined) continue;
+
+        // 删除重复副本（保留坐标所属 Chunk）
+        const oldEntry = chunk.blockData[key];
+        const oldType = this.getBlockTypeFromEntry(oldEntry);
+
+        delete chunk.blockData[key];
+        chunk.visibleKeys.delete(key);
+        chunk.solidBlocks.delete(key);
+
+        // 立即尝试移除当前渲染网格，降低“等合并回包”期间的视觉残留
+        if (typeof chunk._removeInstancedMeshBlock === 'function') {
+          chunk._removeInstancedMeshBlock(key, x, y, z, oldType);
+        }
+        if (typeof chunk._removeDynamicMesh === 'function') {
+          chunk._removeDynamicMesh(x, y, z, key);
+        }
+
+        removedCount++;
+        touchedChunks.set(chunkKey, (touchedChunks.get(chunkKey) || 0) + 1);
+      }
+    }
+
+    if (removedCount > 0) {
+      for (const [chunkKey, count] of touchedChunks) {
+        const chunk = this.chunks.get(chunkKey);
+        if (!chunk || !chunk.isReady) continue;
+        chunk.dirtyBlocks += count;
+        chunk.scheduleConsolidation();
+        chunk.saveDebounced?.();
+      }
+      this.clearBlockLookupCaches();
+      console.log(`[OwnershipDedupe] removed duplicate owners: ${removedCount}, touched chunks: ${touchedChunks.size}`);
+    }
   }
 
   /**
