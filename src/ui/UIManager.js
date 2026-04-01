@@ -14,7 +14,7 @@ import {
 import { VISUAL_STYLE_KEYS } from '../core/Engine.js';
 
 const TEXTURE_BLUR_LEVEL_CLEAR = 0;
-const TEXTURE_BLUR_LEVEL_SOFT = 0.35;
+const TEXTURE_BLUR_LEVEL_SOFT = 0.2;
 
 /**
  * UI 管理器 - 负责协调所有 UI 组件的初始化和更新
@@ -48,6 +48,7 @@ export class UIManager {
     const btnMid = document.getElementById('btn-mid');
     const btnQuality = document.getElementById('btn-quality');
     const btnStyleDay = document.getElementById('btn-style-day');
+    const btnStyleMorning = document.getElementById('btn-style-morning');
     const btnStyleOvercast = document.getElementById('btn-style-overcast');
     const btnSave = document.getElementById('btn-save-game');
     const btnExportSave = document.getElementById('btn-export-save');
@@ -130,11 +131,17 @@ export class UIManager {
     };
 
     // 环境风格切换
-    if (btnStyleDay && btnStyleOvercast) {
+    if (btnStyleDay && btnStyleMorning && btnStyleOvercast) {
       btnStyleDay.onclick = (e) => {
         e.stopPropagation();
         this.game.engine.setVisualStyle(VISUAL_STYLE_KEYS.DAY);
         this.hud.showMessage('已切换至白天风格');
+        this.updateActiveButtons();
+      };
+      btnStyleMorning.onclick = (e) => {
+        e.stopPropagation();
+        this.game.engine.setVisualStyle(VISUAL_STYLE_KEYS.MORNING);
+        this.hud.showMessage('已切换至早晨风格');
         this.updateActiveButtons();
       };
       btnStyleOvercast.onclick = (e) => {
@@ -536,6 +543,7 @@ export class UIManager {
     const btnMid = document.getElementById('btn-mid');
     const btnQuality = document.getElementById('btn-quality');
     const btnStyleDay = document.getElementById('btn-style-day');
+    const btnStyleMorning = document.getElementById('btn-style-morning');
     const btnStyleOvercast = document.getElementById('btn-style-overcast');
     const btnGunDestroyOn = document.getElementById('btn-gun-destroy-on');
     const btnGunDestroyOff = document.getElementById('btn-gun-destroy-off');
@@ -556,9 +564,10 @@ export class UIManager {
     btnMid.classList.toggle('active', scale === 0.7);
     btnQuality.classList.toggle('active', scale === 1.0);
 
-    if (btnStyleDay && btnStyleOvercast) {
+    if (btnStyleDay && btnStyleMorning && btnStyleOvercast) {
       const currentStyle = this.game.engine.currentVisualStyle;
       btnStyleDay.classList.toggle('active', currentStyle === VISUAL_STYLE_KEYS.DAY);
+      btnStyleMorning.classList.toggle('active', currentStyle === VISUAL_STYLE_KEYS.MORNING);
       btnStyleOvercast.classList.toggle('active', currentStyle === VISUAL_STYLE_KEYS.OVERCAST);
     }
 

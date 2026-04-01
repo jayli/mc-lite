@@ -26,7 +26,7 @@ export const FOG_NEAR = 30;
 // 雾的完全覆盖距离（米）
 export const FOG_FAR = 70;
 // 阴影贴图的分辨率大小（像素）
-export const SHADOW_MAP_SIZE = 512;
+export const SHADOW_MAP_SIZE = 1024;
 // 阴影相机的覆盖范围大小（米）
 export const SHADOW_CAMERA_SIZE = 30;
 // 阴影相机远裁剪面：收紧覆盖范围，降低阴影渲染开销
@@ -34,6 +34,7 @@ export const SHADOW_CAMERA_FAR = 250;
 // 环境风格配置键
 export const VISUAL_STYLE_KEYS = {
   DAY: 'day',
+  MORNING: 'morning',
   OVERCAST: 'overcast'
 };
 
@@ -57,28 +58,59 @@ export class Engine {
     this.currentVisualStyle = VISUAL_STYLE_KEYS.DAY;
     this.visualStyles = {
       [VISUAL_STYLE_KEYS.DAY]: {
-        fogColor: FOG_COLOR,
-        fogNear: FOG_NEAR,
-        fogFar: FOG_FAR,
+        // 保持原有白天风格参数
+        fogColor: 0x94bcf5,
+        fogNear: 30,
+        fogFar: 70,
         directionalLightColor: 0xfffaf0,
         directionalLightIntensity: 3.2,
         ambientLightColor: 0xddeeff,
         ambientLightIntensity: 1,
         // 使用雾色作为背景，避免远处方块雾化后与天空出现硬边
         backgroundMode: 'fogColor',
-        backgroundColor: null
+        backgroundColor: null,
+        sunDirection: [0, 0.8, 0.6],
+        toneMappingExposure: 1.25,
+        sunVisible: false,
+        colorSaturate: 1,
+        colorContrast: 1,
+        colorBrightness: 1
+      },
+      [VISUAL_STYLE_KEYS.MORNING]: {
+        // 早晨风格：贴近参考图的暖色晨光 + 蓝紫天空 + 柔和阴影
+        fogColor: 0xb7c6f7,
+        fogNear: 42,
+        fogFar: 115,
+        directionalLightColor: 0xffe9c9,
+        directionalLightIntensity: 2.65,
+        ambientLightColor: 0xc8d7ff,
+        ambientLightIntensity: 1.25,
+        backgroundMode: 'skybox',
+        backgroundColor: null,
+        sunDirection: [0.18, 0.45, 0.88],
+        toneMappingExposure: 1.35,
+        sunVisible: false,
+        colorSaturate: 1.15,
+        colorContrast: 1.1,
+        colorBrightness: 1.06
       },
       [VISUAL_STYLE_KEYS.OVERCAST]: {
         // 阴天参数参考最初版本 components/main.js
         fogColor: 0x87CEEB,
-        fogNear: FOG_NEAR,
-        fogFar: FOG_FAR-5,
+        fogNear: 30,
+        fogFar: 65,
         directionalLightColor: 0xffffff,
         directionalLightIntensity: 1.2,
         ambientLightColor: 0xffffff,
         ambientLightIntensity: 0.5,
         backgroundMode: 'color',
-        backgroundColor: 0x87CEEB
+        backgroundColor: 0x87CEEB,
+        sunDirection: [0, 0.8, 0.6],
+        toneMappingExposure: 1.25,
+        sunVisible: false,
+        colorSaturate: 1,
+        colorContrast: 1,
+        colorBrightness: 1
       }
     };
 
@@ -93,7 +125,7 @@ export class Engine {
       powerPreference: "high-performance" // 提示浏览器使用高性能 GPU
     });
     this.renderer.shadowMap.enabled = true; // 启用阴影系统
-    this.renderer.shadowMap.type = THREE.PCFShadowMap; // 设置阴影映射类型为PCF（Percentage-Closer Filtering）软阴影
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // 设置阴影映射类型为更柔和的 PCF 软阴影
     // 性能优化：关闭每帧自动更新阴影，仅在场景关键变化时按需刷新
     this.renderer.shadowMap.autoUpdate = false;
     this.renderer.shadowMap.needsUpdate = true;
@@ -107,8 +139,8 @@ export class Engine {
     this.sunDirection = new THREE.Vector3(0, 0.8, 0.6).normalize(); // 设置太阳光方向向量，并归一化为单位向量
     this.sunColor = 0xfff7c2;   // 设置太阳光的颜色（暖黄色）
     this.lightColor = 0xfffaf0; // 设置环境光的颜色（温暖的白色）
-    this.zenithColor = 0x87CEEB;  // 设置天顶（天空上方）颜色（浅蓝色）
-    this.horizonColor = 0xb2e0f2; // 设置地平线颜色（较浅的蓝白色）
+    this.zenithColor = 0x9fb7f7;  // 设置天顶颜色（偏蓝紫）
+    this.horizonColor = 0xf7c9a8; // 设置地平线颜色（暖色晚霞）
 
     const light = new THREE.DirectionalLight(this.lightColor, 3.2);
     this.scene.add(light.target);
@@ -122,8 +154,9 @@ export class Engine {
     light.shadow.camera.bottom = -SHADOW_CAMERA_SIZE; // 设置阴影相机底部范围
     light.shadow.camera.near = 0.1;                   // 设置阴影相机近裁剪面
     light.shadow.camera.far = SHADOW_CAMERA_FAR;      // 设置阴影相机远裁剪面（收紧至玩家活动核心区域）
-    light.shadow.bias = 0.0001;                       // 设置阴影偏移，防止阴影自遮挡伪影
-    light.shadow.normalBias = 0.078;                  // 设置法线偏移，改善斜面阴影质量
+    light.shadow.bias = 0.00008;                      // 设置阴影偏移，防止阴影自遮挡伪影
+    light.shadow.normalBias = 0.048;                  // 设置法线偏移，改善斜面阴影质量
+    light.shadow.radius = 2.6;                        // 阴影边缘轻微软化
 
     this.scene.add(light);
     this.ambientLight = new THREE.AmbientLight(0xddeeff, 1);
@@ -341,8 +374,8 @@ export class Engine {
     });
 
     this.sunSprite = new THREE.Sprite(sunMaterial); // 创建精灵对象用于渲染太阳
-    this.sunSprite.visible = false;
-    this.sunSprite.scale.set(20, 20, 1);
+    this.sunSprite.visible = true;
+    this.sunSprite.scale.set(28, 28, 1);
     this.scene.add(this.sunSprite);
   }
 
@@ -386,6 +419,21 @@ export class Engine {
     this.light.intensity = style.directionalLightIntensity;
     this.ambientLight.color.set(style.ambientLightColor);
     this.ambientLight.intensity = style.ambientLightIntensity;
+    if (Array.isArray(style.sunDirection) && style.sunDirection.length === 3) {
+      this.sunDirection.set(style.sunDirection[0], style.sunDirection[1], style.sunDirection[2]).normalize();
+      this.requestShadowMapUpdate();
+    }
+    if (typeof style.toneMappingExposure === 'number') {
+      this.renderer.toneMappingExposure = style.toneMappingExposure;
+    }
+    this.colorSaturate = style.colorSaturate ?? 1;
+    this.colorContrast = style.colorContrast ?? 1;
+    this.colorBrightness = style.colorBrightness ?? 1;
+    this._applyColorGrading();
+
+    if (this.sunSprite) {
+      this.sunSprite.visible = style.sunVisible !== false;
+    }
 
     if (style.backgroundMode === 'skybox' && this.skyboxTexture) {
       this.scene.background = this.skyboxTexture;
@@ -550,7 +598,10 @@ export class Engine {
     window.addEventListener('resize', () => this.onResize());
 
     // 初始化色彩分级（色调偏移）
-    this.colorHueShift = 0;
+    if (typeof this.colorHueShift !== 'number') this.colorHueShift = 0;
+    if (typeof this.colorSaturate !== 'number') this.colorSaturate = 1;
+    if (typeof this.colorContrast !== 'number') this.colorContrast = 1;
+    if (typeof this.colorBrightness !== 'number') this.colorBrightness = 1;
     this._applyColorGrading();
   }
 
@@ -561,7 +612,7 @@ export class Engine {
   _applyColorGrading() {
     const canvas = this.renderer.domElement;
     if (canvas) {
-      canvas.style.filter = `hue-rotate(${this.colorHueShift}deg)`;
+      canvas.style.filter = `hue-rotate(${this.colorHueShift}deg) saturate(${this.colorSaturate}) contrast(${this.colorContrast}) brightness(${this.colorBrightness})`;
     }
   }
 
