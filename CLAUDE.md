@@ -90,17 +90,27 @@ npm run lint
 - 数据层: 持久化与存储 : `src/services/`, `src/constants/`
 
 ### 关键机制（需要跨文件理解）
-1. **Consolidation 合并机制**
-   - 动态添加/删除的方块会先作为独立动态网格存在
-   - 当脏方块数量达到 50 个，或玩家停止操作 1000ms 后，会触发后台合并
-   - 合并过程会将区块数据发送到 Worker 重新计算所有可见面和 AO，生成优化的 InstancedMesh
-   - 竞态条件风险：主线程 AO 更新与 Worker 合并结果可能存在时序冲突
 
-2. **AO 阴影计算**
-   - 主线程与 Worker 有两套 AO 计算逻辑，对未加载区域的处理不同
-   - 主线程：未加载区块默认认为是遮挡的（适合 FrozenMountain 等封闭地图）
-   - Worker：未加载/不存在的方块默认认为是不遮挡的（适合开放地形）
-   - AO 工具函数统一在 `src/utils/AOUtils.js`，建议优先复用
+> **详细架构文档**: `docs/RENDERING_PIPELINE_ARCHITECTURE.md` — 完整的渲染管线架构图解
+
+#### 渲染管线核心设计
+- **blockData 是唯一权威数据源**，存储 `{type, orientation}`，所有其他数据都可从它派生
+- **两条计算路径**：
+  - 初始生成路径：WorldWorker 一次性计算地形、面剔除、AO → 创建 InstancedMesh
+  - 动态更新路径：主线程立即响应（动态 Mesh）→ Consolidation 延迟合并回 InstancedMesh
+- **数据流向**：数据层(blockData) → 计算层(面剔除+AO) → 渲染层(InstancedMesh)，派生数据可随时重建
+
+#### Consolidation 合并机制
+- 动态添加/删除的方块会先作为独立动态网格存在
+- 当脏方块数量达到 50 个，或玩家停止操作 1000ms 后，会触发后台合并
+- 合并过程会将区块数据发送到 Worker 重新计算所有可见面和 AO，生成优化的 InstancedMesh
+- 竞态条件风险：主线程 AO 更新与 Worker 合并结果可能存在时序冲突
+
+#### AO 阴影计算
+- 主线程与 Worker 有两套 AO 计算逻辑，对未加载区域的处理不同
+- 主线程：未加载区块默认认为是遮挡的（适合 FrozenMountain 等封闭地图）
+- Worker：未加载/不存在的方块默认认为是不遮挡的（适合开放地形）
+- AO 工具函数统一在 `src/utils/AOUtils.js`，建议优先复用
 
 ### 核心分层详解
 | 系统 | 入口文件 | 职责 |
