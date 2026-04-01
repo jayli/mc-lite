@@ -35,6 +35,9 @@ export function extendChunk(Chunk) {
    * 在区块不再需要时调用
    */
   Chunk.prototype.dispose = function() {
+    // 注销该区块的所有光源
+    this._unregisterLightSources();
+
     // 清除合并定时器
     if (this.consolidationTimer) {
       clearTimeout(this.consolidationTimer);

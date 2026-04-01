@@ -573,6 +573,46 @@ export class Chunk {
   // ============================================================
 
   /**
+   * 注册该 Chunk 中的所有光源方块
+   * 扫描 blockData 中标记为 isLightSource 的方块，创建对应的 PointLight
+   */
+  _registerLightSources() {
+    if (!this.world.lightSourceManager) return;
+
+    for (const key in this.blockData) {
+      const entry = this.blockData[key];
+      const parsed = parseBlockEntry(entry);
+      if (!parsed.type || parsed.type === 'air') continue;
+
+      const props = getBlockProps(parsed.type);
+      if (props.isLightSource) {
+        const [x, y, z] = key.split(',').map(Number);
+        this.world.lightSourceManager.addLight(x, y, z, parsed.type);
+      }
+    }
+  }
+
+  /**
+   * 注销该 Chunk 中的所有光源方块
+   * 清除该 Chunk 内所有光源的 PointLight
+   */
+  _unregisterLightSources() {
+    if (!this.world.lightSourceManager) return;
+
+    for (const key in this.blockData) {
+      const entry = this.blockData[key];
+      const parsed = parseBlockEntry(entry);
+      if (!parsed.type || parsed.type === 'air') continue;
+
+      const props = getBlockProps(parsed.type);
+      if (props.isLightSource) {
+        const [x, y, z] = key.split(',').map(Number);
+        this.world.lightSourceManager.removeLight(x, y, z);
+      }
+    }
+  }
+
+  /**
    * 动态添加单个方块（与批量生成相对）
    * 用于游戏运行时玩家放置方块
    * @param {number} x - 世界坐标X
@@ -630,11 +670,20 @@ export class Chunk {
     this._handleRealisticTreeRemoval(x, y, z, oldType);
     this._removeDynamicMesh(x, y, z, key);
 
-    // 8. 如果是移除方块，唤醒邻居
+    // 8. 如果是移除方块，唤醒邻居并移除光源
     if (type === 'air') {
       this.dirtyBlocks++;
       this.scheduleConsolidation();
       this._revealNeighbors(x, y, z);
+      // 移除光源
+      if (this.world.lightSourceManager) {
+        this.world.lightSourceManager.updateLight(
+          Math.floor(x),
+          Math.floor(y),
+          Math.floor(z),
+          null
+        );
+      }
       return;
     }
 
@@ -661,6 +710,16 @@ export class Chunk {
         if (!nb) return null;
         return { block: nb, neighbors: getNeighborsOf(nx, ny, nz) };
       });
+    }
+
+    // 11. 更新光源（如果方块是光源或移除的是光源）
+    if (this.world.lightSourceManager) {
+      this.world.lightSourceManager.updateLight(
+        Math.floor(x),
+        Math.floor(y),
+        Math.floor(z),
+        type
+      );
     }
   }
 
@@ -964,6 +1023,18 @@ export class Chunk {
 
     // 5. 触发持久化刷新 (防抖)
     this.saveDebounced();
+
+    // 6. 更新光源（移除被删除方块位置的光源）
+    if (this.world.lightSourceManager) {
+      positions.forEach(p => {
+        this.world.lightSourceManager.updateLight(
+          Math.floor(p.x),
+          Math.floor(p.y),
+          Math.floor(p.z),
+          null  // null 表示移除光源
+        );
+      });
+    }
   }
 
   /**

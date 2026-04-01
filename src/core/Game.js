@@ -23,6 +23,7 @@ import { MinecartPlacementHandler } from '../actors/minecart/MinecartPlacementHa
 import { preloadAllStructures } from '../world/entity-system/StructureLoader.js';
 import { DEFAULT_INVENTORY_COUNT, DEFAULT_TEXTURE_BLUR_LEVEL, DEFAULT_COLOR_HUE_SHIFT } from '../constants/GameConfig.js';
 import { materials } from './MaterialManager.js';
+import { LightSourceManager } from './LightSourceManager.js';
 import Stats from 'stats';
 
 /**
@@ -38,6 +39,11 @@ export class Game {
     // 初始化游戏世界（地形、区块等）
     this.world = new World(this.engine.scene);
     this.world.persistenceService = persistenceService;
+
+    // 初始化光源管理器（追踪发光方块并创建 PointLight）
+    this.lightSourceManager = new LightSourceManager(this.engine.scene);
+    this.world.lightSourceManager = this.lightSourceManager;
+
     // 阴影按需刷新：由 World 在区块/方块变化时请求
     this.world.setShadowUpdateCallback(() => this.engine.requestShadowMapUpdate());
     // 初始化玩家角色
@@ -273,6 +279,9 @@ export class Game {
 
     // 矿车物品
     this.player.inventory.add('mine_cart', DEFAULT_INVENTORY_COUNT);
+
+    // 吊灯方块
+    this.player.inventory.add('hanging_lamp', DEFAULT_INVENTORY_COUNT);
 
     // this.player.inventory.add('cloud', DEFAULT_INVENTORY_COUNT);
 

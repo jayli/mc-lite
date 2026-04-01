@@ -420,6 +420,17 @@ export const BLOCK_DATA = {
     isRendered: false,
     isShadowEnabled: false,
     orientationEnabled: false
+  },
+
+  // ========== 吊灯方块 ==========
+  'hanging_lamp': {
+    isSolid: false,
+    isTransparent: true,
+    isRendered: true,
+    orientationEnabled: false,
+    isShadowEnabled: false,
+    geometryType: 'hanging_lamp',
+    isLightSource: true  // 标记为光源方块
   }
 };
 export function getBlockProperties(type) {

@@ -218,7 +218,9 @@ export class MaterialManager {
         transparent: def.transparent || false,
         opacity: def.opacity || 1,
         side: def.side || THREE.FrontSide,
-        alphaTest: def.alphaTest || 0
+        alphaTest: def.alphaTest || 0,
+        emissive: def.emissive || 0x000000,      // 自发光颜色
+        emissiveIntensity: def.emissiveIntensity || 0  // 自发光强度
       });
       if (useAO) this._applyShaderModifications(mat);
       return mat;
@@ -228,7 +230,9 @@ export class MaterialManager {
     const mat = new THREE.MeshStandardMaterial({
       color: def.color || 0xffffff,
       transparent: def.transparent || false,
-      opacity: def.opacity || 1
+      opacity: def.opacity || 1,
+      emissive: def.emissive || 0x000000,      // 自发光颜色
+      emissiveIntensity: def.emissiveIntensity || 0  // 自发光强度
     });
     if (useAO) this._applyShaderModifications(mat);
     return mat;
@@ -1192,4 +1196,32 @@ materials.registerMaterial('bed_tail', {
 materials.registerMaterial('bed_alias_block', {
   color: 0x8B4513,
   roughness: 0.8
+});
+
+// ========== 吊灯材质 ==========
+// 吊灯使用暖黄色材质带自发光效果
+// 使用程序化纹理绘制吊灯形状（细绳 + 灯体）
+materials.registerMaterial('hanging_lamp', {
+  color: '#aaa49a',            // 背景色
+  emissive: '#FFE4B5',         // 自发光颜色（暖黄色）
+  emissiveIntensity: 0.8,      // 发光强度
+  transparent: true,
+  alphaTest: 0.1,
+  textureGenerator: (ctx) => {
+    // 绘制细绳（深灰色）
+    ctx.fillStyle = '#333333';
+    ctx.fillRect(30, 0, 4, 20);  // 细绳：宽4像素，高20像素，位于顶部中央
+
+    // 绘制灯体（暖黄色）
+    ctx.fillStyle = '#FFE4B5';
+    ctx.fillRect(18, 20, 28, 28);  // 灯体：宽28像素，高28像素，位于细绳下方
+
+    // 添加发光效果（更亮的中心）
+    ctx.fillStyle = '#FFF5E6';
+    ctx.fillRect(24, 26, 16, 16);  // 内部发光区域
+
+    // 添加高光点
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(26, 28, 4, 4);  // 左上高光
+  }
 });

@@ -201,6 +201,24 @@ const geoHalfBlock = (() => {
 })();
 
 /**
+ * 吊灯几何体 - 细绳圆柱 + 灯体立方体
+ * 细绳：直径0.03，长度0.4，从方块顶部向下延伸
+ * 灯体：0.3x0.3x0.3立方体，位于方块正中间
+ */
+const geoHangingLamp = (() => {
+  const geoms = [];
+  // 细绳圆柱：直径0.03（半径0.015），长度0.4，从顶部(y=0.5)向下延伸到(y=0.1)
+  const rope = new THREE.CylinderGeometry(0.015, 0.015, 0.4, 8);
+  rope.translate(0, 0.3, 0); // 中心在 y=0.3（从 y=0.5 到 y=0.1）
+  geoms.push(rope);
+  // 灯体立方体：0.3x0.3x0.3，位于方块正中间
+  const lampBody = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+  lampBody.translate(0, 0, 0); // 中心在 y=0（方块正中间）
+  geoms.push(lampBody);
+  return addVertexIdAttribute(BufferGeometryUtils.mergeGeometries(geoms));
+})();
+
+/**
  * 几何体映射表 - 将方块类型映射到对应的几何体
  */
 export const geomMap = {
@@ -221,6 +239,7 @@ export const geomMap = {
   'cobblestone_step_updown': geoCobblestoneStepUpdown,
   'stone_diorite_step': geoCobblestoneStep,
   'half_block': geoHalfBlock,
+  'hanging_lamp': geoHangingLamp,
   'default': addVertexIdAttribute(new THREE.BoxGeometry(1, 1, 1))
 };
 
@@ -351,6 +370,10 @@ export function extendChunk(Chunk) {
 
     // 恢复宝箱状态
     this._restoreChestStates(savedChestStates);
+
+    // 重新注册光源（合并后方块可能变化，需要同步更新光源）
+    this._unregisterLightSources();
+    this._registerLightSources();
 
     // 重置状态
     this.dirtyBlocks = Math.max(0, this.dirtyBlocks - consolidatedCount);

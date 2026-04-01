@@ -181,6 +181,10 @@ export function extendChunk(Chunk) {
         }
 
         this.isReady = true;
+
+        // 8. 注册该 Chunk 中的所有光源方块
+        this._registerLightSources();
+
         resolve();
       });
 
