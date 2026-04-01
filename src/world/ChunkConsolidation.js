@@ -49,8 +49,17 @@ function buildCrossGeo(offsetY = -0.25) {
 }
 // 花的几何体（交叉平面，向下偏移0.25单位，使花朵看起来生长在地面上）
 const geoFlower = buildCrossGeo(-0.25);
-// 藤蔓的几何体（交叉平面，无偏移，使藤蔓看起来附着在方块上）
-const geoVine = buildCrossGeo(0);
+// 藤蔓的几何体（交叉平面，高度占满整个方块，偏移+0.5使其从底部延伸到顶部，堆叠时无缝衔接）
+const geoVine = (() => {
+  const height = 1.0; // 占满方块高度
+  const width = 0.8;  // 宽度稍宽以覆盖更好
+  const p1 = new THREE.PlaneGeometry(width, height);
+  const p2 = new THREE.PlaneGeometry(width, height);
+  p2.rotateY(Math.PI / 2);
+  const merged = BufferGeometryUtils.mergeGeometries([p1, p2]);
+  merged.translate(0, 0.5, 0); // 向上偏移0.5，使几何体从y=0到y=1
+  return addVertexIdAttribute(merged);
+})();
 
 /**
  * 睡莲几何体 - 一个旋转为水平方向的平面
