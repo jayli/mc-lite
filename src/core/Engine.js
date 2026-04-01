@@ -405,8 +405,13 @@ export class Engine {
       this.waterMaterial.uniforms.uFogFar.value = style.fogFar;
     }
 
-    if (style.backgroundMode === 'fogColor') {
+    // 恢复对应风格的背景（修复：需处理所有背景模式）
+    if (style.backgroundMode === 'skybox' && this.skyboxTexture) {
+      this.scene.background = this.skyboxTexture;
+    } else if (style.backgroundMode === 'fogColor') {
       this.scene.background = new THREE.Color(style.fogColor);
+    } else {
+      this.scene.background = new THREE.Color(style.backgroundColor || 0x87CEEB);
     }
   }
 

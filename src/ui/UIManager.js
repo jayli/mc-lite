@@ -7,9 +7,7 @@ import {
   ZOMBIE_LIMIT_MED,
   ZOMBIE_LIMIT_HIGH,
   COLOR_HUE_SHIFT_NORMAL,
-  COLOR_HUE_SHIFT_WARM,
-  COLOR_HUE_SHIFT_COOL,
-  COLOR_HUE_SHIFT_RETRO
+  COLOR_HUE_SHIFT_COOL
 } from '../constants/GameConfig.js';
 import { VISUAL_STYLE_KEYS } from '../core/Engine.js';
 
@@ -60,9 +58,7 @@ export class UIManager {
     const btnTextureBlurClear = document.getElementById('btn-texture-blur-clear');
     const btnTextureBlurSoft = document.getElementById('btn-texture-blur-soft');
     const btnColorNormal = document.getElementById('btn-color-normal');
-    const btnColorWarm = document.getElementById('btn-color-warm');
     const btnColorCool = document.getElementById('btn-color-cool');
-    const btnColorRetro = document.getElementById('btn-color-retro');
     const btnTntDestroyToggle = document.getElementById('btn-tnt-destroy-toggle');
     const btnCreatePlayground = document.getElementById('btn-create-playground');
     const btnExportModel = document.getElementById('btn-export-model');
@@ -220,29 +216,17 @@ export class UIManager {
     }
 
     // 色调偏移设置
-    if (btnColorNormal && btnColorWarm && btnColorCool && btnColorRetro) {
+    if (btnColorNormal && btnColorCool) {
       btnColorNormal.onclick = (e) => {
         e.stopPropagation();
         this.game.setColorHueShift(COLOR_HUE_SHIFT_NORMAL);
         this.hud.showMessage('色调偏移已设为：正常');
         this.updateActiveButtons();
       };
-      btnColorWarm.onclick = (e) => {
-        e.stopPropagation();
-        this.game.setColorHueShift(COLOR_HUE_SHIFT_WARM);
-        this.hud.showMessage('色调偏移已设为：暖色');
-        this.updateActiveButtons();
-      };
       btnColorCool.onclick = (e) => {
         e.stopPropagation();
         this.game.setColorHueShift(COLOR_HUE_SHIFT_COOL);
         this.hud.showMessage('色调偏移已设为：冷色');
-        this.updateActiveButtons();
-      };
-      btnColorRetro.onclick = (e) => {
-        e.stopPropagation();
-        this.game.setColorHueShift(COLOR_HUE_SHIFT_RETRO);
-        this.hud.showMessage('色调偏移已设为：复古');
         this.updateActiveButtons();
       };
     }
@@ -553,9 +537,7 @@ export class UIManager {
     const btnTextureBlurClear = document.getElementById('btn-texture-blur-clear');
     const btnTextureBlurSoft = document.getElementById('btn-texture-blur-soft');
     const btnColorNormal = document.getElementById('btn-color-normal');
-    const btnColorWarm = document.getElementById('btn-color-warm');
     const btnColorCool = document.getElementById('btn-color-cool');
-    const btnColorRetro = document.getElementById('btn-color-retro');
     const btnTntDestroyToggle = document.getElementById('btn-tnt-destroy-toggle');
 
     if (!btnPerf || !btnMid || !btnQuality) return;
@@ -588,12 +570,10 @@ export class UIManager {
       btnTextureBlurSoft.classList.toggle('active', Math.abs(blurLevel - TEXTURE_BLUR_LEVEL_SOFT) < 0.01);
     }
 
-    if (btnColorNormal && btnColorWarm && btnColorCool && btnColorRetro) {
+    if (btnColorNormal && btnColorCool) {
       const hueShift = this.game.colorHueShift || 0;
       btnColorNormal.classList.toggle('active', hueShift === COLOR_HUE_SHIFT_NORMAL);
-      btnColorWarm.classList.toggle('active', hueShift === COLOR_HUE_SHIFT_WARM);
       btnColorCool.classList.toggle('active', hueShift === COLOR_HUE_SHIFT_COOL);
-      btnColorRetro.classList.toggle('active', hueShift === COLOR_HUE_SHIFT_RETRO);
     }
 
     if (btnTntDestroyToggle) {

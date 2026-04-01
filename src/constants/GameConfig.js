@@ -49,12 +49,8 @@ export const GameConfig = {
   DEFAULT_COLOR_HUE_SHIFT: 0,
   /** 色调偏移预设：正常（无偏移） */
   COLOR_HUE_SHIFT_NORMAL: 0,
-  /** 色调偏移预设：暖色调（偏橙红） */
-  COLOR_HUE_SHIFT_WARM: 15,
   /** 色调偏移预设：冷色调（偏蓝） */
   COLOR_HUE_SHIFT_COOL: -15,
-  /** 色调偏移预设：复古（偏褐黄） */
-  COLOR_HUE_SHIFT_RETRO: 25,
 
   // ==================== 方块面掩码配置 ====================
   /** 面掩码 - 所有面都可见（二进制 00111111） */
@@ -105,14 +101,8 @@ export const DEFAULT_COLOR_HUE_SHIFT = GameConfig.DEFAULT_COLOR_HUE_SHIFT;
 /** 色调偏移预设：正常（无偏移） */
 export const COLOR_HUE_SHIFT_NORMAL = GameConfig.COLOR_HUE_SHIFT_NORMAL;
 
-/** 色调偏移预设：暖色调（偏橙红） */
-export const COLOR_HUE_SHIFT_WARM = GameConfig.COLOR_HUE_SHIFT_WARM;
-
 /** 色调偏移预设：冷色调（偏蓝） */
 export const COLOR_HUE_SHIFT_COOL = GameConfig.COLOR_HUE_SHIFT_COOL;
-
-/** 色调偏移预设：复古（偏褐黄） */
-export const COLOR_HUE_SHIFT_RETRO = GameConfig.COLOR_HUE_SHIFT_RETRO;
 
 /** 面掩码 - 所有面都可见（二进制 00111111） */
 export const FACE_MASK_ALL = GameConfig.FACE_MASK_ALL;
