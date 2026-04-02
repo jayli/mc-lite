@@ -24,6 +24,7 @@ import { preloadAllStructures } from '../world/entity-system/StructureLoader.js'
 import { DEFAULT_INVENTORY_COUNT, DEFAULT_TEXTURE_BLUR_LEVEL, DEFAULT_COLOR_HUE_SHIFT } from '../constants/GameConfig.js';
 import { materials } from './MaterialManager.js';
 import { LightSourceManager } from './LightSourceManager.js';
+import { RainEffect } from '../world/effects/RainEffect.js';
 import Stats from 'stats';
 
 /**
@@ -83,6 +84,10 @@ export class Game {
     this.maxActiveZombies = 20; // 最大活跃丧尸数
     this.textureBlurLevel = materials.getTextureBlurLevel();
     this.colorHueShift = this.engine.getColorHueShift(); // 色调偏移值
+
+    // 下雨效果状态
+    this.rainState = { enabled: false, lastToggleTime: 0 };
+    this.rainEffect = null;
 
     this.isRunning = false; // 游戏运行状态标志
     this.perfStats = { player: 0, world: 0, ui: 0, render: 0 }; // 性能统计数据
@@ -416,6 +421,11 @@ export class Game {
       this.zombieNestManager.update(dt);
     }
 
+    // 更新下雨效果
+    if (this.rainEffect && this.rainState.enabled && this.player) {
+      this.rainEffect.update(this.player.position, dt);
+    }
+
     if (this.ui) this.ui.update(dt); // 更新UI
     const t4 = performance.now();
 
@@ -542,6 +552,26 @@ export class Game {
   setColorHueShift(hueShift) {
     this.engine.setColorHueShift(hueShift);
     this.colorHueShift = this.engine.getColorHueShift();
+  }
+
+  /**
+   * 切换下雨效果
+   */
+  toggleRain() {
+    this.rainState.enabled = !this.rainState.enabled;
+    if (this.rainState.enabled) {
+      // 开启下雨，传入玩家位置
+      const playerPos = this.player ? this.player.position : { x: 0, y: 0, z: 0 };
+      this.rainEffect = new RainEffect(this.engine.scene, { playerPos });
+      this.ui.hud.showMessage('已开启下雨');
+    } else {
+      // 关闭下雨
+      if (this.rainEffect) {
+        this.rainEffect.dispose();
+        this.rainEffect = null;
+      }
+      this.ui.hud.showMessage('已关闭下雨');
+    }
   }
 
   /**

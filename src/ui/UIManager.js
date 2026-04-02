@@ -61,6 +61,7 @@ export class UIManager {
     const btnColorNormal = document.getElementById('btn-color-normal');
     const btnColorCool = document.getElementById('btn-color-cool');
     const btnTntDestroyToggle = document.getElementById('btn-tnt-destroy-toggle');
+    const btnRainToggle = document.getElementById('btn-rain-toggle');
     const btnCreatePlayground = document.getElementById('btn-create-playground');
     const btnExportModel = document.getElementById('btn-export-model');
     const btnImportModel = document.getElementById('btn-import-model');
@@ -202,6 +203,24 @@ export class UIManager {
         e.stopPropagation();
         this.game.canTntDestroyBlocks = !this.game.canTntDestroyBlocks;
         this.hud.showMessage(this.game.canTntDestroyBlocks ? '已开启 TNT 爆炸破坏方块' : '已关闭 TNT 爆炸破坏方块');
+        this.updateActiveButtons();
+      };
+    }
+
+    // 下雨效果设置（单按钮开关，带防抖）
+    if (btnRainToggle) {
+      btnRainToggle.onclick = (e) => {
+        e.stopPropagation();
+        // 防抖检查（100-200ms）
+        const now = Date.now();
+        if (this.game.rainState.lastToggleTime &&
+            now - this.game.rainState.lastToggleTime < 150) {
+          return;
+        }
+        this.game.rainState.lastToggleTime = now;
+
+        // 切换下雨状态
+        this.game.toggleRain();
         this.updateActiveButtons();
       };
     }
@@ -589,6 +608,14 @@ export class UIManager {
       const isEnabled = this.game.canTntDestroyBlocks !== false;
       btnTntDestroyToggle.classList.toggle('active', isEnabled);
       btnTntDestroyToggle.innerText = isEnabled ? '点击关闭' : '点击开启';
+    }
+
+    // 更新下雨按钮状态
+    const btnRainToggle = document.getElementById('btn-rain-toggle');
+    if (btnRainToggle) {
+      const isRainEnabled = this.game.rainState.enabled;
+      btnRainToggle.classList.toggle('active', isRainEnabled);
+      btnRainToggle.innerText = isRainEnabled ? '停止下雨' : '开始下雨';
     }
 
     // 更新创造台按钮状态

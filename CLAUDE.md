@@ -212,3 +212,10 @@ npm run lint
 ## 代码提交
 任何修改都不能自动提交代码，必须等待明确的指令才能提交。
 
+
+## Active Technologies
+- JavaScript (ES6+), Three.js r160+ + Three.js (场景、粒子系统、SpriteMaterial) (001-rain-toggle)
+- N/A (纯视觉效果，无持久化) (001-rain-toggle)
+
+## Recent Changes
+- 001-rain-toggle: Added JavaScript (ES6+), Three.js r160+ + Three.js (场景、粒子系统、SpriteMaterial)
