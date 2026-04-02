@@ -112,18 +112,21 @@ export class UIManager {
     btnPerf.onclick = (e) => {
       e.stopPropagation();
       this.game.engine.setResolution(0.4);
+      this.game.refreshRainQualityIfNeeded();
       this.hud.showMessage('已切换至性能模式 (0.4x)');
       this.updateActiveButtons();
     };
     btnMid.onclick = (e) => {
       e.stopPropagation();
       this.game.engine.setResolution(0.7);
+      this.game.refreshRainQualityIfNeeded();
       this.hud.showMessage('已切换至平衡模式 (0.7x)');
       this.updateActiveButtons();
     };
     btnQuality.onclick = (e) => {
       e.stopPropagation();
       this.game.engine.setResolution(1.0);
+      this.game.refreshRainQualityIfNeeded();
       this.hud.showMessage('已切换至画质模式 (1.0x)');
       this.updateActiveButtons();
     };
