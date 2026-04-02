@@ -25,6 +25,7 @@ import { DEFAULT_INVENTORY_COUNT, DEFAULT_TEXTURE_BLUR_LEVEL, DEFAULT_COLOR_HUE_
 import { materials } from './MaterialManager.js';
 import { LightSourceManager } from './LightSourceManager.js';
 import { RainEffect } from '../world/effects/RainEffect.js';
+import { audioManager } from './AudioManager.js';
 import Stats from 'stats';
 
 /**
@@ -320,6 +321,7 @@ export class Game {
   */
   stop() {
     this.isRunning = false;
+    audioManager.stopSound('rain');
   }
 
   /**
@@ -561,12 +563,12 @@ export class Game {
   getRainQualityOptions() {
     const scale = this.engine?.resolutionScale ?? 1;
     if (scale <= 0.4) {
-      return { particleCount: 180, radius: 18, speed: 22, dropLength: 0.45, refreshDistance: 10 };
+      return { particleCount: 120, radius: 18, speed: 22, dropLength: 0.45, refreshDistance: 10, lineWidth: 2 };
     }
     if (scale <= 0.7) {
-      return { particleCount: 280, radius: 18, speed: 23, dropLength: 0.48, refreshDistance: 9 };
+      return { particleCount: 187, radius: 18, speed: 23, dropLength: 0.48, refreshDistance: 9, lineWidth: 2 };
     }
-    return { particleCount: 400, radius: 18, speed: 24, dropLength: 0.5, refreshDistance: 8 };
+    return { particleCount: 267, radius: 18, speed: 24, dropLength: 0.5, refreshDistance: 8, lineWidth: 2 };
   }
 
   /**
@@ -601,6 +603,7 @@ export class Game {
         world: this.world,
         ...qualityOptions
       });
+      audioManager.playSound('rain', 0.2, true);
       this.ui.hud.showMessage('已开启下雨');
     } else {
       // 关闭下雨
@@ -608,6 +611,7 @@ export class Game {
         this.rainEffect.dispose();
         this.rainEffect = null;
       }
+      audioManager.stopSound('rain');
       this.ui.hud.showMessage('已关闭下雨');
     }
   }

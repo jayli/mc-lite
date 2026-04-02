@@ -18,6 +18,7 @@ export class RainEffect {
     this.radius = options.radius || 20;  // 下雨范围半径20米
     this.speed = options.speed || 24;
     this.dropLength = options.dropLength || 0.5;  // 雨滴长度
+    this.lineWidth = options.lineWidth || 2;
     this.refreshDistance = options.refreshDistance || 8;  // 玩家移动超过8格就刷新雨滴范围
     this.refreshDistanceSq = this.refreshDistance * this.refreshDistance;
     this.refreshInterval = options.refreshInterval || (1 / 30); // 30Hz 进行玩家位置检查
@@ -114,6 +115,7 @@ export class RainEffect {
         }
       `
     });
+    this.material.linewidth = this.lineWidth;
 
     // 创建 LineSegments 并添加到场景
     this.lines = new THREE.LineSegments(this.geometry, this.material);

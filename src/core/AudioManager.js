@@ -148,6 +148,7 @@ export async function initializeAudio() {
     './src/assets/sound/explosion.mp3',
     './src/assets/sound/put.mp3',
     './src/assets/sound/delete_get.mp3',
+    './src/assets/sound/rain.mp3',
     './src/assets/sound/running_water.mp3',
     './src/assets/sound/running_land.mp3',
     './src/assets/sound/bgm.mp3',
