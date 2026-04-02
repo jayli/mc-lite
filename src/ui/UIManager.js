@@ -48,6 +48,7 @@ export class UIManager {
     const btnStyleDay = document.getElementById('btn-style-day');
     const btnStyleMorning = document.getElementById('btn-style-morning');
     const btnStyleOvercast = document.getElementById('btn-style-overcast');
+    const btnStyleNight = document.getElementById('btn-style-night');
     const btnSave = document.getElementById('btn-save-game');
     const btnExportSave = document.getElementById('btn-export-save');
     const btnGunDestroyOn = document.getElementById('btn-gun-destroy-on');
@@ -127,7 +128,7 @@ export class UIManager {
     };
 
     // 环境风格切换
-    if (btnStyleDay && btnStyleMorning && btnStyleOvercast) {
+    if (btnStyleDay && btnStyleMorning && btnStyleOvercast && btnStyleNight) {
       btnStyleDay.onclick = (e) => {
         e.stopPropagation();
         this.game.engine.setVisualStyle(VISUAL_STYLE_KEYS.DAY);
@@ -144,6 +145,12 @@ export class UIManager {
         e.stopPropagation();
         this.game.engine.setVisualStyle(VISUAL_STYLE_KEYS.OVERCAST);
         this.hud.showMessage('已切换至阴天风格');
+        this.updateActiveButtons();
+      };
+      btnStyleNight.onclick = (e) => {
+        e.stopPropagation();
+        this.game.engine.setVisualStyle(VISUAL_STYLE_KEYS.NIGHT);
+        this.hud.showMessage('已切换至黑夜风格');
         this.updateActiveButtons();
       };
     }
@@ -302,7 +309,7 @@ export class UIManager {
           if (result.success) {
             this.hud.showMessage('创造台已关闭');
             btnCreatePlayground.disabled = false;
-            btnCreatePlayground.style.background = '#4a90e2';
+            btnCreatePlayground.classList.remove('btn-playground-active');
             btnCreatePlayground.innerText = '打开创造台';
             // 隐藏导出模型按钮
             if (btnExportModel) {
@@ -331,7 +338,7 @@ export class UIManager {
               if (optimizationDone) {
                 this.hud.showMessage('创造台已创建');
                 // 更新按钮为关闭状态
-                btnCreatePlayground.style.background = '#e74c3c';
+                btnCreatePlayground.classList.add('btn-playground-active');
                 btnCreatePlayground.innerText = '关闭创造台';
                 // 显示导出模型按钮
                 if (btnExportModel) {
@@ -494,7 +501,7 @@ export class UIManager {
     if (playgroundService.isPlaygroundActive) {
       // 创造台已存在，显示"关闭创造台"按钮
       btnCreatePlayground.disabled = false;
-      btnCreatePlayground.style.background = '#e74c3c';
+      btnCreatePlayground.classList.add('btn-playground-active');
       btnCreatePlayground.innerText = '关闭创造台';
       // 显示导出模型按钮
       if (btnExportModel) {
@@ -506,7 +513,7 @@ export class UIManager {
     } else {
       // 创造台不存在，显示"打开创造台"按钮
       btnCreatePlayground.disabled = false;
-      btnCreatePlayground.style.background = '#4a90e2';
+      btnCreatePlayground.classList.remove('btn-playground-active');
       btnCreatePlayground.innerText = '打开创造台';
       // 隐藏导出模型按钮
       if (btnExportModel) {
@@ -529,6 +536,7 @@ export class UIManager {
     const btnStyleDay = document.getElementById('btn-style-day');
     const btnStyleMorning = document.getElementById('btn-style-morning');
     const btnStyleOvercast = document.getElementById('btn-style-overcast');
+    const btnStyleNight = document.getElementById('btn-style-night');
     const btnGunDestroyOn = document.getElementById('btn-gun-destroy-on');
     const btnGunDestroyOff = document.getElementById('btn-gun-destroy-off');
     const btnZombie20 = document.getElementById('btn-zombie-20');
@@ -546,11 +554,12 @@ export class UIManager {
     btnMid.classList.toggle('active', scale === 0.7);
     btnQuality.classList.toggle('active', scale === 1.0);
 
-    if (btnStyleDay && btnStyleMorning && btnStyleOvercast) {
+    if (btnStyleDay && btnStyleMorning && btnStyleOvercast && btnStyleNight) {
       const currentStyle = this.game.engine.currentVisualStyle;
       btnStyleDay.classList.toggle('active', currentStyle === VISUAL_STYLE_KEYS.DAY);
       btnStyleMorning.classList.toggle('active', currentStyle === VISUAL_STYLE_KEYS.MORNING);
       btnStyleOvercast.classList.toggle('active', currentStyle === VISUAL_STYLE_KEYS.OVERCAST);
+      btnStyleNight.classList.toggle('active', currentStyle === VISUAL_STYLE_KEYS.NIGHT);
     }
 
     if (btnGunDestroyOn && btnGunDestroyOff) {
@@ -696,7 +705,11 @@ export class UIManager {
     if (btnReturn) {
       const hasPosition = this.savedPlayerPosition || this.originalPlayerPosition;
       btnReturn.disabled = !hasPosition;
-      btnReturn.style.background = hasPosition ? '#4a90e2' : '#999';
+      if (hasPosition) {
+        btnReturn.classList.add('btn-return-ready');
+      } else {
+        btnReturn.classList.remove('btn-return-ready');
+      }
     }
   }
 

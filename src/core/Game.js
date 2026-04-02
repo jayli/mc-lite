@@ -435,6 +435,10 @@ export class Game {
           this.engine.sunSprite.position.copy(this.player.position)
             .addScaledVector(this.engine.sunDirection, 150);
         }
+        if (this.engine.moonSprite) {
+          this.engine.moonSprite.position.copy(this.player.position)
+            .addScaledVector(this.engine.moonDirection, 150);
+        }
 
         // 天空球位置：始终以玩家为中心，确保玩家无论移动多远都无法到达天空边界
         /* if (this.engine.skyMesh) {
@@ -446,7 +450,16 @@ export class Game {
           this.engine.light.position.copy(this.player.position)
             .addScaledVector(this.engine.sunDirection, 60);
           this.engine.light.target.position.copy(this.player.position); // 光源始终指向玩家
+        }
 
+        // 月光位置：与太阳光一致跟随玩家，但方向独立，作为黑夜柔和补光
+        if (this.engine.moonLight) {
+          this.engine.moonLight.position.copy(this.player.position)
+            .addScaledVector(this.engine.moonDirection, 56);
+          this.engine.moonLight.target.position.copy(this.player.position);
+        }
+
+        if (this.engine.light) {
           // 更新记录位置，用于下一次距离检测
           this.engine._lastUpdatePos.copy(this.player.position);
           // 玩家移动超过阈值后，请求刷新阴影贴图

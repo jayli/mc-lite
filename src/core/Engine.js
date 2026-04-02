@@ -35,7 +35,8 @@ export const SHADOW_CAMERA_FAR = 250;
 export const VISUAL_STYLE_KEYS = {
   DAY: 'day',
   MORNING: 'morning',
-  OVERCAST: 'overcast'
+  OVERCAST: 'overcast',
+  NIGHT: 'night'
 };
 
 export let carModel = null;      // 汽车模型缓存
@@ -64,14 +65,19 @@ export class Engine {
         fogFar: 70,
         directionalLightColor: 0xfffaf0,
         directionalLightIntensity: 3.2,
+        moonDirectionalLightColor: 0xbfd2ff,
+        moonDirectionalLightIntensity: 0.02,
         ambientLightColor: 0xddeeff,
         ambientLightIntensity: 1,
         // 使用雾色作为背景，避免远处方块雾化后与天空出现硬边
         backgroundMode: 'fogColor',
         backgroundColor: null,
         sunDirection: [0, 0.8, 0.6],
+        moonDirection: [-0.28, 0.55, -0.78],
         toneMappingExposure: 1.25,
         sunVisible: false,
+        moonVisible: false,
+        moonSize: 18,
         colorSaturate: 1,
         colorContrast: 1,
         colorBrightness: 1
@@ -83,16 +89,23 @@ export class Engine {
         fogFar: 115,
         directionalLightColor: 0xffe9c9,
         directionalLightIntensity: 2.65,
+        moonDirectionalLightColor: 0xc7d8ff,
+        moonDirectionalLightIntensity: 0.12,
         ambientLightColor: 0xc8d7ff,
         ambientLightIntensity: 1.25,
         backgroundMode: 'skybox',
         backgroundColor: null,
         sunDirection: [0.18, 0.45, 0.88],
+        moonDirection: [-0.38, 0.45, -0.81],
         toneMappingExposure: 1.35,
         sunVisible: false,
+        moonVisible: false,
+        moonSize: 20,
         colorSaturate: 1.15,
         colorContrast: 1.1,
-        colorBrightness: 1.06
+        colorBrightness: 1.06,
+        backgroundBlurriness: 0.22,
+        skyboxKey: 'skyBox4'
       },
       [VISUAL_STYLE_KEYS.OVERCAST]: {
         // 阴天参数参考最初版本 components/main.js
@@ -101,16 +114,46 @@ export class Engine {
         fogFar: 65,
         directionalLightColor: 0xffffff,
         directionalLightIntensity: 1.2,
+        moonDirectionalLightColor: 0xb8c8f5,
+        moonDirectionalLightIntensity: 0.05,
         ambientLightColor: 0xffffff,
         ambientLightIntensity: 0.5,
         backgroundMode: 'color',
         backgroundColor: 0x87CEEB,
         sunDirection: [0, 0.8, 0.6],
+        moonDirection: [-0.25, 0.5, -0.82],
         toneMappingExposure: 1.25,
         sunVisible: false,
+        moonVisible: false,
+        moonSize: 18,
         colorSaturate: 1,
         colorContrast: 1,
         colorBrightness: 1
+      },
+      [VISUAL_STYLE_KEYS.NIGHT]: {
+        // 黑夜风格：低照度、蓝色环境光、星空天空盒；雾距拉远到可视边界外
+        fogColor: 0x050b1e,
+        fogNear: 1200,
+        fogFar: 2400,
+        directionalLightColor: 0x9cbcff,
+        directionalLightIntensity: 0.22,
+        moonDirectionalLightColor: 0xcddcff,
+        moonDirectionalLightIntensity: 5,
+        ambientLightColor: 0x5d79b7,
+        ambientLightIntensity: 5,
+        backgroundMode: 'skybox',
+        backgroundColor: null,
+        sunDirection: [0.08, 0.25, 0.96],
+        moonDirection: [-0.32, 0.58, -0.75],
+        toneMappingExposure: 0.95,
+        sunVisible: false,
+        moonVisible: true,
+        moonSize: 34,
+        colorSaturate: 1.08,
+        colorContrast: 1.12,
+        colorBrightness: 0.75,
+        backgroundBlurriness: 0.28,
+        skyboxKey: 'skyBox1'
       }
     };
 
@@ -137,6 +180,7 @@ export class Engine {
 
     // 灯光与天空设置
     this.sunDirection = new THREE.Vector3(0, 0.8, 0.6).normalize(); // 设置太阳光方向向量，并归一化为单位向量
+    this.moonDirection = new THREE.Vector3(-0.28, 0.55, -0.78).normalize(); // 设置月光方向向量（更偏斜，营造柔和侧光）
     this.sunColor = 0xfff7c2;   // 设置太阳光的颜色（暖黄色）
     this.lightColor = 0xfffaf0; // 设置环境光的颜色（温暖的白色）
     this.zenithColor = 0x9fb7f7;  // 设置天顶颜色（偏蓝紫）
@@ -159,10 +203,18 @@ export class Engine {
     light.shadow.radius = 2.6;                        // 阴影边缘轻微软化
 
     this.scene.add(light);
+
+    // 月光平行光：默认弱光，主要在黑夜风格下提供柔和补光
+    const moonLight = new THREE.DirectionalLight(0xcddcff, 0.02);
+    this.scene.add(moonLight.target);
+    moonLight.castShadow = false;
+    this.scene.add(moonLight);
+
     this.ambientLight = new THREE.AmbientLight(0xddeeff, 1);
     this.scene.add(this.ambientLight);
 
     this.light = light;
+    this.moonLight = moonLight;
 
     this.createWaterPlane();
 
@@ -170,6 +222,7 @@ export class Engine {
     this._lastUpdatePos = new THREE.Vector3(Infinity, Infinity, Infinity);
 
     this.createSun();
+    this.createMoon();
     this.createSkybox();
     this.setVisualStyle(VISUAL_STYLE_KEYS.DAY);
 
@@ -379,14 +432,70 @@ export class Engine {
     this.scene.add(this.sunSprite);
   }
 
+  createMoon() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256;
+    canvas.height = 256;
+    const context = canvas.getContext('2d');
+
+    // 先画柔和月晕，再画满月圆盘，确保是“大大的圆形满月”
+    const glow = context.createRadialGradient(128, 128, 0, 128, 128, 128);
+    glow.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
+    glow.addColorStop(0.45, 'rgba(226, 236, 255, 0.35)');
+    glow.addColorStop(1, 'rgba(200, 220, 255, 0)');
+    context.fillStyle = glow;
+    context.fillRect(0, 0, 256, 256);
+
+    const moonGradient = context.createRadialGradient(112, 112, 16, 128, 128, 64);
+    moonGradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+    moonGradient.addColorStop(0.55, 'rgba(245, 248, 255, 1)');
+    moonGradient.addColorStop(1, 'rgba(216, 226, 246, 1)');
+    context.fillStyle = moonGradient;
+    context.beginPath();
+    context.arc(128, 128, 60, 0, Math.PI * 2);
+    context.fill();
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const moonMaterial = new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      fog: false,
+      depthTest: true
+    });
+
+    this.moonSprite = new THREE.Sprite(moonMaterial);
+    this.moonSprite.visible = false;
+    this.moonSprite.scale.set(34, 34, 1);
+    this.scene.add(this.moonSprite);
+  }
+
   createSkybox() {
     const loader = new THREE.CubeTextureLoader();
-    this.skyboxTexture = loader.setPath('src/assets/skyBox4/').load([
-      'posx.jpg', 'negx.jpg',
-      'posy.jpg', 'negy.jpg',
-      'posz.jpg', 'negz.jpg'
-    ]);
+    const faces = ['posx.jpg', 'negx.jpg', 'posy.jpg', 'negy.jpg', 'posz.jpg', 'negz.jpg'];
+    const skybox4 = loader.setPath('src/assets/skyBox4/').load(faces);
+    const skybox1 = loader.setPath('src/assets/skyBox1/').load(faces);
+    this.configureSkyboxTexture(skybox4);
+    this.configureSkyboxTexture(skybox1);
+    this.skyboxTextures = {
+      skyBox4: skybox4,
+      skyBox1: skybox1
+    };
+    this.skyboxTexture = this.skyboxTextures.skyBox4;
     this.scene.background = this.skyboxTexture;
+  }
+
+  configureSkyboxTexture(texture) {
+    if (!texture) return;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    texture.generateMipmaps = true;
+    texture.needsUpdate = true;
+  }
+
+  getSkyboxTextureByStyle(style) {
+    const skyboxKey = style?.skyboxKey || 'skyBox4';
+    return this.skyboxTextures?.[skyboxKey] || this.skyboxTexture;
   }
 
   getVisualStyle(styleKey) {
@@ -406,12 +515,16 @@ export class Engine {
     }
 
     // 恢复对应风格的背景（修复：需处理所有背景模式）
-    if (style.backgroundMode === 'skybox' && this.skyboxTexture) {
-      this.scene.background = this.skyboxTexture;
+    const styleSkyboxTexture = this.getSkyboxTextureByStyle(style);
+    if (style.backgroundMode === 'skybox' && styleSkyboxTexture) {
+      this.scene.background = styleSkyboxTexture;
+      this.scene.backgroundBlurriness = style.backgroundBlurriness ?? 0;
     } else if (style.backgroundMode === 'fogColor') {
       this.scene.background = new THREE.Color(style.fogColor);
+      this.scene.backgroundBlurriness = 0;
     } else {
       this.scene.background = new THREE.Color(style.backgroundColor || 0x87CEEB);
+      this.scene.backgroundBlurriness = 0;
     }
   }
 
@@ -422,11 +535,18 @@ export class Engine {
 
     this.light.color.set(style.directionalLightColor);
     this.light.intensity = style.directionalLightIntensity;
+    if (this.moonLight) {
+      this.moonLight.color.set(style.moonDirectionalLightColor || 0xcddcff);
+      this.moonLight.intensity = style.moonDirectionalLightIntensity ?? 0.02;
+    }
     this.ambientLight.color.set(style.ambientLightColor);
     this.ambientLight.intensity = style.ambientLightIntensity;
     if (Array.isArray(style.sunDirection) && style.sunDirection.length === 3) {
       this.sunDirection.set(style.sunDirection[0], style.sunDirection[1], style.sunDirection[2]).normalize();
       this.requestShadowMapUpdate();
+    }
+    if (Array.isArray(style.moonDirection) && style.moonDirection.length === 3) {
+      this.moonDirection.set(style.moonDirection[0], style.moonDirection[1], style.moonDirection[2]).normalize();
     }
     if (typeof style.toneMappingExposure === 'number') {
       this.renderer.toneMappingExposure = style.toneMappingExposure;
@@ -439,13 +559,22 @@ export class Engine {
     if (this.sunSprite) {
       this.sunSprite.visible = style.sunVisible !== false;
     }
+    if (this.moonSprite) {
+      this.moonSprite.visible = style.moonVisible === true;
+      const moonSize = style.moonSize ?? 28;
+      this.moonSprite.scale.set(moonSize, moonSize, 1);
+    }
 
-    if (style.backgroundMode === 'skybox' && this.skyboxTexture) {
-      this.scene.background = this.skyboxTexture;
+    const styleSkyboxTexture = this.getSkyboxTextureByStyle(style);
+    if (style.backgroundMode === 'skybox' && styleSkyboxTexture) {
+      this.scene.background = styleSkyboxTexture;
+      this.scene.backgroundBlurriness = style.backgroundBlurriness ?? 0;
     } else if (style.backgroundMode === 'fogColor') {
       this.scene.background = new THREE.Color(style.fogColor);
+      this.scene.backgroundBlurriness = 0;
     } else {
       this.scene.background = new THREE.Color(style.backgroundColor || 0x87CEEB);
+      this.scene.backgroundBlurriness = 0;
     }
 
     // 水下时仍保持水下雾，离开水下后再回到当前风格雾参数

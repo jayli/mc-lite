@@ -180,6 +180,12 @@ button.active {
   gap: 4px;
 }
 
+.visual-style-btn-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
 .btn-status-toggle {
   width: 100%;
   padding: 6px 4px;
@@ -205,4 +211,182 @@ button.active {
   padding-left: 6px;
   padding-right: 6px;
   white-space: nowrap;
+  font-size: 12px;
+}
+
+/* ========== 启动存档模态框样式 ========== */
+#load-save-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 100;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  color: white;
+}
+
+.load-save-content {
+  background: #c6c6c6;
+  border: 4px solid #555;
+  padding: 30px;
+  border-radius: 4px;
+  box-shadow: 5px 5px 0 #000;
+  text-align: center;
+  color: #333;
+  width: 400px;
+}
+
+.load-save-logo {
+  width: 260px;
+  height: 48px;
+  max-width: 100%;
+  object-fit: cover;
+  object-position: center;
+  margin: 0 auto 12px auto;
+  display: block;
+}
+
+.load-save-buttons {
+  display: flex;
+  gap: 15px;
+  margin-top: 25px;
+  justify-content: center;
+}
+
+.load-save-buttons button {
+  flex: 1;
+}
+
+#btn-load-save {
+  background: #559944;
+}
+
+#btn-new-world {
+  background: #8b8b8b;
+}
+
+.load-save-import-section {
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 2px solid #999;
+}
+
+.load-save-import-section p {
+  margin: 0 0 10px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+#btn-import-save-file {
+  background: #7a9e7e;
+  width: 100%;
+}
+
+/* ========== 配置面板按钮样式 ========== */
+
+/* 存档功能按钮行 */
+.save-btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+.save-btn-row button {
+  flex: 1;
+}
+
+#btn-save-game {
+  background: #4a90e2;
+}
+
+#btn-export-save {
+  background: #7a9e7e;
+}
+
+/* 地标传送按钮颜色 */
+#btn-teleport-frozen {
+  background: #5b9bd5;
+}
+
+#btn-teleport-pyramid {
+  background: #ed7d31;
+}
+
+#btn-teleport-island {
+  background: #2ca02c;
+}
+
+#btn-teleport-snow {
+  background: #aec7e8;
+}
+
+#btn-teleport-plain-land {
+  background: #d4a373;
+}
+
+/* 位置记录按钮行 */
+.position-btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.position-btn-row button {
+  flex: 1;
+  min-width: 120px;
+}
+
+#btn-record-position {
+  background: #4a90e2;
+}
+
+#btn-return-origin {
+  background: #999;
+}
+
+#btn-return-origin:disabled {
+  background: #999;
+}
+
+/* 返回按钮就绪状态 */
+#btn-return-origin.btn-return-ready {
+  background: #4a90e2;
+}
+
+/* 创造台按钮激活状态 */
+#btn-create-playground.btn-playground-active {
+  background: #e74c3c;
+}
+
+/* 创造台按钮 */
+#btn-create-playground {
+  width: 100%;
+  margin-top: 5px;
+  background: #4a90e2;
+}
+
+#btn-export-model {
+  width: 100%;
+  margin-top: 5px;
+  background: #8b8b8b;
+}
+
+#btn-import-model {
+  width: 100%;
+  margin-top: 5px;
+  background: #7a9e7e;
+}
+
+/* 配置面板底部确定按钮容器 */
+.settings-footer {
+  margin-top: auto;
+  display: flex;
+  justify-content: center;
+  padding-top: 20px;
 }
