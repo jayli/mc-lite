@@ -561,12 +561,12 @@ export class Game {
   getRainQualityOptions() {
     const scale = this.engine?.resolutionScale ?? 1;
     if (scale <= 0.4) {
-      return { particleCount: 180, radius: 16, speed: 22, dropLength: 0.45, refreshDistance: 10 };
+      return { particleCount: 180, radius: 18, speed: 22, dropLength: 0.45, refreshDistance: 10 };
     }
     if (scale <= 0.7) {
       return { particleCount: 280, radius: 18, speed: 23, dropLength: 0.48, refreshDistance: 9 };
     }
-    return { particleCount: 400, radius: 20, speed: 24, dropLength: 0.5, refreshDistance: 8 };
+    return { particleCount: 400, radius: 18, speed: 24, dropLength: 0.5, refreshDistance: 8 };
   }
 
   /**
@@ -580,7 +580,11 @@ export class Game {
       this.rainEffect = null;
     }
     const qualityOptions = this.getRainQualityOptions();
-    this.rainEffect = new RainEffect(this.engine.scene, { playerPos, ...qualityOptions });
+    this.rainEffect = new RainEffect(this.engine.scene, {
+      playerPos,
+      world: this.world,
+      ...qualityOptions
+    });
   }
 
   /**
@@ -592,7 +596,11 @@ export class Game {
       // 开启下雨，传入玩家位置
       const playerPos = this.player ? this.player.position : { x: 0, y: 0, z: 0 };
       const qualityOptions = this.getRainQualityOptions();
-      this.rainEffect = new RainEffect(this.engine.scene, { playerPos, ...qualityOptions });
+      this.rainEffect = new RainEffect(this.engine.scene, {
+        playerPos,
+        world: this.world,
+        ...qualityOptions
+      });
       this.ui.hud.showMessage('已开启下雨');
     } else {
       // 关闭下雨

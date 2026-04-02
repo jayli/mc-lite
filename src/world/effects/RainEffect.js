@@ -24,6 +24,9 @@ export class RainEffect {
     this.verticalRefreshDistance = options.verticalRefreshDistance || 6;
     this.cycleHeight = options.cycleHeight || 42;
     this.refreshBatchSize = options.refreshBatchSize || 64; // 分批刷新，削峰
+    this.floorOffset = options.floorOffset || 0.02;
+    this.searchDepth = options.searchDepth || 56;
+    this.world = options.world || null;
 
     // 玩家位置
     this.playerPos = options.playerPos || { x: 0, y: 0, z: 0 };
@@ -39,6 +42,7 @@ export class RainEffect {
     this.phases = null;
     this.speedScales = null;
     this.isBottomVertex = null;
+    this.minYs = null;
     this.geometry = null;
     this.material = null;
     this.lines = null;
@@ -56,6 +60,7 @@ export class RainEffect {
     this.phases = new Float32Array(vertexCount);
     this.speedScales = new Float32Array(vertexCount);
     this.isBottomVertex = new Float32Array(vertexCount);
+    this.minYs = new Float32Array(vertexCount);
 
     // 初始化每个雨滴
     for (let i = 0; i < this.particleCount; i++) {
@@ -70,6 +75,7 @@ export class RainEffect {
     this.geometry.setAttribute('aPhase', new THREE.BufferAttribute(this.phases, 1));
     this.geometry.setAttribute('aSpeedScale', new THREE.BufferAttribute(this.speedScales, 1));
     this.geometry.setAttribute('aIsBottomVertex', new THREE.BufferAttribute(this.isBottomVertex, 1));
+    this.geometry.setAttribute('aMinY', new THREE.BufferAttribute(this.minYs, 1));
 
     // 使用 ShaderMaterial 将雨滴下落计算移动到 GPU
     this.material = new THREE.ShaderMaterial({
@@ -90,11 +96,13 @@ export class RainEffect {
         attribute float aPhase;
         attribute float aSpeedScale;
         attribute float aIsBottomVertex;
+        attribute float aMinY;
 
         void main() {
           vec3 transformed = position;
           float fallDistance = mod((uTime * uBaseSpeed * aSpeedScale) + aPhase, uCycleHeight);
           transformed.y = position.y - fallDistance - (aIsBottomVertex * uDropLength);
+          transformed.y = max(transformed.y, aMinY);
           gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
         }
       `,
@@ -124,6 +132,7 @@ export class RainEffect {
     const x = playerPos.x + Math.cos(angle) * r;
     const topY = playerPos.y + 30 + Math.random() * 20;
     const z = playerPos.z + Math.sin(angle) * r;
+    const minY = this.resolveRainMinY(x, topY, z, playerPos.y);
 
     const phase = randomizeDynamics ? (Math.random() * this.cycleHeight) : null;
     const speedScale = randomizeDynamics ? (0.85 + Math.random() * 0.35) : null;
@@ -141,6 +150,7 @@ export class RainEffect {
       this.speedScales[vertexIdx] = speedScale;
     }
     this.isBottomVertex[vertexIdx] = 0;
+    this.minYs[vertexIdx] = minY;
 
     // 顶点2（底部，位置与顶点1一致，长度在 shader 中通过 uDropLength 计算）
     this.positions[idx + 3] = x;
@@ -151,6 +161,28 @@ export class RainEffect {
       this.speedScales[vertexIdx + 1] = speedScale;
     }
     this.isBottomVertex[vertexIdx + 1] = 1;
+    this.minYs[vertexIdx + 1] = minY;
+  }
+
+  /**
+   * 计算雨滴可见最低高度：
+   * - 有实心方块时，停在该方块顶部
+   * - 无遮挡时，保持默认循环最低高度
+   */
+  resolveRainMinY(x, topY, z, playerY = 0) {
+    const defaultMinY = playerY - (this.cycleHeight * 0.35);
+    if (!this.world || typeof this.world.isSolid !== 'function') {
+      return defaultMinY;
+    }
+
+    const startY = Math.floor(topY);
+    const endY = Math.floor(Math.max(defaultMinY, topY - this.searchDepth));
+    for (let y = startY; y >= endY; y--) {
+      if (this.world.isSolid(x, y, z)) {
+        return y + 1 + this.floorOffset;
+      }
+    }
+    return defaultMinY;
   }
 
   /**
@@ -192,6 +224,7 @@ export class RainEffect {
     this.refreshCursor = end;
 
     this.geometry.attributes.position.needsUpdate = true;
+    this.geometry.attributes.aMinY.needsUpdate = true;
 
     if (this.refreshCursor >= this.particleCount) {
       this.isRefreshing = false;
@@ -250,6 +283,7 @@ export class RainEffect {
     this.phases = null;
     this.speedScales = null;
     this.isBottomVertex = null;
+    this.minYs = null;
     this.geometry = null;
     this.material = null;
     this.lines = null;
