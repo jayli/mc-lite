@@ -1,6 +1,6 @@
 # Quickstart: 下雨功能开关
 
-**Feature**: 001-rain-toggle
+**Feature**: 030-rain-toggle
 **Date**: 2026-04-02
 
 ## 开发者快速入门

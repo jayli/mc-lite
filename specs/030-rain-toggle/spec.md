@@ -1,6 +1,6 @@
 # Feature Specification: 下雨功能开关
 
-**Feature Branch**: `001-rain-toggle`
+**Feature Branch**: `030-rain-toggle`
 **Created**: 2026-04-02
 **Status**: Draft
 **Input**: User description: "新增下雨，在配置菜单中增加一个"下雨"的按钮，按下表示开启下雨，弹起表示不下雨。按钮放在TNT破坏方块这个区域，放在"点击开启"的右边。"

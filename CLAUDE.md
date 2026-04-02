@@ -214,8 +214,8 @@ npm run lint
 
 
 ## Active Technologies
-- JavaScript (ES6+), Three.js r160+ + Three.js (场景、粒子系统、SpriteMaterial) (001-rain-toggle)
-- N/A (纯视觉效果，无持久化) (001-rain-toggle)
+- JavaScript (ES6+), Three.js r160+ + Three.js (场景、粒子系统、SpriteMaterial) (030-rain-toggle)
+- N/A (纯视觉效果，无持久化) (030-rain-toggle)
 
 ## Recent Changes
-- 001-rain-toggle: Added JavaScript (ES6+), Three.js r160+ + Three.js (场景、粒子系统、SpriteMaterial)
+- 030-rain-toggle: Added JavaScript (ES6+), Three.js r160+ + Three.js (场景、粒子系统、SpriteMaterial)

@@ -1,7 +1,7 @@
 # Implementation Plan: 下雨功能开关
 
-**Branch**: `001-rain-toggle` | **Date**: 2026-04-02 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `/specs/001-rain-toggle/spec.md`
+**Branch**: `030-rain-toggle` | **Date**: 2026-04-02 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/030-rain-toggle/spec.md`
 
 ## Summary
 
@@ -39,7 +39,7 @@
 ### Documentation (this feature)
 
 ```text
-specs/001-rain-toggle/
+specs/030-rain-toggle/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output
 ├── data-model.md        # Phase 1 output

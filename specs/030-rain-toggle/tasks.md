@@ -1,6 +1,6 @@
 # Tasks: 下雨功能开关
 
-**Input**: Design documents from `/specs/001-rain-toggle/`
+**Input**: Design documents from `/specs/030-rain-toggle/`
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md
 
 **Tests**: 未明确要求测试，本任务列表不包含测试任务。
