@@ -79,6 +79,11 @@ export class World {
     // --- 重复 owner 清理状态 ---
     // 当已就绪 Chunk 数变化时触发一次数据层去重，清理历史重复 owner
     this._lastReadyChunkCount = 0;
+    this._lastReadyChunkKeys = new Set();
+
+    // --- AO 边界修复队列 ---
+    // 当新 Chunk 就绪后，将其及四邻加入队列，分帧重算 Instanced AO
+    this._pendingAORefreshChunkKeys = new Set();
 
     // 阴影按需刷新回调（由 Game/Engine 注入）
     this.shadowUpdateCallback = null;
@@ -157,14 +162,33 @@ export class World {
 
     // Chunk 就绪数量变化时执行一次去重，避免历史重复 owner 长期存在
     let readyChunkCount = 0;
+    const readyChunkKeys = new Set();
     for (const [, chunk] of this.chunks) {
-      if (chunk?.isReady) readyChunkCount++;
+      if (chunk?.isReady) {
+        readyChunkCount++;
+        readyChunkKeys.add(`${chunk.cx},${chunk.cz}`);
+      }
     }
-    if (readyChunkCount !== this._lastReadyChunkCount) {
+    const readyStateChanged =
+      readyChunkCount !== this._lastReadyChunkCount ||
+      readyChunkKeys.size !== this._lastReadyChunkKeys.size ||
+      [...readyChunkKeys].some(key => !this._lastReadyChunkKeys.has(key));
+
+    if (readyStateChanged) {
       this._dedupeLoadedChunkOwners();
+
+      for (const key of readyChunkKeys) {
+        if (!this._lastReadyChunkKeys.has(key)) {
+          this._enqueueChunkAndNeighborsForAORefresh(key);
+        }
+      }
+
       this._lastReadyChunkCount = readyChunkCount;
+      this._lastReadyChunkKeys = readyChunkKeys;
       this.requestShadowMapUpdate('chunk-ready-count-changed');
     }
+
+    this._processPendingAORefreshQueue();
 
     // 更新粒子系统逻辑（运动、透明度衰减等）
     this.particles.update(dt);
@@ -249,6 +273,45 @@ export class World {
       }
       this.clearBlockLookupCaches();
       console.log(`[OwnershipDedupe] removed duplicate owners: ${removedCount}, touched chunks: ${touchedChunks.size}`);
+    }
+  }
+
+  /**
+   * 将指定 Chunk 及四邻加入 AO 重算队列
+   * @param {string} chunkKey - Chunk 键，格式 "cx,cz"
+   */
+  _enqueueChunkAndNeighborsForAORefresh(chunkKey) {
+    const [cx, cz] = chunkKey.split(',').map(Number);
+    const keys = [
+      `${cx},${cz}`,
+      `${cx + 1},${cz}`,
+      `${cx - 1},${cz}`,
+      `${cx},${cz + 1}`,
+      `${cx},${cz - 1}`
+    ];
+    keys.forEach((key) => this._pendingAORefreshChunkKeys.add(key));
+  }
+
+  /**
+   * 分帧处理 AO 重算队列，避免单帧卡顿
+   */
+  _processPendingAORefreshQueue() {
+    const MAX_CHUNKS_PER_TICK = 2;
+    let processed = 0;
+
+    for (const key of [...this._pendingAORefreshChunkKeys]) {
+      if (processed >= MAX_CHUNKS_PER_TICK) break;
+
+      const chunk = this.chunks.get(key);
+      if (!chunk || !chunk.isReady) {
+        this._pendingAORefreshChunkKeys.delete(key);
+        continue;
+      }
+      if (chunk.isConsolidating) continue;
+
+      chunk.rebuildInstancedAOFromWorld?.();
+      this._pendingAORefreshChunkKeys.delete(key);
+      processed++;
     }
   }
 

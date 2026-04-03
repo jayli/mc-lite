@@ -282,6 +282,61 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('AO 刷新队列 - 新就绪区块会加入自身及四邻', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world._enqueueChunkAndNeighborsForAORefresh('2,3');
+
+    assertEqual(world._pendingAORefreshChunkKeys.size, 5, '应加入 5 个 Chunk 键');
+    assertTrue(world._pendingAORefreshChunkKeys.has('2,3'), '应包含自身');
+    assertTrue(world._pendingAORefreshChunkKeys.has('3,3'), '应包含东邻');
+    assertTrue(world._pendingAORefreshChunkKeys.has('1,3'), '应包含西邻');
+    assertTrue(world._pendingAORefreshChunkKeys.has('2,4'), '应包含南邻');
+    assertTrue(world._pendingAORefreshChunkKeys.has('2,2'), '应包含北邻');
+
+    teardownEnvironment();
+  });
+
+  test('AO 刷新队列 - 仅处理已就绪且非合并中的区块', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    let refreshedReadyChunk = 0;
+    let refreshedConsolidatingChunk = 0;
+
+    world.chunks.set('0,0', {
+      cx: 0,
+      cz: 0,
+      isReady: true,
+      isConsolidating: false,
+      rebuildInstancedAOFromWorld: () => { refreshedReadyChunk++; }
+    });
+
+    world.chunks.set('1,0', {
+      cx: 1,
+      cz: 0,
+      isReady: true,
+      isConsolidating: true,
+      rebuildInstancedAOFromWorld: () => { refreshedConsolidatingChunk++; }
+    });
+
+    world._pendingAORefreshChunkKeys.add('0,0');
+    world._pendingAORefreshChunkKeys.add('1,0');
+
+    world._processPendingAORefreshQueue();
+
+    assertEqual(refreshedReadyChunk, 1, '已就绪且非合并区块应被刷新');
+    assertEqual(refreshedConsolidatingChunk, 0, '合并中的区块应跳过刷新');
+    assertTrue(world._pendingAORefreshChunkKeys.has('1,0'), '跳过的区块应保留在队列中');
+
+    teardownEnvironment();
+  });
+
   // =========== setBlock 测试 ===========
   test('setBlock - 在已加载区块放置方块', async () => {
     setupEnvironment();

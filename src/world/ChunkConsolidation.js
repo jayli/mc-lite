@@ -367,6 +367,7 @@ export function extendChunk(Chunk) {
 
     // 构建新的渲染网格
     this.buildMeshes(d);
+    this.rebuildInstancedAOFromWorld?.();
 
     // 恢复宝箱状态
     this._restoreChestStates(savedChestStates);

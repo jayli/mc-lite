@@ -568,6 +568,80 @@ export class Chunk {
     return mesh;
   }
 
+  /**
+   * 基于当前世界已加载数据，重算本 Chunk 所有 InstancedMesh 的 AO
+   * 主要用于邻接 Chunk 延迟就绪后修正边界 AO，避免“同类方块明暗不一致”
+   */
+  rebuildInstancedAOFromWorld() {
+    if (!this.isReady) return;
+
+    const isOccluding = createOcclusionChecker(
+      { chunk: this, chunks: this.world.chunks },
+      CHUNK_SIZE,
+      getBlockProps
+    );
+
+    for (const child of this.group.children) {
+      if (!child?.isInstancedMesh) continue;
+
+      const type = child.userData?.type;
+      if (!type) continue;
+
+      const props = getBlockProps(type);
+      if (!props.isSolid || props.isTransparent) continue;
+
+      const typeMap = this.instanceIndexMap[type];
+      if (!(typeMap instanceof Map) || typeMap.size === 0) continue;
+
+      const geometry = child.geometry;
+      if (!geometry) continue;
+
+      const instanceCount = child.count;
+      let aoLowAttr = geometry.getAttribute('aAoLow');
+      let aoHighAttr = geometry.getAttribute('aAoHigh');
+      let orientationAttr = geometry.getAttribute('aOrientation');
+
+      if (!aoLowAttr || aoLowAttr.array.length !== instanceCount) {
+        aoLowAttr = new THREE.InstancedBufferAttribute(new Float32Array(instanceCount), 1);
+        geometry.setAttribute('aAoLow', aoLowAttr);
+      }
+      if (!aoHighAttr || aoHighAttr.array.length !== instanceCount) {
+        aoHighAttr = new THREE.InstancedBufferAttribute(new Float32Array(instanceCount), 1);
+        geometry.setAttribute('aAoHigh', aoHighAttr);
+      }
+      if (!orientationAttr || orientationAttr.array.length !== instanceCount) {
+        orientationAttr = new THREE.InstancedBufferAttribute(new Float32Array(instanceCount), 1);
+        geometry.setAttribute('aOrientation', orientationAttr);
+      }
+
+      let updated = false;
+
+      for (const [key, idx] of typeMap.entries()) {
+        if (!Number.isInteger(idx) || idx < 0 || idx >= instanceCount) continue;
+
+        const entry = this.blockData[key];
+        if (!entry) continue;
+
+        const parsed = parseBlockEntry(entry);
+        if (parsed.type !== type) continue;
+
+        const [x, y, z] = key.split(',').map(Number);
+        const { aoLow, aoHigh } = computeBlockAOPacked(x, y, z, isOccluding);
+
+        aoLowAttr.array[idx] = aoLow;
+        aoHighAttr.array[idx] = aoHigh;
+        orientationAttr.array[idx] = parsed.orientation || 0;
+        updated = true;
+      }
+
+      if (updated) {
+        aoLowAttr.needsUpdate = true;
+        aoHighAttr.needsUpdate = true;
+        orientationAttr.needsUpdate = true;
+      }
+    }
+  }
+
   // ============================================================
   // 公共 API
   // ============================================================

@@ -64,6 +64,7 @@ export function extendChunk(Chunk) {
 
         // 2. 构建渲染网格 (InstancedMesh)
         this.buildMeshes(d);
+        this.rebuildInstancedAOFromWorld?.();
 
         // 3. 处理真实感树木 (在主线程生成，因为涉及复杂 Mesh 克隆)
         // 使用实例化渲染优化：记录树木数据，后续批量创建 InstancedMesh
