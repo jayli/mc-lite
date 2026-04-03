@@ -20,13 +20,13 @@ Export current-session dialogue (user + assistant) after the latest `/clear` mar
 From project root:
 
 ```bash
-python3 .codex/skills/export/export_session.py
+python3 .codex/skills/export_codex/export_session.py
 ```
 
 Optional:
 
 ```bash
-python3 .codex/skills/export/export_session.py --session /absolute/path/to/rollout-xxxx.jsonl
+python3 .codex/skills/export_codex/export_session.py --session /absolute/path/to/rollout-xxxx.jsonl
 ```
 
 ## Notes

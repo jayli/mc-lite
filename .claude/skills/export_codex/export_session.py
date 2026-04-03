@@ -14,9 +14,9 @@ Message = Tuple[str, str, str]
 def find_project_root(start: Path) -> Path:
     current = start.resolve()
     for candidate in [current, *current.parents]:
-        if (candidate / ".codex" / "skills" / "export").exists():
+        if (candidate / ".codex" / "skills" / "export_codex").exists():
             return candidate
-    raise FileNotFoundError("Cannot find project root containing .codex/skills/export")
+    raise FileNotFoundError("Cannot find project root containing .codex/skills/export_codex")
 
 
 def latest_session_file() -> Path:
