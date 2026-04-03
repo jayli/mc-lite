@@ -103,6 +103,9 @@ npm run lint
 | Chunk | `src/world/Chunk.js` | 区块渲染 (InstancedMesh)、隐藏面剔除 |
 | Enemy | `src/core/EnemyManager.js` | 敌人生命周期与 EnemyWorker 通信 |
 | Turret | `src/actors/turret/TurretManager.js` | 炮塔自动防御子系统入口 |
+| Minecart | `src/actors/minecart/MinecartManager.js` | 矿车生命周期、移动系统、持久化 |
+| ZombieNest | `src/actors/zombie-nest/ZombieNestManager.js` | 丧尸巢穴创建、刷怪、持久化 |
+| LightSource | `src/core/LightSourceManager.js` | 发光方块的 PointLight 管理 |
 | AO | `src/core/AOSystem.js` | 主线程环境光遮蔽计算 |
 | FaceCulling | `src/core/FaceCullingSystem.js` | 面剔除系统，协调主线程与 Worker |
 
@@ -130,6 +133,33 @@ npm run lint
 - `src/actors/enemy/Zombie.js` — 丧尸实体（状态、AI行为、受击逻辑）
 - `src/actors/enemy/ZombieInstancedRenderer.js` — 丧尸 InstancedMesh 批量渲染
 
+### 矿车系统
+位于 `src/actors/minecart/`，矿车实体与轨道移动：
+- `MinecartManager.js` — 矿车生命周期管理、位置索引、Chunk 持久化
+- `Minecart.js` — 矿车实体（位置、朝向、运动状态）
+- `MinecartMovementSystem.js` — 轨道检测、方向判定、移动物理
+- `MinecartLinkDetector.js` — 矿车链接检测（串联矿车）
+- `MinecartPlacementHandler.js` — 矿车放置逻辑
+- `MinecartInstancedRenderer.js` — 矿车 InstancedMesh 批量渲染
+- `MinecartCollisionSystem.js` — 矿车碰撞检测
+
+协作链路：`PlayerInteraction` → `MinecartPlacementHandler` → `MinecartManager.createMinecart()` → `MinecartMovementSystem.updateAll()`
+
+### 丧尸巢穴系统
+位于 `src/actors/zombie-nest/`，可放置的丧尸生成点：
+- `ZombieNestManager.js` — 巢穴生命周期、位置索引、Chunk 持久化、刷怪回调
+- `ZombieNest.js` — 巢穴实体（位置、关键方块、刷怪间隔）
+- `ZombieNestPlacementHandler.js` — 巢穴放置逻辑
+
+协作链路：`PlayerInteraction` → `ZombieNestPlacementHandler` → `ZombieNestManager.createNest()` → `handleNestSpawn()` → `EnemyManager.addZombie()`
+
+### 下雨效果
+位于 `src/world/effects/`：
+- `RainEffect.js` — GPU 驱动的雨滴粒子系统（LineSegments + ShaderMaterial），跟随玩家移动，碰撞地面方块
+
+### 光源管理系统
+- `src/core/LightSourceManager.js` — 发光方块（吊灯、萤石、蛙明灯、岩浆）的 PointLight 管理，支持区块加载时批量添加/移除
+
 ### 区块子模块
 位于 `src/world/`：
 - `ChunkConsolidation.js` — 区块合并机制（动态方块→优化 InstancedMesh）
@@ -152,6 +182,7 @@ npm run lint
 ### 自定义地图
 位于 `src/workers/maps/`，由 `WorldWorker.js` 调用，每个地图模块负责特定地标的位置计算和方块生成：
 - `RegionCenterUtils.js` — 区域内确定性随机中心计算工具（被所有地图共享）
+- `CityMap.js` — 主城地图生成（建筑配额、确定性排布、城门放置、地形平缓化）
 - `FrozenMountain.js` — 冰封山峰地图生成
 - `Pyramid.js` — 金字塔地图生成（新地图参照此文件实现）
 - `IslandMap.js` — 海岛地图生成
@@ -193,6 +224,7 @@ npm run lint
   - `src/utils/MathUtils.js` - 数学工具（seededRandom、角度计算、插值等）
   - `src/utils/IndexedDBUtils.js` - IndexedDB 通用操作封装
   - `src/utils/StructureUtils.js` - 结构放置工具
+  - `src/utils/CityPlacementUtils.js` - City 建筑放置算法（哈希随机、边界检查、距离判定）
 - **常量配置**:
   - `src/constants/GameConfig.js` - 游戏全局常量（背包容量、丧尸上限、AO参数等）
   - `src/constants/RegionMapConfig.js` - 区域地图配置（区域大小、地标参数）
@@ -214,8 +246,4 @@ npm run lint
 
 
 ## Active Technologies
-- JavaScript (ES6+), Three.js r160+ + Three.js (场景、粒子系统、SpriteMaterial) (030-rain-toggle)
-- N/A (纯视觉效果，无持久化) (030-rain-toggle)
-
-## Recent Changes
-- 030-rain-toggle: Added JavaScript (ES6+), Three.js r160+ + Three.js (场景、粒子系统、SpriteMaterial)
+- JavaScript (ES6+), Three.js r160+ (场景、InstancedMesh、ShaderMaterial、LineSegments、PointLight)
