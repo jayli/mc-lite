@@ -273,6 +273,11 @@ export function extendChunk(Chunk) {
     for (const type in d) {
       const props = getBlockProps(type);
       if (d[type].length === 0 || !props.isRendered) continue;  // 跳过没有任何实例或不需渲染的方块类型
+
+      // 检查是否已存在相同类型的 InstancedMesh（如树叶在合并时被保留）
+      const existingMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === type);
+      if (existingMesh) continue; // 跳过已存在的类型，避免重复创建
+
       const renderPositions = d[type].filter(shouldRenderPos);
       if (renderPositions.length === 0) continue;
 

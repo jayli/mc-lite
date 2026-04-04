@@ -524,14 +524,19 @@ export function extendChunk(Chunk) {
       }
     });
 
-    // 移除旧的 InstancedMesh（保留树木）
+    // 移除旧的 InstancedMesh（保留树木和树叶）
     for (let i = this.group.children.length - 1; i >= 0; i--) {
       const child = this.group.children[i];
       if (child.isInstancedMesh) {
-        if (child.userData.type === 'realistic_trunk' || child.userData.type === 'realistic_leaves') {
+        const type = child.userData.type;
+        // 保留真实感树木和普通树叶（树叶是静态的，不应在合并时重建）
+        if (type === 'realistic_trunk' || type === 'realistic_leaves' ||
+            type === 'leaves' || type === 'azalea_leaves' || type === 'azalea_flowers' ||
+            type === 'sky_leaves' || type === 'yellow_leaves' || type === 'swamp_leaves' ||
+            type === 'snow_leaves') {
           continue;
         }
-        if (child.geometry && child.geometry !== geomMap[child.userData.type] && child.geometry !== geomMap['default']) {
+        if (child.geometry && child.geometry !== geomMap[type] && child.geometry !== geomMap['default']) {
           child.geometry.dispose();
         }
         this.group.remove(child);
