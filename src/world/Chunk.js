@@ -85,10 +85,12 @@ export class Chunk {
 
   /**
    * 检查指定位置是否在当前 Chunk 的责任范围内
+   * - 大型静态结构：严格按坐标归属
+   * - 小型实体（tree、gunman、rover 等）：允许跨 Chunk owner
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y
    * @param {number} z - 世界坐标 Z
-   * @returns {boolean} 是否在责任范围内（Chunk 内或属于当前 Chunk 负责的结构）
+   * @returns {boolean} 是否在责任范围内
    */
   _isInResponsibility(x, y, z) {
     const localX = Math.floor(x) - this.cx * CHUNK_SIZE;
@@ -97,6 +99,8 @@ export class Chunk {
 
     if (isInChunk) return true;
 
+    // 检查是否属于允许跨 Chunk 的小型实体
+    // belongsToCrossChunkStructure 内部会过滤大型静态结构
     if (this.structureCenters?.length > 0) {
       return belongsToCrossChunkStructure(x, y, z, this.structureCenters);
     }

@@ -14,9 +14,11 @@ import { IslandMap } from './maps/IslandMap.js';
 import { PlainLand } from './maps/PlainLand.js';
 import { CityMap } from './maps/CityMap.js';
 import {
-  belongsToCrossChunkStructure as checkBelongsToCrossChunkStructure,
   CROSS_CHUNK_OWNER_BLOCKED_TYPES,
-  getStructureRenderDist
+  getStructureRenderDist,
+  isCrossChunkOwnerType,
+  STRUCTURE_HEIGHT_RANGE,
+  STRUCTURE_HEIGHT_RANGE_SPECIAL
 } from '../utils/StructureUtils.js';
 import { getAOForFace } from '../utils/AOUtils.js';
 
@@ -76,8 +78,6 @@ const CITY_TALL_WELL_CHANCE = CITY_FLOWER_BED_CHANCE * 3; // 与 pavilion 相同
 const OWNERSHIP_SCHEMA_VERSION = 2;
 // 旧档归属迁移调试开关（默认关闭）
 const DEBUG_OWNERSHIP_MIGRATION = false;
-// 边界切割自动检测调试开关（默认关闭）
-const DEBUG_AUTO_CROSS_CHUNK_OWNER = false;
 
 /**
  * 将世界坐标转换为 Chunk 内局部坐标（0-15）
@@ -242,7 +242,6 @@ onmessage = async function(e) {
   const cityCoreCandidates = []; // 记录 City 核心区候选点（用于后置填充）
   const blockSourceTypeMap = new Map(); // 记录方块来源结构类型（仅结构任务）
   let activeStructureType = null;
-  const blockedCrossChunkOwnerTypes = new Set(CROSS_CHUNK_OWNER_BLOCKED_TYPES);
 
   // 模拟 Chunk 类的 add 方法 - 改为写入 blockMap
   const fakeChunk = {
@@ -1407,31 +1406,39 @@ onmessage = async function(e) {
     }
   }
 
-  // 自动检测：识别“本 Chunk 结构任务写入了 Chunk 外方块”的类型，自动加入跨 Chunk owner 例外
-  const autoCrossChunkOwnerTypes = new Set();
-  for (const [key, block] of blockMap) {
-    const sourceType = blockSourceTypeMap.get(key);
-    if (!sourceType) continue;
-    if (blockedCrossChunkOwnerTypes.has(sourceType)) continue;
-    const inCurrentChunk = block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;
-    if (!inCurrentChunk) {
-      autoCrossChunkOwnerTypes.add(sourceType);
-    }
-  }
-  if (DEBUG_AUTO_CROSS_CHUNK_OWNER && autoCrossChunkOwnerTypes.size > 0) {
-    console.log(
-      `[AutoCrossChunkOwner] chunk ${cx},${cz} detected types: ${Array.from(autoCrossChunkOwnerTypes).join(',')}`
-    );
-  }
+  // 统一 Chunk 归属判定：
+  // - 大型静态结构（tank、castle 等）：严格按坐标归属，避免重复 owner
+  // - 小型实体（tree、gunman、rover 等）：允许跨 Chunk owner，保持原有渲染行为
+  const belongsToCrossChunkStructure = (bx, by, bz) => {
+    if (!structureCenters || structureCenters.length === 0) return false;
 
-  // 统一 Chunk 归属判定，避免多处重复实现
-  const belongsToCrossChunkStructure = (bx, by, bz) =>
-    checkBelongsToCrossChunkStructure(bx, by, bz, structureCenters, autoCrossChunkOwnerTypes);
+    for (const center of structureCenters) {
+      if (!isCrossChunkOwnerType(center.type)) continue;
+
+      const maxDist = getStructureRenderDist(center.type);
+      const heightRange = STRUCTURE_HEIGHT_RANGE_SPECIAL[center.type] ?? STRUCTURE_HEIGHT_RANGE;
+      const dx = Math.abs(bx - center.x);
+      const dz = Math.abs(bz - center.z);
+      const dy = Math.abs(by - center.y);
+
+      if (dx <= maxDist && dz <= maxDist && dy <= heightRange) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   const isBlockOwnedByCurrentChunk = (block) => {
     const inCurrentChunk = block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;
-    const isCrossChunkStructureBlock = !inCurrentChunk &&
-      belongsToCrossChunkStructure(block.x, block.y, block.z);
-    return inCurrentChunk || isCrossChunkStructureBlock;
+    if (inCurrentChunk) return true;
+
+    // 检查是否属于允许跨 Chunk 的小型实体
+    const sourceType = blockSourceTypeMap.get(`${Math.floor(block.x)},${Math.floor(block.y)},${Math.floor(block.z)}`);
+    if (sourceType && isCrossChunkOwnerType(sourceType)) {
+      return belongsToCrossChunkStructure(block.x, block.y, block.z);
+    }
+
+    return false;
   };
 
   // 如果有 snapshot，用 snapshot 中的方块覆盖 blockMap（保留玩家修改）

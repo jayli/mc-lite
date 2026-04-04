@@ -76,14 +76,10 @@ export class World {
     // 命中缓存：blockKey -> 所属 chunkKey（仅缓存跨区块命中）
     this.crossChunkOwnerCache = new Map();
 
-    // --- 重复 owner 清理状态 ---
-    // 当已就绪 Chunk 数变化时触发一次数据层去重，清理历史重复 owner
+    // --- Chunk 就绪状态跟踪 ---
+    // 用于检测 Chunk 就绪状态变化，触发阴影更新
     this._lastReadyChunkCount = 0;
     this._lastReadyChunkKeys = new Set();
-
-    // --- AO 边界修复队列 ---
-    // 当新 Chunk 就绪后，将其及四邻加入队列，分帧重算 Instanced AO
-    this._pendingAORefreshChunkKeys = new Set();
 
     // 阴影按需刷新回调（由 Game/Engine 注入）
     this.shadowUpdateCallback = null;
@@ -175,20 +171,15 @@ export class World {
       [...readyChunkKeys].some(key => !this._lastReadyChunkKeys.has(key));
 
     if (readyStateChanged) {
-      this._dedupeLoadedChunkOwners();
-
-      for (const key of readyChunkKeys) {
-        if (!this._lastReadyChunkKeys.has(key)) {
-          this._enqueueChunkAndNeighborsForAORefresh(key);
-        }
-      }
+      // 移除 _dedupeLoadedChunkOwners 调用：Worker 已按坐标正确归属方块，不再需要兜底清理
+      // 同时移除 AO 边界重算：方块只被一个 Chunk 渲染一次，AO 不会重复着色
 
       this._lastReadyChunkCount = readyChunkCount;
       this._lastReadyChunkKeys = readyChunkKeys;
       this.requestShadowMapUpdate('chunk-ready-count-changed');
     }
 
-    this._processPendingAORefreshQueue();
+    // 移除 _processPendingAORefreshQueue 调用：不再需要 AO 边界重算
 
     // 更新粒子系统逻辑（运动、透明度衰减等）
     this.particles.update(dt);
@@ -219,102 +210,6 @@ export class World {
    * 当“坐标所属 Chunk”已加载并包含该方块时，移除其他 Chunk 的同坐标副本。
    * 目的：消除同坐标双重渲染导致的深度竞争（AO/明暗随视角闪烁）。
    */
-  _dedupeLoadedChunkOwners() {
-    let removedCount = 0;
-    const touchedChunks = new Map(); // chunkKey -> removedCount
-
-    for (const [chunkKey, chunk] of this.chunks) {
-      if (!chunk || !chunk.isReady) continue;
-
-      for (const key in chunk.blockData) {
-        const [x, y, z] = key.split(',').map(Number);
-        const ownerCx = Math.floor(x / CHUNK_SIZE);
-        const ownerCz = Math.floor(z / CHUNK_SIZE);
-        const coordChunkKey = `${ownerCx},${ownerCz}`;
-
-        // 当前就是坐标所属 Chunk，无需处理
-        if (coordChunkKey === chunkKey) continue;
-
-        const coordChunk = this.chunks.get(coordChunkKey);
-        // 坐标所属 Chunk 未加载/未就绪时，不做删除，避免结构边缘暂时缺块
-        if (!coordChunk || !coordChunk.isReady) continue;
-
-        // 坐标所属 Chunk 没有该方块，不删
-        if (coordChunk.blockData[key] === undefined) continue;
-
-        // 删除重复副本（保留坐标所属 Chunk）
-        const oldEntry = chunk.blockData[key];
-        const oldType = this.getBlockTypeFromEntry(oldEntry);
-
-        delete chunk.blockData[key];
-        chunk.visibleKeys.delete(key);
-        chunk.solidBlocks.delete(key);
-
-        // 立即尝试移除当前渲染网格，降低“等合并回包”期间的视觉残留
-        if (typeof chunk._removeInstancedMeshBlock === 'function') {
-          chunk._removeInstancedMeshBlock(key, x, y, z, oldType);
-        }
-        if (typeof chunk._removeDynamicMesh === 'function') {
-          chunk._removeDynamicMesh(x, y, z, key);
-        }
-
-        removedCount++;
-        touchedChunks.set(chunkKey, (touchedChunks.get(chunkKey) || 0) + 1);
-      }
-    }
-
-    if (removedCount > 0) {
-      for (const [chunkKey, count] of touchedChunks) {
-        const chunk = this.chunks.get(chunkKey);
-        if (!chunk || !chunk.isReady) continue;
-        chunk.dirtyBlocks += count;
-        chunk.scheduleConsolidation();
-        chunk.saveDebounced?.();
-      }
-      this.clearBlockLookupCaches();
-      console.log(`[OwnershipDedupe] removed duplicate owners: ${removedCount}, touched chunks: ${touchedChunks.size}`);
-    }
-  }
-
-  /**
-   * 将指定 Chunk 及四邻加入 AO 重算队列
-   * @param {string} chunkKey - Chunk 键，格式 "cx,cz"
-   */
-  _enqueueChunkAndNeighborsForAORefresh(chunkKey) {
-    const [cx, cz] = chunkKey.split(',').map(Number);
-    const keys = [
-      `${cx},${cz}`,
-      `${cx + 1},${cz}`,
-      `${cx - 1},${cz}`,
-      `${cx},${cz + 1}`,
-      `${cx},${cz - 1}`
-    ];
-    keys.forEach((key) => this._pendingAORefreshChunkKeys.add(key));
-  }
-
-  /**
-   * 分帧处理 AO 重算队列，避免单帧卡顿
-   */
-  _processPendingAORefreshQueue() {
-    const MAX_CHUNKS_PER_TICK = 2;
-    let processed = 0;
-
-    for (const key of [...this._pendingAORefreshChunkKeys]) {
-      if (processed >= MAX_CHUNKS_PER_TICK) break;
-
-      const chunk = this.chunks.get(key);
-      if (!chunk || !chunk.isReady) {
-        this._pendingAORefreshChunkKeys.delete(key);
-        continue;
-      }
-      if (chunk.isConsolidating) continue;
-
-      chunk.rebuildInstancedAOFromWorld?.();
-      this._pendingAORefreshChunkKeys.delete(key);
-      processed++;
-    }
-  }
-
   /**
    * 生成击中粒子效果 (转发至 ParticleSystem)
    * @param {THREE.Vector3} pos - 粒子生成位置

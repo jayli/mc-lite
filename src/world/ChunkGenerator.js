@@ -237,8 +237,8 @@ export function extendChunk(Chunk) {
     const dummy = new THREE.Object3D();
     const currentChunkKey = `${this.cx},${this.cz}`;
 
-    // 渲染去重：同坐标若已由坐标所属 Chunk 持有，则当前 Chunk 不再重复渲染
-    // 这样可避免重复网格引起的深度竞争（表现为 AO/明暗随视角闪烁）
+    // 渲染去重：小型实体（tree、gunman 等）可能跨 Chunk 渲染
+    // 当坐标所属 Chunk 已就绪且有该方块时，跳过当前 Chunk 的重复渲染
     const shouldRenderPos = (pos) => {
       const ix = Math.floor(pos.x);
       const iy = Math.floor(pos.y);
@@ -250,7 +250,7 @@ export function extendChunk(Chunk) {
       // 坐标归属当前 Chunk：始终渲染
       if (coordChunkKey === currentChunkKey) return true;
 
-      // 跨 Chunk 方块：若坐标所属 Chunk 已就绪且存在同坐标方块，则跳过当前重复渲染
+      // 跨 Chunk 方块（小型实体）：若坐标所属 Chunk 已就绪且存在同坐标方块，则跳过
       const coordChunk = this.world?.chunks?.get(coordChunkKey);
       if (coordChunk?.isReady) {
         const key = `${ix},${iy},${iz}`;
@@ -259,7 +259,7 @@ export function extendChunk(Chunk) {
         }
       }
 
-      // 坐标所属 Chunk 未加载时保留渲染，避免结构边缘临时缺块
+      // 坐标所属 Chunk 未加载时保留渲染
       return true;
     };
 
@@ -339,7 +339,7 @@ export function extendChunk(Chunk) {
         }
       }
 
-      // 将实例化网格添加到区块的分S组中
+      // 将实例化网格添加到区块的分组中
       this.group.add(mesh);
     }
   }
