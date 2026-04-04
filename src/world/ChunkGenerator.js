@@ -239,8 +239,8 @@ export function extendChunk(Chunk) {
     const currentChunkKey = `${this.cx},${this.cz}`;
 
     // 渲染去重：小型实体（tree、gunman 等）可能跨 Chunk 渲染
-    // 当坐标所属 Chunk 已就绪且有该方块时，跳过当前 Chunk 的重复渲染
-    const shouldRenderPos = (pos) => {
+    // 当坐标所属 Chunk 已就绪且有相同类型方块时，跳过当前 Chunk 的重复渲染
+    const shouldRenderPos = (pos, blockType) => {
       const ix = Math.floor(pos.x);
       const iy = Math.floor(pos.y);
       const iz = Math.floor(pos.z);
@@ -251,16 +251,21 @@ export function extendChunk(Chunk) {
       // 坐标归属当前 Chunk：始终渲染
       if (coordChunkKey === currentChunkKey) return true;
 
-      // 跨 Chunk 方块（小型实体）：若坐标所属 Chunk 已就绪且存在同坐标方块，则跳过
+      // 跨 Chunk 方块：若坐标所属 Chunk 已就绪且存在同类型方块，则跳过（去重）
+      // 关键：必须比较类型，否则坐标所属 Chunk 的不同方块（如地形方块）会错误地隐藏跨区块树叶
       const coordChunk = this.world?.chunks?.get(coordChunkKey);
       if (coordChunk?.isReady) {
         const key = `${ix},${iy},${iz}`;
-        if (coordChunk.blockData?.[key] !== undefined) {
-          return false;
+        const coordEntry = coordChunk.blockData?.[key];
+        if (coordEntry !== undefined) {
+          const coordType = typeof coordEntry === 'string' ? coordEntry : coordEntry.type;
+          if (coordType === blockType) {
+            return false;
+          }
         }
       }
 
-      // 坐标所属 Chunk 未加载时保留渲染
+      // 坐标所属 Chunk 未加载或没有同类型方块时保留渲染
       return true;
     };
 
