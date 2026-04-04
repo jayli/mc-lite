@@ -104,7 +104,7 @@ export class Engine {
         colorSaturate: 1.15,
         colorContrast: 1.1,
         colorBrightness: 1.06,
-        backgroundBlurriness: 0.22,
+        backgroundBlurriness: 0,
         skyboxKey: 'skyBox4'
       },
       [VISUAL_STYLE_KEYS.OVERCAST]: {
@@ -505,9 +505,21 @@ export class Engine {
 
   applySurfaceFogFromStyle() {
     const style = this.getVisualStyle(this.currentVisualStyle);
-    this.scene.fog.color.set(style.fogColor);
-    this.scene.fog.near = style.fogNear;
-    this.scene.fog.far = style.fogFar;
+
+    // 早晨和黑夜不显示雾效果
+    const noFogStyles = [VISUAL_STYLE_KEYS.MORNING, VISUAL_STYLE_KEYS.NIGHT];
+    if (noFogStyles.includes(this.currentVisualStyle)) {
+      this.scene.fog = null;
+    } else {
+      // 重新启用雾（如果之前被禁用）
+      if (!this.scene.fog) {
+        this.scene.fog = new THREE.Fog(style.fogColor, style.fogNear, style.fogFar);
+      } else {
+        this.scene.fog.color.set(style.fogColor);
+        this.scene.fog.near = style.fogNear;
+        this.scene.fog.far = style.fogFar;
+      }
+    }
 
     if (this.waterMaterial) {
       this.waterMaterial.uniforms.uFogColor.value.set(style.fogColor);
