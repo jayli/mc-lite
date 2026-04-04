@@ -1187,12 +1187,16 @@ onmessage = async function(e) {
     const centerWx = cx * CHUNK_SIZE + 8;
     const centerWz = cz * CHUNK_SIZE + 8;
     Island.generate(centerWx, islandY, centerWz, fakeChunk, dPlaceholder);
+    // 注册空岛结构中心，用于跨Chunk渲染
+    structureCenters.push({ type: 'island', x: centerWx, y: islandY, z: centerWz });
   }
   if (chunkRandom(cx, cz, seed + 52) < 0.20) {
     const startX = cx * CHUNK_SIZE + Math.floor(chunkRandom(cx, cz, seed + 53) * CHUNK_SIZE);
     const startZ = cz * CHUNK_SIZE + Math.floor(chunkRandom(cx, cz, seed + 54) * CHUNK_SIZE);
     const size = 30 + Math.floor(chunkRandom(cx, cz, seed + 55) * 21);
     Cloud.generateCluster(startX, 35, startZ, size, fakeChunk, dPlaceholder);
+    // 注册云朵结构中心，用于跨Chunk渲染
+    structureCenters.push({ type: 'cloud', x: startX, y: 35, z: startZ });
   }
 
   // 执行结构生成队列，并记录大型结构的中心点

@@ -45,7 +45,6 @@ export class UIManager {
     const btnPerf = document.getElementById('btn-perf');
     const btnMid = document.getElementById('btn-mid');
     const btnQuality = document.getElementById('btn-quality');
-    const btnStyleDay = document.getElementById('btn-style-day');
     const btnStyleMorning = document.getElementById('btn-style-morning');
     const btnStyleOvercast = document.getElementById('btn-style-overcast');
     const btnStyleNight = document.getElementById('btn-style-night');
@@ -132,13 +131,7 @@ export class UIManager {
     };
 
     // 环境风格切换
-    if (btnStyleDay && btnStyleMorning && btnStyleOvercast && btnStyleNight) {
-      btnStyleDay.onclick = (e) => {
-        e.stopPropagation();
-        this.game.engine.setVisualStyle(VISUAL_STYLE_KEYS.DAY);
-        this.hud.showMessage('已切换至白天风格');
-        this.updateActiveButtons();
-      };
+    if (btnStyleMorning && btnStyleOvercast && btnStyleNight) {
       btnStyleMorning.onclick = (e) => {
         e.stopPropagation();
         this.game.engine.setVisualStyle(VISUAL_STYLE_KEYS.MORNING);
@@ -555,7 +548,6 @@ export class UIManager {
     const btnPerf = document.getElementById('btn-perf');
     const btnMid = document.getElementById('btn-mid');
     const btnQuality = document.getElementById('btn-quality');
-    const btnStyleDay = document.getElementById('btn-style-day');
     const btnStyleMorning = document.getElementById('btn-style-morning');
     const btnStyleOvercast = document.getElementById('btn-style-overcast');
     const btnStyleNight = document.getElementById('btn-style-night');
@@ -576,9 +568,8 @@ export class UIManager {
     btnMid.classList.toggle('active', scale === 0.7);
     btnQuality.classList.toggle('active', scale === 1.0);
 
-    if (btnStyleDay && btnStyleMorning && btnStyleOvercast && btnStyleNight) {
+    if (btnStyleMorning && btnStyleOvercast && btnStyleNight) {
       const currentStyle = this.game.engine.currentVisualStyle;
-      btnStyleDay.classList.toggle('active', currentStyle === VISUAL_STYLE_KEYS.DAY);
       btnStyleMorning.classList.toggle('active', currentStyle === VISUAL_STYLE_KEYS.MORNING);
       btnStyleOvercast.classList.toggle('active', currentStyle === VISUAL_STYLE_KEYS.OVERCAST);
       btnStyleNight.classList.toggle('active', currentStyle === VISUAL_STYLE_KEYS.NIGHT);

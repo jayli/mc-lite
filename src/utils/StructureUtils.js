@@ -47,7 +47,8 @@ export const STRUCTURE_RENDER_DIST = {
   tall_well: 12,      // tall_well 底座约 11x7，保守按 12 处理
   rover: 3,           // 火星车
   gunman: 3,          // 模型人
-  island: 16          // 空岛跨Chunk渲染距离
+  island: 16,          // 空岛跨Chunk渲染距离
+  cloud: 10            // 云朵跨Chunk渲染距离（40个方块分布，半径约8-10）
 };
 
 /**
@@ -75,7 +76,8 @@ export const STRUCTURE_HEIGHT_RANGE_SPECIAL = {
   gate: 24,       // gate 结构 Y 方向±24，覆盖拱顶与塔楼
   flower_bed: 8,  // flower_bed 高度较低，保守给 8 避免边界切割
   pavilion: 64,   // pavilion 最高约 61 层，预留容差
-  tall_well: 64   // tall_well 为高竖向结构，放宽 Y 范围防止上半截切割
+  tall_well: 64,  // tall_well 为高竖向结构，放宽 Y 范围防止上半截切割
+  island: 16      // 空岛高度约8 + 天空树高度约8，共约16层
 };
 
 /**
@@ -104,7 +106,9 @@ export const CROSS_CHUNK_OWNER_TYPES = Object.freeze([
   'gunman',     // 模型人
   'rover',      // 火星车
   'zombieNest', // 丧尸巢穴
-  'turret'      // 炮塔（预留）
+  'turret',     // 炮塔（预留）
+  'island',     // 空岛（代码生成，跨Chunk渲染）
+  'cloud'       // 云朵（代码生成，跨Chunk渲染）
 ]);
 
 const CROSS_CHUNK_OWNER_SET = new Set(CROSS_CHUNK_OWNER_TYPES);

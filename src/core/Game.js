@@ -705,7 +705,7 @@ export class Game {
       this.canTntDestroyBlocks = saveData.settings.canTntDestroyBlocks !== undefined ? saveData.settings.canTntDestroyBlocks : false;
       this.maxActiveZombies = saveData.settings.maxActiveZombies !== undefined ? saveData.settings.maxActiveZombies : 10;
       this.enemyManager.maxActiveZombies = this.maxActiveZombies; // 同步到敌人管理器
-      const visualStyle = saveData.settings.visualStyle || VISUAL_STYLE_KEYS.DAY;
+      const visualStyle = saveData.settings.visualStyle || VISUAL_STYLE_KEYS.MORNING;
       this.engine.setVisualStyle(visualStyle);
       const textureBlurLevel = saveData.settings.textureBlurLevel !== undefined
         ? saveData.settings.textureBlurLevel

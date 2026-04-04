@@ -33,7 +33,6 @@ export const SHADOW_CAMERA_SIZE = 30;
 export const SHADOW_CAMERA_FAR = 250;
 // 环境风格配置键
 export const VISUAL_STYLE_KEYS = {
-  DAY: 'day',
   MORNING: 'morning',
   OVERCAST: 'overcast',
   NIGHT: 'night'
@@ -56,32 +55,8 @@ export class Engine {
     this.scene.background = null;
     this.scene.fog = new THREE.Fog(FOG_COLOR, FOG_NEAR, FOG_FAR);
     this.isUnderwater = false;
-    this.currentVisualStyle = VISUAL_STYLE_KEYS.DAY;
+    this.currentVisualStyle = VISUAL_STYLE_KEYS.MORNING;
     this.visualStyles = {
-      [VISUAL_STYLE_KEYS.DAY]: {
-        // 保持原有白天风格参数
-        fogColor: 0x94bcf5,
-        fogNear: 30,
-        fogFar: 70,
-        directionalLightColor: 0xfffaf0,
-        directionalLightIntensity: 3.2,
-        moonDirectionalLightColor: 0xbfd2ff,
-        moonDirectionalLightIntensity: 0.02,
-        ambientLightColor: 0xddeeff,
-        ambientLightIntensity: 1,
-        // 使用雾色作为背景，避免远处方块雾化后与天空出现硬边
-        backgroundMode: 'fogColor',
-        backgroundColor: null,
-        sunDirection: [0, 0.8, 0.6],
-        moonDirection: [-0.28, 0.55, -0.78],
-        toneMappingExposure: 1.25,
-        sunVisible: false,
-        moonVisible: false,
-        moonSize: 18,
-        colorSaturate: 1,
-        colorContrast: 1,
-        colorBrightness: 1
-      },
       [VISUAL_STYLE_KEYS.MORNING]: {
         // 早晨风格：贴近参考图的暖色晨光 + 蓝紫天空 + 柔和阴影
         fogColor: 0xb7c6f7,
@@ -225,7 +200,7 @@ export class Engine {
     this.createSun();
     this.createMoon();
     this.createSkybox();
-    this.setVisualStyle(VISUAL_STYLE_KEYS.DAY);
+    this.setVisualStyle(VISUAL_STYLE_KEYS.MORNING);
 
     this.init();
     this.loadModel();
@@ -500,7 +475,7 @@ export class Engine {
   }
 
   getVisualStyle(styleKey) {
-    return this.visualStyles[styleKey] || this.visualStyles[VISUAL_STYLE_KEYS.DAY];
+    return this.visualStyles[styleKey] || this.visualStyles[VISUAL_STYLE_KEYS.MORNING];
   }
 
   applySurfaceFogFromStyle() {
@@ -542,7 +517,7 @@ export class Engine {
   }
 
   setVisualStyle(styleKey) {
-    const targetStyleKey = this.visualStyles[styleKey] ? styleKey : VISUAL_STYLE_KEYS.DAY;
+    const targetStyleKey = this.visualStyles[styleKey] ? styleKey : VISUAL_STYLE_KEYS.MORNING;
     const style = this.getVisualStyle(targetStyleKey);
     this.currentVisualStyle = targetStyleKey;
 
