@@ -397,34 +397,35 @@ export class Game {
     */
   update(dt) {
     const t1 = performance.now();
-    if (this.player) this.player.update(dt); // 更新玩家状态（移动、物理等）
+    const gameplayReady = this.world?.isGameplayReady?.() ?? true;
+    if (this.player && gameplayReady) this.player.update(dt); // 更新玩家状态（移动、物理等）
     const t2 = performance.now();
 
     if (this.world && this.player) this.world.update(this.player.position, dt); // 更新世界状态（区块加载等）
     const t3 = performance.now();
 
     // 更新敌人管理器（替代原来的丧尸管理器）
-    if (this.enemyManager && this.player) {
+    if (gameplayReady && this.enemyManager && this.player) {
       this.enemyManager.updateAll(this.player.position, dt);
     }
 
     // 更新炮塔管理器
-    if (this.turretManager) {
+    if (gameplayReady && this.turretManager) {
       this.turretManager.update(dt);
     }
 
     // 更新矿车管理器
-    if (this.minecartManager) {
+    if (gameplayReady && this.minecartManager) {
       this.minecartManager.update(dt, getRotationAngle, this.player);
     }
 
     // 更新丧尸巢穴管理器
-    if (this.zombieNestManager) {
+    if (gameplayReady && this.zombieNestManager) {
       this.zombieNestManager.update(dt);
     }
 
     // 更新下雨效果
-    if (this.rainEffect && this.rainState.enabled && this.player) {
+    if (gameplayReady && this.rainEffect && this.rainState.enabled && this.player) {
       this.rainEffect.update(this.player.position, dt);
     }
 

@@ -123,6 +123,9 @@ async function waitForChunkReady(world, chunkKey, maxWaitCount = 100) {
     if (chunk && chunk.isReady) {
       return true;
     }
+    if (typeof world.drainAssemblyQueues === 'function') {
+      await world.drainAssemblyQueues({ maxIterations: 8 });
+    }
     await new Promise(resolve => setTimeout(resolve, 50));
     waitCount++;
   }
@@ -282,6 +285,68 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('bootstrap - Worker 回包后 chunk 应停留在 worker-ready，未 finalize 前不应 ready', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+
+    await new Promise(resolve => setTimeout(resolve, 250));
+
+    const chunk = world.chunks.get('0,0');
+    assertNotNull(chunk, '区块 0,0 应该存在');
+    assertEqual(world.bootstrapState.phase, 'bootstrapping', '世界应处于启动阶段');
+    assertEqual(chunk.loadState, 'worker-ready', 'Worker 回包后应停留在 worker-ready');
+    assertFalse(chunk.isReady, '未 finalize 前不应标记为 ready');
+
+    teardownEnvironment();
+  });
+
+  test('bootstrap - 完成装配队列后应进入 runtime-streaming 且 chunk ready', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await new Promise(resolve => setTimeout(resolve, 250));
+
+    await world.drainAssemblyQueues();
+
+    const chunk = world.chunks.get('0,0');
+    assertNotNull(chunk, '区块 0,0 应该存在');
+    assertEqual(chunk.loadState, 'finalized', '排空装配队列后 chunk 应 finalized');
+    assertTrue(chunk.isReady, 'finalize 后 chunk 应 ready');
+    assertEqual(world.bootstrapState.phase, 'runtime-streaming', '世界应进入运行期增量加载阶段');
+    assertTrue(world.isGameplayReady(), '排空装配队列后应允许进入游戏');
+
+    teardownEnvironment();
+  });
+
+  test('static_tree 地形加速 - 应将树冠覆盖范围内的 chunk 提升为高优先级装配', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    const chunk = {
+      cx: 0,
+      cz: 0,
+      structureCenters: [{ type: 'static_tree', x: 15, y: 10, z: 15 }]
+    };
+
+    world._markStaticTreeTerrainBoostFromChunk(chunk);
+
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('0,0'), '应包含树中心所在 chunk');
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('1,0'), '应包含东侧被树冠覆盖的 chunk');
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('0,1'), '应包含南侧被树冠覆盖的 chunk');
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('1,1'), '应包含东南角被树冠覆盖的 chunk');
+
+    teardownEnvironment();
+  });
+
   test('AO 刷新队列 - 新就绪区块会加入自身及四邻', () => {
     setupEnvironment();
 
@@ -333,6 +398,84 @@ describe('World 真实类测试', (test) => {
     assertEqual(refreshedReadyChunk, 1, '已就绪且非合并区块应被刷新');
     assertEqual(refreshedConsolidatingChunk, 0, '合并中的区块应跳过刷新');
     assertTrue(world._pendingAORefreshChunkKeys.has('1,0'), '跳过的区块应保留在队列中');
+
+    teardownEnvironment();
+  });
+
+  test('AO 刷新队列 - 运行期 finalize 只应延迟加入自身 Chunk', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+    world.bootstrapState.phase = 'runtime-streaming';
+
+    const chunk = { cx: 4, cz: 5 };
+    world.onChunkFinalized(chunk);
+
+    assertEqual(world._pendingAORefreshChunkKeys.size, 1, '运行期 finalize 不应立即加入四邻');
+    assertTrue(world._pendingAORefreshChunkKeys.has('4,5'), '应仅包含当前 Chunk');
+
+    const meta = world._pendingAORefreshMeta?.get('4,5');
+    assertNotNull(meta, '应记录 AO 收敛延迟元数据');
+    assertTrue(meta.readyAt > 0, '应存在延迟执行时间');
+
+    teardownEnvironment();
+  });
+
+  test('AO 刷新队列 - 未到延迟时间的任务不应执行', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    let refreshed = 0;
+    world.chunks.set('0,0', {
+      cx: 0,
+      cz: 0,
+      isReady: true,
+      isConsolidating: false,
+      rebuildInstancedAOFromWorld: () => { refreshed++; }
+    });
+
+    world._pendingAORefreshChunkKeys.add('0,0');
+    world._pendingAORefreshMeta?.set('0,0', {
+      readyAt: (globalThis.performance?.now?.() ?? Date.now()) + 10_000
+    });
+
+    world._processPendingAORefreshQueue({ maxChunks: 1, budgetMs: 1 });
+
+    assertEqual(refreshed, 0, '未到延迟时间的 AO 收敛任务不应执行');
+    assertTrue(world._pendingAORefreshChunkKeys.has('0,0'), '未到时间的任务应继续保留在队列中');
+
+    teardownEnvironment();
+  });
+
+  test('AO 刷新队列 - 运行期流式加载活跃时不应执行 runtime-finalize 收敛', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    let refreshed = 0;
+    world.chunks.set('0,0', {
+      cx: 0,
+      cz: 0,
+      isReady: true,
+      isConsolidating: false,
+      rebuildInstancedAOFromWorld: () => { refreshed++; }
+    });
+
+    world._pendingAORefreshChunkKeys.add('0,0');
+    world._pendingAORefreshMeta?.set('0,0', {
+      readyAt: (globalThis.performance?.now?.() ?? Date.now()) - 1,
+      reason: 'runtime-finalize'
+    });
+    world._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
+
+    world._processPendingAORefreshQueue({ maxChunks: 1, budgetMs: 1 });
+
+    assertEqual(refreshed, 0, '流式加载仍活跃时不应执行运行期 AO 收敛');
+    assertTrue(world._pendingAORefreshChunkKeys.has('0,0'), '任务应继续保留在队列中');
 
     teardownEnvironment();
   });

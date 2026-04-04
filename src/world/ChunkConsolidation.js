@@ -395,6 +395,15 @@ export function extendChunk(Chunk) {
     // 重置状态
     this.dirtyBlocks = Math.max(0, this.dirtyBlocks - consolidatedCount);
     this.isConsolidating = false;
+    this.world?._enqueueChunkAndNeighborsForAORefresh?.(`${this.cx},${this.cz}`, {
+      includeNeighbors: true,
+      delayMs: 80,
+      reason: 'consolidation'
+    });
+    if (this.loadState === 'waiting-consolidation') {
+      this.loadState = 'entities-built';
+      this.world?.onChunkConsolidationComplete?.(this);
+    }
 
     if (this.dirtyBlocks > 0) this.scheduleConsolidation();
   };

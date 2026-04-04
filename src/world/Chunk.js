@@ -10,7 +10,7 @@ import { faceCullingSystem } from '../core/FaceCullingSystem.js';
 import { getBlockProperties, createBlockPropsResolver } from '../constants/BlockData.js';
 import { getRotationAngle, parseBlockEntry } from '../utils/OrientationUtils.js';
 import { getStructureRenderDist, belongsToCrossChunkStructure } from '../utils/StructureUtils.js';
-import { createOcclusionChecker, computeBlockAOPacked } from '../utils/AOUtils.js';
+import { createOcclusionChecker, computeBlockAOPacked, packAOData } from '../utils/AOUtils.js';
 import { createChunkNeighborSampler } from './ChunkNeighborUtils.js';
 import { extendChunk as extendWithConsolidation, CHUNK_SIZE, geomMap } from './ChunkConsolidation.js';
 import { extendChunk as extendWithGenerator } from './ChunkGenerator.js';
@@ -18,6 +18,8 @@ import { extendChunk as extendWithPersistence } from './ChunkPersistence.js';
 import { extendChunk as extendWithRenderUtils } from './ChunkRenderUtils.js';
 import { FACE_MASK_ALL } from '../constants/GameConfig.js';
 import { StaticModelInstancedRenderer } from './entities/StaticModelInstancedRenderer.js';
+import { carModel, gunManModel } from '../core/Engine.js';
+import { RealisticTree } from './entities/RealisticTree.js';
 
 // 阴影投射白名单规则：所有“实心且可渲染”的方块都允许投射阴影
 const isSolidShadowCaster = (props) => props.isSolid && props.isRendered !== false;
@@ -27,6 +29,8 @@ const isGlassType = (type) => typeof type === 'string' && type.includes('glass')
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
 const getFaceCullingSystem = () => globalThis._faceCullingSystem || faceCullingSystem;
 const getMaterials = () => globalThis._materials || materials;
+const getCarModel = () => globalThis._carModel || carModel;
+const getGunManModel = () => globalThis._gunManModel || gunManModel;
 
 // 获取方块属性函数 - 优先使用测试环境的模拟
 const getBlockProps = createBlockPropsResolver(getBlockProperties);
@@ -37,6 +41,25 @@ const getBlockProps = createBlockPropsResolver(getBlockProperties);
  * 支持动态更新与后台合并优化系统
  */
 export class Chunk {
+  static getAOImpactedNeighborKeys(x, y, z) {
+    const impacted = [];
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          if (dx === 0 && dy === 0 && dz === 0) continue;
+          impacted.push({
+            x: x + dx,
+            y: y + dy,
+            z: z + dz,
+            key: `${Math.floor(x + dx)},${Math.floor(y + dy)},${Math.floor(z + dz)}`,
+            isOrthogonal: Math.abs(dx) + Math.abs(dy) + Math.abs(dz) === 1
+          });
+        }
+      }
+    }
+    return impacted;
+  }
+
   /**
    * 创建区块实例
    * @param {number} cx - 区块的 X 坐标（区块空间坐标，世界坐标 / 16）
@@ -50,6 +73,13 @@ export class Chunk {
     this.world = world;
     this.group = new THREE.Group();
     this.isReady = false;
+    this.loadState = 'created';
+    this.queuedAssemblyStages = new Set();
+    this.pendingTerrainData = null;
+    this.pendingSnapshot = null;
+    this.pendingRuntimeEntities = null;
+    this.pendingSpecialEntityData = null;
+    this.disposed = false;
 
     // 数据存储
     this.blockData = {};
@@ -330,7 +360,7 @@ export class Chunk {
     this._removeDynamicMesh(x, y, z, key);
 
     // 立即创建动态网格，保证暴露面立刻可见
-    const mesh = this._createDynamicBlockMesh(x, y, z, key, type, parsed.orientation || 0);
+    const mesh = this._createDynamicBlockMesh(x, y, z, key, type, parsed.orientation || 0, { applyAO: false });
     if (!mesh) return;
 
     this.group.add(mesh);
@@ -341,10 +371,8 @@ export class Chunk {
   }
 
   /**
-   * 轻量刷新方块渲染（优先原位更新，不做删旧重建）
-   * 1. 动态网格：原位更新 AO attribute（同步计算，确保当帧渲染正确）
-   * 2. InstancedMesh：按实例索引更新 AO attribute
-   * 3. 异常兜底：回退到重建路径，保证补面及时可见
+   * 轻量刷新方块渲染（仅保证补面立即可见，不做即时 AO）
+   * AO 统一延迟到 consolidation 后由 chunk 级重建收敛，避免交互阶段的中间态 AO 脏块。
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y
    * @param {number} z - 世界坐标 Z
@@ -354,56 +382,15 @@ export class Chunk {
   _refreshBlockRenderLightweight(x, y, z, key, entryOrType) {
     const parsed = parseBlockEntry(entryOrType);
     const type = parsed.type;
-    const orientation = parsed.orientation || 0;
     if (!type || type === 'air' || type === 'collider') return;
 
     const props = getBlockProps(type);
     if (!props.isRendered) return;
 
-    // 轻量路径 1：动态网格原位更新
-    const dynamicMesh = this.dynamicMeshes.get(key);
-    if (dynamicMesh) {
-      if (!props.isSolid || props.isTransparent) return;
-
-      const isOccluding = createOcclusionChecker(
-        { chunk: this, chunks: this.world.chunks },
-        CHUNK_SIZE,
-        getBlockProps
-      );
-      const { aoLow, aoHigh } = computeBlockAOPacked(x, y, z, isOccluding);
-      const geometry = dynamicMesh.geometry;
-      const count = geometry?.attributes?.position?.count || 0;
-      if (count > 0) {
-        let aoLowAttr = geometry.getAttribute('aAoLow');
-        let aoHighAttr = geometry.getAttribute('aAoHigh');
-        let orientationAttr = geometry.getAttribute('aOrientation');
-
-        if (!aoLowAttr || aoLowAttr.array.length !== count) {
-          aoLowAttr = new THREE.BufferAttribute(new Float32Array(count), 1);
-          geometry.setAttribute('aAoLow', aoLowAttr);
-        }
-        if (!aoHighAttr || aoHighAttr.array.length !== count) {
-          aoHighAttr = new THREE.BufferAttribute(new Float32Array(count), 1);
-          geometry.setAttribute('aAoHigh', aoHighAttr);
-        }
-        if (!orientationAttr || orientationAttr.array.length !== count) {
-          orientationAttr = new THREE.BufferAttribute(new Float32Array(count), 1);
-          geometry.setAttribute('aOrientation', orientationAttr);
-        }
-
-        aoLowAttr.array.fill(aoLow);
-        aoHighAttr.array.fill(aoHigh);
-        orientationAttr.array.fill(orientation);
-        aoLowAttr.needsUpdate = true;
-        aoHighAttr.needsUpdate = true;
-        orientationAttr.needsUpdate = true;
-        dynamicMesh.userData = { ...(dynamicMesh.userData || {}), type, orientation };
-        return;
-      }
-    }
-
-    // 轻量路径 2：InstancedMesh 原位更新
-    if (this._updateInstancedBlockAO(x, y, z, key, type, orientation)) {
+    // 原本已经可见的 InstancedMesh 方块不需要重建。
+    // 方块几何本来就是完整立方体，邻块移除后新暴露的面会自然可见。
+    // 若在这里删旧建新，反而容易引入临时 dynamic mesh、黑闪和共面重叠。
+    if (this.visibleKeys.has(key) && !this.dynamicMeshes.has(key)) {
       return;
     }
 
@@ -469,16 +456,12 @@ export class Chunk {
    * @param {number} z - 世界坐标 Z
    */
   _revealNeighbors(x, y, z) {
-    const neighbors = [
-      { dx: 1, dy: 0, dz: 0 }, { dx: -1, dy: 0, dz: 0 },
-      { dx: 0, dy: 1, dz: 0 }, { dx: 0, dy: -1, dz: 0 },
-      { dx: 0, dy: 0, dz: 1 }, { dx: 0, dy: 0, dz: -1 }
-    ];
+    const neighbors = Chunk.getAOImpactedNeighborKeys(x, y, z);
 
-    for (const offset of neighbors) {
-      const nx = x + offset.dx;
-      const ny = y + offset.dy;
-      const nz = z + offset.dz;
+    for (const neighbor of neighbors) {
+      const nx = neighbor.x;
+      const ny = neighbor.y;
+      const nz = neighbor.z;
 
       const nCx = Math.floor(nx / CHUNK_SIZE);
       const nCz = Math.floor(nz / CHUNK_SIZE);
@@ -486,7 +469,7 @@ export class Chunk {
       if (nCx === this.cx && nCz === this.cz) {
         const nKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
         if (this.blockData[nKey]) {
-          if (!this.visibleKeys.has(nKey)) {
+          if (!this.visibleKeys.has(nKey) && neighbor.isOrthogonal) {
             this.addBlockDynamic(nx, ny, nz, this.blockData[nKey]);
           } else {
             this._refreshBlockRenderLightweight(nx, ny, nz, nKey, this.blockData[nKey]);
@@ -512,11 +495,12 @@ export class Chunk {
    * @param {number} orientation - 方块朝向
    * @returns {THREE.Mesh|null} 创建的网格或 null
    */
-  _createDynamicBlockMesh(x, y, z, key, type, orientation) {
+  _createDynamicBlockMesh(x, y, z, key, type, orientation, options = {}) {
     const props = getBlockProps(type);
     if (!props.isRendered || !this.visibleKeys.has(key)) {
       return null;
     }
+    const applyAO = options.applyAO === true;
 
     const geometry = geomMap[props.geometryType] || geomMap['default'];
     let material = getMaterials().getMaterial(type);
@@ -533,17 +517,23 @@ export class Chunk {
     mesh.userData = { type, orientation };
     mesh.frustumCulled = false;
 
-    // 设置 AO 属性（同步计算，确保当帧渲染正确）
+    // 动态交互期不做即时 AO，统一延迟到 consolidation 后收敛。
+    // 但为了避免临时 mesh 因缺少 AO attribute 而出现黑闪，这里会写入“中性 AO”。
     if (props.isSolid && !props.isTransparent) {
       mesh.geometry = geometry.clone();
       const count = mesh.geometry.attributes.position.count;
-
-      const isOccluding = createOcclusionChecker(
-        { chunk: this, chunks: this.world.chunks },
-        CHUNK_SIZE,
-        getBlockProps
-      );
-      const { aoLow, aoHigh } = computeBlockAOPacked(x, y, z, isOccluding);
+      let aoLow = 0;
+      let aoHigh = 0;
+      if (applyAO) {
+        const isOccluding = createOcclusionChecker(
+          { chunk: this, chunks: this.world.chunks },
+          CHUNK_SIZE,
+          getBlockProps
+        );
+        ({ aoLow, aoHigh } = computeBlockAOPacked(x, y, z, isOccluding));
+      } else {
+        ({ aoLow, aoHigh } = packAOData(new Uint8Array(24).fill(3)));
+      }
 
       const aoLowArray = new Float32Array(count);
       const aoHighArray = new Float32Array(count);
@@ -876,6 +866,140 @@ export class Chunk {
     return this.entityCollisionIndex.get(key) || null;
   }
 
+  /**
+   * 接收 Worker 生成结果，但暂不立即在主线程完成全部装配
+   * @param {object} payload - Worker 回包数据
+   */
+  acceptWorkerResult(payload = {}) {
+    const {
+      d,
+      solidBlocks,
+      realisticTrees,
+      modGunMan,
+      rovers,
+      allBlockTypes,
+      visibleKeys,
+      snapshot,
+      structureCenters
+    } = payload;
+
+    if (allBlockTypes) this.blockData = allBlockTypes;
+    this.visibleKeys = new Set(visibleKeys || []);
+    this.solidBlocks = new Set(solidBlocks || []);
+    this.structureCenters = structureCenters || [];
+    this.entities.staticTrees = (structureCenters || [])
+      .filter(c => c.type === 'static_tree')
+      .map(c => ({ x: c.x, y: c.y, z: c.z }));
+    this.entities.realisticTrees = realisticTrees || [];
+
+    this.pendingTerrainData = d || {};
+    this.pendingSnapshot = snapshot || null;
+    this.pendingRuntimeEntities = {
+      zombieNests: snapshot?.entities?.zombieNests || [],
+      turrets: snapshot?.entities?.turrets || [],
+      minecarts: snapshot?.entities?.minecarts || []
+    };
+    this.pendingSpecialEntityData = {
+      realisticTrees: realisticTrees || [],
+      modGunMan: modGunMan || [],
+      rovers: rovers || []
+    };
+    this.loadState = 'worker-ready';
+  }
+
+  /**
+   * 构建地形 InstancedMesh
+   * @returns {boolean} 是否完成该阶段
+   */
+  assembleTerrainPhase() {
+    if (this.loadState !== 'worker-ready') return this.loadState === 'terrain-built' || this.loadState === 'entities-built' || this.loadState === 'finalized';
+    this.buildMeshes(this.pendingTerrainData || {});
+    this.loadState = 'terrain-built';
+    return true;
+  }
+
+  /**
+   * 构建实体渲染、恢复运行时实例并落地快照
+   * @returns {boolean} 是否完成该阶段
+   */
+  assembleEntityPhase() {
+    if (this.loadState !== 'terrain-built') return this.loadState === 'entities-built' || this.loadState === 'finalized';
+
+    const realisticTrees = this.pendingSpecialEntityData?.realisticTrees || [];
+    realisticTrees.forEach(pos => {
+      RealisticTree.generate(pos.x, pos.y, pos.z, this, null, true);
+    });
+    RealisticTree.createInstancedForChunk(this);
+
+    const gunman = this.pendingSpecialEntityData?.modGunMan || [];
+    const rovers = this.pendingSpecialEntityData?.rovers || [];
+    this.loadSpecialEntityInstances('modGunMan', gunman, getGunManModel());
+    this.loadSpecialEntityInstances('rover', rovers, getCarModel());
+
+    const snapshot = this.pendingSnapshot;
+    if (snapshot) {
+      const persistence = getPersistenceService();
+      const chunkKey = `${this.cx},${this.cz}`;
+      const existingData = persistence?.cache?.get?.(chunkKey);
+      if (existingData?.entities) {
+        snapshot.entities = {
+          ...existingData.entities,
+          ...snapshot.entities,
+          turrets: existingData.entities.turrets || snapshot.entities?.turrets || []
+        };
+      }
+      if (persistence?.cache?.set) {
+        persistence.cache.set(chunkKey, snapshot);
+      }
+      this._pendingPersistenceFlush = true;
+    }
+
+    this.loadState = 'entities-built';
+    return true;
+  }
+
+  /**
+   * finalize 阶段：必要时 consolidation，之后才标记 ready
+   */
+  finalizeAssemblyPhase() {
+    if (this.loadState === 'finalized') return true;
+    if (this.loadState !== 'entities-built' && this.loadState !== 'waiting-consolidation') return false;
+
+    if (this.loadState !== 'waiting-consolidation' && this.dirtyBlocks > 0) {
+      this.loadState = 'waiting-consolidation';
+      this.consolidate();
+      return false;
+    }
+
+    if (this._pendingPersistenceFlush) {
+      this._pendingPersistenceFlush = false;
+      getPersistenceService()?.saveChunkData?.(this.cx, this.cz, this.pendingSnapshot);
+    }
+
+    const zombieNests = this.pendingRuntimeEntities?.zombieNests;
+    if (Array.isArray(zombieNests) && zombieNests.length > 0) {
+      this.world?.zombieNestManager?.restoreNestsForChunk?.(this.cx, this.cz, zombieNests);
+    }
+    const turrets = this.pendingRuntimeEntities?.turrets;
+    if (Array.isArray(turrets) && turrets.length > 0) {
+      this.world?.turretManager?.restoreTurretsForChunk?.(this.cx, this.cz, turrets);
+    }
+    const minecarts = this.pendingRuntimeEntities?.minecarts;
+    if (Array.isArray(minecarts) && minecarts.length > 0) {
+      this.world?.minecartManager?.restoreMinecartsForChunk?.(this.cx, this.cz, minecarts);
+    }
+
+    this._registerLightSources();
+    this.isReady = true;
+    this.loadState = 'finalized';
+    this.pendingTerrainData = null;
+    this.pendingSpecialEntityData = null;
+    this.pendingRuntimeEntities = null;
+    this.pendingSnapshot = null;
+    this.world?.onChunkFinalized?.(this);
+    return true;
+  }
+
   // ============================================================
   // 公共 API
   // ============================================================
@@ -996,7 +1120,7 @@ export class Chunk {
     }
 
     // 9. 创建新的动态网格
-    const mesh = this._createDynamicBlockMesh(x, y, z, key, type, blockOrientation);
+    const mesh = this._createDynamicBlockMesh(x, y, z, key, type, blockOrientation, { applyAO: false });
     if (mesh) {
       this.group.add(mesh);
       this.dynamicMeshes.set(key, mesh);
@@ -1188,12 +1312,8 @@ export class Chunk {
         getPersistenceService().recordChangeForChunk(this.cx, this.cz, px, py, pz, 'air');
 
         // 收集周围 6 个方向的邻居坐标
-        const offsets = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
-        offsets.forEach(([dx, dy, dz]) => {
-          const nx = px + dx;
-          const ny = py + dy;
-          const nz = pz + dz;
-          neighborsToUpdate.add(`${nx},${ny},${nz}`);
+        Chunk.getAOImpactedNeighborKeys(px, py, pz).forEach(({ key: neighborKey }) => {
+          neighborsToUpdate.add(neighborKey);
         });
       }
     });

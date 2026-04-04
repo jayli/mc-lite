@@ -3,20 +3,16 @@
  * 负责区块生成、实体生成等功能
  */
 import * as THREE from 'three';
-import { RealisticTree } from './entities/RealisticTree.js';
 import { getBlockProperties, createBlockPropsResolver } from '../constants/BlockData.js';
 import { getRotationAngle } from '../utils/OrientationUtils.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { persistenceService } from '../services/PersistenceService.js';
 import { materials } from '../core/MaterialManager.js';
-import { carModel, gunManModel } from '../core/Engine.js';
 import { geomMap, worldWorker, workerCallbacks } from './ChunkConsolidation.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
 const getMaterials = () => globalThis._materials || materials;
-const getCarModel = () => globalThis._carModel || carModel;
-const getGunManModel = () => globalThis._gunManModel || gunManModel;
 
 // 获取方块属性函数 - 优先使用测试环境的模拟
 const getBlockProps = createBlockPropsResolver(getBlockProperties);
@@ -38,97 +34,8 @@ export function extendChunk(Chunk) {
 
       // 注册 Worker 回调
       workerCallbacks.set(callbackKey, (data) => {
-        const { d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot: newSnapshot, structureCenters } = data;
-
-        // 1. 同步全量方块数据和可见性状态 (完全替换，确保剔除状态同步)
-        if (allBlockTypes) this.blockData = allBlockTypes;
-        if (visibleKeys) {
-          this.visibleKeys = new Set(visibleKeys);
-        }
-        if (solidBlocks) {
-          this.solidBlocks = new Set(solidBlocks);
-        }
-
-        // 1.1 保存结构中心列表，用于跨 Chunk 碰撞体生成
-        this.structureCenters = structureCenters || [];
-
-        // 1.1.1 从 structureCenters 提取 static_tree 并保存，用于 consolidate 时恢复
-        this.entities.staticTrees = (structureCenters || [])
-          .filter(c => c.type === 'static_tree')
-          .map(c => ({ x: c.x, y: c.y, z: c.z }));
-
-        // 1.2 保存实体快照，用于后续合并
-        this.entities.realisticTrees = realisticTrees || [];
-
-        // 2. 构建渲染网格 (InstancedMesh)
-        // AO 由 Worker 统一计算并随 d 回包（aoLow/aoHigh），
-        // 不在 Chunk 首次加载时于主线程再次重算，避免加载卡顿。
-        this.buildMeshes(d);
-
-        // 3. 处理真实感树木 (在主线程生成，因为涉及复杂 Mesh 克隆)
-        // 使用实例化渲染优化：记录树木数据，后续批量创建 InstancedMesh
-        realisticTrees.forEach(pos => {
-          RealisticTree.generate(pos.x, pos.y, pos.z, this, null, true);
-        });
-
-        // 3.0 创建实例化树木网格（替换克隆的 Mesh）
-        const instancedResult = RealisticTree.createInstancedForChunk(this);
-        if (instancedResult) {
-          console.log(`Chunk ${this.cx},${this.cz}: Created ${instancedResult.trunkCount} instanced trees`);
-        }
-
-        // 3.1 加载模型人/火星车：实例化渲染 + 独立碰撞占位索引
-        this.loadSpecialEntityInstances('modGunMan', modGunMan || [], getGunManModel());
-        this.loadSpecialEntityInstances('rover', rovers || [], getCarModel());
-
-        // 4. 重要：在生成完成后，立即保存快照数据
-        if (newSnapshot) {
-          const persistence = getPersistenceService();
-          // 合并策略：保留缓存中现有的 entities（如炮塔），Worker 只负责 blocks
-          // 因为 Worker 不会保留所有实体类型（如 turrets）
-          const chunkKey = `${this.cx},${this.cz}`;
-          const existingData = persistence?.cache?.get?.(chunkKey);
-          if (existingData?.entities) {
-            // 保留 Worker 返回的 entities，但补充缓存中有而 Worker 没有的实体类型
-            newSnapshot.entities = {
-              ...existingData.entities,
-              ...newSnapshot.entities,
-              // 确保这些实体类型不会被 Worker 的空数组覆盖
-              turrets: existingData.entities.turrets || newSnapshot.entities?.turrets || []
-            };
-          }
-
-          // 先更新内存缓存，避免刚加载完成后立刻修改时写入不到缓存
-          // 测试环境的 mock persistence 可能没有 cache 字段，需要兼容
-          if (persistence?.cache?.set) {
-            persistence.cache.set(chunkKey, newSnapshot);
-          }
-          persistence?.saveChunkData?.(this.cx, this.cz, newSnapshot);
-        }
-
-        // 5. 恢复该 Chunk 中的丧尸巢穴运行时实例（直接按快照记录重建，无需扫描）
-        const zombieNests = newSnapshot?.entities?.zombieNests;
-        if (Array.isArray(zombieNests) && zombieNests.length > 0) {
-          this.world?.zombieNestManager?.restoreNestsForChunk?.(this.cx, this.cz, zombieNests);
-        }
-
-        // 6. 恢复该 Chunk 中的炮塔运行时实例（直接按快照记录重建，无需扫描）
-        const turrets = newSnapshot?.entities?.turrets;
-        if (Array.isArray(turrets) && turrets.length > 0) {
-          this.world?.turretManager?.restoreTurretsForChunk?.(this.cx, this.cz, turrets);
-        }
-
-        // 7. 恢复该 Chunk 中的矿车运行时实例（直接按快照记录重建，无需扫描）
-        const minecarts = newSnapshot?.entities?.minecarts;
-        if (Array.isArray(minecarts) && minecarts.length > 0) {
-          this.world?.minecartManager?.restoreMinecartsForChunk?.(this.cx, this.cz, minecarts);
-        }
-
-        this.isReady = true;
-
-        // 8. 注册该 Chunk 中的所有光源方块
-        this._registerLightSources();
-
+        this.acceptWorkerResult(data);
+        this.world?.onChunkWorkerReady?.(this);
         resolve();
       });
 

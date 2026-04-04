@@ -8,6 +8,7 @@ import { persistenceService } from '../services/PersistenceService.js';
 import { noise } from '../utils/MathUtils.js';
 import { ParticleSystem } from './effects/ParticleSystem.js';
 import { parseBlockEntry } from '../utils/OrientationUtils.js';
+import { ChunkAssemblyScheduler } from './ChunkAssemblyScheduler.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
@@ -19,6 +20,11 @@ const getParticleSystem = () => globalThis._ParticleSystem || ParticleSystem;
 const CHUNK_SIZE = 16;
 /** 渲染距离（以区块为单位），玩家周围 3x3 的区块将被加载 */
 const RENDER_DIST = 3;
+const RUNTIME_FINALIZE_AO_DELAY_MS = 900;
+const CONSOLIDATION_AO_DELAY_MS = 120;
+const RUNTIME_AO_BUDGET_MS = 0.5;
+const RUNTIME_AO_MAX_CHUNKS = 1;
+const RUNTIME_AO_IDLE_GRACE_MS = 1500;
 /**
  * 世界管理器类
  * 管理游戏世界中的所有区块、粒子效果和方块操作，是世界数据的中央访问点
@@ -83,6 +89,20 @@ export class World {
 
     // 阴影按需刷新回调（由 Game/Engine 注入）
     this.shadowUpdateCallback = null;
+    this.pendingShadowUpdate = false;
+    this.shadowUpdateScheduledAt = 0;
+
+    // 世界启动与 Chunk 装配状态
+    this.bootstrapState = {
+      phase: 'bootstrapping',
+      targetChunkKeys: new Set(),
+      finalizedChunkKeys: new Set()
+    };
+    this.chunkAssemblyScheduler = new ChunkAssemblyScheduler(this);
+    this._staticTreeTerrainBoostChunkKeys = new Set();
+    this._pendingAORefreshChunkKeys = new Set();
+    this._pendingAORefreshMeta = new Map();
+    this._lastStreamingActivityAt = 0;
   }
 
   /**
@@ -99,7 +119,215 @@ export class World {
    */
   requestShadowMapUpdate(reason = 'world-change') {
     if (!this.shadowUpdateCallback) return;
+    if (this.bootstrapState.phase !== 'runtime-streaming') {
+      this.pendingShadowUpdate = true;
+      return;
+    }
+
+    const now = globalThis.performance?.now?.() ?? Date.now();
+    if (now - this.shadowUpdateScheduledAt < 200) {
+      this.pendingShadowUpdate = true;
+      return;
+    }
+
+    this.shadowUpdateScheduledAt = now;
+    this.pendingShadowUpdate = false;
     this.shadowUpdateCallback(reason);
+  }
+
+  flushShadowUpdates(reason = 'world-change') {
+    if (!this.shadowUpdateCallback || !this.pendingShadowUpdate) return;
+    this.pendingShadowUpdate = false;
+    this.shadowUpdateScheduledAt = globalThis.performance?.now?.() ?? Date.now();
+    this.shadowUpdateCallback(reason);
+  }
+
+  isGameplayReady() {
+    return this.bootstrapState.phase === 'runtime-streaming';
+  }
+
+  _ensureBootstrapTargets(cx, cz) {
+    if (this.bootstrapState.phase !== 'bootstrapping') return;
+    if (this.bootstrapState.targetChunkKeys.size > 0) return;
+    for (let i = -RENDER_DIST; i <= RENDER_DIST; i++) {
+      for (let j = -RENDER_DIST; j <= RENDER_DIST; j++) {
+        this.bootstrapState.targetChunkKeys.add(`${cx + i},${cz + j}`);
+      }
+    }
+  }
+
+  _computeChunkAssemblyPriority(chunk) {
+    const key = `${chunk.cx},${chunk.cz}`;
+    if (this.bootstrapState.phase === 'bootstrapping' && this.bootstrapState.targetChunkKeys.has(key)) {
+      return 1000;
+    }
+    if (this._staticTreeTerrainBoostChunkKeys.has(key)) {
+      return 900;
+    }
+    const playerPos = this._lastPlayerPos || new THREE.Vector3();
+    const playerCx = Math.floor(playerPos.x / CHUNK_SIZE);
+    const playerCz = Math.floor(playerPos.z / CHUNK_SIZE);
+    const dist = Math.abs(chunk.cx - playerCx) + Math.abs(chunk.cz - playerCz);
+    return Math.max(0, 100 - dist);
+  }
+
+  _markStaticTreeTerrainBoostFromChunk(chunk) {
+    if (!chunk?.structureCenters?.length) return;
+
+    for (const center of chunk.structureCenters) {
+      if (center?.type !== 'static_tree') continue;
+
+      const minCx = Math.floor((center.x - 8) / CHUNK_SIZE);
+      const maxCx = Math.floor((center.x + 8) / CHUNK_SIZE);
+      const minCz = Math.floor((center.z - 8) / CHUNK_SIZE);
+      const maxCz = Math.floor((center.z + 8) / CHUNK_SIZE);
+
+      for (let cx = minCx; cx <= maxCx; cx++) {
+        for (let cz = minCz; cz <= maxCz; cz++) {
+          const key = `${cx},${cz}`;
+          this._staticTreeTerrainBoostChunkKeys.add(key);
+          const targetChunk = this.chunks.get(key);
+          if (targetChunk?.loadState === 'worker-ready') {
+            this.chunkAssemblyScheduler.enqueue(targetChunk, 'terrain', 900);
+          }
+        }
+      }
+    }
+  }
+
+  onChunkWorkerReady(chunk) {
+    if (!chunk) return;
+    const key = `${chunk.cx},${chunk.cz}`;
+    this._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
+    if (this.bootstrapState.phase === 'bootstrapping' && this.bootstrapState.targetChunkKeys.has(key)) {
+      chunk.deferConsolidation = true;
+    }
+    this._markStaticTreeTerrainBoostFromChunk(chunk);
+    this.chunkAssemblyScheduler.enqueue(chunk, 'terrain', this._computeChunkAssemblyPriority(chunk));
+  }
+
+  onChunkConsolidationComplete(chunk) {
+    if (!chunk) return;
+    this._enqueueChunkAndNeighborsForAORefresh(`${chunk.cx},${chunk.cz}`, {
+      includeNeighbors: true,
+      delayMs: CONSOLIDATION_AO_DELAY_MS,
+      reason: 'consolidation'
+    });
+    this.chunkAssemblyScheduler.enqueue(chunk, 'finalize', this._computeChunkAssemblyPriority(chunk));
+  }
+
+  onChunkFinalized(chunk) {
+    if (!chunk) return;
+    const key = `${chunk.cx},${chunk.cz}`;
+    if (this.bootstrapState.phase === 'runtime-streaming') {
+      this._enqueueChunkAndNeighborsForAORefresh(key, {
+        includeNeighbors: false,
+        delayMs: RUNTIME_FINALIZE_AO_DELAY_MS,
+        reason: 'runtime-finalize'
+      });
+    }
+    if (this.bootstrapState.phase === 'bootstrapping' && this.bootstrapState.targetChunkKeys.has(key)) {
+      this.bootstrapState.finalizedChunkKeys.add(key);
+      if (this.bootstrapState.finalizedChunkKeys.size >= this.bootstrapState.targetChunkKeys.size) {
+        this.bootstrapState.phase = 'runtime-streaming';
+        for (const targetKey of this.bootstrapState.targetChunkKeys) {
+          const targetChunk = this.chunks.get(targetKey);
+          if (targetChunk) targetChunk.deferConsolidation = false;
+        }
+        this.flushShadowUpdates('bootstrap-finished');
+      }
+    }
+  }
+
+  processAssemblyQueues() {
+    const isBootstrap = this.bootstrapState.phase === 'bootstrapping';
+    this.chunkAssemblyScheduler.processWithinBudget({
+      budgetMs: isBootstrap ? 12 : 2.5,
+      maxTasks: isBootstrap ? 8 : 2
+    });
+  }
+
+  _enqueueChunkAndNeighborsForAORefresh(chunkKey, options = {}) {
+    if (!chunkKey) return;
+    const [cx, cz] = chunkKey.split(',').map(Number);
+    const includeNeighbors = options.includeNeighbors !== false;
+    const delayMs = Number.isFinite(options.delayMs) ? options.delayMs : 0;
+    const reason = options.reason || 'unknown';
+    const readyAt = (globalThis.performance?.now?.() ?? Date.now()) + delayMs;
+    const keys = includeNeighbors
+      ? [
+          `${cx},${cz}`,
+          `${cx + 1},${cz}`,
+          `${cx - 1},${cz}`,
+          `${cx},${cz + 1}`,
+          `${cx},${cz - 1}`
+        ]
+      : [`${cx},${cz}`];
+    keys.forEach((key) => {
+      this._pendingAORefreshChunkKeys.add(key);
+      const prev = this._pendingAORefreshMeta.get(key);
+      if (!prev || readyAt < prev.readyAt) {
+        this._pendingAORefreshMeta.set(key, { readyAt, reason });
+      }
+    });
+  }
+
+  _processPendingAORefreshQueue(options = {}) {
+    if (this._pendingAORefreshChunkKeys.size === 0) return 0;
+    const maxChunks = Number.isFinite(options.maxChunks) ? options.maxChunks : RUNTIME_AO_MAX_CHUNKS;
+    const budgetMs = Number.isFinite(options.budgetMs) ? options.budgetMs : RUNTIME_AO_BUDGET_MS;
+    if (maxChunks <= 0 || budgetMs <= 0) return 0;
+
+    const start = globalThis.performance?.now?.() ?? Date.now();
+    const currentTime = start;
+    let processed = 0;
+    for (const key of [...this._pendingAORefreshChunkKeys]) {
+      if (processed >= maxChunks) break;
+      const elapsed = (globalThis.performance?.now?.() ?? Date.now()) - start;
+      if (elapsed >= budgetMs) break;
+
+      const meta = this._pendingAORefreshMeta.get(key);
+      if (meta && meta.readyAt > currentTime) continue;
+      if (
+        meta?.reason === 'runtime-finalize' &&
+        currentTime - this._lastStreamingActivityAt < RUNTIME_AO_IDLE_GRACE_MS
+      ) {
+        continue;
+      }
+      const chunk = this.chunks.get(key);
+      if (!chunk) {
+        this._pendingAORefreshChunkKeys.delete(key);
+        this._pendingAORefreshMeta.delete(key);
+        continue;
+      }
+      if (!chunk.isReady || chunk.isConsolidating) {
+        continue;
+      }
+      chunk.rebuildInstancedAOFromWorld?.();
+      this._pendingAORefreshChunkKeys.delete(key);
+      this._pendingAORefreshMeta.delete(key);
+      processed++;
+    }
+    return processed;
+  }
+
+  async drainAssemblyQueues(options = {}) {
+    await this.chunkAssemblyScheduler.drainAll(options);
+
+    let iterations = 0;
+    const maxIterations = Number.isFinite(options.maxIterations) ? options.maxIterations : 200;
+    while (this.bootstrapState.phase === 'bootstrapping' && iterations < maxIterations) {
+      this.processAssemblyQueues();
+      if (!this.chunkAssemblyScheduler.hasWork()) {
+        const outstanding = [...this.bootstrapState.targetChunkKeys].some((key) => {
+          const chunk = this.chunks.get(key);
+          return chunk && !chunk.isReady;
+        });
+        if (!outstanding) break;
+      }
+      await Promise.resolve();
+      iterations++;
+    }
   }
 
   /**
@@ -109,10 +337,12 @@ export class World {
    */
   update(playerPos = new THREE.Vector3(), dt = 0) {
     let chunkTopologyChanged = false;
+    this._lastPlayerPos = playerPos.clone ? playerPos.clone() : new THREE.Vector3(playerPos.x, playerPos.y, playerPos.z);
 
     // 计算玩家所在的区块坐标
     const cx = Math.floor(playerPos.x / CHUNK_SIZE);
     const cz = Math.floor(playerPos.z / CHUNK_SIZE);
+    this._ensureBootstrapTargets(cx, cz);
 
     // --- 加载新区块 ---
     // 遍历渲染距离范围内的所有坐标，如果未加载则创建新区块
@@ -177,6 +407,17 @@ export class World {
       this._lastReadyChunkCount = readyChunkCount;
       this._lastReadyChunkKeys = readyChunkKeys;
       this.requestShadowMapUpdate('chunk-ready-count-changed');
+    }
+
+    this.processAssemblyQueues();
+    this._processPendingAORefreshQueue(this.bootstrapState.phase === 'runtime-streaming'
+      ? { maxChunks: RUNTIME_AO_MAX_CHUNKS, budgetMs: RUNTIME_AO_BUDGET_MS }
+      : { maxChunks: 0, budgetMs: 0 });
+    if (this.pendingShadowUpdate && this.bootstrapState.phase === 'runtime-streaming') {
+      const now = globalThis.performance?.now?.() ?? Date.now();
+      if (now - this.shadowUpdateScheduledAt >= 200) {
+        this.flushShadowUpdates('batched-world-change');
+      }
     }
 
     // 移除 _processPendingAORefreshQueue 调用：不再需要 AO 边界重算
