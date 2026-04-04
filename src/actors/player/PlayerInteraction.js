@@ -745,7 +745,9 @@ export class PlayerInteraction {
         for (const [dx, dy, dz] of neighborOffsets) {
           if (this.player.physics.isSolid(rx + dx, ry + dy, rz + dz)) {
             hasSolidNeighbor = true;
-            if (this.player._direction.dot(new THREE.Vector3(dx, dy, dz).normalize()) > 0.01) { allInvisible = false; break; }
+            // 使用预分配的临时向量避免 GC
+            this.player._tempDirVector.set(dx, dy, dz).normalize();
+            if (this.player._direction.dot(this.player._tempDirVector) > 0.01) { allInvisible = false; break; }
           }
         }
         if (hasSolidNeighbor && allInvisible) { if (this.tryPlaceBlock(rx, ry, rz, type)) { this.swing(); return; } }

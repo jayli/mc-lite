@@ -220,6 +220,7 @@ export class Engine {
 
     this._tmpVec = new THREE.Vector3();
     this._lastUpdatePos = new THREE.Vector3(Infinity, Infinity, Infinity);
+    this._underwaterColor = new THREE.Color(0x103060); // 预分配水下颜色对象避免GC
 
     this.createSun();
     this.createMoon();
@@ -793,20 +794,20 @@ export class Engine {
     const waterLevel = WATER_LEVEL_OFFSET;
 
     // 定义噪声生成函数，用于地形和水面效果计算
-    const getNoise = (x, z, scale) => {
+    const getNoise = this._getNoise || (this._getNoise = (x, z, scale) => {
       const nx = x + WORLD_CONFIG.SEED, nz = z + WORLD_CONFIG.SEED;
       return Math.sin(nx * scale) * 2 + Math.cos(nz * scale) * 2;
-    };
+    });
 
     // 定义地形高度计算函数，用于判断当前位置是否靠近海洋
-    const getHeight = (x, z) => {
+    const getHeight = this._getHeight || (this._getHeight = (x, z) => {
       const h = getNoise(x, z, 0.08) + getNoise(x, z, 0.02) * 3;
       const temp = getNoise(x, z, 0.01);
       const hum = getNoise(x + 1000, z + 1000, 0.015);
       if (temp < -1.5) return h * 0.5 + 2;
       if (temp > -1.5 && temp < -0.8 && hum > 0.5) return h * 0.3 - 2;
       return h;
-    };
+    });
 
     let isNearOcean = false;
     if (getHeight(camX, camZ) < -0.8) {
@@ -824,7 +825,7 @@ export class Engine {
         this.scene.fog.color.set(0x103060);    // 设置水下雾的颜色为深蓝色
         this.scene.fog.near = 0.1;             // 设置水下雾的近距范围
         this.scene.fog.far = 15;               // 设置水下雾的远距范围，较短的距离增强水下效果
-        this.scene.background = new THREE.Color(0x103060); // 水下背景同步为雾色，避免远处边界突变
+        this.scene.background = this._underwaterColor; // 使用预分配的颜色对象
         this.isUnderwater = true;              // 标记玩家处于水下状态
 
         if (this.waterMaterial) {

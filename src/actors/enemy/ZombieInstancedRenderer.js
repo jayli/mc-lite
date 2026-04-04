@@ -162,12 +162,11 @@ export class ZombieInstancedRenderer {
     this.dummy = new THREE.Object3D();
     this.parentDummy = new THREE.Object3D();
     this._tempMatrix = new THREE.Matrix4();
-    this.color = new THREE.Color();
   }
 
   // --------------------------------------------------------------------------
   // 初始化方法
-  // --------------------------------------------------------------------------
+  //--------------------------------------------------------------------------
 
   /**
    * 初始化共享资源
@@ -331,7 +330,12 @@ export class ZombieInstancedRenderer {
   initializeInstanceColors(mesh) {
     if (!mesh.setColorAt) return;
 
-    const defaultColor = new THREE.Color(0xffffff);
+    // 使用静态变量避免重复创建 Color 对象
+    if (!ZombieInstancedRenderer._defaultColor) {
+      ZombieInstancedRenderer._defaultColor = new THREE.Color(0xffffff);
+    }
+    const defaultColor = ZombieInstancedRenderer._defaultColor;
+
     for (let i = 0; i < this.maxCount; i++) {
       mesh.setColorAt(i, defaultColor);
     }

@@ -176,6 +176,7 @@ export class Player {
     // 性能优化：池与复用
     this._tempVector = new THREE.Vector3();              // 临时向量对象，用于避免频繁创建新向量
     this._direction = new THREE.Vector3();               // 临时方向向量，用于存储计算中的方向
+    this._tempDirVector = new THREE.Vector3();           // 临时方向向量，用于邻居偏移计算
     this._dummyMatrix = new THREE.Matrix4();             // 临时矩阵对象，用于转换操作
     this._dummyQuaternion = new THREE.Quaternion();      // 临时四元数对象，用于旋转操作
     this._dummyScale = new THREE.Vector3();              // 临时缩放向量，用于提取变换矩阵中的缩放分量

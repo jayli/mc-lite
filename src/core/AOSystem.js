@@ -48,6 +48,10 @@ export class AOSystem {
       console.warn('AOSystem: No worker provided on initialization, will be set later');
     }
 
+    // 预分配临时对象避免GC
+    this._tmpMatrix = new THREE.Matrix4();
+    this._tmpPosition = new THREE.Vector3();
+
     console.log('AOSystem initialized');
   }
 
@@ -206,14 +210,12 @@ export class AOSystem {
     let needsUpdate = false;
 
     for (let i = 0; i < instanceCount; i++) {
-      // 获取实例位置
-      const matrix = new THREE.Matrix4();
-      mesh.getMatrixAt(i, matrix);
-      const position = new THREE.Vector3();
-      position.setFromMatrixPosition(matrix);
+      // 获取实例位置（使用预分配对象避免GC）
+      mesh.getMatrixAt(i, this._tmpMatrix);
+      this._tmpPosition.setFromMatrixPosition(this._tmpMatrix);
 
       // 查找对应的 AO 数据
-      const key = `${Math.round(position.x)},${Math.round(position.y)},${Math.round(position.z)}`;
+      const key = `${Math.round(this._tmpPosition.x)},${Math.round(this._tmpPosition.y)},${Math.round(this._tmpPosition.z)}`;
       const ao = aoMap.get(key);
 
       if (ao) {
