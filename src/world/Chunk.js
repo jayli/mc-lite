@@ -339,7 +339,7 @@ export class Chunk {
 
   /**
    * 轻量刷新方块渲染（优先原位更新，不做删旧重建）
-   * 1. 动态网格：原位更新 AO attribute
+   * 1. 动态网格：原位更新 AO attribute（同步计算，确保当帧渲染正确）
    * 2. InstancedMesh：按实例索引更新 AO attribute
    * 3. 异常兜底：回退到重建路径，保证补面及时可见
    * @param {number} x - 世界坐标 X
@@ -409,7 +409,7 @@ export class Chunk {
   }
 
   /**
-   * 原位更新 InstancedMesh 中单个实例的 AO/朝向属性
+   * 原位更新 InstancedMesh 中单个实例的 AO/朝向属性（同步）
    * @returns {boolean} 是否更新成功
    */
   _updateInstancedBlockAO(x, y, z, key, type, orientation = 0) {
@@ -432,10 +432,10 @@ export class Chunk {
     );
     const { aoLow, aoHigh } = computeBlockAOPacked(x, y, z, isOccluding);
 
+    const instanceCount = mesh.count;
     let aoLowAttr = mesh.geometry.getAttribute('aAoLow');
     let aoHighAttr = mesh.geometry.getAttribute('aAoHigh');
     let orientationAttr = mesh.geometry.getAttribute('aOrientation');
-    const instanceCount = mesh.count;
 
     if (!aoLowAttr || aoLowAttr.array.length !== instanceCount) {
       aoLowAttr = new THREE.InstancedBufferAttribute(new Float32Array(instanceCount), 1);
@@ -530,19 +530,16 @@ export class Chunk {
     mesh.userData = { type, orientation };
     mesh.frustumCulled = false;
 
-    // 设置 AO 属性
+    // 设置 AO 属性（同步计算，确保当帧渲染正确）
     if (props.isSolid && !props.isTransparent) {
       mesh.geometry = geometry.clone();
       const count = mesh.geometry.attributes.position.count;
 
-      // 计算 AO（同步计算，确保 FrozenMountain 山体内 AO 正确显示）
       const isOccluding = createOcclusionChecker(
         { chunk: this, chunks: this.world.chunks },
         CHUNK_SIZE,
         getBlockProps
       );
-
-      // 计算 AO 数据（打包格式）
       const { aoLow, aoHigh } = computeBlockAOPacked(x, y, z, isOccluding);
 
       const aoLowArray = new Float32Array(count);
@@ -574,7 +571,7 @@ export class Chunk {
 
   /**
    * 基于当前世界已加载数据，重算本 Chunk 所有 InstancedMesh 的 AO
-   * 主要用于邻接 Chunk 延迟就绪后修正边界 AO，避免“同类方块明暗不一致”
+   * 主要用于邻接 Chunk 延迟就绪后修正边界 AO，避免"同类方块明暗不一致"
    */
   rebuildInstancedAOFromWorld() {
     if (!this.isReady) return;

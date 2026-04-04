@@ -18,6 +18,10 @@ export const CONSOLIDATION_DELAY = 1000;
 export const worldWorker = new Worker(new URL('../workers/WorldWorker.js', import.meta.url), { type: 'module' });
 export const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函数
 
+// AO Worker 实例（基于 FaceCullingWorker，专用于动态交互 AO 计算）
+export const aoWorker = new Worker(new URL('../workers/FaceCullingWorker.js', import.meta.url), { type: 'module' });
+export const aoCallbacks = new Map(); // AO Worker 回调映射
+
 // 共享几何体定义 - 用于优化渲染性能，避免在每个区块中重复创建相同的几何体，减少 GPU 内存占用
 
 /**
@@ -268,6 +272,19 @@ export function extendChunk(Chunk) {
     });
   };
 
+  // 注册 AO Worker 消息处理器
+  aoWorker.onmessage = (e) => {
+    const { id, data } = e.data;
+    if (id && aoCallbacks.has(id)) {
+      aoCallbacks.get(id)(data);
+      aoCallbacks.delete(id);
+    }
+  };
+
+  aoWorker.onerror = (e) => {
+    console.error('AOWorker Error:', e.message, 'at', e.filename, ':', e.lineno);
+  };
+
   /**
    * 调度后台合并任务
    * 实现防抖和阈值立即触发逻辑
@@ -365,9 +382,8 @@ export function extendChunk(Chunk) {
     // 清理旧网格
     this._cleanupOldMeshes(consolidatedMeshKeys);
 
-    // 构建新的渲染网格
+    // 构建新的渲染网格（Worker 已计算 AO，buildMeshes 直接应用）
     this.buildMeshes(d);
-    this.rebuildInstancedAOFromWorld?.();
 
     // 恢复宝箱状态
     this._restoreChestStates(savedChestStates);

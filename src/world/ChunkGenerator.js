@@ -63,8 +63,9 @@ export function extendChunk(Chunk) {
         this.entities.rovers = rovers || [];
 
         // 2. 构建渲染网格 (InstancedMesh)
+        // AO 由 Worker 统一计算并随 d 回包（aoLow/aoHigh），
+        // 不在 Chunk 首次加载时于主线程再次重算，避免加载卡顿。
         this.buildMeshes(d);
-        this.rebuildInstancedAOFromWorld?.();
 
         // 3. 处理真实感树木 (在主线程生成，因为涉及复杂 Mesh 克隆)
         // 使用实例化渲染优化：记录树木数据，后续批量创建 InstancedMesh

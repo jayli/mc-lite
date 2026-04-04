@@ -1,8 +1,8 @@
 // src/workers/FaceCullingWorker.js
 // 专门处理隐藏面剔除计算的Worker
 
-import { getBlockProperties } from '../constants/BlockData.js';
-import { buildAODataForBlocks, computeIncrementalAO } from '../utils/AOUtils.js';
+import { getBlockProperties, isFullCubeOccluder } from '../constants/BlockData.js';
+import { buildAODataForBlocks, computeIncrementalAO, calculateAOForBlock, isAOApplicable } from '../utils/AOUtils.js';
 import {
   computeFaceVisibilityMask,
   createBlockDataNeighborQuery,
@@ -252,6 +252,41 @@ function computeIncrementalAOWorker(position, operation, blockType, blockData, n
   return computeIncrementalAO(position, operation, blockType, blockData, neighborhoodRadius, getBlockProperties);
 }
 
+/**
+ * 批量计算指定位置的 AO 数据（用于动态交互）
+ * 使用 isFullCubeOccluder 保持与主线程 createOcclusionChecker 一致的遮挡判定
+ * @param {Array} positions - 位置数组 [{x, y, z}]
+ * @param {Object} blockData - 方块数据快照 {"x,y,z": "type"}
+ * @returns {Object} { aoResults: [{x, y, z, aoLow, aoHigh}] }
+ */
+function computePositionsAO(positions, blockData) {
+  // 使用 isFullCubeOccluder 作为遮挡判定，与主线程 createOcclusionChecker 保持一致
+  const isOccluding = (x, y, z) => {
+    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const type = blockData[key];
+    if (!type) return false;
+    return isFullCubeOccluder(type);
+  };
+
+  const aoResults = [];
+
+  for (const pos of positions) {
+    const key = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
+    const type = blockData[key];
+
+    // 非 AO 适用方块（空气、透明、非实心）也需要占位结果，以更新动态网格
+    if (!type || !isAOApplicable(type)) {
+      aoResults.push({ x: pos.x, y: pos.y, z: pos.z, aoLow: 0, aoHigh: 0 });
+      continue;
+    }
+
+    const { aoLow, aoHigh } = calculateAOForBlock(pos.x, pos.y, pos.z, isOccluding);
+    aoResults.push({ x: pos.x, y: pos.y, z: pos.z, aoLow, aoHigh });
+  }
+
+  return { aoResults };
+}
+
 // Worker 消息处理器
 self.onmessage = function(e) {
   const { type, data } = e.data;
@@ -296,6 +331,11 @@ self.onmessage = function(e) {
           data.blockData,
           data.neighborhoodRadius || 1
         );
+        break;
+
+      // 动态交互 AO 批量计算（主线程异步请求）
+      case 'COMPUTE_POSITIONS_AO':
+        result = computePositionsAO(data.positions, data.blockData);
         break;
 
       default:

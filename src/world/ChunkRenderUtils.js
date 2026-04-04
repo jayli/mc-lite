@@ -203,7 +203,8 @@ export function extendChunk(Chunk) {
   };
 
   /**
-   * 批量更新邻居方块的 AO（在 requestIdleCallback 中执行）
+   * 批量更新邻居方块的 AO（在 requestIdleCallback 中同步执行）
+   * AO 计算保持同步以确保渲染正确性，但通过 requestIdleCallback 避免阻塞主线程
    * @param {Array} positions - 位置数组 [{x, y, z}]
    * @private
    */
