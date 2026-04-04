@@ -59,8 +59,6 @@ export function extendChunk(Chunk) {
 
         // 1.2 保存实体快照，用于后续合并
         this.entities.realisticTrees = realisticTrees || [];
-        this.entities.modGunMan = modGunMan || [];
-        this.entities.rovers = rovers || [];
 
         // 2. 构建渲染网格 (InstancedMesh)
         // AO 由 Worker 统一计算并随 d 回包（aoLow/aoHigh），
@@ -79,65 +77,9 @@ export function extendChunk(Chunk) {
           console.log(`Chunk ${this.cx},${this.cz}: Created ${instancedResult.trunkCount} instanced trees`);
         }
 
-        // 3.1 处理模型人 (gun_man.glb)
-        if (modGunMan && modGunMan.length > 0 && getGunManModel()) {
-          modGunMan.forEach(pos => {
-            const gm = getGunManModel().clone();
-            if (!gm) return; // 测试环境中可能为 null
-            gm.userData.isEntity = true;
-            gm.userData.type = 'modGunMan';
-            gm.position.set(pos.x + 0.5, pos.y, pos.z + 0.5);
-
-            // 确保可见性
-            gm.traverse(child => {
-              if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-                child.frustumCulled = false;
-              }
-            });
-
-            // 添加碰撞体：1x1x2
-            const collisionBlocks = [];
-            for (let dy = 0; dy < 2; dy++) {
-              collisionBlocks.push({ x: pos.x, y: pos.y + dy, z: pos.z });
-            }
-
-            // 批量应用碰撞块
-            collisionBlocks.forEach(b => {
-              this.addBlockDynamic(b.x, b.y, b.z, 'collider');
-            });
-
-            gm.userData.collisionBlocks = collisionBlocks;
-            this.group.add(gm);
-          });
-        }
-
-        // 3.1 处理火星车模型
-        if (rovers && rovers.length > 0 && getCarModel()) {
-          rovers.forEach(pos => {
-            const car = getCarModel().clone();
-            if (!car) return; // 测试环境中可能为 null
-            car.userData.isEntity = true;
-            car.userData.type = 'rover';
-            // 放置在方块顶部中心，注意模型已经处理过，基座在 (0,0,0)
-            car.position.set(pos.x + 0.5, pos.y, pos.z + 0.5);
-
-            // 添加碰撞体：火星车尺寸为 5x3x3 (长Z, 高Y, 宽X)
-            // 我们以 pos 为基准，模型居中放置
-            const collisionBlocks = [];
-            for (let dx = -1; dx <= 1; dx++) {
-              for (let dy = 0; dy < 3; dy++) {
-                for (let dz = -2; dz <= 2; dz++) {
-                  collisionBlocks.push({ x: pos.x + dx, y: pos.y + dy, z: pos.z + dz });
-                  this.addBlockDynamic(pos.x + dx, pos.y + dy, pos.z + dz, 'collider');
-                }
-              }
-            }
-            car.userData.collisionBlocks = collisionBlocks;
-            this.group.add(car);
-          });
-        }
+        // 3.1 加载模型人/火星车：实例化渲染 + 独立碰撞占位索引
+        this.loadSpecialEntityInstances('modGunMan', modGunMan || [], getGunManModel());
+        this.loadSpecialEntityInstances('rover', rovers || [], getCarModel());
 
         // 4. 重要：在生成完成后，立即保存快照数据
         if (newSnapshot) {

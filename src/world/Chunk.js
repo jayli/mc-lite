@@ -17,6 +17,7 @@ import { extendChunk as extendWithGenerator } from './ChunkGenerator.js';
 import { extendChunk as extendWithPersistence } from './ChunkPersistence.js';
 import { extendChunk as extendWithRenderUtils } from './ChunkRenderUtils.js';
 import { FACE_MASK_ALL } from '../constants/GameConfig.js';
+import { StaticModelInstancedRenderer } from './entities/StaticModelInstancedRenderer.js';
 
 // 阴影投射白名单规则：所有“实心且可渲染”的方块都允许投射阴影
 const isSolidShadowCaster = (props) => props.isSolid && props.isRendered !== false;
@@ -60,6 +61,8 @@ export class Chunk {
     this.entities = { realisticTrees: [], modGunMan: [], rovers: [] };
     this.structureCenters = [];
     this._tempOriginalSolidBlocks = null;
+    this.specialEntityRenderers = new Map();
+    this.entityCollisionIndex = new Map();
 
     // 后台合并系统
     this.dirtyBlocks = 0;
@@ -641,6 +644,236 @@ export class Chunk {
         orientationAttr.needsUpdate = true;
       }
     }
+  }
+
+  /**
+   * 获取特殊实体记录所在桶
+   * @param {string} entityType - 实体类型
+   * @returns {string|null}
+   */
+  _getSpecialEntityBucket(entityType) {
+    if (entityType === 'modGunMan') return 'modGunMan';
+    if (entityType === 'rover') return 'rovers';
+    return null;
+  }
+
+  /**
+   * 获取结构中心类型
+   * @param {string} entityType - 实体类型
+   * @returns {string}
+   */
+  _getSpecialEntityCenterType(entityType) {
+    return entityType === 'modGunMan' ? 'gunman' : entityType;
+  }
+
+  /**
+   * 生成特殊实体唯一 ID
+   * @param {string} entityType - 实体类型
+   * @param {{x:number,y:number,z:number}} position - 位置
+   * @returns {string}
+   */
+  _makeSpecialEntityId(entityType, position) {
+    return `${entityType}:${Math.floor(position.x)},${Math.floor(position.y)},${Math.floor(position.z)}`;
+  }
+
+  /**
+   * 生成特殊实体记录
+   * @param {string} entityType - 实体类型
+   * @param {{id?:string,x:number,y:number,z:number,rotationY?:number}} position - 位置
+   * @returns {{id:string,x:number,y:number,z:number,rotationY:number}|null}
+   */
+  _createSpecialEntityRecord(entityType, position) {
+    if (!position) return null;
+    const x = Math.floor(position.x);
+    const y = Math.floor(position.y);
+    const z = Math.floor(position.z);
+    return {
+      id: position.id || this._makeSpecialEntityId(entityType, { x, y, z }),
+      x,
+      y,
+      z,
+      rotationY: position.rotationY || 0
+    };
+  }
+
+  /**
+   * 获取特殊实体占位碰撞块
+   * @param {string} entityType - 实体类型
+   * @param {{x:number,y:number,z:number}} record - 实体记录
+   * @returns {Array<{x:number,y:number,z:number}>}
+   */
+  _getSpecialEntityCollisionBlocks(entityType, record) {
+    const blocks = [];
+    if (!record) return blocks;
+
+    if (entityType === 'modGunMan') {
+      for (let dy = 0; dy < 2; dy++) {
+        blocks.push({ x: record.x, y: record.y + dy, z: record.z });
+      }
+      return blocks;
+    }
+
+    if (entityType === 'rover') {
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = 0; dy < 3; dy++) {
+          for (let dz = -2; dz <= 2; dz++) {
+            blocks.push({ x: record.x + dx, y: record.y + dy, z: record.z + dz });
+          }
+        }
+      }
+    }
+
+    return blocks;
+  }
+
+  /**
+   * 将特殊实体同步到持久化快照缓存
+   */
+  _syncSpecialEntitiesToPersistence() {
+    const persistence = getPersistenceService();
+    const chunkKey = `${this.cx},${this.cz}`;
+    const chunkData = persistence?.cache?.get?.(chunkKey);
+    if (!chunkData?.entities) return;
+
+    chunkData.entities.modGunMan = (this.entities.modGunMan || []).map(({ id, x, y, z, rotationY = 0 }) => ({
+      id, x, y, z, rotationY
+    }));
+    chunkData.entities.rovers = (this.entities.rovers || []).map(({ id, x, y, z, rotationY = 0 }) => ({
+      id, x, y, z, rotationY
+    }));
+  }
+
+  /**
+   * 注册特殊实体占位碰撞
+   * @param {string} entityType - 实体类型
+   * @param {{id:string,x:number,y:number,z:number}} record - 实体记录
+   */
+  _registerSpecialEntityCollision(entityType, record) {
+    const collisionBlocks = this._getSpecialEntityCollisionBlocks(entityType, record);
+    collisionBlocks.forEach(({ x, y, z }) => {
+      const key = `${x},${y},${z}`;
+      this.entityCollisionIndex.set(key, {
+        entityType,
+        entityId: record.id,
+        x: record.x,
+        y: record.y,
+        z: record.z
+      });
+      this.solidBlocks.add(key);
+    });
+  }
+
+  /**
+   * 注销特殊实体占位碰撞
+   * @param {string} entityType - 实体类型
+   * @param {{id:string,x:number,y:number,z:number}} record - 实体记录
+   */
+  _unregisterSpecialEntityCollision(entityType, record) {
+    const collisionBlocks = this._getSpecialEntityCollisionBlocks(entityType, record);
+    collisionBlocks.forEach(({ x, y, z }) => {
+      const key = `${x},${y},${z}`;
+      const existing = this.entityCollisionIndex.get(key);
+      if (existing && existing.entityId === record.id) {
+        this.entityCollisionIndex.delete(key);
+        this.solidBlocks.delete(key);
+      }
+    });
+  }
+
+  /**
+   * 加载特殊实体实例化渲染与碰撞占位
+   * @param {string} entityType - 实体类型
+   * @param {Array<{id?:string,x:number,y:number,z:number,rotationY?:number}>} positions - 实体位置列表
+   * @param {THREE.Object3D|null} sourceModel - 模型模板
+   */
+  loadSpecialEntityInstances(entityType, positions, sourceModel = null) {
+    const bucket = this._getSpecialEntityBucket(entityType);
+    if (!bucket) return;
+
+    const existingRenderer = this.specialEntityRenderers.get(entityType);
+    if (existingRenderer) {
+      existingRenderer.detachFromGroup(this.group);
+      existingRenderer.dispose();
+      this.specialEntityRenderers.delete(entityType);
+    }
+
+    // 清理旧占位
+    const oldRecords = this.entities[bucket] || [];
+    oldRecords.forEach(record => this._unregisterSpecialEntityCollision(entityType, record));
+
+    const seen = new Set();
+    const records = [];
+    (positions || []).forEach((position) => {
+      const record = this._createSpecialEntityRecord(entityType, position);
+      if (!record || seen.has(record.id)) return;
+      seen.add(record.id);
+      records.push(record);
+      this._registerSpecialEntityCollision(entityType, record);
+    });
+
+    this.entities[bucket] = records;
+
+    if (!sourceModel || records.length === 0) return;
+
+    const renderer = new StaticModelInstancedRenderer({
+      sourceModel,
+      records,
+      entityType,
+      ownerChunk: this
+    });
+    renderer.attachToGroup(this.group);
+    this.specialEntityRenderers.set(entityType, renderer);
+  }
+
+  /**
+   * 销毁特殊实体
+   * @param {string} entityType - 实体类型
+   * @param {string} entityId - 实体 ID
+   * @returns {boolean} 是否销毁成功
+   */
+  destroySpecialEntity(entityType, entityId) {
+    const bucket = this._getSpecialEntityBucket(entityType);
+    if (!bucket) return false;
+
+    const records = this.entities[bucket] || [];
+    const index = records.findIndex(record => record.id === entityId);
+    if (index < 0) return false;
+
+    const record = records[index];
+    this._unregisterSpecialEntityCollision(entityType, record);
+
+    const renderer = this.specialEntityRenderers.get(entityType);
+    if (renderer) {
+      renderer.hideEntity(entityId);
+    }
+
+    records.splice(index, 1);
+    this.structureCenters = (this.structureCenters || []).filter(center => {
+      if (center.type !== this._getSpecialEntityCenterType(entityType)) return true;
+      return !(
+        Math.floor(center.x) === record.x &&
+        Math.floor(center.y) === record.y &&
+        Math.floor(center.z) === record.z
+      );
+    });
+
+    this._syncSpecialEntitiesToPersistence();
+    this.saveDebounced();
+    this.world?.clearBlockLookupCaches?.();
+    this.world?.requestShadowMapUpdate?.('destroy-special-entity');
+    return true;
+  }
+
+  /**
+   * 获取特殊实体占位碰撞信息
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @returns {object|null}
+   */
+  getSpecialEntityCollisionAt(x, y, z) {
+    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    return this.entityCollisionIndex.get(key) || null;
   }
 
   // ============================================================

@@ -457,6 +457,11 @@ export function extendChunk(Chunk) {
           this.solidBlocks.add(key);
         }
       }
+      if (this.entityCollisionIndex?.size > 0) {
+        for (const key of this.entityCollisionIndex.keys()) {
+          this.solidBlocks.add(key);
+        }
+      }
       this.regenerateCrossChunkColliders();
     }
   };
@@ -531,6 +536,7 @@ export function extendChunk(Chunk) {
         const type = child.userData.type;
         // 保留真实感树木和普通树叶（树叶是静态的，不应在合并时重建）
         if (type === 'realistic_trunk' || type === 'realistic_leaves' ||
+            type === 'modGunMan' || type === 'rover' ||
             type === 'leaves' || type === 'azalea_leaves' || type === 'azalea_flowers' ||
             type === 'sky_leaves' || type === 'yellow_leaves' || type === 'swamp_leaves' ||
             type === 'snow_leaves') {

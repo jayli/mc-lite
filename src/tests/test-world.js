@@ -12,7 +12,7 @@
  */
 
 import { describe, test } from './runner.js';
-import { assertEqual, assertTrue, assertFalse, assertNotNull } from './assert.js';
+import { assertEqual, assertTrue, assertFalse, assertNotNull, assertUndefined } from './assert.js';
 import * as THREE from 'three';
 import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 import { mockFaceCullingSystem, mockMaterials, mockBlockData } from './test-mocks.js';
@@ -477,6 +477,25 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('特殊实体占位 - 不写入 blockData 但可被 world 查询为 collider', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    const chunk = world.chunks.get('0,0');
+    chunk.loadSpecialEntityInstances('modGunMan', [{ x: 5, y: 10, z: 5 }], null);
+
+    assertTrue(world.isSolid(5, 10, 5), 'gunman 占位应参与碰撞');
+    assertEqual(world.getBlock(5, 10, 5), 'collider', 'gunman 占位应返回 collider');
+    assertEqual(world.getBlock(5, 11, 5), 'collider', 'gunman 头顶占位应返回 collider');
+    assertUndefined(chunk.blockData['5,10,5'], 'gunman 占位不应写入 blockData');
+
+    teardownEnvironment();
+  });
+
   // =========== removeBlocksBatch 测试 ===========
   test('removeBlocksBatch - 批量移除方块', async () => {
     setupEnvironment();
@@ -506,6 +525,29 @@ describe('World 真实类测试', (test) => {
 
     // 第四个方块应该还在
     assertEqual(world.getBlock(3, 10, 0), 'dirt', '方块 3 应该保留');
+
+    teardownEnvironment();
+  });
+
+  test('removeBlocksBatch - 命中特殊实体占位时应销毁整个实体', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    const chunk = world.chunks.get('0,0');
+    chunk.loadSpecialEntityInstances('rover', [{ x: 8, y: 10, z: 8 }], null);
+
+    assertEqual(chunk.entities.rovers.length, 1, '初始应有 1 个 rover');
+    assertEqual(world.getBlock(7, 10, 6), 'collider', 'rover 占位应可查询');
+
+    world.removeBlocksBatch([{ x: 7, y: 10, z: 6 }], false);
+
+    assertEqual(chunk.entities.rovers.length, 0, '命中占位后应销毁整个 rover');
+    assertEqual(world.getBlock(7, 10, 6), null, 'rover 占位应被清除');
+    assertFalse(world.isSolid(7, 10, 6), 'rover 占位清除后不应继续碰撞');
 
     teardownEnvironment();
   });

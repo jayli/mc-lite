@@ -262,6 +262,7 @@ export class World {
     const chunkGroups = new Map();
     // 同时收集方块坐标所在的Chunk，用于更新渲染网格
     const renderChunks = new Map();
+    const specialEntitiesToDestroy = new Map();
 
     positions.forEach(p => {
       const px = Math.floor(p.x);
@@ -277,6 +278,14 @@ export class World {
       if (!renderChunks.has(coordKey)) renderChunks.set(coordKey, []);
       renderChunks.get(coordKey).push(p);
 
+      const specialCollision = this.getSpecialEntityCollision(px, py, pz);
+      if (specialCollision) {
+        specialEntitiesToDestroy.set(
+          `${specialCollision.ownerChunkKey}:${specialCollision.entityType}:${specialCollision.entityId}`,
+          specialCollision
+        );
+      }
+
       // 与 removeBlock 语义保持一致：同坐标存在多个 owner 时，批量删除也要全部命中
       const owners = this.getAllBlockOwners(px, py, pz);
       owners.forEach((owner) => {
@@ -285,6 +294,10 @@ export class World {
         chunkGroups.get(targetKey).push(p);
       });
     });
+
+    for (const collision of specialEntitiesToDestroy.values()) {
+      collision.ownerChunk.destroySpecialEntity(collision.entityType, collision.entityId);
+    }
 
     // 针对每个区块执行批量删除优化（更新blockData）
     for (const [key, chunkPosList] of chunkGroups) {
@@ -420,6 +433,55 @@ export class World {
   }
 
   /**
+   * 获取指定坐标的特殊实体占位碰撞信息
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @returns {{
+   *   ownerChunk: Chunk,
+   *   ownerChunkKey: string,
+   *   entityType: string,
+   *   entityId: string
+   * }|null}
+   */
+  getSpecialEntityCollision(x, y, z) {
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    const iz = Math.floor(z);
+    const cx = Math.floor(ix / CHUNK_SIZE);
+    const cz = Math.floor(iz / CHUNK_SIZE);
+    const coordChunkKey = `${cx},${cz}`;
+    const coordChunk = this.chunks.get(coordChunkKey) || null;
+
+    if (coordChunk?.isReady) {
+      const collision = coordChunk.getSpecialEntityCollisionAt?.(ix, iy, iz);
+      if (collision) {
+        return {
+          ownerChunk: coordChunk,
+          ownerChunkKey: coordChunkKey,
+          entityType: collision.entityType,
+          entityId: collision.entityId
+        };
+      }
+    }
+
+    for (const [otherKey, otherChunk] of this.chunks) {
+      if (!otherChunk?.isReady || otherKey === coordChunkKey) continue;
+      const collision = otherChunk.getSpecialEntityCollisionAt?.(ix, iy, iz);
+      if (collision) {
+        return {
+          ownerChunk: otherChunk,
+          ownerChunkKey: otherKey,
+          entityType: collision.entityType,
+          entityId: collision.entityId
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * 获取指定坐标在所有已加载 Chunk 中的持有者列表（用于清理历史重复 owner）
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y
@@ -526,7 +588,8 @@ export class World {
    */
   getBlock(x, y, z) {
     const owner = this.resolveBlockOwner(x, y, z, { allowScan: true });
-    return owner ? this.getBlockTypeFromEntry(owner.entry) : null;
+    if (owner) return this.getBlockTypeFromEntry(owner.entry);
+    return this.getSpecialEntityCollision(x, y, z) ? 'collider' : null;
   }
 
   /**
@@ -555,7 +618,8 @@ export class World {
    */
   getBlockFast(x, y, z) {
     const owner = this.resolveBlockOwner(x, y, z, { allowScan: false });
-    return owner ? this.getBlockTypeFromEntry(owner.entry) : null;
+    if (owner) return this.getBlockTypeFromEntry(owner.entry);
+    return this.getSpecialEntityCollision(x, y, z) ? 'collider' : null;
   }
 
   /**
@@ -567,7 +631,8 @@ export class World {
    */
   getBlockEntry(x, y, z) {
     const owner = this.resolveBlockOwner(x, y, z, { allowScan: true });
-    return owner ? parseBlockEntry(owner.entry) : null;
+    if (owner) return parseBlockEntry(owner.entry);
+    return this.getSpecialEntityCollision(x, y, z) ? { type: 'collider', orientation: 0 } : null;
   }
 
   /**
@@ -667,7 +732,14 @@ export class World {
   removeBlock(x, y, z) {
     // 防御式处理：移除该坐标在所有 Chunk 的重复 owner，避免历史脏数据导致一键只删一层
     const owners = this.getAllBlockOwners(x, y, z);
-    if (owners.length === 0) return;
+    if (owners.length === 0) {
+      const specialCollision = this.getSpecialEntityCollision(x, y, z);
+      if (!specialCollision) return;
+      specialCollision.ownerChunk.destroySpecialEntity(specialCollision.entityType, specialCollision.entityId);
+      this.clearBlockLookupCaches();
+      this.requestShadowMapUpdate('remove-special-entity');
+      return;
+    }
     owners.forEach(owner => owner.ownerChunk.removeBlock(x, y, z));
     this.clearBlockLookupCaches();
     this.requestShadowMapUpdate('remove-block');
@@ -681,7 +753,13 @@ export class World {
    */
   removeBlockCollider(x, y, z) {
     const owners = this.getAllBlockOwners(x, y, z);
-    if (owners.length === 0) return;
+    if (owners.length === 0) {
+      const specialCollision = this.getSpecialEntityCollision(x, y, z);
+      if (!specialCollision) return;
+      specialCollision.ownerChunk.destroySpecialEntity(specialCollision.entityType, specialCollision.entityId);
+      this.clearBlockLookupCaches();
+      return;
+    }
     owners.forEach(owner => owner.ownerChunk.removeCollisionKey(x, y, z));
     this.clearBlockLookupCaches();
   }

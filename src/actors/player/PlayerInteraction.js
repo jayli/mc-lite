@@ -444,6 +444,21 @@ export class PlayerInteraction {
     while (m && !m.userData.isEntity && !m.userData.type && m.parent && !m.isInstancedMesh && m.type !== 'Scene') m = m.parent;
     const type = m.userData.type || 'unknown';
 
+    if (m.isInstancedMesh && m.userData?.specialEntityRenderer) {
+      const record = m.userData.specialEntityRenderer.getEntityAt(hit.instanceId);
+      if (!record) return;
+
+      this.player._tempVector.set(record.x + 0.5, record.y + 0.5, record.z + 0.5);
+      if (isHandBreak) {
+        this.player.world.spawnBlockCrashParticles(this.player._tempVector);
+      } else {
+        this.player.spawnParticles(this.player._tempVector, type);
+      }
+      m.userData.specialEntityRenderer.destroyEntityAt(hit.instanceId);
+      audioManager.playSound('delete_get', 0.3);
+      return;
+    }
+
     // 检查是否为不可破坏方块
     if (type === 'end_stone' || type === 'playground_block' || type === 'playground_center_block') return;
 

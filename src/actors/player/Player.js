@@ -724,8 +724,8 @@ export class Player {
     const hits = this.raycaster.intersectObjects(this.getInteractionTargets(), true);
     this.raycaster.far = Infinity;
 
-    // 检查是否击中丧尸 - Mag7在射程内直接消灭
-    for (const hit of hits) {
+      // 检查是否击中丧尸 - Mag7在射程内直接消灭
+      for (const hit of hits) {
       const obj = hit.object;
 
       // Check for InstancedMesh zombie
@@ -737,6 +737,13 @@ export class Player {
             console.log(`[Combat] Mag7 击中丧尸，直接消灭！`);
             break;
           }
+        }
+      }
+
+      // 检查是否是实例化特殊实体（rover / gunman）
+      else if (obj.userData?.specialEntityRenderer) {
+        if (obj.userData.specialEntityRenderer.destroyEntityAt(hit.instanceId)) {
+          break;
         }
       }
 

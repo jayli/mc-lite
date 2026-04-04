@@ -70,6 +70,9 @@ export function extendChunk(Chunk) {
     });
     // 清空组，移除所有子对象
     this.group.clear();
+    this.specialEntityRenderers?.forEach(renderer => renderer.dispose?.());
+    this.specialEntityRenderers?.clear?.();
+    this.entityCollisionIndex?.clear?.();
   };
 
   /**
