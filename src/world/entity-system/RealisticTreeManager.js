@@ -53,6 +53,7 @@ class RealisticTreeManager {
 
   /**
    * 记录树木到区块数据（用于后续实例化合并）
+   * 同时记录到所有可能被树叶覆盖的相邻区块，避免跨区块切割问题
    * @param {number} cx - 区块 X 坐标
    * @param {number} cz - 区块 Z 坐标
    * @param {number} x - 世界坐标 X
@@ -61,11 +62,27 @@ class RealisticTreeManager {
    * @param {number} templateIndex - 模板索引
    */
   addTreeToChunk(cx, cz, x, y, z, templateIndex) {
-    const chunkKey = `${cx},${cz}`;
-    if (!this.chunkTreeData.has(chunkKey)) {
-      this.chunkTreeData.set(chunkKey, []);
+    // 树叶渲染距离为8格（与 STRUCTURE_RENDER_DIST.tree 保持一致）
+    const TREE_RENDER_DIST = 8;
+    const CHUNK_SIZE = 16;
+
+    // 计算树叶可能覆盖的所有区块
+    const minCx = Math.floor((x - TREE_RENDER_DIST) / CHUNK_SIZE);
+    const maxCx = Math.floor((x + TREE_RENDER_DIST) / CHUNK_SIZE);
+    const minCz = Math.floor((z - TREE_RENDER_DIST) / CHUNK_SIZE);
+    const maxCz = Math.floor((z + TREE_RENDER_DIST) / CHUNK_SIZE);
+
+    // 将树记录到所有可能被树叶覆盖的区块
+    for (let targetCx = minCx; targetCx <= maxCx; targetCx++) {
+      for (let targetCz = minCz; targetCz <= maxCz; targetCz++) {
+        const chunkKey = `${targetCx},${targetCz}`;
+        if (!this.chunkTreeData.has(chunkKey)) {
+          this.chunkTreeData.set(chunkKey, []);
+        }
+        // 记录树的原点坐标和模板索引
+        this.chunkTreeData.get(chunkKey).push({ x, y, z, templateIndex });
+      }
     }
-    this.chunkTreeData.get(chunkKey).push({ x, y, z, templateIndex });
   }
 
   /**
@@ -104,6 +121,7 @@ class RealisticTreeManager {
       return null;
     }
 
+    const CHUNK_SIZE = 16;
     const trunkMat = materials.getMaterial('realistic_trunk_procedural');
     const leavesMat = materials.getMaterial('realistic_oak_leaves');
     const dummy = new THREE.Object3D();
@@ -114,9 +132,32 @@ class RealisticTreeManager {
       instanceIndexMap['realistic_leaves'] = new Map();
     }
 
+    // 过滤出原点在当前 chunk 的树（避免重复渲染）
+    // 虽然树被记录到多个 chunk，但只在其原点 chunk 中渲染
+    const localTrees = treeData.filter(tree => {
+      const treeCx = Math.floor(tree.x / CHUNK_SIZE);
+      const treeCz = Math.floor(tree.z / CHUNK_SIZE);
+      return treeCx === cx && treeCz === cz;
+    });
+
+    // 去重：同一棵树可能被多次记录（如果多次调用 addTreeToChunk）
+    const uniqueTrees = [];
+    const seenKeys = new Set();
+    for (const tree of localTrees) {
+      const key = `${tree.x},${tree.y},${tree.z}`;
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        uniqueTrees.push(tree);
+      }
+    }
+
+    if (uniqueTrees.length === 0) {
+      return null;
+    }
+
     // 为每个模板创建实例化网格
     for (let tIdx = 0; tIdx < this.templates.length; tIdx++) {
-      const treesForTemplate = treeData.filter(t => t.templateIndex === tIdx);
+      const treesForTemplate = uniqueTrees.filter(t => t.templateIndex === tIdx);
       if (treesForTemplate.length === 0) continue;
 
       const template = this.templates[tIdx];
@@ -126,6 +167,7 @@ class RealisticTreeManager {
       const trunkMesh = new THREE.InstancedMesh(trunkGeo, trunkMat, treesForTemplate.length);
       trunkMesh.castShadow = true;
       trunkMesh.receiveShadow = true;
+      trunkMesh.frustumCulled = false; // 禁用视锥剔除，避免跨chunk的树被错误剔除
       trunkMesh.userData = { type: 'realistic_trunk', isTreePart: true };
 
       treesForTemplate.forEach((tree, i) => {
@@ -152,6 +194,7 @@ class RealisticTreeManager {
       const leavesGeo = template.leaves.geometry;
       const leavesMesh = new THREE.InstancedMesh(leavesGeo, leavesMat, treesForTemplate.length);
       leavesMesh.castShadow = true;
+      leavesMesh.frustumCulled = false; // 禁用视锥剔除，避免跨chunk的树被错误剔除
       leavesMesh.userData = { type: 'realistic_leaves', isTreePart: true };
 
       treesForTemplate.forEach((tree, i) => {
@@ -185,10 +228,10 @@ class RealisticTreeManager {
       }
     }
 
-    // 清除已处理的数据
+    // 清除当前 chunk 的数据
     this.clearChunkTreeData(cx, cz);
 
-    return { trunkCount: treeData.length };
+    return { trunkCount: uniqueTrees.length };
   }
 
   /**
