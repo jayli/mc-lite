@@ -809,9 +809,13 @@ export class Engine {
     // 检测玩家是否在水下，并相应地更改雾效设置
     if (camY < waterLevel && isNearOcean) {
       if (!this.isUnderwater) {
-        this.scene.fog.color.set(0x103060);    // 设置水下雾的颜色为深蓝色
-        this.scene.fog.near = 0.1;             // 设置水下雾的近距范围
-        this.scene.fog.far = 15;               // 设置水下雾的远距范围，较短的距离增强水下效果
+        if (!this.scene.fog) {
+          this.scene.fog = new THREE.Fog(0x103060, 0.1, 15);
+        } else {
+          this.scene.fog.color.set(0x103060);    // 设置水下雾的颜色为深蓝色
+          this.scene.fog.near = 0.1;             // 设置水下雾的近距范围
+          this.scene.fog.far = 15;               // 设置水下雾的远距范围，较短的距离增强水下效果
+        }
         this.scene.background = this._underwaterColor; // 使用预分配的颜色对象
         this.isUnderwater = true;              // 标记玩家处于水下状态
 
