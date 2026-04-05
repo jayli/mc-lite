@@ -26,6 +26,12 @@ export class StaticModelInstancedRenderer {
 
   _build() {
     if (!this.sourceModel || this.records.length === 0) return;
+    if (
+      typeof this.sourceModel.updateMatrixWorld !== 'function' ||
+      typeof this.sourceModel.traverse !== 'function'
+    ) {
+      return;
+    }
 
     this.sourceModel.updateMatrixWorld(true);
 

@@ -94,6 +94,11 @@ export class ChunkAssemblyScheduler {
     if (!chunk || chunk.disposed) return;
 
     switch (stage) {
+      case 'runtime-build':
+        if (chunk.assembleRuntimeBuildPhase()) {
+          this.enqueue(chunk, 'finalize', task.priority);
+        }
+        break;
       case 'terrain':
         if (chunk.assembleTerrainPhase()) {
           this.enqueue(chunk, 'entities', task.priority);

@@ -25,6 +25,8 @@ const CONSOLIDATION_AO_DELAY_MS = 120;
 const RUNTIME_AO_BUDGET_MS = 0.5;
 const RUNTIME_AO_MAX_CHUNKS = 1;
 const RUNTIME_AO_IDLE_GRACE_MS = 1500;
+const RUNTIME_DEFERRED_FINALIZE_IDLE_GRACE_MS = 800;
+const RUNTIME_DEFERRED_FINALIZE_MAX_CHUNKS = 1;
 /**
  * 世界管理器类
  * 管理游戏世界中的所有区块、粒子效果和方块操作，是世界数据的中央访问点
@@ -103,6 +105,7 @@ export class World {
     this._pendingAORefreshChunkKeys = new Set();
     this._pendingAORefreshMeta = new Map();
     this._lastStreamingActivityAt = 0;
+    this._pendingDeferredFinalizeChunkKeys = new Set();
   }
 
   /**
@@ -188,7 +191,11 @@ export class World {
           this._staticTreeTerrainBoostChunkKeys.add(key);
           const targetChunk = this.chunks.get(key);
           if (targetChunk?.loadState === 'worker-ready') {
-            this.chunkAssemblyScheduler.enqueue(targetChunk, 'terrain', 900);
+            this.chunkAssemblyScheduler.enqueue(
+              targetChunk,
+              targetChunk.spawnReason === 'runtime-streaming' ? 'runtime-build' : 'terrain',
+              900
+            );
           }
         }
       }
@@ -203,7 +210,11 @@ export class World {
       chunk.deferConsolidation = true;
     }
     this._markStaticTreeTerrainBoostFromChunk(chunk);
-    this.chunkAssemblyScheduler.enqueue(chunk, 'terrain', this._computeChunkAssemblyPriority(chunk));
+    this.chunkAssemblyScheduler.enqueue(
+      chunk,
+      chunk.spawnReason === 'runtime-streaming' ? 'runtime-build' : 'terrain',
+      this._computeChunkAssemblyPriority(chunk)
+    );
   }
 
   onChunkConsolidationComplete(chunk) {
@@ -219,7 +230,10 @@ export class World {
   onChunkFinalized(chunk) {
     if (!chunk) return;
     const key = `${chunk.cx},${chunk.cz}`;
-    if (this.bootstrapState.phase === 'runtime-streaming') {
+    if (chunk.hasDeferredFinalizeWork) {
+      this._pendingDeferredFinalizeChunkKeys.add(key);
+    }
+    if (this.bootstrapState.phase === 'runtime-streaming' && !chunk.isPureRuntimeStreamingChunk?.()) {
       this._enqueueChunkAndNeighborsForAORefresh(key, {
         includeNeighbors: false,
         delayMs: RUNTIME_FINALIZE_AO_DELAY_MS,
@@ -245,6 +259,34 @@ export class World {
       budgetMs: isBootstrap ? 12 : 2.5,
       maxTasks: isBootstrap ? 8 : 2
     });
+  }
+
+  _processDeferredFinalizeQueue(options = {}) {
+    if (this._pendingDeferredFinalizeChunkKeys.size === 0) return 0;
+    const maxChunks = Number.isFinite(options.maxChunks) ? options.maxChunks : RUNTIME_DEFERRED_FINALIZE_MAX_CHUNKS;
+    if (maxChunks <= 0) return 0;
+
+    const currentTime = globalThis.performance?.now?.() ?? Date.now();
+    if (currentTime - this._lastStreamingActivityAt < RUNTIME_DEFERRED_FINALIZE_IDLE_GRACE_MS) {
+      return 0;
+    }
+
+    let processed = 0;
+    for (const key of [...this._pendingDeferredFinalizeChunkKeys]) {
+      if (processed >= maxChunks) break;
+      const chunk = this.chunks.get(key);
+      if (!chunk || chunk.disposed) {
+        this._pendingDeferredFinalizeChunkKeys.delete(key);
+        continue;
+      }
+      if (!chunk.isReady || chunk.isConsolidating) continue;
+      const done = chunk.runDeferredFinalizePhase?.();
+      if (done !== false) {
+        this._pendingDeferredFinalizeChunkKeys.delete(key);
+      }
+      processed++;
+    }
+    return processed;
   }
 
   _enqueueChunkAndNeighborsForAORefresh(chunkKey, options = {}) {
@@ -413,6 +455,9 @@ export class World {
     this._processPendingAORefreshQueue(this.bootstrapState.phase === 'runtime-streaming'
       ? { maxChunks: RUNTIME_AO_MAX_CHUNKS, budgetMs: RUNTIME_AO_BUDGET_MS }
       : { maxChunks: 0, budgetMs: 0 });
+    if (this.bootstrapState.phase === 'runtime-streaming') {
+      this._processDeferredFinalizeQueue();
+    }
     if (this.pendingShadowUpdate && this.bootstrapState.phase === 'runtime-streaming') {
       const now = globalThis.performance?.now?.() ?? Date.now();
       if (now - this.shadowUpdateScheduledAt >= 200) {
@@ -544,6 +589,7 @@ export class World {
     for (const [key, chunkPosList] of chunkGroups) {
       const chunk = this.chunks.get(key);
       if (chunk) {
+        chunk.markPlayerMutation?.();
         chunk.removeBlocksBatch(chunkPosList, isBatch);
       }
     }
@@ -896,6 +942,7 @@ export class World {
     }
 
     // 逻辑委托：调用区块的动态添加方法，处理网格生成和邻居面更新
+    chunk.markPlayerMutation?.();
     chunk.addBlockDynamic(x, y, z, typeOrEntry, orientation);
     this.clearBlockLookupCaches();
     this.requestShadowMapUpdate('set-block');
@@ -940,6 +987,7 @@ export class World {
       placed += result.placed;
       skipped += result.skipped;
       if (result.placed > 0) {
+        chunk.markPlayerMutation?.();
         touchedChunks.add(chunkKey);
       }
     }
@@ -981,6 +1029,7 @@ export class World {
       this.requestShadowMapUpdate('remove-special-entity');
       return;
     }
+    owners.forEach(owner => owner.ownerChunk.markPlayerMutation?.());
     owners.forEach(owner => owner.ownerChunk.removeBlock(x, y, z));
     this.clearBlockLookupCaches();
     this.requestShadowMapUpdate('remove-block');

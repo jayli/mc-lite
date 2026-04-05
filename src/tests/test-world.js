@@ -132,6 +132,38 @@ async function waitForChunkReady(world, chunkKey, maxWaitCount = 100) {
   return false;
 }
 
+async function waitForChunkState(world, chunkKey, targetState, maxWaitCount = 120, options = {}) {
+  const advanceAssemblies = options.advanceAssemblies !== false;
+  let waitCount = 0;
+  while (waitCount < maxWaitCount) {
+    const chunk = world.chunks.get(chunkKey);
+    if (chunk && chunk.loadState === targetState) {
+      return true;
+    }
+    if (advanceAssemblies && typeof world.processAssemblyQueues === 'function') {
+      world.processAssemblyQueues();
+    }
+    await new Promise(resolve => setTimeout(resolve, 25));
+    waitCount++;
+  }
+  return false;
+}
+
+async function waitForWorldPhase(world, targetPhase, maxWaitCount = 160) {
+  let waitCount = 0;
+  while (waitCount < maxWaitCount) {
+    if (world.bootstrapState?.phase === targetPhase) {
+      return true;
+    }
+    if (typeof world.processAssemblyQueues === 'function') {
+      world.processAssemblyQueues();
+    }
+    await new Promise(resolve => setTimeout(resolve, 25));
+    waitCount++;
+  }
+  return false;
+}
+
 // ============================================
 // 其他依赖模拟
 // ============================================
@@ -183,8 +215,8 @@ const setupEnvironment = () => {
   globalThis._blockData = mockBlockData;
   globalThis._chestManager = mockChestManager;
   globalThis._ParticleSystem = MockParticleSystem;
-  globalThis._carModel = { clone: () => null };
-  globalThis._gunManModel = { clone: () => null };
+  globalThis._carModel = new THREE.Group();
+  globalThis._gunManModel = new THREE.Group();
 
   // 启用 Worker 模拟
   shouldMockWorkers = true;
@@ -293,10 +325,13 @@ describe('World 真实类测试', (test) => {
 
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
 
-    await new Promise(resolve => setTimeout(resolve, 250));
+    const reachedWorkerReady = await waitForChunkState(world, '0,0', 'worker-ready', 120, {
+      advanceAssemblies: false
+    });
 
     const chunk = world.chunks.get('0,0');
     assertNotNull(chunk, '区块 0,0 应该存在');
+    assertTrue(reachedWorkerReady, '区块 0,0 应在超时前进入 worker-ready');
     assertEqual(world.bootstrapState.phase, 'bootstrapping', '世界应处于启动阶段');
     assertEqual(chunk.loadState, 'worker-ready', 'Worker 回包后应停留在 worker-ready');
     assertFalse(chunk.isReady, '未 finalize 前不应标记为 ready');
@@ -311,12 +346,11 @@ describe('World 真实类测试', (test) => {
     world = new World(scene);
 
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    await new Promise(resolve => setTimeout(resolve, 250));
-
-    await world.drainAssemblyQueues();
+    const enteredRuntime = await waitForWorldPhase(world, 'runtime-streaming');
 
     const chunk = world.chunks.get('0,0');
     assertNotNull(chunk, '区块 0,0 应该存在');
+    assertTrue(enteredRuntime, '世界应在超时前进入 runtime-streaming');
     assertEqual(chunk.loadState, 'finalized', '排空装配队列后 chunk 应 finalized');
     assertTrue(chunk.isReady, 'finalize 后 chunk 应 ready');
     assertEqual(world.bootstrapState.phase, 'runtime-streaming', '世界应进入运行期增量加载阶段');
@@ -402,22 +436,23 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
-  test('AO 刷新队列 - 运行期 finalize 只应延迟加入自身 Chunk', () => {
+  test('AO 刷新队列 - 纯新 runtime chunk finalize 后不应加入 AO 队列', () => {
     setupEnvironment();
 
     scene = new THREE.Scene();
     world = new World(scene);
     world.bootstrapState.phase = 'runtime-streaming';
 
-    const chunk = { cx: 4, cz: 5 };
+    const chunk = {
+      cx: 4,
+      cz: 5,
+      hasDeferredFinalizeWork: true,
+      isPureRuntimeStreamingChunk: () => true
+    };
     world.onChunkFinalized(chunk);
 
-    assertEqual(world._pendingAORefreshChunkKeys.size, 1, '运行期 finalize 不应立即加入四邻');
-    assertTrue(world._pendingAORefreshChunkKeys.has('4,5'), '应仅包含当前 Chunk');
-
-    const meta = world._pendingAORefreshMeta?.get('4,5');
-    assertNotNull(meta, '应记录 AO 收敛延迟元数据');
-    assertTrue(meta.readyAt > 0, '应存在延迟执行时间');
+    assertEqual(world._pendingAORefreshChunkKeys.size, 0, '纯新 runtime chunk 不应进入 AO 收敛队列');
+    assertTrue(world._pendingDeferredFinalizeChunkKeys.has('4,5'), '纯新 runtime chunk 应进入延迟 finalize 队列');
 
     teardownEnvironment();
   });
@@ -476,6 +511,62 @@ describe('World 真实类测试', (test) => {
 
     assertEqual(refreshed, 0, '流式加载仍活跃时不应执行运行期 AO 收敛');
     assertTrue(world._pendingAORefreshChunkKeys.has('0,0'), '任务应继续保留在队列中');
+
+    teardownEnvironment();
+  });
+
+  test('延迟 finalize 队列 - 流式加载活跃时不应执行纯新 runtime chunk 的后置任务', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+    world.bootstrapState.phase = 'runtime-streaming';
+
+    let ran = 0;
+    world.chunks.set('2,2', {
+      cx: 2,
+      cz: 2,
+      isReady: true,
+      isConsolidating: false,
+      disposed: false,
+      runDeferredFinalizePhase: () => { ran++; return true; }
+    });
+    world._pendingDeferredFinalizeChunkKeys.add('2,2');
+    world._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
+
+    world._processDeferredFinalizeQueue();
+
+    assertEqual(ran, 0, '流式加载仍活跃时不应执行后置 finalize');
+    assertTrue(world._pendingDeferredFinalizeChunkKeys.has('2,2'), '任务应继续留在延迟 finalize 队列中');
+
+    teardownEnvironment();
+  });
+
+  test('Chunk finalize - 纯新 runtime chunk 应跳过首次 consolidation', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    const runtimeChunk = world.chunks.get('0,0');
+    runtimeChunk.spawnReason = 'runtime-streaming';
+    runtimeChunk.hasPlayerMutations = false;
+    runtimeChunk.loadState = 'entities-built';
+    runtimeChunk.isReady = false;
+    runtimeChunk.dirtyBlocks = 3;
+
+    let consolidateCalled = 0;
+    runtimeChunk.consolidate = () => { consolidateCalled++; };
+    runtimeChunk.world.onChunkFinalized = () => {};
+
+    const result = runtimeChunk.finalizeAssemblyPhase();
+
+    assertTrue(result, '纯新 runtime chunk finalize 应直接完成');
+    assertEqual(consolidateCalled, 0, '纯新 runtime chunk 不应触发首次 consolidation');
+    assertEqual(runtimeChunk.loadState, 'finalized', '纯新 runtime chunk 应直接进入 finalized');
+    assertEqual(runtimeChunk.dirtyBlocks, 0, '首次 finalize 后应清空加载期脏块计数');
 
     teardownEnvironment();
   });

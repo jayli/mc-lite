@@ -74,11 +74,17 @@ export class Chunk {
     this.group = new THREE.Group();
     this.isReady = false;
     this.loadState = 'created';
+    this.spawnReason = world?.bootstrapState?.phase === 'runtime-streaming' ? 'runtime-streaming' : 'bootstrap';
+    this.hasPlayerMutations = false;
     this.queuedAssemblyStages = new Set();
     this.pendingTerrainData = null;
     this.pendingSnapshot = null;
     this.pendingRuntimeEntities = null;
     this.pendingSpecialEntityData = null;
+    this.hasDeferredFinalizeWork = false;
+    this._needsDeferredPersistenceFlush = false;
+    this._needsDeferredRuntimeEntityRestore = false;
+    this._needsDeferredLightRegistration = false;
     this.disposed = false;
 
     // 数据存储
@@ -815,6 +821,14 @@ export class Chunk {
     this.specialEntityRenderers.set(entityType, renderer);
   }
 
+  markPlayerMutation() {
+    this.hasPlayerMutations = true;
+  }
+
+  isPureRuntimeStreamingChunk() {
+    return this.spawnReason === 'runtime-streaming' && !this.hasPlayerMutations;
+  }
+
   /**
    * 销毁特殊实体
    * @param {string} entityType - 实体类型
@@ -918,6 +932,19 @@ export class Chunk {
     return true;
   }
 
+  assembleRuntimeBuildPhase() {
+    if (this.loadState === 'finalized') return true;
+    if (this.loadState === 'created') return false;
+    if (this.loadState === 'worker-ready') {
+      this.buildMeshes(this.pendingTerrainData || {});
+      this.loadState = 'terrain-built';
+    }
+    if (this.loadState === 'terrain-built') {
+      this.assembleEntityPhase();
+    }
+    return this.loadState === 'entities-built' || this.loadState === 'finalized';
+  }
+
   /**
    * 构建实体渲染、恢复运行时实例并落地快照
    * @returns {boolean} 是否完成该阶段
@@ -965,39 +992,106 @@ export class Chunk {
     if (this.loadState === 'finalized') return true;
     if (this.loadState !== 'entities-built' && this.loadState !== 'waiting-consolidation') return false;
 
-    if (this.loadState !== 'waiting-consolidation' && this.dirtyBlocks > 0) {
+    if (this.loadState !== 'waiting-consolidation' && this.dirtyBlocks > 0 && !this.isPureRuntimeStreamingChunk()) {
       this.loadState = 'waiting-consolidation';
       this.consolidate();
       return false;
     }
 
-    if (this._pendingPersistenceFlush) {
+    if (this.isPureRuntimeStreamingChunk()) {
+      this.dirtyBlocks = 0;
+      if (this.consolidationTimer) {
+        clearTimeout(this.consolidationTimer);
+        this.consolidationTimer = null;
+      }
+    }
+
+    const shouldDeferNonRenderFinalize = this.isPureRuntimeStreamingChunk();
+    if (shouldDeferNonRenderFinalize) {
+      this.hasDeferredFinalizeWork = true;
+      this._needsDeferredPersistenceFlush = Boolean(this._pendingPersistenceFlush);
+      this._needsDeferredRuntimeEntityRestore = Boolean(
+        (this.pendingRuntimeEntities?.zombieNests?.length || 0) +
+        (this.pendingRuntimeEntities?.turrets?.length || 0) +
+        (this.pendingRuntimeEntities?.minecarts?.length || 0)
+      );
+      this._needsDeferredLightRegistration = true;
+    }
+
+    if (this._pendingPersistenceFlush && !shouldDeferNonRenderFinalize) {
       this._pendingPersistenceFlush = false;
       getPersistenceService()?.saveChunkData?.(this.cx, this.cz, this.pendingSnapshot);
     }
 
-    const zombieNests = this.pendingRuntimeEntities?.zombieNests;
-    if (Array.isArray(zombieNests) && zombieNests.length > 0) {
-      this.world?.zombieNestManager?.restoreNestsForChunk?.(this.cx, this.cz, zombieNests);
-    }
-    const turrets = this.pendingRuntimeEntities?.turrets;
-    if (Array.isArray(turrets) && turrets.length > 0) {
-      this.world?.turretManager?.restoreTurretsForChunk?.(this.cx, this.cz, turrets);
-    }
-    const minecarts = this.pendingRuntimeEntities?.minecarts;
-    if (Array.isArray(minecarts) && minecarts.length > 0) {
-      this.world?.minecartManager?.restoreMinecartsForChunk?.(this.cx, this.cz, minecarts);
+    if (!shouldDeferNonRenderFinalize) {
+      const zombieNests = this.pendingRuntimeEntities?.zombieNests;
+      if (Array.isArray(zombieNests) && zombieNests.length > 0) {
+        this.world?.zombieNestManager?.restoreNestsForChunk?.(this.cx, this.cz, zombieNests);
+      }
+      const turrets = this.pendingRuntimeEntities?.turrets;
+      if (Array.isArray(turrets) && turrets.length > 0) {
+        this.world?.turretManager?.restoreTurretsForChunk?.(this.cx, this.cz, turrets);
+      }
+      const minecarts = this.pendingRuntimeEntities?.minecarts;
+      if (Array.isArray(minecarts) && minecarts.length > 0) {
+        this.world?.minecartManager?.restoreMinecartsForChunk?.(this.cx, this.cz, minecarts);
+      }
     }
 
-    this._registerLightSources();
+    if (!shouldDeferNonRenderFinalize) {
+      this._registerLightSources();
+    }
     this.isReady = true;
     this.loadState = 'finalized';
     this.pendingTerrainData = null;
     this.pendingSpecialEntityData = null;
-    this.pendingRuntimeEntities = null;
+    if (!shouldDeferNonRenderFinalize) {
+      this.pendingRuntimeEntities = null;
+    }
     this.pendingSnapshot = null;
     this.world?.onChunkFinalized?.(this);
     return true;
+  }
+
+  runDeferredFinalizePhase() {
+    if (this.disposed || !this.hasDeferredFinalizeWork) return true;
+
+    if (this._needsDeferredPersistenceFlush) {
+      this._needsDeferredPersistenceFlush = false;
+      this._pendingPersistenceFlush = false;
+      getPersistenceService()?.saveChunkData?.(this.cx, this.cz);
+    }
+
+    if (this._needsDeferredRuntimeEntityRestore) {
+      const zombieNests = this.pendingRuntimeEntities?.zombieNests;
+      if (Array.isArray(zombieNests) && zombieNests.length > 0) {
+        this.world?.zombieNestManager?.restoreNestsForChunk?.(this.cx, this.cz, zombieNests);
+      }
+      const turrets = this.pendingRuntimeEntities?.turrets;
+      if (Array.isArray(turrets) && turrets.length > 0) {
+        this.world?.turretManager?.restoreTurretsForChunk?.(this.cx, this.cz, turrets);
+      }
+      const minecarts = this.pendingRuntimeEntities?.minecarts;
+      if (Array.isArray(minecarts) && minecarts.length > 0) {
+        this.world?.minecartManager?.restoreMinecartsForChunk?.(this.cx, this.cz, minecarts);
+      }
+      this._needsDeferredRuntimeEntityRestore = false;
+      this.pendingRuntimeEntities = null;
+    } else if (this.pendingRuntimeEntities) {
+      this.pendingRuntimeEntities = null;
+    }
+
+    if (this._needsDeferredLightRegistration) {
+      this._registerLightSources();
+      this._needsDeferredLightRegistration = false;
+    }
+
+    this.hasDeferredFinalizeWork = (
+      this._needsDeferredPersistenceFlush ||
+      this._needsDeferredRuntimeEntityRestore ||
+      this._needsDeferredLightRegistration
+    );
+    return !this.hasDeferredFinalizeWork;
   }
 
   // ============================================================
