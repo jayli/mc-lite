@@ -103,7 +103,7 @@ npm run lint
 | Chunk | `src/world/Chunk.js` | 区块渲染 (InstancedMesh)、隐藏面剔除 |
 | Enemy | `src/core/EnemyManager.js` | 敌人生命周期与 EnemyWorker 通信 |
 | Turret | `src/actors/turret/TurretManager.js` | 炮塔自动防御子系统入口 |
-| AO | `src/core/AOSystem.js` | 主线程环境光遮蔽计算 |
+| AO | `src/workers/AOWorker.js` | 专用 AO 计算 Worker，脏集机制异步计算 |
 | FaceCulling | `src/core/FaceCullingSystem.js` | 面剔除系统，协调主线程与 Worker |
 
 ### 玩家系统
