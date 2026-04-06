@@ -111,6 +111,11 @@ export class Chunk {
     this.pendingBatchFaceCullingUpdates = new Set();
     this.batchFaceCullingTimer = null;
 
+    // AO 脏集管理系统
+    this.dirtyAOPositions = new Set();  // 需要重新计算 AO 的方块坐标集合
+    this.aoRefreshTimer = null;         // AO 刷新防抖定时器
+    this._aoOperationQueue = [];        // 快速操作队列：记录所有操作位置，最终统一计算邻居
+
     // 持久化
     this.saveTimeout = null;
 
@@ -374,6 +379,8 @@ export class Chunk {
     mesh.updateMatrix();
     mesh.updateMatrixWorld();
     this.visibleKeys.add(key);
+    // 标记 AO 脏位置（放置方块：自身+邻居）
+    this._markDirtyAO(x, y, z, true);
   }
 
   /**
@@ -402,57 +409,6 @@ export class Chunk {
 
     // 兜底：异常场景回退到重建，确保视觉正确性
     this._refreshBlockRenderMesh(x, y, z, key, entryOrType);
-  }
-
-  /**
-   * 原位更新 InstancedMesh 中单个实例的 AO/朝向属性（同步）
-   * @returns {boolean} 是否更新成功
-   */
-  _updateInstancedBlockAO(x, y, z, key, type, orientation = 0) {
-    const typeMap = this.instanceIndexMap[type];
-    if (!typeMap || !typeMap.has(key)) return false;
-
-    const idx = typeMap.get(key);
-    if (idx === undefined || idx < 0) return false;
-
-    const props = getBlockProps(type);
-    if (!props.isSolid || props.isTransparent) return true;
-
-    const mesh = this.group.children.find(c => c.isInstancedMesh && c.userData?.type === type);
-    if (!mesh || !mesh.geometry) return false;
-
-    const isOccluding = createOcclusionChecker(
-      { chunk: this, chunks: this.world.chunks },
-      CHUNK_SIZE,
-      getBlockProps
-    );
-    const { aoLow, aoHigh } = computeBlockAOPacked(x, y, z, isOccluding);
-
-    const instanceCount = mesh.count;
-    let aoLowAttr = mesh.geometry.getAttribute('aAoLow');
-    let aoHighAttr = mesh.geometry.getAttribute('aAoHigh');
-    let orientationAttr = mesh.geometry.getAttribute('aOrientation');
-
-    if (!aoLowAttr || aoLowAttr.array.length !== instanceCount) {
-      aoLowAttr = new THREE.InstancedBufferAttribute(new Float32Array(instanceCount), 1);
-      mesh.geometry.setAttribute('aAoLow', aoLowAttr);
-    }
-    if (!aoHighAttr || aoHighAttr.array.length !== instanceCount) {
-      aoHighAttr = new THREE.InstancedBufferAttribute(new Float32Array(instanceCount), 1);
-      mesh.geometry.setAttribute('aAoHigh', aoHighAttr);
-    }
-    if (!orientationAttr || orientationAttr.array.length !== instanceCount) {
-      orientationAttr = new THREE.InstancedBufferAttribute(new Float32Array(instanceCount), 1);
-      mesh.geometry.setAttribute('aOrientation', orientationAttr);
-    }
-
-    aoLowAttr.array[idx] = aoLow;
-    aoHighAttr.array[idx] = aoHigh;
-    orientationAttr.array[idx] = orientation;
-    aoLowAttr.needsUpdate = true;
-    aoHighAttr.needsUpdate = true;
-    orientationAttr.needsUpdate = true;
-    return true;
   }
 
   /**
@@ -488,6 +444,293 @@ export class Chunk {
           neighborChunk.checkReveal(nx, ny, nz);
         }
       }
+    }
+    // 标记 AO 脏位置（删除方块后邻居需要刷新 AO）
+    this._markDirtyAO(x, y, z, false);
+  }
+
+  /**
+   * 标记受方块操作影响的邻居为需要 AO 重算
+   * @param {number} x - 方块世界坐标 X
+   * @param {number} y - 方块世界坐标 Y
+   * @param {number} z - 方块世界坐标 Z
+   * @param {boolean} includeSelf - 是否包含自身（放置时 true，删除时 false）
+   */
+  _markDirtyAO(x, y, z, includeSelf = false) {
+    const fx = Math.floor(x), fy = Math.floor(y), fz = Math.floor(z);
+
+    // 记录操作位置到队列，最终 AO 刷新时基于最新 blockData 重新计算邻居
+    this._aoOperationQueue.push({ x: fx, y: fy, z: fz, includeSelf });
+
+    // 同时立即标记 3x3x3 邻居（即时路径，保证单次操作也能正确刷新）
+    // AO 顶点着色依赖对角线方向的方块，因此需要 26 邻居全覆盖
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          if (dx === 0 && dy === 0 && dz === 0) continue;
+          this._addDirtyAOPosition(fx + dx, fy + dy, fz + dz);
+        }
+      }
+    }
+
+    if (includeSelf) {
+      this._addDirtyAOPosition(fx, fy, fz);
+    }
+
+    // 注意：不在此处调度 AO 刷新。AO 刷新统一由 consolidation 完成后触发，
+    // 因为方块操作后需要先 consolidation 生成 InstancedMesh，才能写入 AO attribute。
+  }
+
+  /**
+   * 将单个坐标添加到脏集（自动处理跨 chunk）
+   * @private
+   */
+  _addDirtyAOPosition(x, y, z) {
+    const key = `${x},${y},${z}`;
+    const ncx = Math.floor(x / CHUNK_SIZE);
+    const ncz = Math.floor(z / CHUNK_SIZE);
+
+    if (ncx === this.cx && ncz === this.cz) {
+      // 当前 chunk 内：只标记实心不透明方块
+      const entry = this.blockData[key];
+      if (entry) {
+        const type = typeof entry === 'string' ? entry : entry.type;
+        if (type && getBlockProps(type).isSolid && !getBlockProps(type).isTransparent) {
+          this.dirtyAOPositions.add(key);
+        }
+      }
+    } else {
+      // 跨 chunk：标记邻居 chunk 的脏集
+      const nChunk = this.world?.chunks?.get(`${ncx},${ncz}`);
+      if (nChunk && nChunk.isReady) {
+        const entry = nChunk.blockData[key];
+        if (entry) {
+          const type = typeof entry === 'string' ? entry : entry.type;
+          if (type && getBlockProps(type).isSolid && !getBlockProps(type).isTransparent) {
+            nChunk.dirtyAOPositions.add(key);
+            // 注意：不在此处调度邻居 AO 刷新。
+            // 邻居的 AO 会在 consolidation 完成后由 _applyConsolidateResult 统一触发。
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * 调度 AO 刷新（防抖 100ms）
+   * 连续操作时定时器被重置，只有最后一次操作后 100ms 才执行
+   * @param {Object} [options]
+   * @param {boolean} [options.fullRefresh=false] - 是否全量刷新（标记所有方块为脏）
+   */
+  _scheduleAORefresh(options = {}) {
+    if (options.fullRefresh) {
+      this._markAllBlocksDirtyAO();
+    }
+    if (this.aoRefreshTimer) {
+      clearTimeout(this.aoRefreshTimer);
+    }
+    this.aoRefreshTimer = setTimeout(() => {
+      this.aoRefreshTimer = null;
+      this._executeAORefresh();
+    }, 100);
+  }
+
+  /**
+   * 标记所有实心不透明方块为 AO 脏位置
+   * 用于 chunk 首次加载后全量刷新（WorldWorker 生成的 AO 可能因缺少邻居数据而不准确）
+   */
+  _markAllBlocksDirtyAO() {
+    for (const [key, entry] of Object.entries(this.blockData)) {
+      if (!entry) continue;
+      const type = typeof entry === 'string' ? entry : entry.type;
+      if (type && getBlockProps(type).isSolid && !getBlockProps(type).isTransparent) {
+        this.dirtyAOPositions.add(key);
+      }
+    }
+  }
+
+  /**
+   * 标记与指定邻居 chunk 相邻的边界方块为 AO 脏位
+   * 只刷新与新 chunk 接壤的那一列方块，而非整个 chunk
+   * @param {number} neighborCx - 邻居 chunk 的 cx
+   * @param {number} neighborCz - 邻居 chunk 的 cz
+   */
+  _markBoundaryDirtyAO(neighborCx, neighborCz) {
+    const dx = neighborCx - this.cx;
+    const dz = neighborCz - this.cz;
+    // 确定边界列：邻居在哪个方向，就取哪个方向的边界列
+    let boundaryX = null, boundaryZ = null;
+    if (dx === 1) boundaryX = this.cx * CHUNK_SIZE;        // 邻居在 +X 方向，取本地 X=0 列
+    else if (dx === -1) boundaryX = this.cx * CHUNK_SIZE + CHUNK_SIZE - 1; // 邻居在 -X 方向，取本地 X=15 列
+    if (dz === 1) boundaryZ = this.cz * CHUNK_SIZE;
+    else if (dz === -1) boundaryZ = this.cz * CHUNK_SIZE + CHUNK_SIZE - 1;
+
+    for (const [key, entry] of Object.entries(this.blockData)) {
+      if (!entry) continue;
+      const type = typeof entry === 'string' ? entry : entry.type;
+      if (!type || !getBlockProps(type).isSolid || getBlockProps(type).isTransparent) continue;
+
+      const [x, y, z] = key.split(',').map(Number);
+      // 只标记边界列上的方块（±1 范围覆盖对角线）
+      const matchX = boundaryX !== null && Math.abs(x - boundaryX) <= 1;
+      const matchZ = boundaryZ !== null && Math.abs(z - boundaryZ) <= 1;
+      if (matchX || matchZ) {
+        this.dirtyAOPositions.add(key);
+      }
+    }
+  }
+
+  /**
+   * 处理 AO 操作队列：基于最新 blockData 重新计算所有操作的邻居脏位
+   * 这确保 Mag7 等快速操作时，所有受影响的方块都会被刷新，不会遗漏
+   */
+  _flushAOOperationQueue() {
+    if (this._aoOperationQueue.length === 0) return;
+
+    // AO 顶点着色依赖 3x3x3 邻居（共 26 个），不仅仅是 6 个正交邻居，
+    // 因为面对角线方向的方块也会影响顶点的 AO 值。
+    for (const op of this._aoOperationQueue) {
+      const { x, y, z, includeSelf } = op;
+      // 标记 3x3x3 邻居（排除自身 0,0,0）
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dz = -1; dz <= 1; dz++) {
+            if (dx === 0 && dy === 0 && dz === 0) continue;
+            this._addDirtyAOPosition(x + dx, y + dy, z + dz);
+          }
+        }
+      }
+      // 操作自身
+      if (includeSelf) {
+        this._addDirtyAOPosition(x, y, z);
+      }
+    }
+
+    // 清空队列
+    this._aoOperationQueue.length = 0;
+  }
+
+  /**
+   * 执行 AO 刷新：先处理操作队列，再收集脏集发送给 AOWorker
+   */
+  _executeAORefresh() {
+    // 先处理操作队列：基于最新 blockData 重新计算所有操作的邻居脏位
+    this._flushAOOperationQueue();
+
+    if (this.dirtyAOPositions.size === 0) return;
+    if (!this.isReady || this.isConsolidating) {
+      // 等待 consolidation 完成后重试
+      this._scheduleAORefresh();
+      return;
+    }
+
+    // 快照当前脏位置（后续新增的不会被本次请求覆盖）
+    const sentKeys = new Set(this.dirtyAOPositions);
+
+    // 收集脏位置
+    const positions = [...sentKeys].map(key => {
+      const [x, y, z] = key.split(',').map(Number);
+      return { x, y, z };
+    });
+
+    // 收集邻居 chunk 快照（跨 chunk AO 计算需要）
+    const neighborChunks = [];
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for (const [dx, dz] of dirs) {
+      const nc = this.world?.chunks?.get(`${this.cx + dx},${this.cz + dz}`);
+      if (nc && nc.isReady) {
+        neighborChunks.push({
+          blockData: nc.blockData,
+          cx: nc.cx,
+          cz: nc.cz
+        });
+      }
+    }
+
+    // 生成请求 ID
+    const requestId = `${this.cx},${this.cz}-${Date.now()}`;
+
+    // 动态导入 Worker 和回调
+    import('./ChunkConsolidation.js').then(({ aoWorker, aoCallbacks }) => {
+      // 注册回调
+      aoCallbacks.set(requestId, (data) => {
+        this._applyAOResults(data.results, sentKeys);
+      });
+
+      // 发送给 Worker
+      aoWorker.postMessage({
+        requestId,
+        chunkKey: `${this.cx},${this.cz}`,
+        positions,
+        blockData: { ...this.blockData },
+        neighborChunks
+      });
+    });
+  }
+
+  /**
+   * 应用 Worker 返回的 AO 结果到 InstancedMesh
+   * 直接覆写 attribute 值，无删除-重建中间态
+   * @param {Array} results - [{x, y, z, aoLow, aoHigh}]
+   */
+  _applyAOResults(results, sentKeys) {
+    if (!results || results.length === 0) {
+      // 即使无结果，也要清除已发送的脏标记
+      if (sentKeys) {
+        for (const key of sentKeys) {
+          this.dirtyAOPositions.delete(key);
+        }
+      }
+      return;
+    }
+
+    // 按方块类型分组，减少 InstancedMesh 查找
+    const resultsByType = new Map();
+    for (const r of results) {
+      const key = `${r.x},${r.y},${r.z}`;
+      const entry = this.blockData[key];
+      if (!entry) continue;
+      const type = typeof entry === 'string' ? entry : entry.type;
+      if (!type) continue;
+      if (!resultsByType.has(type)) resultsByType.set(type, []);
+      resultsByType.get(type).push({ ...r, key });
+    }
+
+    // 按类型批量更新 InstancedMesh
+    for (const [type, typeResults] of resultsByType) {
+      const typeMap = this.instanceIndexMap[type];
+      if (!typeMap) continue;
+
+      // 查找对应类型的 InstancedMesh
+      const mesh = this.group.children.find(
+        c => c.isInstancedMesh && c.userData?.type === type
+      );
+      if (!mesh?.geometry) continue;
+
+      const aoLowAttr = mesh.geometry.getAttribute('aAoLow');
+      const aoHighAttr = mesh.geometry.getAttribute('aAoHigh');
+      if (!aoLowAttr || !aoHighAttr) continue;
+
+      for (const r of typeResults) {
+        const idx = typeMap.get(r.key);
+        if (idx === undefined || idx < 0 || idx >= aoLowAttr.array.length) continue;
+
+        // 直接覆写，无中间态
+        aoLowAttr.array[idx] = r.aoLow;
+        aoHighAttr.array[idx] = r.aoHigh;
+      }
+
+      aoLowAttr.needsUpdate = true;
+      aoHighAttr.needsUpdate = true;
+    }
+
+    // 只清除本次已发送的脏标记，保留后续新增的
+    if (sentKeys) {
+      for (const key of sentKeys) {
+        this.dirtyAOPositions.delete(key);
+      }
+    } else {
+      this.dirtyAOPositions.clear();
     }
   }
 
@@ -566,80 +809,6 @@ export class Chunk {
     }
 
     return mesh;
-  }
-
-  /**
-   * 基于当前世界已加载数据，重算本 Chunk 所有 InstancedMesh 的 AO
-   * 主要用于邻接 Chunk 延迟就绪后修正边界 AO，避免"同类方块明暗不一致"
-   */
-  rebuildInstancedAOFromWorld() {
-    if (!this.isReady) return;
-
-    const isOccluding = createOcclusionChecker(
-      { chunk: this, chunks: this.world.chunks },
-      CHUNK_SIZE,
-      getBlockProps
-    );
-
-    for (const child of this.group.children) {
-      if (!child?.isInstancedMesh) continue;
-
-      const type = child.userData?.type;
-      if (!type) continue;
-
-      const props = getBlockProps(type);
-      if (!props.isSolid || props.isTransparent) continue;
-
-      const typeMap = this.instanceIndexMap[type];
-      if (!(typeMap instanceof Map) || typeMap.size === 0) continue;
-
-      const geometry = child.geometry;
-      if (!geometry) continue;
-
-      const instanceCount = child.count;
-      let aoLowAttr = geometry.getAttribute('aAoLow');
-      let aoHighAttr = geometry.getAttribute('aAoHigh');
-      let orientationAttr = geometry.getAttribute('aOrientation');
-
-      if (!aoLowAttr || aoLowAttr.array.length !== instanceCount) {
-        aoLowAttr = new THREE.InstancedBufferAttribute(new Float32Array(instanceCount), 1);
-        geometry.setAttribute('aAoLow', aoLowAttr);
-      }
-      if (!aoHighAttr || aoHighAttr.array.length !== instanceCount) {
-        aoHighAttr = new THREE.InstancedBufferAttribute(new Float32Array(instanceCount), 1);
-        geometry.setAttribute('aAoHigh', aoHighAttr);
-      }
-      if (!orientationAttr || orientationAttr.array.length !== instanceCount) {
-        orientationAttr = new THREE.InstancedBufferAttribute(new Float32Array(instanceCount), 1);
-        geometry.setAttribute('aOrientation', orientationAttr);
-      }
-
-      let updated = false;
-
-      for (const [key, idx] of typeMap.entries()) {
-        if (!Number.isInteger(idx) || idx < 0 || idx >= instanceCount) continue;
-
-        const entry = this.blockData[key];
-        if (!entry) continue;
-
-        const parsed = parseBlockEntry(entry);
-        if (parsed.type !== type) continue;
-
-        const [x, y, z] = key.split(',').map(Number);
-        const { aoLow, aoHigh } = computeBlockAOPacked(x, y, z, isOccluding);
-
-        aoLowAttr.array[idx] = aoLow;
-        aoHighAttr.array[idx] = aoHigh;
-        orientationAttr.array[idx] = parsed.orientation || 0;
-        updated = true;
-      }
-
-      if (updated) {
-        aoLowAttr.needsUpdate = true;
-        aoHighAttr.needsUpdate = true;
-        orientationAttr.needsUpdate = true;
-      }
-    }
   }
 
   /**
@@ -1224,6 +1393,9 @@ export class Chunk {
       mesh.updateMatrixWorld();
     }
 
+    // 9.5 标记 AO 脏位置（放置方块：自身+邻居）
+    this._markDirtyAO(x, y, z, true);
+
     // 10. 通知 Face Culling 系统更新
     const fcSystem2 = getFaceCullingSystem();
     if (fcSystem2 && fcSystem2.isEnabled()) {
@@ -1518,6 +1690,8 @@ export class Chunk {
               this.pendingBatchFaceCullingUpdates.add(nKey);
               // 启动防抖定时器，在最后一批删除完成后统一处理
               this._scheduleBatchFaceCullingUpdate();
+              // 标记 AO 脏位置（邻居自身 + 它的 6 个邻居，都要重算）
+              this._markDirtyAO(nx, ny, nz, true);
             } else {
               // 非批量模式：立即刷新网格补面
               this._refreshBlockRenderLightweight(nx, ny, nz, nKey, this.blockData[nKey]);
@@ -1532,6 +1706,8 @@ export class Chunk {
             // 批量模式：将跨区块的更新也收集起来
             this.pendingBatchFaceCullingUpdates.add(nKey);
             this._scheduleBatchFaceCullingUpdate();
+            // 标记 AO 脏位置（跨 chunk 邻居自身 + 它的邻居都要重算）
+            this._markDirtyAO(nx, ny, nz, true);
           } else {
             neighborChunk.checkReveal(nx, ny, nz);
           }

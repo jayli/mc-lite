@@ -20,11 +20,6 @@ const getParticleSystem = () => globalThis._ParticleSystem || ParticleSystem;
 const CHUNK_SIZE = 16;
 /** 渲染距离（以区块为单位），玩家周围 3x3 的区块将被加载 */
 const RENDER_DIST = 3;
-const RUNTIME_FINALIZE_AO_DELAY_MS = 900;
-const CONSOLIDATION_AO_DELAY_MS = 120;
-const RUNTIME_AO_BUDGET_MS = 0.5;
-const RUNTIME_AO_MAX_CHUNKS = 1;
-const RUNTIME_AO_IDLE_GRACE_MS = 1500;
 const RUNTIME_DEFERRED_FINALIZE_IDLE_GRACE_MS = 800;
 const RUNTIME_DEFERRED_FINALIZE_MAX_CHUNKS = 1;
 /**
@@ -102,8 +97,6 @@ export class World {
     };
     this.chunkAssemblyScheduler = new ChunkAssemblyScheduler(this);
     this._staticTreeTerrainBoostChunkKeys = new Set();
-    this._pendingAORefreshChunkKeys = new Set();
-    this._pendingAORefreshMeta = new Map();
     this._lastStreamingActivityAt = 0;
     this._pendingDeferredFinalizeChunkKeys = new Set();
   }
@@ -219,26 +212,28 @@ export class World {
 
   onChunkConsolidationComplete(chunk) {
     if (!chunk) return;
-    this._enqueueChunkAndNeighborsForAORefresh(`${chunk.cx},${chunk.cz}`, {
-      includeNeighbors: true,
-      delayMs: CONSOLIDATION_AO_DELAY_MS,
-      reason: 'consolidation'
-    });
     this.chunkAssemblyScheduler.enqueue(chunk, 'finalize', this._computeChunkAssemblyPriority(chunk));
   }
 
   onChunkFinalized(chunk) {
     if (!chunk) return;
     const key = `${chunk.cx},${chunk.cz}`;
+
+    // Chunk finalized 后触发 AO 全量刷新（使用 AOWorker 带邻居数据重算）
+    // WorldWorker 生成 chunk 时没有邻居数据，跨 chunk 方块的 AO 可能不准确。
+    chunk._scheduleAORefresh({ fullRefresh: true });
+    // 邻居 chunk 只需增量刷新边界方块（不做 fullRefresh 避免邻居集体闪烁）
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for (const [dx, dz] of dirs) {
+      const nChunk = this.chunks.get(`${chunk.cx + dx},${chunk.cz + dz}`);
+      if (nChunk && nChunk.isReady) {
+        nChunk._markBoundaryDirtyAO(chunk.cx, chunk.cz);
+        nChunk._scheduleAORefresh();
+      }
+    }
+
     if (chunk.hasDeferredFinalizeWork) {
       this._pendingDeferredFinalizeChunkKeys.add(key);
-    }
-    if (this.bootstrapState.phase === 'runtime-streaming' && !chunk.isPureRuntimeStreamingChunk?.()) {
-      this._enqueueChunkAndNeighborsForAORefresh(key, {
-        includeNeighbors: false,
-        delayMs: RUNTIME_FINALIZE_AO_DELAY_MS,
-        reason: 'runtime-finalize'
-      });
     }
     if (this.bootstrapState.phase === 'bootstrapping' && this.bootstrapState.targetChunkKeys.has(key)) {
       this.bootstrapState.finalizedChunkKeys.add(key);
@@ -284,70 +279,6 @@ export class World {
       if (done !== false) {
         this._pendingDeferredFinalizeChunkKeys.delete(key);
       }
-      processed++;
-    }
-    return processed;
-  }
-
-  _enqueueChunkAndNeighborsForAORefresh(chunkKey, options = {}) {
-    if (!chunkKey) return;
-    const [cx, cz] = chunkKey.split(',').map(Number);
-    const includeNeighbors = options.includeNeighbors !== false;
-    const delayMs = Number.isFinite(options.delayMs) ? options.delayMs : 0;
-    const reason = options.reason || 'unknown';
-    const readyAt = (globalThis.performance?.now?.() ?? Date.now()) + delayMs;
-    const keys = includeNeighbors
-      ? [
-          `${cx},${cz}`,
-          `${cx + 1},${cz}`,
-          `${cx - 1},${cz}`,
-          `${cx},${cz + 1}`,
-          `${cx},${cz - 1}`
-        ]
-      : [`${cx},${cz}`];
-    keys.forEach((key) => {
-      this._pendingAORefreshChunkKeys.add(key);
-      const prev = this._pendingAORefreshMeta.get(key);
-      if (!prev || readyAt < prev.readyAt) {
-        this._pendingAORefreshMeta.set(key, { readyAt, reason });
-      }
-    });
-  }
-
-  _processPendingAORefreshQueue(options = {}) {
-    if (this._pendingAORefreshChunkKeys.size === 0) return 0;
-    const maxChunks = Number.isFinite(options.maxChunks) ? options.maxChunks : RUNTIME_AO_MAX_CHUNKS;
-    const budgetMs = Number.isFinite(options.budgetMs) ? options.budgetMs : RUNTIME_AO_BUDGET_MS;
-    if (maxChunks <= 0 || budgetMs <= 0) return 0;
-
-    const start = globalThis.performance?.now?.() ?? Date.now();
-    const currentTime = start;
-    let processed = 0;
-    for (const key of [...this._pendingAORefreshChunkKeys]) {
-      if (processed >= maxChunks) break;
-      const elapsed = (globalThis.performance?.now?.() ?? Date.now()) - start;
-      if (elapsed >= budgetMs) break;
-
-      const meta = this._pendingAORefreshMeta.get(key);
-      if (meta && meta.readyAt > currentTime) continue;
-      if (
-        meta?.reason === 'runtime-finalize' &&
-        currentTime - this._lastStreamingActivityAt < RUNTIME_AO_IDLE_GRACE_MS
-      ) {
-        continue;
-      }
-      const chunk = this.chunks.get(key);
-      if (!chunk) {
-        this._pendingAORefreshChunkKeys.delete(key);
-        this._pendingAORefreshMeta.delete(key);
-        continue;
-      }
-      if (!chunk.isReady || chunk.isConsolidating) {
-        continue;
-      }
-      chunk.rebuildInstancedAOFromWorld?.();
-      this._pendingAORefreshChunkKeys.delete(key);
-      this._pendingAORefreshMeta.delete(key);
       processed++;
     }
     return processed;
@@ -452,9 +383,6 @@ export class World {
     }
 
     this.processAssemblyQueues();
-    this._processPendingAORefreshQueue(this.bootstrapState.phase === 'runtime-streaming'
-      ? { maxChunks: RUNTIME_AO_MAX_CHUNKS, budgetMs: RUNTIME_AO_BUDGET_MS }
-      : { maxChunks: 0, budgetMs: 0 });
     if (this.bootstrapState.phase === 'runtime-streaming') {
       this._processDeferredFinalizeQueue();
     }
@@ -464,8 +392,6 @@ export class World {
         this.flushShadowUpdates('batched-world-change');
       }
     }
-
-    // 移除 _processPendingAORefreshQueue 调用：不再需要 AO 边界重算
 
     // 更新粒子系统逻辑（运动、透明度衰减等）
     this.particles.update(dt);

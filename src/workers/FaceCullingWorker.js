@@ -1,8 +1,7 @@
 // src/workers/FaceCullingWorker.js
 // 专门处理隐藏面剔除计算的Worker
 
-import { getBlockProperties, isFullCubeOccluder } from '../constants/BlockData.js';
-import { buildAODataForBlocks, computeIncrementalAO, calculateAOForBlock, isAOApplicable } from '../utils/AOUtils.js';
+import { getBlockProperties } from '../constants/BlockData.js';
 import {
   computeFaceVisibilityMask,
   createBlockDataNeighborQuery,
@@ -211,82 +210,6 @@ function calculateFaceVisibilityWithWorld(block, blockData, worldChunks, current
   );
 }
 
-/**
- * 批量计算 AO 数据（用于区块生成）
- * @param {Array} blocks - 方块数组 [{x, y, z, type}]
- * @param {Object} blockData - 完整方块数据 {"x,y,z": "type"}
- * @param {number} cx - 区块 X 坐标
- * @param {number} cz - 区块 Z 坐标
- * @param {Array} worldChunks - 相邻区块数据
- * @returns {Object} AO 计算结果
- */
-function computeBatchAO(blocks, blockData, cx, cz, worldChunks = []) {
-  const startTime = performance.now();
-  const affectedNeighbors = [];
-
-  // 创建跨区块 occluding 检查器
-  const isOccluding = createOccludingChecker(blockData, worldChunks, cx, cz);
-
-  const aoData = buildAODataForBlocks(blocks, isOccluding);
-
-  return {
-    aoData,
-    affectedNeighbors,
-    duration: performance.now() - startTime,
-    cx,
-    cz
-  };
-}
-
-/**
- * 增量计算 AO 数据（用于动态方块更新）
- * 现在直接复用 AOUtils 中的通用实现
- * @param {Object} position - 方块位置 {x, y, z}
- * @param {'PLACE'|'DESTROY'} operation - 操作类型
- * @param {string} blockType - 方块类型
- * @param {Object} blockData - 局部方块数据
- * @param {number} neighborhoodRadius - 邻居半径
- * @returns {Object} AO 计算结果
- */
-function computeIncrementalAOWorker(position, operation, blockType, blockData, neighborhoodRadius = 1) {
-  return computeIncrementalAO(position, operation, blockType, blockData, neighborhoodRadius, getBlockProperties);
-}
-
-/**
- * 批量计算指定位置的 AO 数据（用于动态交互）
- * 使用 isFullCubeOccluder 保持与主线程 createOcclusionChecker 一致的遮挡判定
- * @param {Array} positions - 位置数组 [{x, y, z}]
- * @param {Object} blockData - 方块数据快照 {"x,y,z": "type"}
- * @returns {Object} { aoResults: [{x, y, z, aoLow, aoHigh}] }
- */
-function computePositionsAO(positions, blockData) {
-  // 使用 isFullCubeOccluder 作为遮挡判定，与主线程 createOcclusionChecker 保持一致
-  const isOccluding = (x, y, z) => {
-    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-    const type = blockData[key];
-    if (!type) return false;
-    return isFullCubeOccluder(type);
-  };
-
-  const aoResults = [];
-
-  for (const pos of positions) {
-    const key = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
-    const type = blockData[key];
-
-    // 非 AO 适用方块（空气、透明、非实心）也需要占位结果，以更新动态网格
-    if (!type || !isAOApplicable(type)) {
-      aoResults.push({ x: pos.x, y: pos.y, z: pos.z, aoLow: 0, aoHigh: 0 });
-      continue;
-    }
-
-    const { aoLow, aoHigh } = calculateAOForBlock(pos.x, pos.y, pos.z, isOccluding);
-    aoResults.push({ x: pos.x, y: pos.y, z: pos.z, aoLow, aoHigh });
-  }
-
-  return { aoResults };
-}
-
 // Worker 消息处理器
 self.onmessage = function(e) {
   const { type, data } = e.data;
@@ -310,32 +233,6 @@ self.onmessage = function(e) {
           data.cz,
           data.worldChunks || null
         );
-        break;
-
-      // AO 计算相关消息
-      case 'COMPUTE_AO_BATCH':
-        result = computeBatchAO(
-          data.blocks,
-          data.blockData,
-          data.cx,
-          data.cz,
-          data.worldChunks || []
-        );
-        break;
-
-      case 'COMPUTE_AO_INCREMENTAL':
-        result = computeIncrementalAOWorker(
-          data.position,
-          data.operation,
-          data.blockType,
-          data.blockData,
-          data.neighborhoodRadius || 1
-        );
-        break;
-
-      // 动态交互 AO 批量计算（主线程异步请求）
-      case 'COMPUTE_POSITIONS_AO':
-        result = computePositionsAO(data.positions, data.blockData);
         break;
 
       default:

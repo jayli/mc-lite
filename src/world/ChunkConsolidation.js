@@ -18,8 +18,8 @@ export const CONSOLIDATION_DELAY = 1000;
 export const worldWorker = new Worker(new URL('../workers/WorldWorker.js', import.meta.url), { type: 'module' });
 export const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函数
 
-// AO Worker 实例（基于 FaceCullingWorker，专用于动态交互 AO 计算）
-export const aoWorker = new Worker(new URL('../workers/FaceCullingWorker.js', import.meta.url), { type: 'module' });
+// 专用 AO Worker — 只做 AO 计算，不复用 FaceCullingWorker
+export const aoWorker = new Worker(new URL('../workers/AOWorker.js', import.meta.url), { type: 'module' });
 export const aoCallbacks = new Map(); // AO Worker 回调映射
 
 // 共享几何体定义 - 用于优化渲染性能，避免在每个区块中重复创建相同的几何体，减少 GPU 内存占用
@@ -272,12 +272,12 @@ export function extendChunk(Chunk) {
     });
   };
 
-  // 注册 AO Worker 消息处理器
+  // 注册专用 AO Worker 消息处理器
   aoWorker.onmessage = (e) => {
-    const { id, data } = e.data;
-    if (id && aoCallbacks.has(id)) {
-      aoCallbacks.get(id)(data);
-      aoCallbacks.delete(id);
+    const { requestId, chunkKey, results } = e.data;
+    if (requestId && aoCallbacks.has(requestId)) {
+      aoCallbacks.get(requestId)({ chunkKey, results });
+      aoCallbacks.delete(requestId);
     }
   };
 
@@ -395,11 +395,20 @@ export function extendChunk(Chunk) {
     // 重置状态
     this.dirtyBlocks = Math.max(0, this.dirtyBlocks - consolidatedCount);
     this.isConsolidating = false;
-    this.world?._enqueueChunkAndNeighborsForAORefresh?.(`${this.cx},${this.cz}`, {
-      includeNeighbors: true,
-      delayMs: 80,
-      reason: 'consolidation'
-    });
+    // Consolidation 后仅刷新脏集中的方块（玩家操作标记的受影响邻居），
+    // 不做 fullRefresh，避免不受影响的方块集体闪烁。
+    // fullRefresh 仅在 chunk 首次加载时由 onChunkFinalized 触发。
+    this._scheduleAORefresh();
+    // 触发有脏位的邻居 chunk 执行 AO 增量刷新（边界方块可能受影响）
+    if (this.world) {
+      const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+      for (const [dx, dz] of dirs) {
+        const nChunk = this.world.chunks.get(`${this.cx + dx},${this.cz + dz}`);
+        if (nChunk && nChunk.isReady && !nChunk.isConsolidating && nChunk.dirtyAOPositions.size > 0) {
+          nChunk._scheduleAORefresh();
+        }
+      }
+    }
     if (this.loadState === 'waiting-consolidation') {
       this.loadState = 'entities-built';
       this.world?.onChunkConsolidationComplete?.(this);
