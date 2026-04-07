@@ -1697,9 +1697,25 @@ onmessage = async function(e) {
   }
 
   // 返回数据
+  // 构建 mesh 数据（包含预计算的矩阵和 AO）
+  const meshData = buildMeshData(fakeChunk, d, cx, cz);
+
+  // 收集可传输的 buffer
+  const transferables = [];
+  for (const data of meshData) {
+    transferables.push(
+      data.matrices.buffer,
+      data.aoLow.buffer,
+      data.aoHigh.buffer,
+      data.orientation.buffer
+    );
+  }
+
   postMessage({
-    cx, cz, callbackKey, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys,
-    structureCenters, // 新增：当前 Chunk 负责渲染的结构中心列表
+    cx, cz, callbackKey,
+    meshData,  // 替换原来的 d
+    solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys,
+    structureCenters,
     snapshot: {
       meta: {
         ownershipVersion: OWNERSHIP_SCHEMA_VERSION
@@ -1712,7 +1728,7 @@ onmessage = async function(e) {
         zombieNests: savedSnapshot?.entities?.zombieNests || []
       }
     }
-  });
+  }, transferables);
 };
 
 // 复制结构生成逻辑
