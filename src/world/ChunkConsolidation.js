@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { getBlockProperties as getBlockProps } from '../constants/BlockData.js';
+import { filterWorkerResultAgainstBlockData } from './ChunkMeshDataFilter.js';
 
 // 区块大小常量
 export const CHUNK_SIZE = 16;
@@ -360,7 +361,7 @@ export function extendChunk(Chunk) {
    * @param {Set} consolidatedMeshKeys - 合并前的动态 Mesh 键集合
    */
   Chunk.prototype._applyConsolidateResult = function(data, consolidatedCount, consolidatedMeshKeys) {
-    let { d, visibleKeys, solidBlocks, structureCenters: newStructureCenters } = data;
+    let { meshData, visibleKeys, solidBlocks, structureCenters: newStructureCenters } = data;
 
     // 更新结构中心列表
     if (newStructureCenters && newStructureCenters.length > 0) {
@@ -368,7 +369,7 @@ export function extendChunk(Chunk) {
     }
 
     // 过滤 Worker 结果，防止幻影方块
-    ({ visibleKeys, solidBlocks, d } = this._filterWorkerResult(data));
+    ({ visibleKeys, solidBlocks, meshData } = this._filterWorkerResult(data));
 
     // 保存原始 solidBlocks 用于跨 Chunk 碰撞体
     this._tempOriginalSolidBlocks = solidBlocks ? [...solidBlocks] : [];
@@ -383,7 +384,7 @@ export function extendChunk(Chunk) {
     this._cleanupOldMeshes(consolidatedMeshKeys);
 
     // 构建新的渲染网格（Worker 已计算 AO，buildMeshes 直接应用）
-    this.buildMeshes(data.meshData || []);
+    this.buildMeshes(meshData || []);
 
     // 恢复宝箱状态
     this._restoreChestStates(savedChestStates);
@@ -422,38 +423,7 @@ export function extendChunk(Chunk) {
    * 核心原则：只保留 blockData 中存在的方块，避免已删除的跨Chunk实体方块被重新生成
    */
   Chunk.prototype._filterWorkerResult = function(data) {
-    let { d, visibleKeys, solidBlocks } = data;
-
-    // 过滤 visibleKeys：只保留 blockData 中存在的方块
-    if (visibleKeys) {
-      visibleKeys = visibleKeys.filter(key => {
-        return this.blockData[key] !== undefined;
-      });
-    }
-
-    // 过滤 solidBlocks：只保留 blockData 中存在的方块
-    if (solidBlocks) {
-      solidBlocks = solidBlocks.filter(key => {
-        return this.blockData[key] !== undefined;
-      });
-    }
-
-    // 过滤 d（渲染数据）：只保留 blockData 中存在且类型匹配的方块
-    if (d) {
-      for (const type in d) {
-        d[type] = d[type].filter(pos => {
-          const key = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
-          const currentEntry = this.blockData[key];
-          if (currentEntry) {
-            const currentType = typeof currentEntry === 'string' ? currentEntry : currentEntry.type;
-            return currentType === type;
-          }
-          return false;
-        });
-      }
-    }
-
-    return { visibleKeys, solidBlocks, d };
+    return filterWorkerResultAgainstBlockData(data, this.blockData);
   };
 
   /**
