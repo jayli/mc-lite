@@ -40,6 +40,15 @@
       </div>
     </div>
 
+    <!-- 游戏加载中模态框 -->
+    <div id="game-loading-modal">
+      <div class="game-loading-content">
+        <div class="game-loading-spinner"></div>
+        <p class="game-loading-text">加载中...</p>
+        <p class="game-loading-subtext">正在生成世界，请稍候</p>
+      </div>
+    </div>
+
     <div id="settings-modal">
       <div id="settings-content">
         <h2 style="margin-top:0; text-align:left;">游戏设置</h2>
@@ -192,6 +201,12 @@ import { Game } from './src/core/Game.js';
               const newBtn = document.getElementById('btn-new-world');
 
               const startGame = async (saveData = null) => {
+                // 显示游戏加载中模态框
+                const loadingModal = document.getElementById('game-loading-modal');
+                if (loadingModal) {
+                  loadingModal.style.display = 'flex';
+                }
+
                 modal.style.display = 'none';
 
                 // 如果是加载存档，在创建 Game 实例前恢复种子

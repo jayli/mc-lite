@@ -217,6 +217,16 @@ export class Player {
    */
   setupInput() {
     window.addEventListener('keydown', e => {
+      // 检查游戏世界是否已准备好（加载完成）
+      const isGameplayReady = this.world?.isGameplayReady?.() ?? true;
+      if (!isGameplayReady) {
+        // 游戏还没准备好，只处理 Tab 键（防止浏览器默认行为）
+        if (e.code === 'Tab') {
+          e.preventDefault();
+        }
+        return; // 不记录其他按键
+      }
+
       this.keys[e.code] = true;
       if (e.code === 'KeyR') {
         this.weaponMode = (this.weaponMode + 1) % 4;
@@ -227,17 +237,35 @@ export class Player {
       }
     });
     window.addEventListener('keyup', e => {
+      // 检查游戏世界是否已准备好（加载完成）
+      const isGameplayReady = this.world?.isGameplayReady?.() ?? true;
+      if (!isGameplayReady) return; // 如果游戏还没准备好，不处理键盘输入
+
       this.keys[e.code] = false;
       if (e.code === 'Space') {
         this.spaceKeyReleased = true;
       }
     });
-    window.addEventListener('mousedown', e => this.interact(e));
+    window.addEventListener('mousedown', e => {
+      // 检查游戏世界是否已准备好（加载完成）
+      const isGameplayReady = this.world?.isGameplayReady?.() ?? true;
+      if (!isGameplayReady) return; // 如果游戏还没准备好，不处理鼠标输入
+
+      this.interact(e);
+    });
     window.addEventListener('mouseup', e => {
+      // 检查游戏世界是否已准备好（加载完成）
+      const isGameplayReady = this.world?.isGameplayReady?.() ?? true;
+      if (!isGameplayReady) return; // 如果游戏还没准备好，不处理鼠标输入
+
       if (e.button === 0) this.isShooting = false;
     });
 
     document.addEventListener('mousemove', e => {
+      // 检查游戏世界是否已准备好（加载完成）
+      const isGameplayReady = this.world?.isGameplayReady?.() ?? true;
+      if (!isGameplayReady) return; // 如果游戏还没准备好，不处理鼠标移动
+
       if (document.pointerLockElement === document.body) {
         this.rotation.y -= e.movementX * 0.002;
         this.cameraPitch -= e.movementY * 0.002;
@@ -247,6 +275,10 @@ export class Player {
 
     this.bgmStarted = false;
     document.addEventListener('click', () => {
+      // 检查游戏世界是否已准备好（加载完成）
+      const isGameplayReady = this.world?.isGameplayReady?.() ?? true;
+      if (!isGameplayReady) return; // 如果游戏还没准备好，不处理点击事件
+
       // 检查背包是否打开，如果打开则不请求指针锁定
       const inventoryModal = document.getElementById('inventory-modal');
       const isInventoryOpen = inventoryModal && window.getComputedStyle(inventoryModal).display !== 'none';
@@ -268,6 +300,17 @@ export class Player {
    * @param {number} dt - 时间步长
    */
   update(dt = 0.016) {
+    // 检查游戏世界是否已准备好（加载完成）
+    const isGameplayReady = this.world?.isGameplayReady?.() ?? true;
+    if (!isGameplayReady) {
+      // 游戏还没准备好，只更新相机位置，不应用物理
+      this.camera.rotation.x = this.cameraPitch;
+      this.camera.rotation.y = this.rotation.y;
+      this.camera.position.copy(this.position);
+      this.camera.position.y += 1.65;
+      return;
+    }
+
     this.camera.rotation.x = this.cameraPitch;
     dt = Math.min(dt, 0.1);
     this.physics.beginFrame();

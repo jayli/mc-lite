@@ -93,6 +93,7 @@ export class Game {
     this.isRunning = false; // 游戏运行状态标志
     this.perfStats = { player: 0, world: 0, ui: 0, render: 0 }; // 性能统计数据
     this.showDebugInfo = false; // 是否显示调试信息
+    this._gameplayReady = false; // 游戏是否已准备好（用于控制加载模态框）
 
     this.lastTime = 0; // 用于计算时间差的时间戳
 
@@ -398,6 +399,21 @@ export class Game {
   update(dt) {
     const t1 = performance.now();
     const gameplayReady = this.world?.isGameplayReady?.() ?? true;
+
+    // 首次进入 gameplayReady 状态时，隐藏加载模态框并锁定鼠标
+    if (gameplayReady && !this._gameplayReady) {
+      this._gameplayReady = true;
+      const loadingModal = document.getElementById('game-loading-modal');
+      if (loadingModal) {
+        loadingModal.style.display = 'none';
+      }
+      // 请求鼠标锁定，让玩家可以控制视角
+      if (document.body.requestPointerLock) {
+        document.body.requestPointerLock();
+      }
+      console.log('[Game] 世界加载完成，进入游戏');
+    }
+
     if (this.player && gameplayReady) this.player.update(dt); // 更新玩家状态（移动、物理等）
     const t2 = performance.now();
 
