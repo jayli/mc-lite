@@ -284,7 +284,7 @@ export class Player {
       const isInventoryOpen = inventoryModal && window.getComputedStyle(inventoryModal).display !== 'none';
 
       if (!isInventoryOpen && document.pointerLockElement !== document.body) {
-        document.body.requestPointerLock();
+        document.body.requestPointerLock().catch(() => {});
       }
 
       if (!this.bgmStarted) {

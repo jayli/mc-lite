@@ -387,19 +387,17 @@ export class Chunk {
    * @returns {string|null} 方块类型
    */
   _getBlockTypeByKey(key) {
-    // 优先使用新存储
+    // 优先使用 blockData（权威存储，worldY 未初始化导致 blockDataArray 索引不可靠）
+    const entry = this.blockData[key];
+    if (entry) return parseBlockEntry(entry).type;
+    // 回退到 blockDataArray
     const [x, y, z] = key.split(',').map(Number);
     const blockIndex = this._getBlockIndex(x, y, z);
     if (blockIndex >= 0) {
       const blockId = this.blockDataArray[blockIndex];
-      if (blockId) {
-        return this._getTypeFromBlockId(blockId);
-      }
+      if (blockId) return this._getTypeFromBlockId(blockId);
     }
-    // 回退到旧存储
-    const entry = this.blockData[key];
-    if (!entry) return null;
-    return parseBlockEntry(entry).type;
+    return null;
   }
 
   /**
@@ -422,16 +420,17 @@ export class Chunk {
    * @returns {string|object|null}
    */
   _getBlockEntryByKey(key) {
+    // 优先使用 blockData（权威存储）
+    const entry = this.blockData[key];
+    if (entry) return entry;
+    // 回退到 blockDataArray
     const [x, y, z] = key.split(',').map(Number);
     const blockIndex = this._getBlockIndex(x, y, z);
     if (blockIndex >= 0) {
       const blockId = this.blockDataArray[blockIndex];
-      if (blockId) {
-        return this._getEntryFromBlockId(blockId);
-      }
-      return null;
+      if (blockId) return this._getEntryFromBlockId(blockId);
     }
-    return this.blockData[key] || null;
+    return null;
   }
 
   /**
@@ -440,23 +439,15 @@ export class Chunk {
    * @returns {boolean}
    */
   _isBlockVisibleByKey(key) {
-    const [x, y, z] = key.split(',').map(Number);
-    const blockIndex = this._getBlockIndex(x, y, z);
-    if (blockIndex >= 0) {
-      const blockId = this.blockDataArray[blockIndex];
-      if (blockId === 0) return false;
-      const type = this._getTypeFromBlockId(blockId);
+    // 优先使用 blockData（权威存储，worldY 未初始化导致 blockDataArray 索引不可靠）
+    const entry = this.blockData[key];
+    if (entry) {
+      const type = typeof entry === 'string' ? entry : entry.type;
       if (!type) return false;
       const props = getBlockProps(type);
       return props.isRendered !== false;
     }
-    // 回退到旧存储
-    const entry = this.blockData[key];
-    if (!entry) return false;
-    const type = typeof entry === 'string' ? entry : entry.type;
-    if (!type) return false;
-    const props = getBlockProps(type);
-    return props.isRendered !== false;
+    return false;
   }
 
   /**
@@ -618,6 +609,10 @@ export class Chunk {
     const neighbors = Chunk.getAOImpactedNeighborKeys(x, y, z);
 
     for (const neighbor of neighbors) {
+      // 对角线邻居不共享面，删除方块不会给它暴露新面，只影响 AO（由 _markDirtyAO 处理）
+      // 跳过对角线邻居的 reveal/refresh，避免为本应隐藏的方块创建临时动态网格（幻影方块）
+      if (!neighbor.isOrthogonal) continue;
+
       const nx = neighbor.x;
       const ny = neighbor.y;
       const nz = neighbor.z;
@@ -627,12 +622,15 @@ export class Chunk {
 
       if (nCx === this.cx && nCz === this.cz) {
         const nKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-        const entry = this._getBlockEntryByKey(nKey);
+        // 只使用 blockData（权威存储），不使用 _getBlockEntryByKey
+        // blockData 始终包含所有方块（acceptWorkerResult 和 _updateBlockState 都写入 blockData）
+        const entry = this.blockData[nKey];
         if (entry) {
           const parsed = parseBlockEntry(entry);
-          if (!this._isBlockVisibleByKey(nKey) && neighbor.isOrthogonal) {
-            this.addBlockDynamic(nx, ny, nz, entry);
-          } else {
+          const props = getBlockProps(parsed.type);
+          if (!this.visibleKeys.has(nKey) && props.isRendered !== false) {
+            this._refreshBlockRenderMesh(nx, ny, nz, nKey, entry);
+          } else if (this.visibleKeys.has(nKey)) {
             this._refreshBlockRenderLightweight(nx, ny, nz, nKey, entry);
           }
         }
@@ -644,7 +642,7 @@ export class Chunk {
         }
       }
     }
-    // 标记 AO 脏位置（删除方块后邻居需要刷新 AO）
+    // 标记 AO 脏位置（删除方块后 26 邻居都需要刷新 AO）
     this._markDirtyAO(x, y, z, false);
   }
 
@@ -1739,8 +1737,14 @@ export class Chunk {
     const targetChunk = owner.ownerChunk;
     const { blockKey, entry } = owner;
 
-    if (!targetChunk._isBlockVisibleByKey(blockKey)) {
-      targetChunk.addBlockDynamic(x, y, z, entry);
+    // 使用 visibleKeys（面剔除状态）判断可见性
+    if (!targetChunk.visibleKeys.has(blockKey)) {
+      // 隐藏邻居只创建临时渲染网格，不改 blockData/持久化
+      const parsed = parseBlockEntry(entry);
+      const props = getBlockProps(parsed.type);
+      if (props.isRendered !== false) {
+        targetChunk._refreshBlockRenderMesh(x, y, z, blockKey, entry);
+      }
     } else {
       // 如果原本可见，跨区块暴露时也要立即刷新网格补面
       targetChunk._refreshBlockRenderLightweight(x, y, z, blockKey, entry);
@@ -1819,9 +1823,11 @@ export class Chunk {
         this.solidBlocks.delete(key);
         getPersistenceService().recordChangeForChunk(this.cx, this.cz, px, py, pz, 'air');
 
-        // 收集周围 6 个方向的邻居坐标
-        Chunk.getAOImpactedNeighborKeys(px, py, pz).forEach(({ key: neighborKey }) => {
-          neighborsToUpdate.add(neighborKey);
+        // 只收集正交邻居（6方向），对角线邻居不共享面，不需要即时 reveal/refresh
+        Chunk.getAOImpactedNeighborKeys(px, py, pz).forEach(({ key: neighborKey, isOrthogonal }) => {
+          if (isOrthogonal) {
+            neighborsToUpdate.add(neighborKey);
+          }
         });
       }
     });
@@ -1921,12 +1927,17 @@ export class Chunk {
 
       if (nCx === this.cx && nCz === this.cz) {
         // 邻居在当前区块
-        const nEntry = this._getBlockEntryByKey(nKey);
+        // 只使用 blockData（权威存储），不使用 _getBlockEntryByKey
+        // blockData 始终包含所有方块（acceptWorkerResult 和 _updateBlockState 都写入 blockData）
+        const nEntry = this.blockData[nKey];
         if (nEntry) {
-          // 如果邻居存在但不可见（被剔除了），则"唤醒"它
-          if (!this._isBlockVisibleByKey(nKey)) {
-            this.addBlockDynamic(nx, ny, nz, nEntry);
-          } else {
+          // 使用 visibleKeys（面剔除状态）判断可见性
+          const nParsed = parseBlockEntry(nEntry);
+          const nProps = getBlockProps(nParsed.type);
+          if (!this.visibleKeys.has(nKey) && nProps.isRendered !== false) {
+            // 隐藏邻居现在有了暴露面，只创建临时渲染网格（不改 blockData/持久化）
+            this._refreshBlockRenderMesh(nx, ny, nz, nKey, nEntry);
+          } else if (this.visibleKeys.has(nKey)) {
             // 如果本来就可见，也要重新触发 Face Culling 更新以显示新的暴露面
             if (isBatch) {
               // 批量模式：收集到待处理队列，不立即更新
@@ -1976,6 +1987,11 @@ export class Chunk {
         );
       });
     }
+
+    // 7. 标记 AO 脏位置（覆盖每个删除位置的全部 26 邻居，含对角线）
+    positions.forEach(p => {
+      this._markDirtyAO(p.x, p.y, p.z, false);
+    });
   }
 
   /**

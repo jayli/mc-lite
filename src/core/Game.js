@@ -408,8 +408,9 @@ export class Game {
         loadingModal.style.display = 'none';
       }
       // 请求鼠标锁定，让玩家可以控制视角
+      // 浏览器要求用户手势才能锁定，首次可能失败，玩家点击画面后会再次触发
       if (document.body.requestPointerLock) {
-        document.body.requestPointerLock();
+        document.body.requestPointerLock().catch(() => {});
       }
       console.log('[Game] 世界加载完成，进入游戏');
     }
