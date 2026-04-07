@@ -634,8 +634,9 @@ export class Chunk {
     });
 
     // 收集邻居 chunk 快照（跨 chunk AO 计算需要）
+    // AO 计算需要 26 邻居（3x3x3），因此需要包含 8 个方向的邻居（正交+对角线）
     const neighborChunks = [];
-    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
     for (const [dx, dz] of dirs) {
       const nc = this.world?.chunks?.get(`${this.cx + dx},${this.cz + dz}`);
       if (nc && nc.isReady) {
