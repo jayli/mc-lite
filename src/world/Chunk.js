@@ -87,11 +87,24 @@ export class Chunk {
     this._needsDeferredLightRegistration = false;
     this.disposed = false;
 
-    // 数据存储
+    // 数据存储 (旧的对象存储 - 将逐步迁移)
     this.blockData = {};
     this.solidBlocks = new Set();
     this.visibleKeys = new Set();
     this.instanceIndexMap = new Map();
+
+    // === 高性能数组存储 (新) ===
+    // 区块大小 16x16x16 = 4096 个方块
+    // blockDataArray[blockIndex] = blockId (0 = 空气)
+    // blockIndex = (y << 8) | (z << 4) | x = y * 256 + z * 16 + x
+    this.blockDataArray = new Uint32Array(4096);
+    // Palette: blockId -> { type, orientation } 或字符串类型
+    // blockId 从 1 开始，0 保留给空气
+    this.blockPalette = new Map();
+    this.blockPaletteReverse = new Map(); // type+JSON(orientation) -> blockId
+    this.nextBlockId = 1; // 下一个可用的 blockId
+    // 预注册空气（id=0，不存入 palette）
+    this.solidBlockIds = new Set(); // 存储实心方块对应的 blockId
 
     // 实体与结构数据
     this.entities = { realisticTrees: [], modGunMan: [], rovers: [] };
@@ -121,6 +134,89 @@ export class Chunk {
 
     // 启动区块生成
     this.gen();
+  }
+
+  // ============================================================
+  // 坐标压缩与 Palette 工具 (高性能查询支持)
+  // ============================================================
+
+  /**
+   * 将区块内局部坐标压缩为数组索引
+   * @param {number} lx - 局部 X (0-15)
+   * @param {number} ly - 局部 Y (0-15)
+   * @param {number} lz - 局部 Z (0-15)
+   * @returns {number} 数组索引 (0-4095)
+   */
+  static packBlockIndex(lx, ly, lz) {
+    return (ly << 8) | (lz << 4) | lx;
+  }
+
+  /**
+   * 从数组索引解压为局部坐标
+   * @param {number} index - 数组索引
+   * @returns {{x:number,y:number,z:number}} 局部坐标
+   */
+  static unpackBlockIndex(index) {
+    return {
+      x: index & 15,
+      y: (index >> 8) & 15,
+      z: (index >> 4) & 15
+    };
+  }
+
+  /**
+   * 从世界坐标获取 blockIndex（仅当在区块内时有效）
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @returns {number} 数组索引，如果不在区块内返回 -1
+   */
+  _getBlockIndex(x, y, z) {
+    const lx = x - this.cx * CHUNK_SIZE;
+    const ly = y - this.worldY;
+    const lz = z - this.cz * CHUNK_SIZE;
+    if (lx < 0 || lx >= CHUNK_SIZE || ly < 0 || ly >= CHUNK_SIZE || lz < 0 || lz >= CHUNK_SIZE) {
+      return -1;
+    }
+    return (ly << 8) | (lz << 4) | lx;
+  }
+
+  /**
+   * 获取或创建 blockId
+   * @param {string|object} entry - 方块条目（类型字符串或对象）
+   * @returns {number} blockId
+   */
+  _getOrCreateBlockId(entry) {
+    const key = typeof entry === 'string' ? entry : JSON.stringify(entry);
+    let id = this.blockPaletteReverse.get(key);
+    if (id !== undefined) return id;
+
+    id = this.nextBlockId++;
+    this.blockPalette.set(id, entry);
+    this.blockPaletteReverse.set(key, id);
+    return id;
+  }
+
+  /**
+   * 从 blockId 获取方块条目
+   * @param {number} blockId
+   * @returns {string|object|null}
+   */
+  _getEntryFromBlockId(blockId) {
+    if (blockId === 0) return null;
+    return this.blockPalette.get(blockId);
+  }
+
+  /**
+   * 从 blockId 获取方块类型
+   * @param {number} blockId
+   * @returns {string|null}
+   */
+  _getTypeFromBlockId(blockId) {
+    if (blockId === 0) return null;
+    const entry = this.blockPalette.get(blockId);
+    if (!entry) return null;
+    return typeof entry === 'string' ? entry : entry.type;
   }
 
   // ============================================================
@@ -157,8 +253,12 @@ export class Chunk {
    * @param {string} key - 方块键
    * @param {string} type - 方块类型
    * @param {Object} entry - 方块条目
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
    */
-  _updateBlockState(key, type, entry) {
+  _updateBlockState(key, type, entry, x, y, z) {
+    // === 旧的对象存储（保持兼容） ===
     if (type === 'air') {
       delete this.blockData[key];
       this.visibleKeys.delete(key);
@@ -173,6 +273,35 @@ export class Chunk {
       this.solidBlocks.add(key);
     } else {
       this.solidBlocks.delete(key);
+    }
+
+    // === 新的数组存储（高性能） ===
+    const blockIndex = this._getBlockIndex(x, y, z);
+    if (blockIndex >= 0) {
+      if (type === 'air') {
+        // 清空数组位置
+        const oldId = this.blockDataArray[blockIndex];
+        if (oldId !== 0) {
+          this.solidBlockIds.delete(oldId);
+          this.blockDataArray[blockIndex] = 0;
+        }
+      } else {
+        // 获取或创建 blockId
+        const blockId = this._getOrCreateBlockId(entry);
+        // 清空旧 id
+        const oldId = this.blockDataArray[blockIndex];
+        if (oldId !== 0 && oldId !== blockId) {
+          this.solidBlockIds.delete(oldId);
+        }
+        // 设置新 id
+        this.blockDataArray[blockIndex] = blockId;
+        // 如果是实心方块，加入 solid set
+        if (props.isSolid) {
+          this.solidBlockIds.add(blockId);
+        } else {
+          this.solidBlockIds.delete(blockId);
+        }
+      }
     }
   }
 
@@ -1076,6 +1205,9 @@ export class Chunk {
       .map(c => ({ x: c.x, y: c.y, z: c.z }));
     this.entities.realisticTrees = realisticTrees || [];
 
+    // === 初始化新的数组存储（高性能查询支持） ===
+    this._initArrayStorageFromBlockData();
+
     this.pendingTerrainData = d || {};
     this.pendingSnapshot = snapshot || null;
     this.pendingRuntimeEntities = {
@@ -1089,6 +1221,47 @@ export class Chunk {
       rovers: rovers || []
     };
     this.loadState = 'worker-ready';
+  }
+
+  /**
+   * 从 blockData 对象初始化数组存储
+   * 在 Worker 结果接收或持久化加载后调用
+   */
+  _initArrayStorageFromBlockData() {
+    // 重置数组存储
+    this.blockDataArray.fill(0);
+    this.blockPalette.clear();
+    this.blockPaletteReverse.clear();
+    this.solidBlockIds.clear();
+    this.nextBlockId = 1;
+
+    // 遍历 blockData 填充数组存储
+    for (const [key, entry] of Object.entries(this.blockData)) {
+      const [x, y, z] = key.split(',').map(Number);
+      const parsed = parseBlockEntry(entry);
+      const type = parsed.type;
+
+      if (!type || type === 'air') continue;
+
+      // 计算数组索引
+      const lx = x - this.cx * CHUNK_SIZE;
+      const ly = y - this.worldY;
+      const lz = z - this.cz * CHUNK_SIZE;
+      if (lx < 0 || lx >= CHUNK_SIZE || ly < 0 || ly >= CHUNK_SIZE || lz < 0 || lz >= CHUNK_SIZE) {
+        continue; // 不在本区块范围内
+      }
+      const blockIndex = (ly << 8) | (lz << 4) | lx;
+
+      // 获取或创建 blockId
+      const blockId = this._getOrCreateBlockId(entry);
+      this.blockDataArray[blockIndex] = blockId;
+
+      // 如果是实心方块，加入 solid set
+      const props = getBlockProps(type);
+      if (props.isSolid) {
+        this.solidBlockIds.add(blockId);
+      }
+    }
   }
 
   /**
@@ -1338,7 +1511,7 @@ export class Chunk {
     getPersistenceService().recordChangeForChunk(this.cx, this.cz, x, y, z, entry);
 
     // 5. 更新数据状态
-    this._updateBlockState(key, type, entry);
+    this._updateBlockState(key, type, entry, x, y, z);
     this.saveDebounced();
 
     // 6. 计算 Face Culling 掩码
@@ -1469,7 +1642,7 @@ export class Chunk {
       const entry = { type: nextType, orientation };
 
       getPersistenceService().recordChangeForChunk(this.cx, this.cz, x, y, z, entry);
-      this._updateBlockState(key, nextType, entry);
+      this._updateBlockState(key, nextType, entry, x, y, z);
       this.dirtyBlocks++;
       hasChanges = true;
       placed++;

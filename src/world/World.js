@@ -575,17 +575,40 @@ export class World {
   resolveBlockOwner(x, y, z, options = {}) {
     const allowScan = options.allowScan !== false;
 
-    const ix = Math.floor(x);
-    const iy = Math.floor(y);
-    const iz = Math.floor(z);
-    const cx = Math.floor(ix / CHUNK_SIZE);
-    const cz = Math.floor(iz / CHUNK_SIZE);
+    const ix = x | 0;  // Math.floor 的位运算版本（对正数效果相同）
+    const iy = y | 0;
+    const iz = z | 0;
+    const cx = ix >> 4;  // Math.floor(ix / 16) 的位运算版本
+    const cz = iz >> 4;
     const coordChunkKey = `${cx},${cz}`;
     const coordChunk = this.chunks.get(coordChunkKey) || null;
     const blockKey = `${ix},${iy},${iz}`;
 
-    // 1) 坐标所属 Chunk 优先
-    if (coordChunk) {
+    // 1) 坐标所属 Chunk 优先 - 使用新的数组存储快速查询
+    if (coordChunk?.isReady) {
+      // 尝试使用高性能数组存储
+      const lx = ix & 15;  // ix % 16
+      const ly = iy - coordChunk.worldY;
+      const lz = iz & 15;
+      if (ly >= 0 && ly < 16) {
+        const blockIndex = (ly << 8) | (lz << 4) | lx;
+        const blockId = coordChunk.blockDataArray?.[blockIndex];
+        if (blockId) {
+          const entry = coordChunk._getEntryFromBlockId(blockId);
+          if (entry) {
+            this.crossChunkOwnerCache.delete(blockKey);
+            return {
+              ownerChunk: coordChunk,
+              ownerChunkKey: coordChunkKey,
+              coordChunk,
+              coordChunkKey,
+              blockKey,
+              entry
+            };
+          }
+        }
+      }
+      // 回退到旧存储
       const entry = coordChunk.blockData[blockKey];
       if (entry) {
         this.crossChunkOwnerCache.delete(blockKey);
@@ -604,7 +627,29 @@ export class World {
     const ownerChunkKey = this.crossChunkOwnerCache.get(blockKey);
     if (ownerChunkKey) {
       const ownerChunk = this.chunks.get(ownerChunkKey);
-      if (ownerChunk && ownerChunk.isReady) {
+      if (ownerChunk?.isReady) {
+        // 尝试新存储
+        const olx = ix & 15;
+        const oly = iy - ownerChunk.worldY;
+        const olz = iz & 15;
+        if (oly >= 0 && oly < 16) {
+          const blockIndex = (oly << 8) | (olz << 4) | olx;
+          const blockId = ownerChunk.blockDataArray?.[blockIndex];
+          if (blockId) {
+            const entry = ownerChunk._getEntryFromBlockId(blockId);
+            if (entry) {
+              return {
+                ownerChunk,
+                ownerChunkKey,
+                coordChunk,
+                coordChunkKey,
+                blockKey,
+                entry
+              };
+            }
+          }
+        }
+        // 回退到旧存储
         const entry = ownerChunk.blockData[blockKey];
         if (entry) {
           return {
@@ -628,18 +673,43 @@ export class World {
 
     // 4) 全量扫描已加载 Chunk
     for (const [otherKey, otherChunk] of this.chunks) {
-      if (!otherChunk || !otherChunk.isReady || otherChunk === coordChunk) continue;
+      if (!otherChunk?.isReady || otherKey === coordChunkKey) continue;
+
+      // 尝试新存储
+      const olx = ix & 15;
+      const oly = iy - otherChunk.worldY;
+      const olz = iz & 15;
+      if (oly >= 0 && oly < 16) {
+        const blockIndex = (oly << 8) | (olz << 4) | olx;
+        const blockId = otherChunk.blockDataArray?.[blockIndex];
+        if (blockId) {
+          const entry = otherChunk._getEntryFromBlockId(blockId);
+          if (entry) {
+            this.crossChunkOwnerCache.set(blockKey, otherKey);
+            return {
+              ownerChunk: otherChunk,
+              ownerChunkKey: otherKey,
+              coordChunk,
+              coordChunkKey,
+              blockKey,
+              entry
+            };
+          }
+        }
+      }
+      // 回退到旧存储
       const entry = otherChunk.blockData[blockKey];
-      if (!entry) continue;
-      this.crossChunkOwnerCache.set(blockKey, otherKey);
-      return {
-        ownerChunk: otherChunk,
-        ownerChunkKey: otherKey,
-        coordChunk,
-        coordChunkKey,
-        blockKey,
-        entry
-      };
+      if (entry) {
+        this.crossChunkOwnerCache.set(blockKey, otherKey);
+        return {
+          ownerChunk: otherChunk,
+          ownerChunkKey: otherKey,
+          coordChunk,
+          coordChunkKey,
+          blockKey,
+          entry
+        };
+      }
     }
 
     return null;
@@ -758,34 +828,60 @@ export class World {
    * @returns {boolean} 是否发生碰撞
    */
   isSolid(x, y, z) {
-    const cx = Math.floor(x / CHUNK_SIZE);
-    const cz = Math.floor(z / CHUNK_SIZE);
+    const cx = x >> 4;  // Math.floor(x / 16)
+    const cz = z >> 4;
     const key = `${cx},${cz}`;
     const chunk = this.chunks.get(key);
 
     // --- 边界情况处理 ---
-    // 如果该坐标所在的区块尚未创建或尚未从 Worker 加载完成（isReady=false）
-    // 为了防止玩家掉入虚空，使用基础高度图噪声函数进行物理占位
     if (!chunk || !chunk.isReady) {
-      // 使用与 TerrainGen 一致的噪声参数来估算地表高度
       const h = Math.floor(noise(x, z, 0.08) + noise(x, z, 0.02) * 3);
-      // y 小于地表高度则视为实心
       return y <= h;
     }
 
-    // 获取方块在区块内的精确碰撞状态（通过 Set 进行 O(1) 查询）
-    const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const ix = x | 0;
+    const iy = y | 0;
+    const iz = z | 0;
 
-    // --- 核心修复：主 Chunk 责任制 ---
-    // 首先检查方块位置所在的 Chunk
+    // --- 快速路径：使用新的数组存储 ---
+    const lx = ix & 15;
+    const ly = iy - chunk.worldY;
+    const lz = iz & 15;
+    if (ly >= 0 && ly < 16) {
+      const blockIndex = (ly << 8) | (lz << 4) | lx;
+      const blockId = chunk.blockDataArray?.[blockIndex];
+      if (blockId && chunk.solidBlockIds?.has(blockId)) {
+        return true;
+      }
+      if (blockId === 0) {
+        // 空气，检查跨区块
+      }
+    }
+
+    // --- 回退路径：使用旧的 solidBlocks Set ---
+    const blockKey = `${ix},${iy},${iz}`;
     if (chunk.solidBlocks.has(blockKey)) {
       return true;
     }
 
-    // 如果不在，查询所有已加载的 Chunk（跨 Chunk 结构的碰撞体可能在其他 Chunk 中）
+    // 查询其他 Chunk（跨区块结构）
     for (const [, otherChunk] of this.chunks) {
-      if (otherChunk.isReady && otherChunk !== chunk && otherChunk.solidBlocks.has(blockKey)) {
-        return true;
+      if (otherChunk.isReady && otherChunk !== chunk) {
+        // 尝试新存储
+        const olx = ix & 15;
+        const oly = iy - otherChunk.worldY;
+        const olz = iz & 15;
+        if (oly >= 0 && oly < 16) {
+          const blockIndex = (oly << 8) | (olz << 4) | olx;
+          const blockId = otherChunk.blockDataArray?.[blockIndex];
+          if (blockId && otherChunk.solidBlockIds?.has(blockId)) {
+            return true;
+          }
+        }
+        // 回退到旧存储
+        if (otherChunk.solidBlocks.has(blockKey)) {
+          return true;
+        }
       }
     }
 
