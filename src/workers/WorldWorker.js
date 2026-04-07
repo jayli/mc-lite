@@ -1,6 +1,7 @@
 // src/workers/WorldWorker.js
+import * as THREE from 'three';
 import { setSeed, seededRandom, getBiome as getBaseBiome } from '../utils/MathUtils.js';
-import { parseBlockEntry } from '../utils/OrientationUtils.js';
+import { parseBlockEntry, getRotationAngle } from '../utils/OrientationUtils.js';
 import { terrainGen } from '../world/TerrainGen.js';
 import { Tree } from '../world/entities/Tree.js';
 import { Cloud } from '../world/entities/Cloud.js';
