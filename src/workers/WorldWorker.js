@@ -1,5 +1,6 @@
 // src/workers/WorldWorker.js
-import * as THREE from 'three';
+// Worker 中不使用 import map，需要完整 URL
+import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { setSeed, seededRandom, getBiome as getBaseBiome } from '../utils/MathUtils.js';
 import { parseBlockEntry, getRotationAngle } from '../utils/OrientationUtils.js';
 import { terrainGen } from '../world/TerrainGen.js';

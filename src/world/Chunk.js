@@ -1251,6 +1251,7 @@ export class Chunk {
    */
   acceptWorkerResult(payload = {}) {
     const {
+      meshData,
       d,
       solidBlocks,
       realisticTrees,
@@ -1274,7 +1275,8 @@ export class Chunk {
     // === 初始化新的数组存储（高性能查询支持） ===
     this._initArrayStorageFromBlockData();
 
-    this.pendingTerrainData = d || {};
+    // 使用 meshData（新格式）或 d（旧格式）
+    this.pendingTerrainData = meshData || d || {};
     this.pendingSnapshot = snapshot || null;
     this.pendingRuntimeEntities = {
       zombieNests: snapshot?.entities?.zombieNests || [],

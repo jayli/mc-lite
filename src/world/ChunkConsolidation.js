@@ -252,11 +252,11 @@ export function extendChunk(Chunk) {
   worldWorker.onmessage = (e) => {
     const {
       cx, cz, callbackKey,
-      d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters
+      meshData, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters
     } = e.data;
     const key = callbackKey || `${cx},${cz}`;
     if (workerCallbacks.has(key)) {
-      workerCallbacks.get(key)({ d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters });
+      workerCallbacks.get(key)({ meshData, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters });
       workerCallbacks.delete(key);
     }
   };
