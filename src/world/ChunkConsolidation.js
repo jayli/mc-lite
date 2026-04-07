@@ -383,7 +383,7 @@ export function extendChunk(Chunk) {
     this._cleanupOldMeshes(consolidatedMeshKeys);
 
     // 构建新的渲染网格（Worker 已计算 AO，buildMeshes 直接应用）
-    this.buildMeshes(d);
+    this.buildMeshes(data.meshData || []);
 
     // 恢复宝箱状态
     this._restoreChestStates(savedChestStates);
