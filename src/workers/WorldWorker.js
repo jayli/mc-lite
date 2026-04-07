@@ -173,6 +173,59 @@ function resolveLargeStaticStructureType(params) {
   return null;
 }
 
+/**
+ * 构建 Mesh 数据（用于 Worker 中预计算）
+ * @param {Object} fakeChunk - 模拟的 chunk 对象
+ * @param {Object} d - 渲染数据 {type: [positions]}
+ * @param {number} cx - chunk X
+ * @param {number} cz - chunk Z
+ * @returns {Array} meshDataArray
+ */
+function buildMeshData(fakeChunk, d, cx, cz) {
+  const meshDataArray = [];
+  const dummy = new THREE.Object3D();
+
+  for (const type in d) {
+    const positions = d[type];
+    if (positions.length === 0) continue;
+
+    const count = positions.length;
+    const matrices = new Float32Array(count * 16);
+    const aoLow = new Float32Array(count);
+    const aoHigh = new Float32Array(count);
+    const orientation = new Float32Array(count);
+    const instanceIndexMap = {};
+
+    for (let i = 0; i < count; i++) {
+      const pos = positions[i];
+
+      // 计算矩阵
+      dummy.position.set(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
+      dummy.rotation.set(0, getRotationAngle(pos.orientation || 0), 0);
+      dummy.updateMatrix();
+
+      // 存储矩阵（16 个元素）
+      matrices.set(dummy.matrix.elements, i * 16);
+
+      // AO 和朝向
+      aoLow[i] = pos.aoLow || 0;
+      aoHigh[i] = pos.aoHigh || 0;
+      orientation[i] = pos.orientation || 0;
+
+      // 索引映射
+      const posKey = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
+      instanceIndexMap[posKey] = i;
+    }
+
+    meshDataArray.push({
+      type, count, matrices, aoLow, aoHigh, orientation,
+      instanceIndexMap
+    });
+  }
+
+  return meshDataArray;
+}
+
 onmessage = async function(e) {
   const {
     cx,
