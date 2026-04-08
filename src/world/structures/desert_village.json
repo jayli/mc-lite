@@ -7401,20 +7401,6 @@
     },
     {
       "x": 7,
-      "y": 56,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 7,
-      "y": 57,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 7,
       "y": 1,
       "z": -8,
       "type": "sand",
@@ -8045,20 +8031,6 @@
     },
     {
       "x": 8,
-      "y": 55,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 8,
-      "y": 56,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 8,
       "y": 1,
       "z": -8,
       "type": "sand",
@@ -8293,160 +8265,6 @@
       "y": 2,
       "z": 8,
       "type": "sand",
-      "direction": 0
-    },
-    {
-      "x": 9,
-      "y": 55,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 9,
-      "y": 57,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 9,
-      "y": 56,
-      "z": -13,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 10,
-      "y": 52,
-      "z": -14,
-      "type": "sky_grass",
-      "direction": 0
-    },
-    {
-      "x": 10,
-      "y": 55,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 10,
-      "y": 57,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 10,
-      "y": 55,
-      "z": -13,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 10,
-      "y": 57,
-      "z": -13,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 11,
-      "y": 55,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 11,
-      "y": 56,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 11,
-      "y": 57,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 11,
-      "y": 55,
-      "z": -13,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 12,
-      "y": 55,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 12,
-      "y": 57,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 12,
-      "y": 55,
-      "z": -13,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 12,
-      "y": 56,
-      "z": -13,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 12,
-      "y": 57,
-      "z": -13,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 13,
-      "y": 55,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 13,
-      "y": 56,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 13,
-      "y": 57,
-      "z": -14,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 13,
-      "y": 56,
-      "z": -13,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": 13,
-      "y": 57,
-      "z": -13,
-      "type": "sky_leaves",
       "direction": 0
     }
   ],

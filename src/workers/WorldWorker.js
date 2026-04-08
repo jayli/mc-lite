@@ -1241,7 +1241,9 @@ onmessage = async function(e) {
     const islandY = 40 + Math.floor(chunkRandom(cx, cz, seed + 51) * 30);
     const centerWx = cx * CHUNK_SIZE + 8;
     const centerWz = cz * CHUNK_SIZE + 8;
+    activeStructureType = 'island';
     Island.generate(centerWx, islandY, centerWz, fakeChunk, dPlaceholder);
+    activeStructureType = null;
     // 注册空岛结构中心，用于跨Chunk渲染
     structureCenters.push({ type: 'island', x: centerWx, y: islandY, z: centerWz });
   }
@@ -1249,7 +1251,9 @@ onmessage = async function(e) {
     const startX = cx * CHUNK_SIZE + Math.floor(chunkRandom(cx, cz, seed + 53) * CHUNK_SIZE);
     const startZ = cz * CHUNK_SIZE + Math.floor(chunkRandom(cx, cz, seed + 54) * CHUNK_SIZE);
     const size = 30 + Math.floor(chunkRandom(cx, cz, seed + 55) * 21);
+    activeStructureType = 'cloud';
     Cloud.generateCluster(startX, 35, startZ, size, fakeChunk, dPlaceholder);
+    activeStructureType = null;
     // 注册云朵结构中心，用于跨Chunk渲染
     structureCenters.push({ type: 'cloud', x: startX, y: 35, z: startZ });
   }
@@ -1497,7 +1501,9 @@ onmessage = async function(e) {
       return belongsToCrossChunkStructure(block.x, block.y, block.z);
     }
 
-    return false;
+    // 对于没有 sourceType 的方块（如从相邻 chunk 传来的空岛/云朵），
+    // 直接检查是否属于跨 Chunk 结构
+    return belongsToCrossChunkStructure(block.x, block.y, block.z);
   };
 
   // 如果有 snapshot，用 snapshot 中的方块覆盖 blockMap（保留玩家修改）

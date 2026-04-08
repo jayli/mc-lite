@@ -29,6 +29,21 @@ export function extendChunk(Chunk) {
     // 0. 加载持久化全量数据 (快照)
     const snapshot = await getPersistenceService().getChunkData(this.cx, this.cz);
 
+    // 收集相邻已加载 chunk 的 structureCenters，用于跨 Chunk 空岛/云朵渲染
+    const neighborStructureCenters = [];
+    if (this.world?.chunks) {
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          if (dx === 0 && dz === 0) continue;
+          const neighborKey = `${this.cx + dx},${this.cz + dz}`;
+          const neighborChunk = this.world.chunks.get(neighborKey);
+          if (neighborChunk?.structureCenters?.length) {
+            neighborStructureCenters.push(...neighborChunk.structureCenters);
+          }
+        }
+      }
+    }
+
     return new Promise((resolve) => {
       const callbackKey = `${this.cx},${this.cz}`;
 
@@ -44,7 +59,8 @@ export function extendChunk(Chunk) {
         cx: this.cx,
         cz: this.cz,
         seed: WORLD_CONFIG.SEED,
-        snapshot
+        snapshot,
+        structureCenters: neighborStructureCenters.length > 0 ? neighborStructureCenters : undefined
       });
     });
   }

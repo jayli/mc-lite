@@ -1,230 +1,6 @@
 {
   "blocks": [
     {
-      "x": -20,
-      "y": 26,
-      "z": -20,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -20,
-      "y": 26,
-      "z": -19,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -20,
-      "y": 68,
-      "z": 17,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -20,
-      "y": 70,
-      "z": 17,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -20,
-      "y": 65,
-      "z": 18,
-      "type": "sky_grass",
-      "direction": 0
-    },
-    {
-      "x": -20,
-      "y": 68,
-      "z": 18,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -20,
-      "y": 69,
-      "z": 18,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -20,
-      "y": 70,
-      "z": 18,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -20,
-      "y": 65,
-      "z": 19,
-      "type": "sky_grass",
-      "direction": 0
-    },
-    {
-      "x": -20,
-      "y": 66,
-      "z": 19,
-      "type": "sky_wood",
-      "direction": 0
-    },
-    {
-      "x": -20,
-      "y": 67,
-      "z": 19,
-      "type": "sky_wood",
-      "direction": 0
-    },
-    {
-      "x": -20,
-      "y": 68,
-      "z": 19,
-      "type": "sky_wood",
-      "direction": 0
-    },
-    {
-      "x": -20,
-      "y": 69,
-      "z": 19,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -19,
-      "y": 26,
-      "z": -20,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -19,
-      "y": 68,
-      "z": 17,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -19,
-      "y": 69,
-      "z": 17,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -19,
-      "y": 70,
-      "z": 17,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -19,
-      "y": 68,
-      "z": 18,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -19,
-      "y": 69,
-      "z": 18,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -19,
-      "y": 70,
-      "z": 18,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -19,
-      "y": 65,
-      "z": 19,
-      "type": "sky_grass",
-      "direction": 0
-    },
-    {
-      "x": -19,
-      "y": 68,
-      "z": 19,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -19,
-      "y": 69,
-      "z": 19,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -19,
-      "y": 70,
-      "z": 19,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -18,
-      "y": 26,
-      "z": -20,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -18,
-      "y": 68,
-      "z": 17,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -18,
-      "y": 70,
-      "z": 17,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -18,
-      "y": 69,
-      "z": 18,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -18,
-      "y": 70,
-      "z": 18,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -18,
-      "y": 68,
-      "z": 19,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -18,
-      "y": 69,
-      "z": 19,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
-      "x": -18,
-      "y": 70,
-      "z": 19,
-      "type": "sky_leaves",
-      "direction": 0
-    },
-    {
       "x": -12,
       "y": 3,
       "z": -8,
@@ -1451,13 +1227,6 @@
     },
     {
       "x": -5,
-      "y": 26,
-      "z": -7,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -5,
       "y": 1,
       "z": -6,
       "type": "green_planks",
@@ -1497,13 +1266,6 @@
       "z": -6,
       "type": "green_planks",
       "direction": 1
-    },
-    {
-      "x": -5,
-      "y": 26,
-      "z": -6,
-      "type": "cloud",
-      "direction": 0
     },
     {
       "x": -5,
@@ -1542,13 +1304,6 @@
     },
     {
       "x": -5,
-      "y": 26,
-      "z": -5,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -5,
       "y": 1,
       "z": -4,
       "type": "green_planks",
@@ -1675,13 +1430,6 @@
     },
     {
       "x": -4,
-      "y": 26,
-      "z": -8,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -4,
       "y": 1,
       "z": -7,
       "type": "iron",
@@ -1721,13 +1469,6 @@
       "z": -7,
       "type": "green_planks",
       "direction": 1
-    },
-    {
-      "x": -4,
-      "y": 26,
-      "z": -7,
-      "type": "cloud",
-      "direction": 0
     },
     {
       "x": -4,
@@ -1773,13 +1514,6 @@
     },
     {
       "x": -4,
-      "y": 26,
-      "z": -6,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -4,
       "y": 1,
       "z": -5,
       "type": "green_planks",
@@ -1805,13 +1539,6 @@
       "z": -5,
       "type": "green_planks",
       "direction": 1
-    },
-    {
-      "x": -4,
-      "y": 26,
-      "z": -5,
-      "type": "cloud",
-      "direction": 0
     },
     {
       "x": -4,
@@ -1857,13 +1584,6 @@
     },
     {
       "x": -4,
-      "y": 26,
-      "z": -4,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -4,
       "y": 1,
       "z": -3,
       "type": "iron",
@@ -1927,13 +1647,6 @@
     },
     {
       "x": -3,
-      "y": 26,
-      "z": -9,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -3,
       "y": 1,
       "z": -8,
       "type": "iron",
@@ -1951,13 +1664,6 @@
       "y": 4,
       "z": -8,
       "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -3,
-      "y": 26,
-      "z": -8,
-      "type": "cloud",
       "direction": 0
     },
     {
@@ -1987,13 +1693,6 @@
       "z": -7,
       "type": "green_planks",
       "direction": 1
-    },
-    {
-      "x": -3,
-      "y": 26,
-      "z": -7,
-      "type": "cloud",
-      "direction": 0
     },
     {
       "x": -3,
@@ -2046,13 +1745,6 @@
     },
     {
       "x": -3,
-      "y": 26,
-      "z": -6,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -3,
       "y": 1,
       "z": -5,
       "type": "green_planks",
@@ -2085,13 +1777,6 @@
       "z": -5,
       "type": "green_planks",
       "direction": 1
-    },
-    {
-      "x": -3,
-      "y": 26,
-      "z": -5,
-      "type": "cloud",
-      "direction": 0
     },
     {
       "x": -3,
@@ -2144,13 +1829,6 @@
     },
     {
       "x": -3,
-      "y": 26,
-      "z": -4,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -3,
       "y": 1,
       "z": -3,
       "type": "iron",
@@ -2179,13 +1857,6 @@
     },
     {
       "x": -3,
-      "y": 26,
-      "z": -3,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -3,
       "y": 1,
       "z": -2,
       "type": "iron",
@@ -2206,27 +1877,6 @@
       "direction": 0
     },
     {
-      "x": -3,
-      "y": 26,
-      "z": -2,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 26,
-      "z": -10,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 26,
-      "z": -9,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
       "x": -2,
       "y": 1,
       "z": -8,
@@ -2249,13 +1899,6 @@
     },
     {
       "x": -2,
-      "y": 26,
-      "z": -8,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -2,
       "y": 1,
       "z": -7,
       "type": "iron",
@@ -2273,13 +1916,6 @@
       "y": 4,
       "z": -7,
       "type": "green_planks",
-      "direction": 0
-    },
-    {
-      "x": -2,
-      "y": 26,
-      "z": -7,
-      "type": "cloud",
       "direction": 0
     },
     {
@@ -2316,13 +1952,6 @@
       "z": -6,
       "type": "green_planks",
       "direction": 1
-    },
-    {
-      "x": -2,
-      "y": 26,
-      "z": -6,
-      "type": "cloud",
-      "direction": 0
     },
     {
       "x": -2,
@@ -2361,13 +1990,6 @@
     },
     {
       "x": -2,
-      "y": 26,
-      "z": -5,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": -2,
       "y": 1,
       "z": -4,
       "type": "green_planks",
@@ -2400,13 +2022,6 @@
       "z": -4,
       "type": "green_planks",
       "direction": 1
-    },
-    {
-      "x": -2,
-      "y": 26,
-      "z": -4,
-      "type": "cloud",
-      "direction": 0
     },
     {
       "x": -2,
@@ -3362,20 +2977,6 @@
     },
     {
       "x": 8,
-      "y": 26,
-      "z": -17,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 8,
-      "y": 26,
-      "z": -16,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 8,
       "y": 7,
       "z": -5,
       "type": "green_planks",
@@ -3383,150 +2984,10 @@
     },
     {
       "x": 9,
-      "y": 26,
-      "z": -17,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 9,
-      "y": 26,
-      "z": -16,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 9,
       "y": 7,
       "z": -5,
       "type": "green_planks",
       "direction": 1
-    },
-    {
-      "x": 10,
-      "y": 26,
-      "z": -18,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 10,
-      "y": 26,
-      "z": -17,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 10,
-      "y": 26,
-      "z": -16,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 11,
-      "y": 26,
-      "z": -18,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 11,
-      "y": 26,
-      "z": -17,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 11,
-      "y": 26,
-      "z": -16,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 12,
-      "y": 26,
-      "z": -19,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 12,
-      "y": 26,
-      "z": -18,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 12,
-      "y": 26,
-      "z": -17,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 12,
-      "y": 26,
-      "z": -16,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 13,
-      "y": 26,
-      "z": -19,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 13,
-      "y": 26,
-      "z": -18,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 13,
-      "y": 26,
-      "z": -17,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 13,
-      "y": 26,
-      "z": -16,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 14,
-      "y": 26,
-      "z": -19,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 14,
-      "y": 26,
-      "z": -18,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 14,
-      "y": 26,
-      "z": -17,
-      "type": "cloud",
-      "direction": 0
-    },
-    {
-      "x": 14,
-      "y": 26,
-      "z": -16,
-      "type": "cloud",
-      "direction": 0
     }
   ],
   "metadata": {
