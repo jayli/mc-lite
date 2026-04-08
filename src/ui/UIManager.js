@@ -117,9 +117,9 @@ export class UIManager {
     };
     btnMid.onclick = (e) => {
       e.stopPropagation();
-      this.game.engine.setResolution(0.7);
+      this.game.engine.setResolution(0.6);
       this.game.refreshRainQualityIfNeeded();
-      this.hud.showMessage('已切换至平衡模式 (0.7x)');
+      this.hud.showMessage('已切换至平衡模式 (0.6x)');
       this.updateActiveButtons();
     };
     btnQuality.onclick = (e) => {
@@ -565,7 +565,7 @@ export class UIManager {
     if (!btnPerf || !btnMid || !btnQuality) return;
 
     btnPerf.classList.toggle('active', scale === 0.4);
-    btnMid.classList.toggle('active', scale === 0.7);
+    btnMid.classList.toggle('active', scale === 0.6);
     btnQuality.classList.toggle('active', scale === 1.0);
 
     if (btnStyleMorning && btnStyleOvercast && btnStyleNight) {
