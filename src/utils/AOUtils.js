@@ -294,13 +294,19 @@ export function createOcclusionChecker(world, CHUNK_SIZE, getBlockPropsFn) {
   return function isOccluding(ox, oy, oz) {
     const cx = Math.floor(ox / CHUNK_SIZE);
     const cz = Math.floor(oz / CHUNK_SIZE);
-    let chunk = (cx === world.chunk.cx && cz === world.chunk.cz)
+    const isCurrentChunk = cx === world.chunk.cx && cz === world.chunk.cz;
+    let chunk = isCurrentChunk
       ? world.chunk
       : world.chunks.get(`${cx},${cz}`);
 
     // 邻居 Chunk 不存在时按空气处理，保持与 Worker 侧 AO 一致，
     // 避免动态网格 AO 与合并后 AO 出现深浅跳变。
     if (!chunk) return false;
+
+    // 关键约束：主线程互动期 AO 只采样当前 Chunk 和已 finalized 的邻接 Chunk。
+    // 否则会把 worker-ready/terrain-built 的半装配 Chunk 当成真实遮挡体，
+    // 导致补面 AO 与可交互世界视图不一致，出现黑面或方向错乱。
+    if (!isCurrentChunk && !chunk.isReady) return false;
 
     const key = `${Math.floor(ox)},${Math.floor(oy)},${Math.floor(oz)}`;
     const entry = chunk.blockData[key];

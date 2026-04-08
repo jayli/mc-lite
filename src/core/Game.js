@@ -93,6 +93,7 @@ export class Game {
     this.isRunning = false; // 游戏运行状态标志
     this.perfStats = { player: 0, world: 0, ui: 0, render: 0 }; // 性能统计数据
     this.showDebugInfo = false; // 是否显示调试信息
+    this._gameplayReady = false; // 游戏是否已准备好（用于控制加载模态框）
 
     this.lastTime = 0; // 用于计算时间差的时间戳
 
@@ -397,34 +398,51 @@ export class Game {
     */
   update(dt) {
     const t1 = performance.now();
-    if (this.player) this.player.update(dt); // 更新玩家状态（移动、物理等）
+    const gameplayReady = this.world?.isGameplayReady?.() ?? true;
+
+    // 首次进入 gameplayReady 状态时，隐藏加载模态框并锁定鼠标
+    if (gameplayReady && !this._gameplayReady) {
+      this._gameplayReady = true;
+      const loadingModal = document.getElementById('game-loading-modal');
+      if (loadingModal) {
+        loadingModal.style.display = 'none';
+      }
+      // 请求鼠标锁定，让玩家可以控制视角
+      // 浏览器要求用户手势才能锁定，首次可能失败，玩家点击画面后会再次触发
+      if (document.body.requestPointerLock) {
+        document.body.requestPointerLock().catch(() => {});
+      }
+      console.log('[Game] 世界加载完成，进入游戏');
+    }
+
+    if (this.player && gameplayReady) this.player.update(dt); // 更新玩家状态（移动、物理等）
     const t2 = performance.now();
 
     if (this.world && this.player) this.world.update(this.player.position, dt); // 更新世界状态（区块加载等）
     const t3 = performance.now();
 
     // 更新敌人管理器（替代原来的丧尸管理器）
-    if (this.enemyManager && this.player) {
+    if (gameplayReady && this.enemyManager && this.player) {
       this.enemyManager.updateAll(this.player.position, dt);
     }
 
     // 更新炮塔管理器
-    if (this.turretManager) {
+    if (gameplayReady && this.turretManager) {
       this.turretManager.update(dt);
     }
 
     // 更新矿车管理器
-    if (this.minecartManager) {
+    if (gameplayReady && this.minecartManager) {
       this.minecartManager.update(dt, getRotationAngle, this.player);
     }
 
     // 更新丧尸巢穴管理器
-    if (this.zombieNestManager) {
+    if (gameplayReady && this.zombieNestManager) {
       this.zombieNestManager.update(dt);
     }
 
     // 更新下雨效果
-    if (this.rainEffect && this.rainState.enabled && this.player) {
+    if (gameplayReady && this.rainEffect && this.rainState.enabled && this.player) {
       this.rainEffect.update(this.player.position, dt);
     }
 
@@ -705,7 +723,7 @@ export class Game {
       this.canTntDestroyBlocks = saveData.settings.canTntDestroyBlocks !== undefined ? saveData.settings.canTntDestroyBlocks : false;
       this.maxActiveZombies = saveData.settings.maxActiveZombies !== undefined ? saveData.settings.maxActiveZombies : 10;
       this.enemyManager.maxActiveZombies = this.maxActiveZombies; // 同步到敌人管理器
-      const visualStyle = saveData.settings.visualStyle || VISUAL_STYLE_KEYS.DAY;
+      const visualStyle = saveData.settings.visualStyle || VISUAL_STYLE_KEYS.MORNING;
       this.engine.setVisualStyle(visualStyle);
       const textureBlurLevel = saveData.settings.textureBlurLevel !== undefined
         ? saveData.settings.textureBlurLevel

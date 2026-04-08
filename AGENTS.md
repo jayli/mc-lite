@@ -43,7 +43,6 @@ This file provides guidance to Qoder (qoder.com) when working with code in this 
 - `MaterialManager.js` — 材质统一注册与管理
 - `AudioManager.js` — 音频加载与播放（导出单例 `audioManager`）
 - `EnemyManager.js` — 敌人生命周期管理，与 `EnemyWorker` 通信
-- `AOSystem.js` — 主线程 AO 环境光遮蔽计算
 - `FaceCullingSystem.js` — 面剔除系统，协调主线程与 Worker 的面剔除逻辑
 - `FaceCullingSystemDebug.js` — 面剔除调试工具
 
@@ -124,11 +123,11 @@ This file provides guidance to Qoder (qoder.com) when working with code in this 
    - 合并过程将区块数据发送到 Worker 重新计算所有可见面和 AO，生成优化的 InstancedMesh
    - **竞态条件风险**: 主线程 AO 更新与 Worker 合并结果可能存在时序冲突
 
-2. **AO 阴影计算（双套逻辑）**
-   - 主线程：未加载区块默认认为遮挡（适合封闭地图如 FrozenMountain）
-   - Worker：未加载/不存在的方块默认不遮挡（适合开放地形）
-   - AO 工具函数统一在 `src/utils/AOUtils.js`，优先复用
-   - AO 修复管理器 `src/core/AORepairManager.js` 作为兜底机制，当前默认禁用
+2. **AO 阴影计算（Worker 专用）**
+   - `AOWorker` 专用 Worker 处理所有 AO 计算，避免阻塞主线程
+   - Chunk 维护 `dirtyAOPositions` 脏集，只计算受影响的方块
+   - AO 工具函数统一在 `src/utils/AOUtils.js`，主线程与 Worker 共用
+   - Consolidation 完成后 100ms 防抖触发 AO 刷新，直接覆写 InstancedMesh attribute
 
 3. **批量删除方块注意**: 使用 `isBatch=false` 参数会复用单次删除逻辑，避免竞态条件导致的 AO 丢失
 
@@ -150,6 +149,7 @@ This file provides guidance to Qoder (qoder.com) when working with code in this 
 | WorldWorker | 地形生成与区块创建 | `src/workers/WorldWorker.js` |
 | EnemyWorker | 丧尸 AI 决策 | `src/workers/EnemyWorker.js` |
 | FaceCullingWorker | 隐藏面剔除计算 | `src/workers/FaceCullingWorker.js` |
+| AOWorker | 环境光遮蔽(AO)异步计算 | `src/workers/AOWorker.js` |
 | ExplosionWorker | 爆炸效果计算 | `src/workers/ExplosionWorker.js` |
 | PersistenceWorker | IndexedDB 自动持久化 | `src/workers/PersistenceWorker.js` |
 | ManualSaveWorker | 手动存档的 IndexedDB 操作 | `src/workers/ManualSaveWorker.js` |

@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { getBlockProperties as getBlockProps } from '../constants/BlockData.js';
+import { filterWorkerResultAgainstBlockData } from './ChunkMeshDataFilter.js';
 
 // 区块大小常量
 export const CHUNK_SIZE = 16;
@@ -17,6 +18,10 @@ export const CONSOLIDATION_DELAY = 1000;
 // Worker 实例与回调映射
 export const worldWorker = new Worker(new URL('../workers/WorldWorker.js', import.meta.url), { type: 'module' });
 export const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函数
+
+// 专用 AO Worker — 只做 AO 计算，不复用 FaceCullingWorker
+export const aoWorker = new Worker(new URL('../workers/AOWorker.js', import.meta.url), { type: 'module' });
+export const aoCallbacks = new Map(); // AO Worker 回调映射
 
 // 共享几何体定义 - 用于优化渲染性能，避免在每个区块中重复创建相同的几何体，减少 GPU 内存占用
 
@@ -248,11 +253,11 @@ export function extendChunk(Chunk) {
   worldWorker.onmessage = (e) => {
     const {
       cx, cz, callbackKey,
-      d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters
+      meshData, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters
     } = e.data;
     const key = callbackKey || `${cx},${cz}`;
     if (workerCallbacks.has(key)) {
-      workerCallbacks.get(key)({ d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters });
+      workerCallbacks.get(key)({ meshData, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters });
       workerCallbacks.delete(key);
     }
   };
@@ -266,6 +271,19 @@ export function extendChunk(Chunk) {
       colno: e.colno,
       error: e.error
     });
+  };
+
+  // 注册专用 AO Worker 消息处理器
+  aoWorker.onmessage = (e) => {
+    const { requestId, chunkKey, results } = e.data;
+    if (requestId && aoCallbacks.has(requestId)) {
+      aoCallbacks.get(requestId)({ chunkKey, results });
+      aoCallbacks.delete(requestId);
+    }
+  };
+
+  aoWorker.onerror = (e) => {
+    console.error('AOWorker Error:', e.message, 'at', e.filename, ':', e.lineno);
   };
 
   /**
@@ -343,7 +361,7 @@ export function extendChunk(Chunk) {
    * @param {Set} consolidatedMeshKeys - 合并前的动态 Mesh 键集合
    */
   Chunk.prototype._applyConsolidateResult = function(data, consolidatedCount, consolidatedMeshKeys) {
-    let { d, visibleKeys, solidBlocks, structureCenters: newStructureCenters } = data;
+    let { meshData, visibleKeys, solidBlocks, structureCenters: newStructureCenters } = data;
 
     // 更新结构中心列表
     if (newStructureCenters && newStructureCenters.length > 0) {
@@ -351,7 +369,7 @@ export function extendChunk(Chunk) {
     }
 
     // 过滤 Worker 结果，防止幻影方块
-    ({ visibleKeys, solidBlocks, d } = this._filterWorkerResult(data));
+    ({ visibleKeys, solidBlocks, meshData } = this._filterWorkerResult(data));
 
     // 保存原始 solidBlocks 用于跨 Chunk 碰撞体
     this._tempOriginalSolidBlocks = solidBlocks ? [...solidBlocks] : [];
@@ -365,9 +383,8 @@ export function extendChunk(Chunk) {
     // 清理旧网格
     this._cleanupOldMeshes(consolidatedMeshKeys);
 
-    // 构建新的渲染网格
-    this.buildMeshes(d);
-    this.rebuildInstancedAOFromWorld?.();
+    // 构建新的渲染网格（Worker 已计算 AO，buildMeshes 直接应用）
+    this.buildMeshes(meshData || []);
 
     // 恢复宝箱状态
     this._restoreChestStates(savedChestStates);
@@ -379,6 +396,24 @@ export function extendChunk(Chunk) {
     // 重置状态
     this.dirtyBlocks = Math.max(0, this.dirtyBlocks - consolidatedCount);
     this.isConsolidating = false;
+    // Consolidation 后仅刷新脏集中的方块（玩家操作标记的受影响邻居），
+    // 不做 fullRefresh，避免不受影响的方块集体闪烁。
+    // fullRefresh 仅在 chunk 首次加载时由 onChunkFinalized 触发。
+    this._scheduleAORefresh();
+    // 触发有脏位的邻居 chunk 执行 AO 增量刷新（边界方块可能受影响）
+    if (this.world) {
+      const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+      for (const [dx, dz] of dirs) {
+        const nChunk = this.world.chunks.get(`${this.cx + dx},${this.cz + dz}`);
+        if (nChunk && nChunk.isReady && !nChunk.isConsolidating && nChunk.dirtyAOPositions.size > 0) {
+          nChunk._scheduleAORefresh();
+        }
+      }
+    }
+    if (this.loadState === 'waiting-consolidation') {
+      this.loadState = 'entities-built';
+      this.world?.onChunkConsolidationComplete?.(this);
+    }
 
     if (this.dirtyBlocks > 0) this.scheduleConsolidation();
   };
@@ -388,38 +423,7 @@ export function extendChunk(Chunk) {
    * 核心原则：只保留 blockData 中存在的方块，避免已删除的跨Chunk实体方块被重新生成
    */
   Chunk.prototype._filterWorkerResult = function(data) {
-    let { d, visibleKeys, solidBlocks } = data;
-
-    // 过滤 visibleKeys：只保留 blockData 中存在的方块
-    if (visibleKeys) {
-      visibleKeys = visibleKeys.filter(key => {
-        return this.blockData[key] !== undefined;
-      });
-    }
-
-    // 过滤 solidBlocks：只保留 blockData 中存在的方块
-    if (solidBlocks) {
-      solidBlocks = solidBlocks.filter(key => {
-        return this.blockData[key] !== undefined;
-      });
-    }
-
-    // 过滤 d（渲染数据）：只保留 blockData 中存在且类型匹配的方块
-    if (d) {
-      for (const type in d) {
-        d[type] = d[type].filter(pos => {
-          const key = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
-          const currentEntry = this.blockData[key];
-          if (currentEntry) {
-            const currentType = typeof currentEntry === 'string' ? currentEntry : currentEntry.type;
-            return currentType === type;
-          }
-          return false;
-        });
-      }
-    }
-
-    return { visibleKeys, solidBlocks, d };
+    return filterWorkerResultAgainstBlockData(data, this.blockData);
   };
 
   /**
@@ -438,6 +442,11 @@ export function extendChunk(Chunk) {
       for (const [key, mesh] of this.dynamicMeshes.entries()) {
         const type = mesh.userData.type;
         if (this.blockData[key] && getBlockProps(type).isSolid) {
+          this.solidBlocks.add(key);
+        }
+      }
+      if (this.entityCollisionIndex?.size > 0) {
+        for (const key of this.entityCollisionIndex.keys()) {
           this.solidBlocks.add(key);
         }
       }
@@ -508,14 +517,20 @@ export function extendChunk(Chunk) {
       }
     });
 
-    // 移除旧的 InstancedMesh（保留树木）
+    // 移除旧的 InstancedMesh（保留树木和树叶）
     for (let i = this.group.children.length - 1; i >= 0; i--) {
       const child = this.group.children[i];
       if (child.isInstancedMesh) {
-        if (child.userData.type === 'realistic_trunk' || child.userData.type === 'realistic_leaves') {
+        const type = child.userData.type;
+        // 保留真实感树木和普通树叶（树叶是静态的，不应在合并时重建）
+        if (type === 'realistic_trunk' || type === 'realistic_leaves' ||
+            type === 'modGunMan' || type === 'rover' ||
+            type === 'leaves' || type === 'azalea_leaves' || type === 'azalea_flowers' ||
+            type === 'sky_leaves' || type === 'yellow_leaves' || type === 'swamp_leaves' ||
+            type === 'snow_leaves') {
           continue;
         }
-        if (child.geometry && child.geometry !== geomMap[child.userData.type] && child.geometry !== geomMap['default']) {
+        if (child.geometry && child.geometry !== geomMap[type] && child.geometry !== geomMap['default']) {
           child.geometry.dispose();
         }
         this.group.remove(child);

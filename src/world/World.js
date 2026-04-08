@@ -8,6 +8,7 @@ import { persistenceService } from '../services/PersistenceService.js';
 import { noise } from '../utils/MathUtils.js';
 import { ParticleSystem } from './effects/ParticleSystem.js';
 import { parseBlockEntry } from '../utils/OrientationUtils.js';
+import { ChunkAssemblyScheduler } from './ChunkAssemblyScheduler.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
@@ -19,6 +20,8 @@ const getParticleSystem = () => globalThis._ParticleSystem || ParticleSystem;
 const CHUNK_SIZE = 16;
 /** 渲染距离（以区块为单位），玩家周围 3x3 的区块将被加载 */
 const RENDER_DIST = 3;
+const RUNTIME_DEFERRED_FINALIZE_IDLE_GRACE_MS = 800;
+const RUNTIME_DEFERRED_FINALIZE_MAX_CHUNKS = 1;
 /**
  * 世界管理器类
  * 管理游戏世界中的所有区块、粒子效果和方块操作，是世界数据的中央访问点
@@ -76,17 +79,26 @@ export class World {
     // 命中缓存：blockKey -> 所属 chunkKey（仅缓存跨区块命中）
     this.crossChunkOwnerCache = new Map();
 
-    // --- 重复 owner 清理状态 ---
-    // 当已就绪 Chunk 数变化时触发一次数据层去重，清理历史重复 owner
+    // --- Chunk 就绪状态跟踪 ---
+    // 用于检测 Chunk 就绪状态变化，触发阴影更新
     this._lastReadyChunkCount = 0;
     this._lastReadyChunkKeys = new Set();
 
-    // --- AO 边界修复队列 ---
-    // 当新 Chunk 就绪后，将其及四邻加入队列，分帧重算 Instanced AO
-    this._pendingAORefreshChunkKeys = new Set();
-
     // 阴影按需刷新回调（由 Game/Engine 注入）
     this.shadowUpdateCallback = null;
+    this.pendingShadowUpdate = false;
+    this.shadowUpdateScheduledAt = 0;
+
+    // 世界启动与 Chunk 装配状态
+    this.bootstrapState = {
+      phase: 'bootstrapping',
+      targetChunkKeys: new Set(),
+      finalizedChunkKeys: new Set()
+    };
+    this.chunkAssemblyScheduler = new ChunkAssemblyScheduler(this);
+    this._staticTreeTerrainBoostChunkKeys = new Set();
+    this._lastStreamingActivityAt = 0;
+    this._pendingDeferredFinalizeChunkKeys = new Set();
   }
 
   /**
@@ -103,7 +115,192 @@ export class World {
    */
   requestShadowMapUpdate(reason = 'world-change') {
     if (!this.shadowUpdateCallback) return;
+    if (this.bootstrapState.phase !== 'runtime-streaming') {
+      this.pendingShadowUpdate = true;
+      return;
+    }
+
+    const now = globalThis.performance?.now?.() ?? Date.now();
+    if (now - this.shadowUpdateScheduledAt < 200) {
+      this.pendingShadowUpdate = true;
+      return;
+    }
+
+    this.shadowUpdateScheduledAt = now;
+    this.pendingShadowUpdate = false;
     this.shadowUpdateCallback(reason);
+  }
+
+  flushShadowUpdates(reason = 'world-change') {
+    if (!this.shadowUpdateCallback || !this.pendingShadowUpdate) return;
+    this.pendingShadowUpdate = false;
+    this.shadowUpdateScheduledAt = globalThis.performance?.now?.() ?? Date.now();
+    this.shadowUpdateCallback(reason);
+  }
+
+  isGameplayReady() {
+    return this.bootstrapState.phase === 'runtime-streaming';
+  }
+
+  _ensureBootstrapTargets(cx, cz) {
+    if (this.bootstrapState.phase !== 'bootstrapping') return;
+    if (this.bootstrapState.targetChunkKeys.size > 0) return;
+    for (let i = -RENDER_DIST; i <= RENDER_DIST; i++) {
+      for (let j = -RENDER_DIST; j <= RENDER_DIST; j++) {
+        this.bootstrapState.targetChunkKeys.add(`${cx + i},${cz + j}`);
+      }
+    }
+  }
+
+  _computeChunkAssemblyPriority(chunk) {
+    const key = `${chunk.cx},${chunk.cz}`;
+    if (this.bootstrapState.phase === 'bootstrapping' && this.bootstrapState.targetChunkKeys.has(key)) {
+      return 1000;
+    }
+    if (this._staticTreeTerrainBoostChunkKeys.has(key)) {
+      return 900;
+    }
+    const playerPos = this._lastPlayerPos || new THREE.Vector3();
+    const playerCx = Math.floor(playerPos.x / CHUNK_SIZE);
+    const playerCz = Math.floor(playerPos.z / CHUNK_SIZE);
+    const dist = Math.abs(chunk.cx - playerCx) + Math.abs(chunk.cz - playerCz);
+    return Math.max(0, 100 - dist);
+  }
+
+  _markStaticTreeTerrainBoostFromChunk(chunk) {
+    if (!chunk?.structureCenters?.length) return;
+
+    for (const center of chunk.structureCenters) {
+      if (center?.type !== 'static_tree') continue;
+
+      const minCx = Math.floor((center.x - 8) / CHUNK_SIZE);
+      const maxCx = Math.floor((center.x + 8) / CHUNK_SIZE);
+      const minCz = Math.floor((center.z - 8) / CHUNK_SIZE);
+      const maxCz = Math.floor((center.z + 8) / CHUNK_SIZE);
+
+      for (let cx = minCx; cx <= maxCx; cx++) {
+        for (let cz = minCz; cz <= maxCz; cz++) {
+          const key = `${cx},${cz}`;
+          this._staticTreeTerrainBoostChunkKeys.add(key);
+          const targetChunk = this.chunks.get(key);
+          if (targetChunk?.loadState === 'worker-ready') {
+            this.chunkAssemblyScheduler.enqueue(
+              targetChunk,
+              targetChunk.spawnReason === 'runtime-streaming' ? 'runtime-build' : 'terrain',
+              900
+            );
+          }
+        }
+      }
+    }
+  }
+
+  onChunkWorkerReady(chunk) {
+    if (!chunk) return;
+    const key = `${chunk.cx},${chunk.cz}`;
+    this._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
+    if (this.bootstrapState.phase === 'bootstrapping' && this.bootstrapState.targetChunkKeys.has(key)) {
+      chunk.deferConsolidation = true;
+    }
+    this._markStaticTreeTerrainBoostFromChunk(chunk);
+    this.chunkAssemblyScheduler.enqueue(
+      chunk,
+      chunk.spawnReason === 'runtime-streaming' ? 'runtime-build' : 'terrain',
+      this._computeChunkAssemblyPriority(chunk)
+    );
+  }
+
+  onChunkConsolidationComplete(chunk) {
+    if (!chunk) return;
+    this.chunkAssemblyScheduler.enqueue(chunk, 'finalize', this._computeChunkAssemblyPriority(chunk));
+  }
+
+  onChunkFinalized(chunk) {
+    if (!chunk) return;
+    const key = `${chunk.cx},${chunk.cz}`;
+
+    // Chunk finalized 后触发 AO 全量刷新（使用 AOWorker 带邻居数据重算）
+    // WorldWorker 生成 chunk 时没有邻居数据，跨 chunk 方块的 AO 可能不准确。
+    chunk._scheduleAORefresh({ fullRefresh: true });
+    // 邻居 chunk 只需增量刷新边界方块（不做 fullRefresh 避免邻居集体闪烁）
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for (const [dx, dz] of dirs) {
+      const nChunk = this.chunks.get(`${chunk.cx + dx},${chunk.cz + dz}`);
+      if (nChunk && nChunk.isReady) {
+        nChunk._markBoundaryDirtyAO(chunk.cx, chunk.cz);
+        nChunk._scheduleAORefresh();
+      }
+    }
+
+    if (chunk.hasDeferredFinalizeWork) {
+      this._pendingDeferredFinalizeChunkKeys.add(key);
+    }
+    if (this.bootstrapState.phase === 'bootstrapping' && this.bootstrapState.targetChunkKeys.has(key)) {
+      this.bootstrapState.finalizedChunkKeys.add(key);
+      if (this.bootstrapState.finalizedChunkKeys.size >= this.bootstrapState.targetChunkKeys.size) {
+        this.bootstrapState.phase = 'runtime-streaming';
+        for (const targetKey of this.bootstrapState.targetChunkKeys) {
+          const targetChunk = this.chunks.get(targetKey);
+          if (targetChunk) targetChunk.deferConsolidation = false;
+        }
+        this.flushShadowUpdates('bootstrap-finished');
+      }
+    }
+  }
+
+  processAssemblyQueues() {
+    const isBootstrap = this.bootstrapState.phase === 'bootstrapping';
+    this.chunkAssemblyScheduler.processWithinBudget({
+      budgetMs: isBootstrap ? 12 : 2.5,
+      maxTasks: isBootstrap ? 8 : 2
+    });
+  }
+
+  _processDeferredFinalizeQueue(options = {}) {
+    if (this._pendingDeferredFinalizeChunkKeys.size === 0) return 0;
+    const maxChunks = Number.isFinite(options.maxChunks) ? options.maxChunks : RUNTIME_DEFERRED_FINALIZE_MAX_CHUNKS;
+    if (maxChunks <= 0) return 0;
+
+    const currentTime = globalThis.performance?.now?.() ?? Date.now();
+    if (currentTime - this._lastStreamingActivityAt < RUNTIME_DEFERRED_FINALIZE_IDLE_GRACE_MS) {
+      return 0;
+    }
+
+    let processed = 0;
+    for (const key of [...this._pendingDeferredFinalizeChunkKeys]) {
+      if (processed >= maxChunks) break;
+      const chunk = this.chunks.get(key);
+      if (!chunk || chunk.disposed) {
+        this._pendingDeferredFinalizeChunkKeys.delete(key);
+        continue;
+      }
+      if (!chunk.isReady || chunk.isConsolidating) continue;
+      const done = chunk.runDeferredFinalizePhase?.();
+      if (done !== false) {
+        this._pendingDeferredFinalizeChunkKeys.delete(key);
+      }
+      processed++;
+    }
+    return processed;
+  }
+
+  async drainAssemblyQueues(options = {}) {
+    await this.chunkAssemblyScheduler.drainAll(options);
+
+    let iterations = 0;
+    const maxIterations = Number.isFinite(options.maxIterations) ? options.maxIterations : 200;
+    while (this.bootstrapState.phase === 'bootstrapping' && iterations < maxIterations) {
+      this.processAssemblyQueues();
+      if (!this.chunkAssemblyScheduler.hasWork()) {
+        const outstanding = [...this.bootstrapState.targetChunkKeys].some((key) => {
+          const chunk = this.chunks.get(key);
+          return chunk && !chunk.isReady;
+        });
+        if (!outstanding) break;
+      }
+      await Promise.resolve();
+      iterations++;
+    }
   }
 
   /**
@@ -113,10 +310,12 @@ export class World {
    */
   update(playerPos = new THREE.Vector3(), dt = 0) {
     let chunkTopologyChanged = false;
+    this._lastPlayerPos = playerPos.clone ? playerPos.clone() : new THREE.Vector3(playerPos.x, playerPos.y, playerPos.z);
 
     // 计算玩家所在的区块坐标
     const cx = Math.floor(playerPos.x / CHUNK_SIZE);
     const cz = Math.floor(playerPos.z / CHUNK_SIZE);
+    this._ensureBootstrapTargets(cx, cz);
 
     // --- 加载新区块 ---
     // 遍历渲染距离范围内的所有坐标，如果未加载则创建新区块
@@ -175,20 +374,24 @@ export class World {
       [...readyChunkKeys].some(key => !this._lastReadyChunkKeys.has(key));
 
     if (readyStateChanged) {
-      this._dedupeLoadedChunkOwners();
-
-      for (const key of readyChunkKeys) {
-        if (!this._lastReadyChunkKeys.has(key)) {
-          this._enqueueChunkAndNeighborsForAORefresh(key);
-        }
-      }
+      // 移除 _dedupeLoadedChunkOwners 调用：Worker 已按坐标正确归属方块，不再需要兜底清理
+      // 同时移除 AO 边界重算：方块只被一个 Chunk 渲染一次，AO 不会重复着色
 
       this._lastReadyChunkCount = readyChunkCount;
       this._lastReadyChunkKeys = readyChunkKeys;
       this.requestShadowMapUpdate('chunk-ready-count-changed');
     }
 
-    this._processPendingAORefreshQueue();
+    this.processAssemblyQueues();
+    if (this.bootstrapState.phase === 'runtime-streaming') {
+      this._processDeferredFinalizeQueue();
+    }
+    if (this.pendingShadowUpdate && this.bootstrapState.phase === 'runtime-streaming') {
+      const now = globalThis.performance?.now?.() ?? Date.now();
+      if (now - this.shadowUpdateScheduledAt >= 200) {
+        this.flushShadowUpdates('batched-world-change');
+      }
+    }
 
     // 更新粒子系统逻辑（运动、透明度衰减等）
     this.particles.update(dt);
@@ -219,102 +422,6 @@ export class World {
    * 当“坐标所属 Chunk”已加载并包含该方块时，移除其他 Chunk 的同坐标副本。
    * 目的：消除同坐标双重渲染导致的深度竞争（AO/明暗随视角闪烁）。
    */
-  _dedupeLoadedChunkOwners() {
-    let removedCount = 0;
-    const touchedChunks = new Map(); // chunkKey -> removedCount
-
-    for (const [chunkKey, chunk] of this.chunks) {
-      if (!chunk || !chunk.isReady) continue;
-
-      for (const key in chunk.blockData) {
-        const [x, y, z] = key.split(',').map(Number);
-        const ownerCx = Math.floor(x / CHUNK_SIZE);
-        const ownerCz = Math.floor(z / CHUNK_SIZE);
-        const coordChunkKey = `${ownerCx},${ownerCz}`;
-
-        // 当前就是坐标所属 Chunk，无需处理
-        if (coordChunkKey === chunkKey) continue;
-
-        const coordChunk = this.chunks.get(coordChunkKey);
-        // 坐标所属 Chunk 未加载/未就绪时，不做删除，避免结构边缘暂时缺块
-        if (!coordChunk || !coordChunk.isReady) continue;
-
-        // 坐标所属 Chunk 没有该方块，不删
-        if (coordChunk.blockData[key] === undefined) continue;
-
-        // 删除重复副本（保留坐标所属 Chunk）
-        const oldEntry = chunk.blockData[key];
-        const oldType = this.getBlockTypeFromEntry(oldEntry);
-
-        delete chunk.blockData[key];
-        chunk.visibleKeys.delete(key);
-        chunk.solidBlocks.delete(key);
-
-        // 立即尝试移除当前渲染网格，降低“等合并回包”期间的视觉残留
-        if (typeof chunk._removeInstancedMeshBlock === 'function') {
-          chunk._removeInstancedMeshBlock(key, x, y, z, oldType);
-        }
-        if (typeof chunk._removeDynamicMesh === 'function') {
-          chunk._removeDynamicMesh(x, y, z, key);
-        }
-
-        removedCount++;
-        touchedChunks.set(chunkKey, (touchedChunks.get(chunkKey) || 0) + 1);
-      }
-    }
-
-    if (removedCount > 0) {
-      for (const [chunkKey, count] of touchedChunks) {
-        const chunk = this.chunks.get(chunkKey);
-        if (!chunk || !chunk.isReady) continue;
-        chunk.dirtyBlocks += count;
-        chunk.scheduleConsolidation();
-        chunk.saveDebounced?.();
-      }
-      this.clearBlockLookupCaches();
-      console.log(`[OwnershipDedupe] removed duplicate owners: ${removedCount}, touched chunks: ${touchedChunks.size}`);
-    }
-  }
-
-  /**
-   * 将指定 Chunk 及四邻加入 AO 重算队列
-   * @param {string} chunkKey - Chunk 键，格式 "cx,cz"
-   */
-  _enqueueChunkAndNeighborsForAORefresh(chunkKey) {
-    const [cx, cz] = chunkKey.split(',').map(Number);
-    const keys = [
-      `${cx},${cz}`,
-      `${cx + 1},${cz}`,
-      `${cx - 1},${cz}`,
-      `${cx},${cz + 1}`,
-      `${cx},${cz - 1}`
-    ];
-    keys.forEach((key) => this._pendingAORefreshChunkKeys.add(key));
-  }
-
-  /**
-   * 分帧处理 AO 重算队列，避免单帧卡顿
-   */
-  _processPendingAORefreshQueue() {
-    const MAX_CHUNKS_PER_TICK = 2;
-    let processed = 0;
-
-    for (const key of [...this._pendingAORefreshChunkKeys]) {
-      if (processed >= MAX_CHUNKS_PER_TICK) break;
-
-      const chunk = this.chunks.get(key);
-      if (!chunk || !chunk.isReady) {
-        this._pendingAORefreshChunkKeys.delete(key);
-        continue;
-      }
-      if (chunk.isConsolidating) continue;
-
-      chunk.rebuildInstancedAOFromWorld?.();
-      this._pendingAORefreshChunkKeys.delete(key);
-      processed++;
-    }
-  }
-
   /**
    * 生成击中粒子效果 (转发至 ParticleSystem)
    * @param {THREE.Vector3} pos - 粒子生成位置
@@ -367,6 +474,7 @@ export class World {
     const chunkGroups = new Map();
     // 同时收集方块坐标所在的Chunk，用于更新渲染网格
     const renderChunks = new Map();
+    const specialEntitiesToDestroy = new Map();
 
     positions.forEach(p => {
       const px = Math.floor(p.x);
@@ -382,6 +490,14 @@ export class World {
       if (!renderChunks.has(coordKey)) renderChunks.set(coordKey, []);
       renderChunks.get(coordKey).push(p);
 
+      const specialCollision = this.getSpecialEntityCollision(px, py, pz);
+      if (specialCollision) {
+        specialEntitiesToDestroy.set(
+          `${specialCollision.ownerChunkKey}:${specialCollision.entityType}:${specialCollision.entityId}`,
+          specialCollision
+        );
+      }
+
       // 与 removeBlock 语义保持一致：同坐标存在多个 owner 时，批量删除也要全部命中
       const owners = this.getAllBlockOwners(px, py, pz);
       owners.forEach((owner) => {
@@ -391,10 +507,15 @@ export class World {
       });
     });
 
+    for (const collision of specialEntitiesToDestroy.values()) {
+      collision.ownerChunk.destroySpecialEntity(collision.entityType, collision.entityId);
+    }
+
     // 针对每个区块执行批量删除优化（更新blockData）
     for (const [key, chunkPosList] of chunkGroups) {
       const chunk = this.chunks.get(key);
       if (chunk) {
+        chunk.markPlayerMutation?.();
         chunk.removeBlocksBatch(chunkPosList, isBatch);
       }
     }
@@ -454,17 +575,40 @@ export class World {
   resolveBlockOwner(x, y, z, options = {}) {
     const allowScan = options.allowScan !== false;
 
-    const ix = Math.floor(x);
-    const iy = Math.floor(y);
-    const iz = Math.floor(z);
-    const cx = Math.floor(ix / CHUNK_SIZE);
-    const cz = Math.floor(iz / CHUNK_SIZE);
+    const ix = x | 0;  // Math.floor 的位运算版本（对正数效果相同）
+    const iy = y | 0;
+    const iz = z | 0;
+    const cx = ix >> 4;  // Math.floor(ix / 16) 的位运算版本
+    const cz = iz >> 4;
     const coordChunkKey = `${cx},${cz}`;
     const coordChunk = this.chunks.get(coordChunkKey) || null;
     const blockKey = `${ix},${iy},${iz}`;
 
-    // 1) 坐标所属 Chunk 优先
-    if (coordChunk) {
+    // 1) 坐标所属 Chunk 优先 - 使用新的数组存储快速查询
+    if (coordChunk?.isReady) {
+      // 尝试使用高性能数组存储
+      const lx = ix & 15;  // ix % 16
+      const ly = iy - coordChunk.worldY;
+      const lz = iz & 15;
+      if (ly >= 0 && ly < 16) {
+        const blockIndex = (ly << 8) | (lz << 4) | lx;
+        const blockId = coordChunk.blockDataArray?.[blockIndex];
+        if (blockId) {
+          const entry = coordChunk._getEntryFromBlockId(blockId);
+          if (entry) {
+            this.crossChunkOwnerCache.delete(blockKey);
+            return {
+              ownerChunk: coordChunk,
+              ownerChunkKey: coordChunkKey,
+              coordChunk,
+              coordChunkKey,
+              blockKey,
+              entry
+            };
+          }
+        }
+      }
+      // 回退到旧存储
       const entry = coordChunk.blockData[blockKey];
       if (entry) {
         this.crossChunkOwnerCache.delete(blockKey);
@@ -483,7 +627,29 @@ export class World {
     const ownerChunkKey = this.crossChunkOwnerCache.get(blockKey);
     if (ownerChunkKey) {
       const ownerChunk = this.chunks.get(ownerChunkKey);
-      if (ownerChunk && ownerChunk.isReady) {
+      if (ownerChunk?.isReady) {
+        // 尝试新存储
+        const olx = ix & 15;
+        const oly = iy - ownerChunk.worldY;
+        const olz = iz & 15;
+        if (oly >= 0 && oly < 16) {
+          const blockIndex = (oly << 8) | (olz << 4) | olx;
+          const blockId = ownerChunk.blockDataArray?.[blockIndex];
+          if (blockId) {
+            const entry = ownerChunk._getEntryFromBlockId(blockId);
+            if (entry) {
+              return {
+                ownerChunk,
+                ownerChunkKey,
+                coordChunk,
+                coordChunkKey,
+                blockKey,
+                entry
+              };
+            }
+          }
+        }
+        // 回退到旧存储
         const entry = ownerChunk.blockData[blockKey];
         if (entry) {
           return {
@@ -507,18 +673,92 @@ export class World {
 
     // 4) 全量扫描已加载 Chunk
     for (const [otherKey, otherChunk] of this.chunks) {
-      if (!otherChunk || !otherChunk.isReady || otherChunk === coordChunk) continue;
+      if (!otherChunk?.isReady || otherKey === coordChunkKey) continue;
+
+      // 尝试新存储
+      const olx = ix & 15;
+      const oly = iy - otherChunk.worldY;
+      const olz = iz & 15;
+      if (oly >= 0 && oly < 16) {
+        const blockIndex = (oly << 8) | (olz << 4) | olx;
+        const blockId = otherChunk.blockDataArray?.[blockIndex];
+        if (blockId) {
+          const entry = otherChunk._getEntryFromBlockId(blockId);
+          if (entry) {
+            this.crossChunkOwnerCache.set(blockKey, otherKey);
+            return {
+              ownerChunk: otherChunk,
+              ownerChunkKey: otherKey,
+              coordChunk,
+              coordChunkKey,
+              blockKey,
+              entry
+            };
+          }
+        }
+      }
+      // 回退到旧存储
       const entry = otherChunk.blockData[blockKey];
-      if (!entry) continue;
-      this.crossChunkOwnerCache.set(blockKey, otherKey);
-      return {
-        ownerChunk: otherChunk,
-        ownerChunkKey: otherKey,
-        coordChunk,
-        coordChunkKey,
-        blockKey,
-        entry
-      };
+      if (entry) {
+        this.crossChunkOwnerCache.set(blockKey, otherKey);
+        return {
+          ownerChunk: otherChunk,
+          ownerChunkKey: otherKey,
+          coordChunk,
+          coordChunkKey,
+          blockKey,
+          entry
+        };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * 获取指定坐标的特殊实体占位碰撞信息
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @returns {{
+   *   ownerChunk: Chunk,
+   *   ownerChunkKey: string,
+   *   entityType: string,
+   *   entityId: string
+   * }|null}
+   */
+  getSpecialEntityCollision(x, y, z) {
+    const ix = Math.floor(x);
+    const iy = Math.floor(y);
+    const iz = Math.floor(z);
+    const cx = Math.floor(ix / CHUNK_SIZE);
+    const cz = Math.floor(iz / CHUNK_SIZE);
+    const coordChunkKey = `${cx},${cz}`;
+    const coordChunk = this.chunks.get(coordChunkKey) || null;
+
+    if (coordChunk?.isReady) {
+      const collision = coordChunk.getSpecialEntityCollisionAt?.(ix, iy, iz);
+      if (collision) {
+        return {
+          ownerChunk: coordChunk,
+          ownerChunkKey: coordChunkKey,
+          entityType: collision.entityType,
+          entityId: collision.entityId
+        };
+      }
+    }
+
+    for (const [otherKey, otherChunk] of this.chunks) {
+      if (!otherChunk?.isReady || otherKey === coordChunkKey) continue;
+      const collision = otherChunk.getSpecialEntityCollisionAt?.(ix, iy, iz);
+      if (collision) {
+        return {
+          ownerChunk: otherChunk,
+          ownerChunkKey: otherKey,
+          entityType: collision.entityType,
+          entityId: collision.entityId
+        };
+      }
     }
 
     return null;
@@ -588,34 +828,60 @@ export class World {
    * @returns {boolean} 是否发生碰撞
    */
   isSolid(x, y, z) {
-    const cx = Math.floor(x / CHUNK_SIZE);
-    const cz = Math.floor(z / CHUNK_SIZE);
+    const cx = x >> 4;  // Math.floor(x / 16)
+    const cz = z >> 4;
     const key = `${cx},${cz}`;
     const chunk = this.chunks.get(key);
 
     // --- 边界情况处理 ---
-    // 如果该坐标所在的区块尚未创建或尚未从 Worker 加载完成（isReady=false）
-    // 为了防止玩家掉入虚空，使用基础高度图噪声函数进行物理占位
     if (!chunk || !chunk.isReady) {
-      // 使用与 TerrainGen 一致的噪声参数来估算地表高度
       const h = Math.floor(noise(x, z, 0.08) + noise(x, z, 0.02) * 3);
-      // y 小于地表高度则视为实心
       return y <= h;
     }
 
-    // 获取方块在区块内的精确碰撞状态（通过 Set 进行 O(1) 查询）
-    const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const ix = x | 0;
+    const iy = y | 0;
+    const iz = z | 0;
 
-    // --- 核心修复：主 Chunk 责任制 ---
-    // 首先检查方块位置所在的 Chunk
+    // --- 快速路径：使用新的数组存储 ---
+    const lx = ix & 15;
+    const ly = iy - chunk.worldY;
+    const lz = iz & 15;
+    if (ly >= 0 && ly < 16) {
+      const blockIndex = (ly << 8) | (lz << 4) | lx;
+      const blockId = chunk.blockDataArray?.[blockIndex];
+      if (blockId && chunk.solidBlockIds?.has(blockId)) {
+        return true;
+      }
+      if (blockId === 0) {
+        // 空气，检查跨区块
+      }
+    }
+
+    // --- 回退路径：使用旧的 solidBlocks Set ---
+    const blockKey = `${ix},${iy},${iz}`;
     if (chunk.solidBlocks.has(blockKey)) {
       return true;
     }
 
-    // 如果不在，查询所有已加载的 Chunk（跨 Chunk 结构的碰撞体可能在其他 Chunk 中）
+    // 查询其他 Chunk（跨区块结构）
     for (const [, otherChunk] of this.chunks) {
-      if (otherChunk.isReady && otherChunk !== chunk && otherChunk.solidBlocks.has(blockKey)) {
-        return true;
+      if (otherChunk.isReady && otherChunk !== chunk) {
+        // 尝试新存储
+        const olx = ix & 15;
+        const oly = iy - otherChunk.worldY;
+        const olz = iz & 15;
+        if (oly >= 0 && oly < 16) {
+          const blockIndex = (oly << 8) | (olz << 4) | olx;
+          const blockId = otherChunk.blockDataArray?.[blockIndex];
+          if (blockId && otherChunk.solidBlockIds?.has(blockId)) {
+            return true;
+          }
+        }
+        // 回退到旧存储
+        if (otherChunk.solidBlocks.has(blockKey)) {
+          return true;
+        }
       }
     }
 
@@ -631,7 +897,8 @@ export class World {
    */
   getBlock(x, y, z) {
     const owner = this.resolveBlockOwner(x, y, z, { allowScan: true });
-    return owner ? this.getBlockTypeFromEntry(owner.entry) : null;
+    if (owner) return this.getBlockTypeFromEntry(owner.entry);
+    return this.getSpecialEntityCollision(x, y, z) ? 'collider' : null;
   }
 
   /**
@@ -660,7 +927,8 @@ export class World {
    */
   getBlockFast(x, y, z) {
     const owner = this.resolveBlockOwner(x, y, z, { allowScan: false });
-    return owner ? this.getBlockTypeFromEntry(owner.entry) : null;
+    if (owner) return this.getBlockTypeFromEntry(owner.entry);
+    return this.getSpecialEntityCollision(x, y, z) ? 'collider' : null;
   }
 
   /**
@@ -672,7 +940,8 @@ export class World {
    */
   getBlockEntry(x, y, z) {
     const owner = this.resolveBlockOwner(x, y, z, { allowScan: true });
-    return owner ? parseBlockEntry(owner.entry) : null;
+    if (owner) return parseBlockEntry(owner.entry);
+    return this.getSpecialEntityCollision(x, y, z) ? { type: 'collider', orientation: 0 } : null;
   }
 
   /**
@@ -695,6 +964,7 @@ export class World {
     }
 
     // 逻辑委托：调用区块的动态添加方法，处理网格生成和邻居面更新
+    chunk.markPlayerMutation?.();
     chunk.addBlockDynamic(x, y, z, typeOrEntry, orientation);
     this.clearBlockLookupCaches();
     this.requestShadowMapUpdate('set-block');
@@ -739,6 +1009,7 @@ export class World {
       placed += result.placed;
       skipped += result.skipped;
       if (result.placed > 0) {
+        chunk.markPlayerMutation?.();
         touchedChunks.add(chunkKey);
       }
     }
@@ -772,7 +1043,15 @@ export class World {
   removeBlock(x, y, z) {
     // 防御式处理：移除该坐标在所有 Chunk 的重复 owner，避免历史脏数据导致一键只删一层
     const owners = this.getAllBlockOwners(x, y, z);
-    if (owners.length === 0) return;
+    if (owners.length === 0) {
+      const specialCollision = this.getSpecialEntityCollision(x, y, z);
+      if (!specialCollision) return;
+      specialCollision.ownerChunk.destroySpecialEntity(specialCollision.entityType, specialCollision.entityId);
+      this.clearBlockLookupCaches();
+      this.requestShadowMapUpdate('remove-special-entity');
+      return;
+    }
+    owners.forEach(owner => owner.ownerChunk.markPlayerMutation?.());
     owners.forEach(owner => owner.ownerChunk.removeBlock(x, y, z));
     this.clearBlockLookupCaches();
     this.requestShadowMapUpdate('remove-block');
@@ -786,7 +1065,13 @@ export class World {
    */
   removeBlockCollider(x, y, z) {
     const owners = this.getAllBlockOwners(x, y, z);
-    if (owners.length === 0) return;
+    if (owners.length === 0) {
+      const specialCollision = this.getSpecialEntityCollision(x, y, z);
+      if (!specialCollision) return;
+      specialCollision.ownerChunk.destroySpecialEntity(specialCollision.entityType, specialCollision.entityId);
+      this.clearBlockLookupCaches();
+      return;
+    }
     owners.forEach(owner => owner.ownerChunk.removeCollisionKey(x, y, z));
     this.clearBlockLookupCaches();
   }

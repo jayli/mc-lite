@@ -162,12 +162,11 @@ export class ZombieInstancedRenderer {
     this.dummy = new THREE.Object3D();
     this.parentDummy = new THREE.Object3D();
     this._tempMatrix = new THREE.Matrix4();
-    this.color = new THREE.Color();
   }
 
   // --------------------------------------------------------------------------
   // 初始化方法
-  // --------------------------------------------------------------------------
+  //--------------------------------------------------------------------------
 
   /**
    * 初始化共享资源
@@ -331,7 +330,12 @@ export class ZombieInstancedRenderer {
   initializeInstanceColors(mesh) {
     if (!mesh.setColorAt) return;
 
-    const defaultColor = new THREE.Color(0xffffff);
+    // 使用静态变量避免重复创建 Color 对象
+    if (!ZombieInstancedRenderer._defaultColor) {
+      ZombieInstancedRenderer._defaultColor = new THREE.Color(0xffffff);
+    }
+    const defaultColor = ZombieInstancedRenderer._defaultColor;
+
     for (let i = 0; i < this.maxCount; i++) {
       mesh.setColorAt(i, defaultColor);
     }
@@ -358,6 +362,17 @@ export class ZombieInstancedRenderer {
    * @param {number} deltaTime - 时间增量（秒）
    */
   update(zombies, deltaTime = 0.016) {
+    // 快速检查：如果没有丧尸，跳过所有渲染更新
+    const zombieCount = Array.isArray(zombies) ? zombies.length : zombies.size;
+    if (zombieCount === 0) {
+      // 确保所有网格实例计数为0，隐藏丧尸
+      if (this.meshes.head.count > 0) {
+        this.resetMeshCounts();
+        this.commitMeshUpdates(0);
+      }
+      return;
+    }
+
     let count = 0;
     this.instanceMap = [];
 

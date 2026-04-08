@@ -26,14 +26,13 @@ export const FOG_NEAR = 30;
 // 雾的完全覆盖距离（米）
 export const FOG_FAR = 70;
 // 阴影贴图的分辨率大小（像素）
-export const SHADOW_MAP_SIZE = 1024;
+export const SHADOW_MAP_SIZE = 512;
 // 阴影相机的覆盖范围大小（米）
 export const SHADOW_CAMERA_SIZE = 30;
 // 阴影相机远裁剪面：收紧覆盖范围，降低阴影渲染开销
 export const SHADOW_CAMERA_FAR = 250;
 // 环境风格配置键
 export const VISUAL_STYLE_KEYS = {
-  DAY: 'day',
   MORNING: 'morning',
   OVERCAST: 'overcast',
   NIGHT: 'night'
@@ -56,32 +55,8 @@ export class Engine {
     this.scene.background = null;
     this.scene.fog = new THREE.Fog(FOG_COLOR, FOG_NEAR, FOG_FAR);
     this.isUnderwater = false;
-    this.currentVisualStyle = VISUAL_STYLE_KEYS.DAY;
+    this.currentVisualStyle = VISUAL_STYLE_KEYS.MORNING;
     this.visualStyles = {
-      [VISUAL_STYLE_KEYS.DAY]: {
-        // 保持原有白天风格参数
-        fogColor: 0x94bcf5,
-        fogNear: 30,
-        fogFar: 70,
-        directionalLightColor: 0xfffaf0,
-        directionalLightIntensity: 3.2,
-        moonDirectionalLightColor: 0xbfd2ff,
-        moonDirectionalLightIntensity: 0.02,
-        ambientLightColor: 0xddeeff,
-        ambientLightIntensity: 1,
-        // 使用雾色作为背景，避免远处方块雾化后与天空出现硬边
-        backgroundMode: 'fogColor',
-        backgroundColor: null,
-        sunDirection: [0, 0.8, 0.6],
-        moonDirection: [-0.28, 0.55, -0.78],
-        toneMappingExposure: 1.25,
-        sunVisible: false,
-        moonVisible: false,
-        moonSize: 18,
-        colorSaturate: 1,
-        colorContrast: 1,
-        colorBrightness: 1
-      },
       [VISUAL_STYLE_KEYS.MORNING]: {
         // 早晨风格：贴近参考图的暖色晨光 + 蓝紫天空 + 柔和阴影
         fogColor: 0xb7c6f7,
@@ -104,7 +79,7 @@ export class Engine {
         colorSaturate: 1.15,
         colorContrast: 1.1,
         colorBrightness: 1.06,
-        backgroundBlurriness: 0.22,
+        backgroundBlurriness: 0,
         skyboxKey: 'skyBox4'
       },
       [VISUAL_STYLE_KEYS.OVERCAST]: {
@@ -172,7 +147,7 @@ export class Engine {
     // 性能优化：关闭每帧自动更新阴影，仅在场景关键变化时按需刷新
     this.renderer.shadowMap.autoUpdate = false;
     this.renderer.shadowMap.needsUpdate = true;
-    this.resolutionScale = 0.7;        // 初始渲染分辨率缩放系数
+    this.resolutionScale = 0.6;        // 初始渲染分辨率缩放系数
     this.renderer.setPixelRatio(this.resolutionScale); // 设置渲染器的像素比例，用于控制输出分辨率
 
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping; // 应用ACES电影感色调映射，使颜色更接近真实摄影效果
@@ -220,14 +195,41 @@ export class Engine {
 
     this._tmpVec = new THREE.Vector3();
     this._lastUpdatePos = new THREE.Vector3(Infinity, Infinity, Infinity);
+    this._underwaterColor = new THREE.Color(0x103060); // 预分配水下颜色对象避免GC
 
     this.createSun();
     this.createMoon();
     this.createSkybox();
-    this.setVisualStyle(VISUAL_STYLE_KEYS.DAY);
+    this.setVisualStyle(VISUAL_STYLE_KEYS.MORNING);
+
+    // 预绑定水面渲染用的噪声和高度计算方法，避免每帧创建函数
+    this._getNoise = this._getNoise.bind(this);
+    this._getHeight = this._getHeight.bind(this);
 
     this.init();
     this.loadModel();
+  }
+
+  /**
+   * 噪声生成函数 - 用于地形和水面效果计算
+   * 预绑定到实例，避免每帧创建闭包
+   */
+  _getNoise(x, z, scale) {
+    const nx = x + WORLD_CONFIG.SEED, nz = z + WORLD_CONFIG.SEED;
+    return Math.sin(nx * scale) * 2 + Math.cos(nz * scale) * 2;
+  }
+
+  /**
+   * 地形高度计算函数 - 用于判断当前位置是否靠近海洋
+   * 预绑定到实例，避免每帧创建闭包
+   */
+  _getHeight(x, z) {
+    const h = this._getNoise(x, z, 0.08) + this._getNoise(x, z, 0.02) * 3;
+    const temp = this._getNoise(x, z, 0.01);
+    const hum = this._getNoise(x + 1000, z + 1000, 0.015);
+    if (temp < -1.5) return h * 0.5 + 2;
+    if (temp > -1.5 && temp < -0.8 && hum > 0.5) return h * 0.3 - 2;
+    return h;
   }
 
   /**
@@ -499,14 +501,26 @@ export class Engine {
   }
 
   getVisualStyle(styleKey) {
-    return this.visualStyles[styleKey] || this.visualStyles[VISUAL_STYLE_KEYS.DAY];
+    return this.visualStyles[styleKey] || this.visualStyles[VISUAL_STYLE_KEYS.MORNING];
   }
 
   applySurfaceFogFromStyle() {
     const style = this.getVisualStyle(this.currentVisualStyle);
-    this.scene.fog.color.set(style.fogColor);
-    this.scene.fog.near = style.fogNear;
-    this.scene.fog.far = style.fogFar;
+
+    // 早晨和黑夜不显示雾效果
+    const noFogStyles = [VISUAL_STYLE_KEYS.MORNING, VISUAL_STYLE_KEYS.NIGHT];
+    if (noFogStyles.includes(this.currentVisualStyle)) {
+      this.scene.fog = null;
+    } else {
+      // 重新启用雾（如果之前被禁用）
+      if (!this.scene.fog) {
+        this.scene.fog = new THREE.Fog(style.fogColor, style.fogNear, style.fogFar);
+      } else {
+        this.scene.fog.color.set(style.fogColor);
+        this.scene.fog.near = style.fogNear;
+        this.scene.fog.far = style.fogFar;
+      }
+    }
 
     if (this.waterMaterial) {
       this.waterMaterial.uniforms.uFogColor.value.set(style.fogColor);
@@ -529,7 +543,7 @@ export class Engine {
   }
 
   setVisualStyle(styleKey) {
-    const targetStyleKey = this.visualStyles[styleKey] ? styleKey : VISUAL_STYLE_KEYS.DAY;
+    const targetStyleKey = this.visualStyles[styleKey] ? styleKey : VISUAL_STYLE_KEYS.MORNING;
     const style = this.getVisualStyle(targetStyleKey);
     this.currentVisualStyle = targetStyleKey;
 
@@ -792,21 +806,8 @@ export class Engine {
     const camZ = this.camera.position.z;
     const waterLevel = WATER_LEVEL_OFFSET;
 
-    // 定义噪声生成函数，用于地形和水面效果计算
-    const getNoise = (x, z, scale) => {
-      const nx = x + WORLD_CONFIG.SEED, nz = z + WORLD_CONFIG.SEED;
-      return Math.sin(nx * scale) * 2 + Math.cos(nz * scale) * 2;
-    };
-
-    // 定义地形高度计算函数，用于判断当前位置是否靠近海洋
-    const getHeight = (x, z) => {
-      const h = getNoise(x, z, 0.08) + getNoise(x, z, 0.02) * 3;
-      const temp = getNoise(x, z, 0.01);
-      const hum = getNoise(x + 1000, z + 1000, 0.015);
-      if (temp < -1.5) return h * 0.5 + 2;
-      if (temp > -1.5 && temp < -0.8 && hum > 0.5) return h * 0.3 - 2;
-      return h;
-    };
+    // 直接使用预绑定的方法，避免每帧创建函数
+    const getHeight = this._getHeight;
 
     let isNearOcean = false;
     if (getHeight(camX, camZ) < -0.8) {
@@ -821,10 +822,14 @@ export class Engine {
     // 检测玩家是否在水下，并相应地更改雾效设置
     if (camY < waterLevel && isNearOcean) {
       if (!this.isUnderwater) {
-        this.scene.fog.color.set(0x103060);    // 设置水下雾的颜色为深蓝色
-        this.scene.fog.near = 0.1;             // 设置水下雾的近距范围
-        this.scene.fog.far = 15;               // 设置水下雾的远距范围，较短的距离增强水下效果
-        this.scene.background = new THREE.Color(0x103060); // 水下背景同步为雾色，避免远处边界突变
+        if (!this.scene.fog) {
+          this.scene.fog = new THREE.Fog(0x103060, 0.1, 15);
+        } else {
+          this.scene.fog.color.set(0x103060);    // 设置水下雾的颜色为深蓝色
+          this.scene.fog.near = 0.1;             // 设置水下雾的近距范围
+          this.scene.fog.far = 15;               // 设置水下雾的远距范围，较短的距离增强水下效果
+        }
+        this.scene.background = this._underwaterColor; // 使用预分配的颜色对象
         this.isUnderwater = true;              // 标记玩家处于水下状态
 
         if (this.waterMaterial) {

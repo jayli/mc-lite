@@ -1,6 +1,8 @@
 // src/workers/WorldWorker.js
+// Worker 中不使用 import map，需要完整 URL
+import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { setSeed, seededRandom, getBiome as getBaseBiome } from '../utils/MathUtils.js';
-import { parseBlockEntry } from '../utils/OrientationUtils.js';
+import { parseBlockEntry, getRotationAngle } from '../utils/OrientationUtils.js';
 import { terrainGen } from '../world/TerrainGen.js';
 import { Tree } from '../world/entities/Tree.js';
 import { Cloud } from '../world/entities/Cloud.js';
@@ -14,9 +16,11 @@ import { IslandMap } from './maps/IslandMap.js';
 import { PlainLand } from './maps/PlainLand.js';
 import { CityMap } from './maps/CityMap.js';
 import {
-  belongsToCrossChunkStructure as checkBelongsToCrossChunkStructure,
   CROSS_CHUNK_OWNER_BLOCKED_TYPES,
-  getStructureRenderDist
+  getStructureRenderDist,
+  isCrossChunkOwnerType,
+  STRUCTURE_HEIGHT_RANGE,
+  STRUCTURE_HEIGHT_RANGE_SPECIAL
 } from '../utils/StructureUtils.js';
 import { getAOForFace } from '../utils/AOUtils.js';
 
@@ -76,8 +80,6 @@ const CITY_TALL_WELL_CHANCE = CITY_FLOWER_BED_CHANCE * 3; // 与 pavilion 相同
 const OWNERSHIP_SCHEMA_VERSION = 2;
 // 旧档归属迁移调试开关（默认关闭）
 const DEBUG_OWNERSHIP_MIGRATION = false;
-// 边界切割自动检测调试开关（默认关闭）
-const DEBUG_AUTO_CROSS_CHUNK_OWNER = false;
 
 /**
  * 将世界坐标转换为 Chunk 内局部坐标（0-15）
@@ -172,6 +174,59 @@ function resolveLargeStaticStructureType(params) {
   return null;
 }
 
+/**
+ * 构建 Mesh 数据（用于 Worker 中预计算）
+ * @param {Object} fakeChunk - 模拟的 chunk 对象
+ * @param {Object} d - 渲染数据 {type: [positions]}
+ * @param {number} cx - chunk X
+ * @param {number} cz - chunk Z
+ * @returns {Array} meshDataArray
+ */
+function buildMeshData(fakeChunk, d, cx, cz) {
+  const meshDataArray = [];
+  const dummy = new THREE.Object3D();
+
+  for (const type in d) {
+    const positions = d[type];
+    if (positions.length === 0) continue;
+
+    const count = positions.length;
+    const matrices = new Float32Array(count * 16);
+    const aoLow = new Float32Array(count);
+    const aoHigh = new Float32Array(count);
+    const orientation = new Float32Array(count);
+    const instanceIndexMap = {};
+
+    for (let i = 0; i < count; i++) {
+      const pos = positions[i];
+
+      // 计算矩阵
+      dummy.position.set(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
+      dummy.rotation.set(0, getRotationAngle(pos.orientation || 0), 0);
+      dummy.updateMatrix();
+
+      // 存储矩阵（16 个元素）
+      matrices.set(dummy.matrix.elements, i * 16);
+
+      // AO 和朝向
+      aoLow[i] = pos.aoLow || 0;
+      aoHigh[i] = pos.aoHigh || 0;
+      orientation[i] = pos.orientation || 0;
+
+      // 索引映射
+      const posKey = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
+      instanceIndexMap[posKey] = i;
+    }
+
+    meshDataArray.push({
+      type, count, matrices, aoLow, aoHigh, orientation,
+      instanceIndexMap
+    });
+  }
+
+  return meshDataArray;
+}
+
 onmessage = async function(e) {
   const {
     cx,
@@ -242,7 +297,6 @@ onmessage = async function(e) {
   const cityCoreCandidates = []; // 记录 City 核心区候选点（用于后置填充）
   const blockSourceTypeMap = new Map(); // 记录方块来源结构类型（仅结构任务）
   let activeStructureType = null;
-  const blockedCrossChunkOwnerTypes = new Set(CROSS_CHUNK_OWNER_BLOCKED_TYPES);
 
   // 模拟 Chunk 类的 add 方法 - 改为写入 blockMap
   const fakeChunk = {
@@ -1188,12 +1242,16 @@ onmessage = async function(e) {
     const centerWx = cx * CHUNK_SIZE + 8;
     const centerWz = cz * CHUNK_SIZE + 8;
     Island.generate(centerWx, islandY, centerWz, fakeChunk, dPlaceholder);
+    // 注册空岛结构中心，用于跨Chunk渲染
+    structureCenters.push({ type: 'island', x: centerWx, y: islandY, z: centerWz });
   }
   if (chunkRandom(cx, cz, seed + 52) < 0.20) {
     const startX = cx * CHUNK_SIZE + Math.floor(chunkRandom(cx, cz, seed + 53) * CHUNK_SIZE);
     const startZ = cz * CHUNK_SIZE + Math.floor(chunkRandom(cx, cz, seed + 54) * CHUNK_SIZE);
     const size = 30 + Math.floor(chunkRandom(cx, cz, seed + 55) * 21);
     Cloud.generateCluster(startX, 35, startZ, size, fakeChunk, dPlaceholder);
+    // 注册云朵结构中心，用于跨Chunk渲染
+    structureCenters.push({ type: 'cloud', x: startX, y: 35, z: startZ });
   }
 
   // 执行结构生成队列，并记录大型结构的中心点
@@ -1407,31 +1465,39 @@ onmessage = async function(e) {
     }
   }
 
-  // 自动检测：识别“本 Chunk 结构任务写入了 Chunk 外方块”的类型，自动加入跨 Chunk owner 例外
-  const autoCrossChunkOwnerTypes = new Set();
-  for (const [key, block] of blockMap) {
-    const sourceType = blockSourceTypeMap.get(key);
-    if (!sourceType) continue;
-    if (blockedCrossChunkOwnerTypes.has(sourceType)) continue;
-    const inCurrentChunk = block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;
-    if (!inCurrentChunk) {
-      autoCrossChunkOwnerTypes.add(sourceType);
-    }
-  }
-  if (DEBUG_AUTO_CROSS_CHUNK_OWNER && autoCrossChunkOwnerTypes.size > 0) {
-    console.log(
-      `[AutoCrossChunkOwner] chunk ${cx},${cz} detected types: ${Array.from(autoCrossChunkOwnerTypes).join(',')}`
-    );
-  }
+  // 统一 Chunk 归属判定：
+  // - 大型静态结构（tank、castle 等）：严格按坐标归属，避免重复 owner
+  // - 小型实体（tree、gunman、rover 等）：允许跨 Chunk owner，保持原有渲染行为
+  const belongsToCrossChunkStructure = (bx, by, bz) => {
+    if (!structureCenters || structureCenters.length === 0) return false;
 
-  // 统一 Chunk 归属判定，避免多处重复实现
-  const belongsToCrossChunkStructure = (bx, by, bz) =>
-    checkBelongsToCrossChunkStructure(bx, by, bz, structureCenters, autoCrossChunkOwnerTypes);
+    for (const center of structureCenters) {
+      if (!isCrossChunkOwnerType(center.type)) continue;
+
+      const maxDist = getStructureRenderDist(center.type);
+      const heightRange = STRUCTURE_HEIGHT_RANGE_SPECIAL[center.type] ?? STRUCTURE_HEIGHT_RANGE;
+      const dx = Math.abs(bx - center.x);
+      const dz = Math.abs(bz - center.z);
+      const dy = Math.abs(by - center.y);
+
+      if (dx <= maxDist && dz <= maxDist && dy <= heightRange) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   const isBlockOwnedByCurrentChunk = (block) => {
     const inCurrentChunk = block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;
-    const isCrossChunkStructureBlock = !inCurrentChunk &&
-      belongsToCrossChunkStructure(block.x, block.y, block.z);
-    return inCurrentChunk || isCrossChunkStructureBlock;
+    if (inCurrentChunk) return true;
+
+    // 检查是否属于允许跨 Chunk 的小型实体
+    const sourceType = blockSourceTypeMap.get(`${Math.floor(block.x)},${Math.floor(block.y)},${Math.floor(block.z)}`);
+    if (sourceType && isCrossChunkOwnerType(sourceType)) {
+      return belongsToCrossChunkStructure(block.x, block.y, block.z);
+    }
+
+    return false;
   };
 
   // 如果有 snapshot，用 snapshot 中的方块覆盖 blockMap（保留玩家修改）
@@ -1632,9 +1698,25 @@ onmessage = async function(e) {
   }
 
   // 返回数据
+  // 构建 mesh 数据（包含预计算的矩阵和 AO）
+  const meshData = buildMeshData(fakeChunk, d, cx, cz);
+
+  // 收集可传输的 buffer
+  const transferables = [];
+  for (const data of meshData) {
+    transferables.push(
+      data.matrices.buffer,
+      data.aoLow.buffer,
+      data.aoHigh.buffer,
+      data.orientation.buffer
+    );
+  }
+
   postMessage({
-    cx, cz, callbackKey, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys,
-    structureCenters, // 新增：当前 Chunk 负责渲染的结构中心列表
+    cx, cz, callbackKey,
+    meshData,  // 替换原来的 d
+    solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys,
+    structureCenters,
     snapshot: {
       meta: {
         ownershipVersion: OWNERSHIP_SCHEMA_VERSION
@@ -1647,7 +1729,7 @@ onmessage = async function(e) {
         zombieNests: savedSnapshot?.entities?.zombieNests || []
       }
     }
-  });
+  }, transferables);
 };
 
 // 复制结构生成逻辑

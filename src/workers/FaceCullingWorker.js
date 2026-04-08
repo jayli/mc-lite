@@ -2,7 +2,6 @@
 // 专门处理隐藏面剔除计算的Worker
 
 import { getBlockProperties } from '../constants/BlockData.js';
-import { buildAODataForBlocks, computeIncrementalAO } from '../utils/AOUtils.js';
 import {
   computeFaceVisibilityMask,
   createBlockDataNeighborQuery,
@@ -211,47 +210,6 @@ function calculateFaceVisibilityWithWorld(block, blockData, worldChunks, current
   );
 }
 
-/**
- * 批量计算 AO 数据（用于区块生成）
- * @param {Array} blocks - 方块数组 [{x, y, z, type}]
- * @param {Object} blockData - 完整方块数据 {"x,y,z": "type"}
- * @param {number} cx - 区块 X 坐标
- * @param {number} cz - 区块 Z 坐标
- * @param {Array} worldChunks - 相邻区块数据
- * @returns {Object} AO 计算结果
- */
-function computeBatchAO(blocks, blockData, cx, cz, worldChunks = []) {
-  const startTime = performance.now();
-  const affectedNeighbors = [];
-
-  // 创建跨区块 occluding 检查器
-  const isOccluding = createOccludingChecker(blockData, worldChunks, cx, cz);
-
-  const aoData = buildAODataForBlocks(blocks, isOccluding);
-
-  return {
-    aoData,
-    affectedNeighbors,
-    duration: performance.now() - startTime,
-    cx,
-    cz
-  };
-}
-
-/**
- * 增量计算 AO 数据（用于动态方块更新）
- * 现在直接复用 AOUtils 中的通用实现
- * @param {Object} position - 方块位置 {x, y, z}
- * @param {'PLACE'|'DESTROY'} operation - 操作类型
- * @param {string} blockType - 方块类型
- * @param {Object} blockData - 局部方块数据
- * @param {number} neighborhoodRadius - 邻居半径
- * @returns {Object} AO 计算结果
- */
-function computeIncrementalAOWorker(position, operation, blockType, blockData, neighborhoodRadius = 1) {
-  return computeIncrementalAO(position, operation, blockType, blockData, neighborhoodRadius, getBlockProperties);
-}
-
 // Worker 消息处理器
 self.onmessage = function(e) {
   const { type, data } = e.data;
@@ -274,27 +232,6 @@ self.onmessage = function(e) {
           data.cx,
           data.cz,
           data.worldChunks || null
-        );
-        break;
-
-      // AO 计算相关消息
-      case 'COMPUTE_AO_BATCH':
-        result = computeBatchAO(
-          data.blocks,
-          data.blockData,
-          data.cx,
-          data.cz,
-          data.worldChunks || []
-        );
-        break;
-
-      case 'COMPUTE_AO_INCREMENTAL':
-        result = computeIncrementalAOWorker(
-          data.position,
-          data.operation,
-          data.blockType,
-          data.blockData,
-          data.neighborhoodRadius || 1
         );
         break;
 

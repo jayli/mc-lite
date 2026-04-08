@@ -114,8 +114,8 @@ describe('Chunk 真实类测试', (test) => {
     globalThis._faceCullingSystem = mockFaceCullingSystem;
     globalThis._materials = mockMaterials;
     globalThis._blockData = mockBlockData;
-    globalThis._carModel = { clone: () => null };
-    globalThis._gunManModel = { clone: () => null };
+    globalThis._carModel = new THREE.Group();
+    globalThis._gunManModel = new THREE.Group();
     mockPersistenceService.calls = [];
   };
 

@@ -57,6 +57,10 @@ export class HUD {
     this._throttledRenderQueued = false;  // 是否有待执行的渲染请求
     this._hotbarRenderTargetTime = 0;     // 计划执行的时间戳
 
+    // 快捷栏状态缓存（避免 JSON.stringify）
+    this._lastSelectedSlot = -1;
+    this._lastSlotItems = null;
+
     // 监听主线程长任务 (Long Tasks)
     if (window.PerformanceObserver) {
       const observer = new PerformanceObserver((list) => {
@@ -216,17 +220,34 @@ export class HUD {
     const selectedSlot = inventory.selectedSlot;
 
     // --- 状态检测优化 ---
-    // 生成当前状态的快照（选中槽位 + 前5个槽位的物品和数量）
-    const currentState = JSON.stringify({
-      selected: selectedSlot,
-      slots: inventory.slots.slice(0, 5).map(s => ({ item: s.item, count: s.count }))
-    });
+    // 快速比较：检查选中槽位和前5个槽位的物品/数量是否有变化
+    let stateChanged = false;
 
-    // 如果状态没有变化，直接跳过渲染，避免昂贵的 DOM 操作
-    if (this._lastInventoryState === currentState) {
+    // 1. 检查选中槽位
+    if (this._lastSelectedSlot !== selectedSlot) {
+      stateChanged = true;
+      this._lastSelectedSlot = selectedSlot;
+    }
+
+    // 2. 检查前5个槽位的物品和数量
+    if (!stateChanged) {
+      for (let i = 0; i < 5; i++) {
+        const slot = inventory.slots[i];
+        const lastItem = this._lastSlotItems?.[i];
+        if (!lastItem || lastItem.item !== slot.item || lastItem.count !== slot.count) {
+          stateChanged = true;
+          break;
+        }
+      }
+    }
+
+    // 3. 如果有变化，更新缓存
+    if (stateChanged) {
+      this._lastSlotItems = inventory.slots.slice(0, 5).map(s => ({ item: s.item, count: s.count }));
+    } else {
+      // 状态没变，跳过渲染
       return;
     }
-    this._lastInventoryState = currentState;
     // --- 优化结束 ---
 
     this.hotbarEl.innerHTML = '';

@@ -12,7 +12,7 @@
  */
 
 import { describe, test } from './runner.js';
-import { assertEqual, assertTrue, assertFalse, assertNotNull } from './assert.js';
+import { assertEqual, assertTrue, assertFalse, assertNotNull, assertUndefined } from './assert.js';
 import * as THREE from 'three';
 import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 import { mockFaceCullingSystem, mockMaterials, mockBlockData } from './test-mocks.js';
@@ -123,7 +123,42 @@ async function waitForChunkReady(world, chunkKey, maxWaitCount = 100) {
     if (chunk && chunk.isReady) {
       return true;
     }
+    if (typeof world.drainAssemblyQueues === 'function') {
+      await world.drainAssemblyQueues({ maxIterations: 8 });
+    }
     await new Promise(resolve => setTimeout(resolve, 50));
+    waitCount++;
+  }
+  return false;
+}
+
+async function waitForChunkState(world, chunkKey, targetState, maxWaitCount = 120, options = {}) {
+  const advanceAssemblies = options.advanceAssemblies !== false;
+  let waitCount = 0;
+  while (waitCount < maxWaitCount) {
+    const chunk = world.chunks.get(chunkKey);
+    if (chunk && chunk.loadState === targetState) {
+      return true;
+    }
+    if (advanceAssemblies && typeof world.processAssemblyQueues === 'function') {
+      world.processAssemblyQueues();
+    }
+    await new Promise(resolve => setTimeout(resolve, 25));
+    waitCount++;
+  }
+  return false;
+}
+
+async function waitForWorldPhase(world, targetPhase, maxWaitCount = 160) {
+  let waitCount = 0;
+  while (waitCount < maxWaitCount) {
+    if (world.bootstrapState?.phase === targetPhase) {
+      return true;
+    }
+    if (typeof world.processAssemblyQueues === 'function') {
+      world.processAssemblyQueues();
+    }
+    await new Promise(resolve => setTimeout(resolve, 25));
     waitCount++;
   }
   return false;
@@ -180,8 +215,8 @@ const setupEnvironment = () => {
   globalThis._blockData = mockBlockData;
   globalThis._chestManager = mockChestManager;
   globalThis._ParticleSystem = MockParticleSystem;
-  globalThis._carModel = { clone: () => null };
-  globalThis._gunManModel = { clone: () => null };
+  globalThis._carModel = new THREE.Group();
+  globalThis._gunManModel = new THREE.Group();
 
   // 启用 Worker 模拟
   shouldMockWorkers = true;
@@ -282,6 +317,70 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('bootstrap - Worker 回包后 chunk 应停留在 worker-ready，未 finalize 前不应 ready', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+
+    const reachedWorkerReady = await waitForChunkState(world, '0,0', 'worker-ready', 120, {
+      advanceAssemblies: false
+    });
+
+    const chunk = world.chunks.get('0,0');
+    assertNotNull(chunk, '区块 0,0 应该存在');
+    assertTrue(reachedWorkerReady, '区块 0,0 应在超时前进入 worker-ready');
+    assertEqual(world.bootstrapState.phase, 'bootstrapping', '世界应处于启动阶段');
+    assertEqual(chunk.loadState, 'worker-ready', 'Worker 回包后应停留在 worker-ready');
+    assertFalse(chunk.isReady, '未 finalize 前不应标记为 ready');
+
+    teardownEnvironment();
+  });
+
+  test('bootstrap - 完成装配队列后应进入 runtime-streaming 且 chunk ready', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    const enteredRuntime = await waitForWorldPhase(world, 'runtime-streaming');
+
+    const chunk = world.chunks.get('0,0');
+    assertNotNull(chunk, '区块 0,0 应该存在');
+    assertTrue(enteredRuntime, '世界应在超时前进入 runtime-streaming');
+    assertEqual(chunk.loadState, 'finalized', '排空装配队列后 chunk 应 finalized');
+    assertTrue(chunk.isReady, 'finalize 后 chunk 应 ready');
+    assertEqual(world.bootstrapState.phase, 'runtime-streaming', '世界应进入运行期增量加载阶段');
+    assertTrue(world.isGameplayReady(), '排空装配队列后应允许进入游戏');
+
+    teardownEnvironment();
+  });
+
+  test('static_tree 地形加速 - 应将树冠覆盖范围内的 chunk 提升为高优先级装配', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    const chunk = {
+      cx: 0,
+      cz: 0,
+      structureCenters: [{ type: 'static_tree', x: 15, y: 10, z: 15 }]
+    };
+
+    world._markStaticTreeTerrainBoostFromChunk(chunk);
+
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('0,0'), '应包含树中心所在 chunk');
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('1,0'), '应包含东侧被树冠覆盖的 chunk');
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('0,1'), '应包含南侧被树冠覆盖的 chunk');
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('1,1'), '应包含东南角被树冠覆盖的 chunk');
+
+    teardownEnvironment();
+  });
+
   test('AO 刷新队列 - 新就绪区块会加入自身及四邻', () => {
     setupEnvironment();
 
@@ -333,6 +432,141 @@ describe('World 真实类测试', (test) => {
     assertEqual(refreshedReadyChunk, 1, '已就绪且非合并区块应被刷新');
     assertEqual(refreshedConsolidatingChunk, 0, '合并中的区块应跳过刷新');
     assertTrue(world._pendingAORefreshChunkKeys.has('1,0'), '跳过的区块应保留在队列中');
+
+    teardownEnvironment();
+  });
+
+  test('AO 刷新队列 - 纯新 runtime chunk finalize 后不应加入 AO 队列', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+    world.bootstrapState.phase = 'runtime-streaming';
+
+    const chunk = {
+      cx: 4,
+      cz: 5,
+      hasDeferredFinalizeWork: true,
+      isPureRuntimeStreamingChunk: () => true
+    };
+    world.onChunkFinalized(chunk);
+
+    assertEqual(world._pendingAORefreshChunkKeys.size, 0, '纯新 runtime chunk 不应进入 AO 收敛队列');
+    assertTrue(world._pendingDeferredFinalizeChunkKeys.has('4,5'), '纯新 runtime chunk 应进入延迟 finalize 队列');
+
+    teardownEnvironment();
+  });
+
+  test('AO 刷新队列 - 未到延迟时间的任务不应执行', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    let refreshed = 0;
+    world.chunks.set('0,0', {
+      cx: 0,
+      cz: 0,
+      isReady: true,
+      isConsolidating: false,
+      rebuildInstancedAOFromWorld: () => { refreshed++; }
+    });
+
+    world._pendingAORefreshChunkKeys.add('0,0');
+    world._pendingAORefreshMeta?.set('0,0', {
+      readyAt: (globalThis.performance?.now?.() ?? Date.now()) + 10_000
+    });
+
+    world._processPendingAORefreshQueue({ maxChunks: 1, budgetMs: 1 });
+
+    assertEqual(refreshed, 0, '未到延迟时间的 AO 收敛任务不应执行');
+    assertTrue(world._pendingAORefreshChunkKeys.has('0,0'), '未到时间的任务应继续保留在队列中');
+
+    teardownEnvironment();
+  });
+
+  test('AO 刷新队列 - 运行期流式加载活跃时不应执行 runtime-finalize 收敛', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    let refreshed = 0;
+    world.chunks.set('0,0', {
+      cx: 0,
+      cz: 0,
+      isReady: true,
+      isConsolidating: false,
+      rebuildInstancedAOFromWorld: () => { refreshed++; }
+    });
+
+    world._pendingAORefreshChunkKeys.add('0,0');
+    world._pendingAORefreshMeta?.set('0,0', {
+      readyAt: (globalThis.performance?.now?.() ?? Date.now()) - 1,
+      reason: 'runtime-finalize'
+    });
+    world._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
+
+    world._processPendingAORefreshQueue({ maxChunks: 1, budgetMs: 1 });
+
+    assertEqual(refreshed, 0, '流式加载仍活跃时不应执行运行期 AO 收敛');
+    assertTrue(world._pendingAORefreshChunkKeys.has('0,0'), '任务应继续保留在队列中');
+
+    teardownEnvironment();
+  });
+
+  test('延迟 finalize 队列 - 流式加载活跃时不应执行纯新 runtime chunk 的后置任务', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+    world.bootstrapState.phase = 'runtime-streaming';
+
+    let ran = 0;
+    world.chunks.set('2,2', {
+      cx: 2,
+      cz: 2,
+      isReady: true,
+      isConsolidating: false,
+      disposed: false,
+      runDeferredFinalizePhase: () => { ran++; return true; }
+    });
+    world._pendingDeferredFinalizeChunkKeys.add('2,2');
+    world._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
+
+    world._processDeferredFinalizeQueue();
+
+    assertEqual(ran, 0, '流式加载仍活跃时不应执行后置 finalize');
+    assertTrue(world._pendingDeferredFinalizeChunkKeys.has('2,2'), '任务应继续留在延迟 finalize 队列中');
+
+    teardownEnvironment();
+  });
+
+  test('Chunk finalize - 纯新 runtime chunk 应跳过首次 consolidation', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    const runtimeChunk = world.chunks.get('0,0');
+    runtimeChunk.spawnReason = 'runtime-streaming';
+    runtimeChunk.hasPlayerMutations = false;
+    runtimeChunk.loadState = 'entities-built';
+    runtimeChunk.isReady = false;
+    runtimeChunk.dirtyBlocks = 3;
+
+    let consolidateCalled = 0;
+    runtimeChunk.consolidate = () => { consolidateCalled++; };
+    runtimeChunk.world.onChunkFinalized = () => {};
+
+    const result = runtimeChunk.finalizeAssemblyPhase();
+
+    assertTrue(result, '纯新 runtime chunk finalize 应直接完成');
+    assertEqual(consolidateCalled, 0, '纯新 runtime chunk 不应触发首次 consolidation');
+    assertEqual(runtimeChunk.loadState, 'finalized', '纯新 runtime chunk 应直接进入 finalized');
+    assertEqual(runtimeChunk.dirtyBlocks, 0, '首次 finalize 后应清空加载期脏块计数');
 
     teardownEnvironment();
   });
@@ -477,6 +711,25 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('特殊实体占位 - 不写入 blockData 但可被 world 查询为 collider', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    const chunk = world.chunks.get('0,0');
+    chunk.loadSpecialEntityInstances('modGunMan', [{ x: 5, y: 10, z: 5 }], null);
+
+    assertTrue(world.isSolid(5, 10, 5), 'gunman 占位应参与碰撞');
+    assertEqual(world.getBlock(5, 10, 5), 'collider', 'gunman 占位应返回 collider');
+    assertEqual(world.getBlock(5, 11, 5), 'collider', 'gunman 头顶占位应返回 collider');
+    assertUndefined(chunk.blockData['5,10,5'], 'gunman 占位不应写入 blockData');
+
+    teardownEnvironment();
+  });
+
   // =========== removeBlocksBatch 测试 ===========
   test('removeBlocksBatch - 批量移除方块', async () => {
     setupEnvironment();
@@ -506,6 +759,29 @@ describe('World 真实类测试', (test) => {
 
     // 第四个方块应该还在
     assertEqual(world.getBlock(3, 10, 0), 'dirt', '方块 3 应该保留');
+
+    teardownEnvironment();
+  });
+
+  test('removeBlocksBatch - 命中特殊实体占位时应销毁整个实体', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    const chunk = world.chunks.get('0,0');
+    chunk.loadSpecialEntityInstances('rover', [{ x: 8, y: 10, z: 8 }], null);
+
+    assertEqual(chunk.entities.rovers.length, 1, '初始应有 1 个 rover');
+    assertEqual(world.getBlock(7, 10, 6), 'collider', 'rover 占位应可查询');
+
+    world.removeBlocksBatch([{ x: 7, y: 10, z: 6 }], false);
+
+    assertEqual(chunk.entities.rovers.length, 0, '命中占位后应销毁整个 rover');
+    assertEqual(world.getBlock(7, 10, 6), null, 'rover 占位应被清除');
+    assertFalse(world.isSolid(7, 10, 6), 'rover 占位清除后不应继续碰撞');
 
     teardownEnvironment();
   });

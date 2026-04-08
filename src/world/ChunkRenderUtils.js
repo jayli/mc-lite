@@ -35,6 +35,7 @@ export function extendChunk(Chunk) {
    * 在区块不再需要时调用
    */
   Chunk.prototype.dispose = function() {
+    this.disposed = true;
     // 注销该区块的所有光源
     this._unregisterLightSources();
 
@@ -70,6 +71,9 @@ export function extendChunk(Chunk) {
     });
     // 清空组，移除所有子对象
     this.group.clear();
+    this.specialEntityRenderers?.forEach(renderer => renderer.dispose?.());
+    this.specialEntityRenderers?.clear?.();
+    this.entityCollisionIndex?.clear?.();
   };
 
   /**
@@ -149,7 +153,7 @@ export function extendChunk(Chunk) {
     if (this.batchFaceCullingTimer) {
       clearTimeout(this.batchFaceCullingTimer);
     }
-    // 比 consolidation 延迟多100ms，确保Worker合并完成后再更新AO，避免竞态条件
+    // 等待本轮批量删除收敛后再统一补面；AO 统一延迟到 consolidation 后重建
     this.batchFaceCullingTimer = setTimeout(() => {
       this.processPendingFaceCullingUpdates();
     }, CONSOLIDATION_DELAY + 100);
@@ -157,7 +161,7 @@ export function extendChunk(Chunk) {
 
   /**
    * 处理所有待处理的批量 Face Culling 更新
-   * 在 Mag7、TNT 等批量删除操作完成后调用，统一更新所有暴露面的 AO 阴影
+   * 在 Mag7、TNT 等批量删除操作完成后调用，统一更新所有暴露面的补面状态
    */
   Chunk.prototype.processPendingFaceCullingUpdates = function() {
     if (this.pendingBatchFaceCullingUpdates.size === 0) return;
@@ -167,9 +171,6 @@ export function extendChunk(Chunk) {
       clearTimeout(this.batchFaceCullingTimer);
       this.batchFaceCullingTimer = null;
     }
-
-    // 收集需要更新 AO 的位置
-    const aoUpdatePositions = [];
 
     // 处理所有待更新的邻居
     this.pendingBatchFaceCullingUpdates.forEach(nKey => {
@@ -181,7 +182,7 @@ export function extendChunk(Chunk) {
         // 邻居在当前区块
         if (this.blockData[nKey]) {
           this._triggerFaceCullingUpdate(nx, ny, nz, this.blockData[nKey]);
-          aoUpdatePositions.push({ x: nx, y: ny, z: nz });
+          this._refreshBlockRenderLightweight(nx, ny, nz, nKey, this.blockData[nKey]);
         }
       } else {
         // 跨区块邻居处理
@@ -192,40 +193,7 @@ export function extendChunk(Chunk) {
       }
     });
 
-    // 批量更新邻居 AO - 解决 Mag7 批量删除后 AO 丢失问题
-    // 在 requestIdleCallback 中执行，避免阻塞主线程
-    if (aoUpdatePositions.length > 0) {
-      this._updateNeighborsAOInBatch(aoUpdatePositions);
-    }
-
     // 清空待处理队列
     this.pendingBatchFaceCullingUpdates.clear();
-  };
-
-  /**
-   * 批量更新邻居方块的 AO（在 requestIdleCallback 中执行）
-   * @param {Array} positions - 位置数组 [{x, y, z}]
-   * @private
-   */
-  Chunk.prototype._updateNeighborsAOInBatch = function(positions) {
-    const updateAO = () => {
-      for (const pos of positions) {
-        const key = `${pos.x},${pos.y},${pos.z}`;
-        const entry = this.blockData[key];
-        if (!entry) continue;
-
-        // 轻量优先：优先原位更新 AO（动态网格或 InstancedMesh），仅异常时回退到重建
-        if (typeof this._refreshBlockRenderLightweight === 'function') {
-          this._refreshBlockRenderLightweight(pos.x, pos.y, pos.z, key, entry);
-        }
-      }
-    };
-
-    // 使用 requestIdleCallback 或 setTimeout 来避免卡顿
-    if (window.requestIdleCallback) {
-      window.requestIdleCallback(updateAO, { timeout: 500 });
-    } else {
-      setTimeout(updateAO, 0);
-    }
   };
 }

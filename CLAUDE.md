@@ -106,7 +106,7 @@ npm run lint
 | Minecart | `src/actors/minecart/MinecartManager.js` | 矿车生命周期、移动系统、持久化 |
 | ZombieNest | `src/actors/zombie-nest/ZombieNestManager.js` | 丧尸巢穴创建、刷怪、持久化 |
 | LightSource | `src/core/LightSourceManager.js` | 发光方块的 PointLight 管理 |
-| AO | `src/core/AOSystem.js` | 主线程环境光遮蔽计算 |
+| AO | `src/workers/AOWorker.js` | 专用 AO 计算 Worker，脏集机制异步计算 |
 | FaceCulling | `src/core/FaceCullingSystem.js` | 面剔除系统，协调主线程与 Worker |
 
 ### 玩家系统
