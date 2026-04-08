@@ -26,7 +26,7 @@ export const FOG_NEAR = 30;
 // 雾的完全覆盖距离（米）
 export const FOG_FAR = 70;
 // 阴影贴图的分辨率大小（像素）
-export const SHADOW_MAP_SIZE = 512;
+export const SHADOW_MAP_SIZE = 256;
 // 阴影相机的覆盖范围大小（米）
 export const SHADOW_CAMERA_SIZE = 30;
 // 阴影相机远裁剪面：收紧覆盖范围，降低阴影渲染开销
