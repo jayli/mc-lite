@@ -61,6 +61,7 @@ export class UIManager {
     const btnColorCool = document.getElementById('btn-color-cool');
     const btnTntDestroyToggle = document.getElementById('btn-tnt-destroy-toggle');
     const btnRainToggle = document.getElementById('btn-rain-toggle');
+    const btnShadowToggle = document.getElementById('btn-shadow-toggle');
     const btnCreatePlayground = document.getElementById('btn-create-playground');
     const btnExportModel = document.getElementById('btn-export-model');
     const btnImportModel = document.getElementById('btn-import-model');
@@ -217,6 +218,17 @@ export class UIManager {
 
         // 切换下雨状态
         this.game.toggleRain();
+        this.updateActiveButtons();
+      };
+    }
+
+    // 实时阴影开关
+    if (btnShadowToggle) {
+      btnShadowToggle.onclick = (e) => {
+        e.stopPropagation();
+        const currentState = this.game.engine.isShadowEnabled();
+        this.game.engine.setShadowEnabled(!currentState);
+        this.hud.showMessage(currentState ? '实时阴影已关闭' : '实时阴影已开启');
         this.updateActiveButtons();
       };
     }
@@ -610,6 +622,14 @@ export class UIManager {
       const isRainEnabled = this.game.rainState.enabled;
       btnRainToggle.classList.toggle('active', isRainEnabled);
       btnRainToggle.innerText = isRainEnabled ? '停止下雨' : '开始下雨';
+    }
+
+    // 更新阴影按钮状态
+    const btnShadowToggle = document.getElementById('btn-shadow-toggle');
+    if (btnShadowToggle) {
+      const isShadowEnabled = this.game.engine.isShadowEnabled();
+      btnShadowToggle.classList.toggle('active', isShadowEnabled);
+      btnShadowToggle.innerText = isShadowEnabled ? '点击关闭' : '点击开启';
     }
 
     // 更新创造台按钮状态

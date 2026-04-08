@@ -958,7 +958,7 @@ export class Chunk {
     mesh.position.set(Math.floor(x) + 0.5, Math.floor(y) + 0.5, Math.floor(z) + 0.5);
     mesh.rotation.set(0, getRotationAngle(orientation), 0);
     mesh.userData = { type, orientation };
-    mesh.frustumCulled = true;
+    mesh.frustumCulled = false;
 
     // 动态交互期不做即时 AO，统一延迟到 consolidation 后收敛。
     // 但为了避免临时 mesh 因缺少 AO attribute 而出现黑闪，这里会写入“中性 AO”。

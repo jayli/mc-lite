@@ -857,6 +857,61 @@ export class Engine {
   }
 
   /**
+   * 设置全局阴影开关
+   * @param {boolean} enabled - 是否启用阴影
+   */
+  setShadowEnabled(enabled) {
+    if (!this.renderer) return;
+
+    const wasEnabled = this.renderer.shadowMap.enabled;
+    this.renderer.shadowMap.enabled = enabled;
+
+    // 切换太阳光源阴影投射
+    if (this.light) {
+      this.light.castShadow = enabled;
+    }
+
+    // 遍历场景中所有 Mesh，更新阴影配置
+    this.scene.traverse((object) => {
+      if (object.isMesh || object.isInstancedMesh) {
+        // 获取原始阴影配置（存储在 userData 中）
+        const originalCast = object.userData.originalCastShadow ?? object.castShadow;
+        const originalReceive = object.userData.originalReceiveShadow ?? object.receiveShadow;
+
+        if (enabled) {
+          // 恢复原始阴影配置
+          object.castShadow = originalCast;
+          object.receiveShadow = originalReceive;
+        } else {
+          // 保存原始配置（如果还没保存）
+          if (object.userData.originalCastShadow === undefined) {
+            object.userData.originalCastShadow = originalCast;
+            object.userData.originalReceiveShadow = originalReceive;
+          }
+          // 禁用阴影
+          object.castShadow = false;
+          object.receiveShadow = false;
+        }
+      }
+    });
+
+    // 如果启用阴影，立即请求一次更新
+    if (enabled && !wasEnabled) {
+      this.renderer.shadowMap.needsUpdate = true;
+    }
+
+    console.log(`全局阴影已${enabled ? '开启' : '关闭'}`);
+  }
+
+  /**
+   * 获取当前阴影启用状态
+   * @returns {boolean}
+   */
+  isShadowEnabled() {
+    return this.renderer?.shadowMap?.enabled ?? false;
+  }
+
+  /**
    * 切换隐藏面剔除系统的启用/禁用状态
    * 输出当前状态到控制台
    */
