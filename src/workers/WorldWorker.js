@@ -1678,7 +1678,9 @@ onmessage = async function(e) {
     }
 
     // 渲染条件：在当前 Chunk 内，或者属于当前 Chunk 的跨区结构
-    const shouldRender = shouldOwnBlock;
+    // 并且方块必须是可以渲染的（排除 collider 等不可见方块）
+    const props = getBlockProperties(block.type);
+    const shouldRender = shouldOwnBlock && props.isRendered !== false;
 
     if (shouldRender && visible) {
       if (!d[block.type]) d[block.type] = [];

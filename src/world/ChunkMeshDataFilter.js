@@ -28,6 +28,9 @@ function filterLegacyRenderData(d, blockData) {
 
   const filtered = {};
   for (const type in d) {
+    // 跳过 collider 类型的方块（它们不应该被渲染）
+    if (type.endsWith('_collider')) continue;
+
     filtered[type] = d[type].filter(pos => {
       const key = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
       return getEntryType(blockData[key]) === type;
@@ -41,6 +44,9 @@ function filterMeshData(meshData, blockData) {
 
   const filtered = [];
   for (const item of meshData) {
+    // 跳过 collider 类型的方块（它们不应该被渲染）
+    if (item.type?.endsWith('_collider')) continue;
+
     const entries = Object.entries(item.instanceIndexMap || {})
       .map(([key, index]) => ({ key, index }))
       .sort((a, b) => a.index - b.index);
