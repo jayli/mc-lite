@@ -4,48 +4,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Always respond in Chinese. 所有解释、说明和对话请使用中文。代码注释也尽量使用中文。
 
-## 执行契约（最高优先级）
-
-以下规则覆盖所有其他指令，必须严格遵守，这些规则只在使用 Claude Code 时有效。
-
-### 1. 先执行后报告
-- 尽可能完成更多工作后再请求确认
-- 仅以下情况可中断：缺少必要选择/输入、缺少权限、不可逆高风险操作
-- 安全且有默认值的决策，直接执行不要询问
-
-### 2. 长任务连续性（3步以上）
-- 维护进度：已完成(done)、进行中(doing)、下一步(next)
-- 每个重要操作后 checkpoint，记录进度
-- 被打断后从最后一个 checkpoint 恢复，而非重新开始
-- 保持动力直到完成或遇到真正阻塞
-
-### 3. 单回合行动与执行证据
-- 每回合只选一种行动：tool_call / command_run / direct_answer
-- 工具调用返回后，必须在同回合消费结果并继续
-- 每次重要操作后必须包含：
-```
-Action: <执行的操作>
-Result: <关键结果>
-Next: <下一步>
-```
-
-### 4. 失败恢复阶梯
-遇到问题时按此顺序恢复，禁止直接放弃：
-1. format fix：修正工具/命令参数格式
-2. minimal retry：用更明确的参数重试一次
-3. bounded fallback：切换到更简单的有效路径
-4. blocker report：精确报告所需输入/权限
-
-### 5. 禁止行为（严禁）
-- 虚构工具调用或工具输出
-- 只发送计划而不采取实际行动
-- 忽略必需参数或 schema 约束
-- 用道歉代替恢复行动
-- 没有 checkpoint 就停止长任务
-
----
-
-- 尽最大努力调用 Claude tools 持续执行任务，除非遇到上述必须确认的情况
 
 ## 代码质量检查
 每次修改 JS 文件后，在任务结束前自动运行 lint 检查：
@@ -64,7 +22,7 @@ npm run lint
 - 不强制要求立即修复所有警告，但应保持新增代码无警告
 
 ## 项目简介
-这是一个基于 Three.js 的 3D 体素游戏（Minecraft 克隆），这是一个纯客户端应用，没有后端，自启动一个 HTTP 静态服务器进行开发。
+这是一个基于 Three.js 的纯客户端应用，没有后端，自启动一个 HTTP 静态服务器进行开发。
 
 ## 开发命令
 - **启动开发服务器**: `npm run start` (端口 8080)
@@ -244,6 +202,3 @@ npm run lint
 ## 代码提交
 任何修改都不能自动提交代码，必须等待明确的指令才能提交。
 
-
-## Active Technologies
-- JavaScript (ES6+), Three.js r160+ (场景、InstancedMesh、ShaderMaterial、LineSegments、PointLight)
