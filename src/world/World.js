@@ -215,22 +215,44 @@ export class World {
     this.chunkAssemblyScheduler.enqueue(chunk, 'finalize', this._computeChunkAssemblyPriority(chunk));
   }
 
+  onChunkAOSourceStable(chunk, options = {}) {
+    if (!chunk) return;
+
+    const {
+      fullRefresh = false,
+      markNeighborBoundaries = false
+    } = options;
+
+    if (chunk.isReady && !chunk.isConsolidating) {
+      chunk._refreshAOFromStableSource?.({ fullRefresh });
+    }
+
+    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for (const [dx, dz] of dirs) {
+      const nChunk = this.chunks.get(`${chunk.cx + dx},${chunk.cz + dz}`);
+      if (!nChunk) continue;
+
+      if (markNeighborBoundaries) {
+        nChunk._markBoundaryDirtyAO?.(chunk.cx, chunk.cz);
+      }
+
+      if (nChunk.isReady && !nChunk.isConsolidating && nChunk.dirtyAOPositions?.size > 0) {
+        nChunk._refreshAOFromStableSource?.();
+      }
+    }
+  }
+
   onChunkFinalized(chunk) {
     if (!chunk) return;
     const key = `${chunk.cx},${chunk.cz}`;
 
     // Chunk finalized 后触发 AO 全量刷新（使用 AOWorker 带邻居数据重算）
     // WorldWorker 生成 chunk 时没有邻居数据，跨 chunk 方块的 AO 可能不准确。
-    chunk._scheduleAORefresh({ fullRefresh: true });
-    // 邻居 chunk 只需增量刷新边界方块（不做 fullRefresh 避免邻居集体闪烁）
-    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-    for (const [dx, dz] of dirs) {
-      const nChunk = this.chunks.get(`${chunk.cx + dx},${chunk.cz + dz}`);
-      if (nChunk && nChunk.isReady) {
-        nChunk._markBoundaryDirtyAO(chunk.cx, chunk.cz);
-        nChunk._scheduleAORefresh();
-      }
-    }
+    this.onChunkAOSourceStable(chunk, {
+      fullRefresh: true,
+      markNeighborBoundaries: true,
+      reason: 'finalized'
+    });
 
     if (chunk.hasDeferredFinalizeWork) {
       this._pendingDeferredFinalizeChunkKeys.add(key);

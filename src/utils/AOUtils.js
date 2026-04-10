@@ -54,6 +54,17 @@ const AO_NEIGHBOR_OFFSETS = [
   ]
 ];
 
+const AO_FACE_NORMAL_OFFSETS = [
+  [1, 0, 0],
+  [-1, 0, 0],
+  [0, 1, 0],
+  [0, -1, 0],
+  [0, 0, 1],
+  [0, 0, -1]
+];
+
+const FULL_BRIGHT_PACKED_AO = 0x00ffffff;
+
 /**
  * 计算单个角落的 AO 值 (0-3)
  * AO = 3 - (side1 + side2 + corner)
@@ -111,23 +122,30 @@ export function getAOForFace(x, y, z, faceIdx, isOccludingFn) {
  * @returns {Object} { aoLow: number, aoHigh: number } 打包的 AO 数据
  */
 export function calculateAOForBlock(x, y, z, isOccludingFn) {
-  let aoLow = 0;
-  let aoHigh = 0;
+  const ix = Math.floor(x);
+  const iy = Math.floor(y);
+  const iz = Math.floor(z);
+  let aoLow = FULL_BRIGHT_PACKED_AO;
+  let aoHigh = FULL_BRIGHT_PACKED_AO;
 
-  // 计算 6 个面的 AO 值
   for (let faceIdx = 0; faceIdx < 6; faceIdx++) {
-    const aos = getAOForFace(x, y, z, faceIdx, isOccludingFn);
+    const normal = AO_FACE_NORMAL_OFFSETS[faceIdx];
+    if (isOccludingFn(ix + normal[0], iy + normal[1], iz + normal[2])) {
+      continue;
+    }
+
+    const aos = getAOForFace(ix, iy, iz, faceIdx, isOccludingFn);
 
     for (let cornerIdx = 0; cornerIdx < 4; cornerIdx++) {
       const vertexIdx = faceIdx * 4 + cornerIdx;
       const aoVal = aos[cornerIdx];
 
       if (vertexIdx < 12) {
-        // 前 12 个顶点 (0-11) 存储在 aoLow
-        aoLow |= (aoVal << (vertexIdx * 2));
+        const shift = vertexIdx * 2;
+        aoLow = (aoLow & ~(0x03 << shift)) | (aoVal << shift);
       } else {
-        // 后 12 个顶点 (12-23) 存储在 aoHigh
-        aoHigh |= (aoVal << ((vertexIdx - 12) * 2));
+        const shift = (vertexIdx - 12) * 2;
+        aoHigh = (aoHigh & ~(0x03 << shift)) | (aoVal << shift);
       }
     }
   }

@@ -5,8 +5,8 @@
  */
 
 import { describe, test } from './runner.js';
-import { assertFalse, assertTrue } from './assert.js';
-import { createOcclusionChecker } from '../utils/AOUtils.js';
+import { assertEqual, assertFalse, assertTrue } from './assert.js';
+import { calculateAOForBlock, createOcclusionChecker, unpackAOValue } from '../utils/AOUtils.js';
 import { getBlockProperties } from '../constants/BlockData.js';
 import { Chunk } from '../world/Chunk.js';
 
@@ -105,5 +105,34 @@ describe('AO 遮挡判定一致性测试', (test) => {
     assertTrue(impactedSet.has('1,1,1'), '应包含角邻');
     assertFalse(impactedSet.has('0,0,0'), '不应包含被删除方块自身');
     assertTrue(impacted.length >= 26, '至少应覆盖 26 个邻居位置');
+  });
+
+  test('被遮挡面不应计算 AO，接触空气的面才计算 AO', () => {
+    const occluders = new Set([
+      '1,0,0',
+      '-1,0,0',
+      '0,-1,0',
+      '0,0,1',
+      '0,0,-1',
+      '-1,1,0',
+      '0,1,-1',
+      '-1,1,-1'
+    ]);
+    let coveredNormalCalls = 0;
+    let coveredCornerCalls = 0;
+    const isOccluding = (x, y, z) => {
+      if (x === 1 && y === 0 && z === 0) coveredNormalCalls++;
+      if (x === 1 && y === -1 && z === 0) coveredCornerCalls++;
+      return occluders.has(`${x},${y},${z}`);
+    };
+
+    const { aoLow, aoHigh } = calculateAOForBlock(0, 0, 0, isOccluding);
+
+    assertEqual(coveredNormalCalls, 1, '被遮挡的 +X 面只允许做一次接触空气判定');
+    assertEqual(coveredCornerCalls, 0, '被遮挡的 +X 面不应继续计算角落 AO');
+    for (let vertexIdx = 0; vertexIdx < 4; vertexIdx++) {
+      assertEqual(unpackAOValue(aoLow, aoHigh, vertexIdx), 3, '+X 隐藏面 AO 应为中性值');
+    }
+    assertEqual(unpackAOValue(aoLow, aoHigh, 8), 0, '+Y 可见面仍应计算墙角 AO');
   });
 });

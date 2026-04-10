@@ -319,6 +319,7 @@ export function extendChunk(Chunk) {
   Chunk.prototype.consolidate = async function() {
     if (this.isConsolidating || !this.isReady) return;
     this.isConsolidating = true;
+    this._aoSourceVersion++;
 
     // 阶段 1: 准备合并数据
     const consolidatedCount = this.dirtyBlocks;
@@ -396,20 +397,7 @@ export function extendChunk(Chunk) {
     // 重置状态
     this.dirtyBlocks = Math.max(0, this.dirtyBlocks - consolidatedCount);
     this.isConsolidating = false;
-    // Consolidation 后仅刷新脏集中的方块（玩家操作标记的受影响邻居），
-    // 不做 fullRefresh，避免不受影响的方块集体闪烁。
-    // fullRefresh 仅在 chunk 首次加载时由 onChunkFinalized 触发。
-    this._scheduleAORefresh();
-    // 触发有脏位的邻居 chunk 执行 AO 增量刷新（边界方块可能受影响）
-    if (this.world) {
-      const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-      for (const [dx, dz] of dirs) {
-        const nChunk = this.world.chunks.get(`${this.cx + dx},${this.cz + dz}`);
-        if (nChunk && nChunk.isReady && !nChunk.isConsolidating && nChunk.dirtyAOPositions.size > 0) {
-          nChunk._scheduleAORefresh();
-        }
-      }
-    }
+    this.world?.onChunkAOSourceStable?.(this, { reason: 'consolidation' });
     if (this.loadState === 'waiting-consolidation') {
       this.loadState = 'entities-built';
       this.world?.onChunkConsolidationComplete?.(this);

@@ -381,6 +381,55 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('AO 稳定源事件 - finalized chunk 应刷新自身并标记四邻边界', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    let selfRefreshes = 0;
+    let neighborRefreshes = 0;
+    let boundaryMarks = 0;
+
+    const chunk = {
+      cx: 0,
+      cz: 0,
+      isReady: true,
+      isConsolidating: false,
+      _refreshAOFromStableSource: (options = {}) => {
+        selfRefreshes++;
+        assertTrue(options.fullRefresh, 'finalized chunk 自身应全量刷新 AO');
+      }
+    };
+    const neighbor = {
+      cx: 1,
+      cz: 0,
+      isReady: true,
+      isConsolidating: false,
+      dirtyAOPositions: new Set(['15,0,0']),
+      _markBoundaryDirtyAO: () => {
+        boundaryMarks++;
+      },
+      _refreshAOFromStableSource: () => {
+        neighborRefreshes++;
+      }
+    };
+
+    world.chunks.set('0,0', chunk);
+    world.chunks.set('1,0', neighbor);
+
+    world.onChunkAOSourceStable(chunk, {
+      fullRefresh: true,
+      markNeighborBoundaries: true
+    });
+
+    assertEqual(selfRefreshes, 1, '稳定源事件应刷新当前 chunk');
+    assertEqual(boundaryMarks, 1, '新 chunk finalized 后应标记邻居边界 AO');
+    assertEqual(neighborRefreshes, 1, '已有脏 AO 的稳定邻居应被刷新');
+
+    teardownEnvironment();
+  });
+
   test('AO 刷新队列 - 新就绪区块会加入自身及四邻', () => {
     setupEnvironment();
 

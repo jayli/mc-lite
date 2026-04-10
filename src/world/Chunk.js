@@ -126,7 +126,8 @@ export class Chunk {
 
     // AO 脏集管理系统
     this.dirtyAOPositions = new Set();  // 需要重新计算 AO 的方块坐标集合
-    this.aoRefreshTimer = null;         // AO 刷新防抖定时器
+    this.aoRefreshTimer = null;         // 兼容旧定时器清理，AO 正确性由稳定源事件保证
+    this._aoSourceVersion = 0;          // AO 源数据版本，用于丢弃过期 Worker 回包
     this._aoOperationQueue = [];        // 快速操作队列：记录所有操作位置，最终统一计算邻居
 
     // 持久化
@@ -706,22 +707,19 @@ export class Chunk {
   }
 
   /**
-   * 调度 AO 刷新（防抖 100ms）
-   * 连续操作时定时器被重置，只有最后一次操作后 100ms 才执行
+   * 在 blockData/InstancedMesh 已稳定后刷新 AO
    * @param {Object} [options]
    * @param {boolean} [options.fullRefresh=false] - 是否全量刷新（标记所有方块为脏）
    */
-  _scheduleAORefresh(options = {}) {
+  _refreshAOFromStableSource(options = {}) {
     if (options.fullRefresh) {
       this._markAllBlocksDirtyAO();
     }
     if (this.aoRefreshTimer) {
       clearTimeout(this.aoRefreshTimer);
-    }
-    this.aoRefreshTimer = setTimeout(() => {
       this.aoRefreshTimer = null;
-      this._executeAORefresh();
-    }, 100);
+    }
+    this._executeAORefresh();
   }
 
   /**
@@ -814,8 +812,6 @@ export class Chunk {
 
     if (this.dirtyAOPositions.size === 0) return;
     if (!this.isReady || this.isConsolidating) {
-      // 等待 consolidation 完成后重试
-      this._scheduleAORefresh();
       return;
     }
 
@@ -845,11 +841,13 @@ export class Chunk {
 
     // 生成请求 ID
     const requestId = `${this.cx},${this.cz}-${Date.now()}`;
+    const aoSourceVersion = this._aoSourceVersion;
 
     // 动态导入 Worker 和回调
     import('./ChunkConsolidation.js').then(({ aoWorker, aoCallbacks }) => {
       // 注册回调
       aoCallbacks.set(requestId, (data) => {
+        if (!this.isReady || this.isConsolidating || this._aoSourceVersion !== aoSourceVersion) return;
         this._applyAOResults(data.results, sentKeys);
       });
 

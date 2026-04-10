@@ -22,7 +22,7 @@ import {
   STRUCTURE_HEIGHT_RANGE,
   STRUCTURE_HEIGHT_RANGE_SPECIAL
 } from '../utils/StructureUtils.js';
-import { getAOForFace } from '../utils/AOUtils.js';
+import { calculateAOForBlock } from '../utils/AOUtils.js';
 
 console.log('WorldWorker.js loaded');
 
@@ -1688,15 +1688,7 @@ onmessage = async function(e) {
       const props = getBlockProperties(block.type);
       const isAOEnabled = !props.isTransparent && props.isSolid;
       if (isAOEnabled) {
-        for (let f = 0; f < 6; f++) {
-          const aos = getAOForFace(block.x, block.y, block.z, f, isOccluding);
-          for (let v = 0; v < 4; v++) {
-            const vertexIdx = f * 4 + v;
-            const aoVal = aos[v];
-            if (vertexIdx < 12) aoLow |= (aoVal << (vertexIdx * 2));
-            else aoHigh |= (aoVal << ((vertexIdx - 12) * 2));
-          }
-        }
+        ({ aoLow, aoHigh } = calculateAOForBlock(block.x, block.y, block.z, isOccluding));
       }
       d[block.type].push({x: block.x, y: block.y, z: block.z, aoLow, aoHigh, orientation: block.orientation || 0});
       visibleKeys.push(key);
