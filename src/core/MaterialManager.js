@@ -143,6 +143,52 @@ export class MaterialManager {
   }
 
   /**
+   * 获取纹理分组映射 — 用于材质合批优化
+   * 将使用相同纹理的方块类型归为一组，减少 Draw Call
+   * @returns {Object} 纹理 URL → 方块类型数组 的映射
+   */
+  getTextureGroups() {
+    const groups = {};
+
+    for (const [type, def] of this.definitions.entries()) {
+      // 跳过透明方块（不参与合批）
+      const props = getBlockProperties(type);
+      if (!props.isSolid || props.isTransparent) continue;
+
+      // 处理多面材质
+      if (def.faces) {
+        for (const faceDef of Object.values(def.faces)) {
+          if (faceDef.textureUrl) {
+            if (!groups[faceDef.textureUrl]) groups[faceDef.textureUrl] = [];
+            if (!groups[faceDef.textureUrl].includes(type)) {
+              groups[faceDef.textureUrl].push(type);
+            }
+          }
+        }
+        continue;
+      }
+
+      // 处理单一纹理
+      if (def.textureUrl) {
+        if (!groups[def.textureUrl]) groups[def.textureUrl] = [];
+        groups[def.textureUrl].push(type);
+      }
+
+      // 处理纯色材质（按颜色值分组）
+      if (def.color) {
+        const colorKey = `color:${def.color}`;
+        if (!groups[colorKey]) groups[colorKey] = [];
+        groups[colorKey].push(type);
+      }
+    }
+
+    // 过滤掉只有一个成员的组（无法合批）
+    return Object.fromEntries(
+      Object.entries(groups).filter(([_, types]) => types.length > 1)
+    );
+  }
+
+  /**
    * 根据材质定义创建 Three.js 材质（私有方法）
    * @param {Object} def - 材质定义对象
    * @param {string} type - 材质类型
