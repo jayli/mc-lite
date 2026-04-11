@@ -119,11 +119,15 @@ export function extendChunk(Chunk) {
 
       // 创建实例化网格：指定几何体、材质和实例总数
       const mesh = new THREE.InstancedMesh(geometry, material, count);
-      mesh.frustumCulled = false;
+      mesh.frustumCulled = true;  // 启用视锥剔除
 
       // === 核心优化：直接设置矩阵数据 ===
       mesh.instanceMatrix.array.set(matrices);
       mesh.instanceMatrix.needsUpdate = true;
+
+      // === 计算边界体积，供视锥剔除使用 ===
+      mesh.computeBoundingBox();
+      mesh.computeBoundingSphere();
 
       // === 设置 AO 属性（已预计算）===
       if (props.isSolid && !props.isTransparent) {
