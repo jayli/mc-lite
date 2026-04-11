@@ -19,6 +19,7 @@ export class MaterialManager {
     this.definitions = new Map();      // 材质定义注册表
     this.textureLoader = new THREE.TextureLoader(); // Three.js 纹理加载器
     this.textureCache = new Map();     // 纹理缓存
+    this.batchedMaterials = new Map(); // 合批材质缓存
     this.textureBlurLevel = DEFAULT_TEXTURE_BLUR_LEVEL; // 贴图模糊参数（0-1）
     this.defaultMaterial = new THREE.MeshStandardMaterial({ color: 0xff00ff }); // 默认材质（洋红色，用于调试）
   }
@@ -211,6 +212,35 @@ export class MaterialManager {
       console.log(`  ${displayName}: ${types.length} 个方块 (${types.join(', ')})`);
     }
     console.groupEnd();
+  }
+
+  /**
+   * 获取合批材质 — 支持多个方块类型共享
+   * @param {string} textureUrl - 主纹理 URL
+   * @param {Array} blockTypes - 该组包含的方块类型
+   * @returns {THREE.Material} 合批材质
+   */
+  getBatchedMaterial(textureUrl, blockTypes) {
+    const cacheKey = `batched:${textureUrl}:${blockTypes.sort().join(',')}`;
+
+    if (this.batchedMaterials.has(cacheKey)) {
+      return this.batchedMaterials.get(cacheKey);
+    }
+
+    // 获取第一个方块类型的材质作为基础
+    const baseMaterial = this.getMaterial(blockTypes[0]);
+
+    // 创建合批材质（克隆基础材质）
+    const batchedMaterial = baseMaterial.clone();
+
+    // 存储纹理列表供着色器使用
+    batchedMaterial.userData.batchedTextures = blockTypes.map(type => {
+      const def = this.definitions.get(type);
+      return def?.textureUrl || null;
+    }).filter(Boolean);
+
+    this.batchedMaterials.set(cacheKey, batchedMaterial);
+    return batchedMaterial;
   }
 
   /**
