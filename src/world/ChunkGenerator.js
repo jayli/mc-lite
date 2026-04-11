@@ -104,68 +104,112 @@ export function extendChunk(Chunk) {
 
     // 遍历每种方块类型的 mesh 数据
     for (const data of meshDataArray) {
-      const { type, count, matrices, aoLow, aoHigh, orientation, instanceIndexMap } = data;
-
-      const props = getBlockProps(type);
-      if (!props.isRendered || count === 0) continue;
-
-      // 检查是否已存在相同类型的 InstancedMesh（如树叶在合并时被保留）
-      const existingMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === type);
-      if (existingMesh) continue; // 跳过已存在的类型，避免重复创建
-
-      // 从材质管理器和几何体映射表获取资源
-      const geometry = geomMap[props.geometryType] || geomMap['default'];
-      const material = getMaterials().getMaterial(type);
-
-      // 创建实例化网格：指定几何体、材质和实例总数
-      const mesh = new THREE.InstancedMesh(geometry, material, count);
-      mesh.frustumCulled = false;
-
-      // === 核心优化：直接设置矩阵数据 ===
-      mesh.instanceMatrix.array.set(matrices);
-      mesh.instanceMatrix.needsUpdate = true;
-
-      // === 设置 AO 属性（已预计算）===
-      if (props.isSolid && !props.isTransparent) {
-        // 克隆几何体以拥有独立的属性
-        mesh.geometry = geometry.clone();
-        mesh.geometry.setAttribute('aAoLow', new THREE.InstancedBufferAttribute(aoLow, 1));
-        mesh.geometry.setAttribute('aAoHigh', new THREE.InstancedBufferAttribute(aoHigh, 1));
-        mesh.geometry.setAttribute('aOrientation', new THREE.InstancedBufferAttribute(orientation, 1));
+      // 判断是否为合批数据（包含 blockTypes 数组）
+      if (data.blockTypes) {
+        this._buildBatchedMesh(data);
+      } else {
+        this._buildSingleTypeMesh(data);
       }
-
-      // 存储元数据，便于后续通过 Raycaster 进行交互识别
-      mesh.userData = { type: type };
-      if (type === 'chest') {
-        mesh.userData.chests = {}; // 如果是箱子，初始化一个子对象存储每个箱子的开启状态
-      }
-
-      // 存储索引映射（用于后续交互）
-      // 跳过树木类型，因为树木的 instanceIndexMap 已经在 createInstancedTreesForChunk 中设置
-      if (type !== 'realistic_trunk' && type !== 'realistic_leaves') {
-        this.instanceIndexMap[type] = new Map(Object.entries(instanceIndexMap));
-      }
-
-      // 宝箱特殊处理：初始化每个箱子的状态
-      if (type === 'chest') {
-        for (let i = 0; i < count; i++) {
-          mesh.userData.chests[i] = { open: false };
-        }
-      }
-
-      // 阴影配置优化
-      if (props.isShadowEnabled) {
-        if (isGlassType(type)) {
-          mesh.castShadow = false;
-          mesh.receiveShadow = false;
-        } else {
-          mesh.castShadow = isSolidShadowCaster(props);
-          mesh.receiveShadow = true; // 开启实时阴影接收
-        }
-      }
-
-      // 将实例化网格添加到区块的分组中
-      this.group.add(mesh);
     }
   }
+
+  /**
+   * 构建合批 Mesh（多个方块类型共享一个 InstancedMesh）
+   * @param {Object} data - Worker 返回的合批 mesh 数据
+   */
+  Chunk.prototype._buildBatchedMesh = function(data) {
+    const { type: textureUrl, count, matrices, aoLow, aoHigh, orientation, textureIndex, instanceIndexMap, blockTypes } = data;
+
+    // 创建使用共享材质的 InstancedMesh
+    const batchedMaterial = this.world.engine.materials.getBatchedMaterial(textureUrl, blockTypes);
+    const props = getBlockProps(blockTypes[0]);
+    const geometry = geomMap[props.geometryType] || geomMap['default'];
+
+    const mesh = new THREE.InstancedMesh(geometry, batchedMaterial, count);
+    mesh.frustumCulled = false;
+    mesh.instanceMatrix.array.set(matrices);
+    mesh.instanceMatrix.needsUpdate = true;
+
+    // 设置 AO 属性
+    mesh.geometry.setAttribute('aAoLow', new THREE.InstancedBufferAttribute(aoLow, 1));
+    mesh.geometry.setAttribute('aAoHigh', new THREE.InstancedBufferAttribute(aoHigh, 1));
+    mesh.geometry.setAttribute('aOrientation', new THREE.InstancedBufferAttribute(orientation, 1));
+    mesh.geometry.setAttribute('aTextureIndex', new THREE.InstancedBufferAttribute(textureIndex, 1));
+
+    mesh.userData = { type: 'batched', blockTypes, textureUrl };
+
+    // 存储索引映射（用于后续交互）
+    this.instanceIndexMap['batched_' + textureUrl] = new Map(Object.entries(instanceIndexMap));
+
+    this.group.add(mesh);
+  };
+
+  /**
+   * 构建单一类型 Mesh（原有逻辑）
+   * @param {Object} data - Worker 返回的 mesh 数据
+   */
+  Chunk.prototype._buildSingleTypeMesh = function(data) {
+    const { type, count, matrices, aoLow, aoHigh, orientation, instanceIndexMap } = data;
+
+    const props = getBlockProps(type);
+    if (!props.isRendered || count === 0) return;
+
+    // 检查是否已存在相同类型的 InstancedMesh（如树叶在合并时被保留）
+    const existingMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === type);
+    if (existingMesh) return; // 跳过已存在的类型，避免重复创建
+
+    // 从材质管理器和几何体映射表获取资源
+    const geometry = geomMap[props.geometryType] || geomMap['default'];
+    const material = getMaterials().getMaterial(type);
+
+    // 创建实例化网格：指定几何体、材质和实例总数
+    const mesh = new THREE.InstancedMesh(geometry, material, count);
+    mesh.frustumCulled = false;
+
+    // === 核心优化：直接设置矩阵数据 ===
+    mesh.instanceMatrix.array.set(matrices);
+    mesh.instanceMatrix.needsUpdate = true;
+
+    // === 设置 AO 属性（已预计算）===
+    if (props.isSolid && !props.isTransparent) {
+      // 克隆几何体以拥有独立的属性
+      mesh.geometry = geometry.clone();
+      mesh.geometry.setAttribute('aAoLow', new THREE.InstancedBufferAttribute(aoLow, 1));
+      mesh.geometry.setAttribute('aAoHigh', new THREE.InstancedBufferAttribute(aoHigh, 1));
+      mesh.geometry.setAttribute('aOrientation', new THREE.InstancedBufferAttribute(orientation, 1));
+    }
+
+    // 存储元数据，便于后续通过 Raycaster 进行交互识别
+    mesh.userData = { type: type };
+    if (type === 'chest') {
+      mesh.userData.chests = {}; // 如果是箱子，初始化一个子对象存储每个箱子的开启状态
+    }
+
+    // 存储索引映射（用于后续交互）
+    // 跳过树木类型，因为树木的 instanceIndexMap 已经在 createInstancedTreesForChunk 中设置
+    if (type !== 'realistic_trunk' && type !== 'realistic_leaves') {
+      this.instanceIndexMap[type] = new Map(Object.entries(instanceIndexMap));
+    }
+
+    // 宝箱特殊处理：初始化每个箱子的状态
+    if (type === 'chest') {
+      for (let i = 0; i < count; i++) {
+        mesh.userData.chests[i] = { open: false };
+      }
+    }
+
+    // 阴影配置优化
+    if (props.isShadowEnabled) {
+      if (isGlassType(type)) {
+        mesh.castShadow = false;
+        mesh.receiveShadow = false;
+      } else {
+        mesh.castShadow = isSolidShadowCaster(props);
+        mesh.receiveShadow = true; // 开启实时阴影接收
+      }
+    }
+
+    // 将实例化网格添加到区块的分组中
+    this.group.add(mesh);
+  };
 }
