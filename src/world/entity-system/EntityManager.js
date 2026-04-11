@@ -156,7 +156,6 @@ class EntityManagerClass {
       }
     }
     await Promise.all(promises);
-    console.log(`EntityManager: Preloaded ${promises.length} JSON entities`);
   }
 
   /**

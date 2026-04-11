@@ -34,12 +34,10 @@ export class StructureLoader {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        console.log(`${this.name}.json loaded, block count:`, data.blocks.length);
 
         // 找出最低 Y 值
         let minY = Infinity;
         data.blocks.forEach(b => { if (b.y < minY) minY = b.y; });
-        console.log(`${this.name} minY:`, minY);
 
         // 将 Y 坐标归一化，使最低点 Y=1
         this.data = {
@@ -51,7 +49,6 @@ export class StructureLoader {
             direction: b.direction !== undefined ? b.direction : 0
           }))
         };
-        console.log(`${this.name} ready, blocks:`, this.data.blocks.length);
         return this.data;
       } catch (err) {
         console.error(`Failed to load ${this.name}.json:`, err);
@@ -219,7 +216,6 @@ export async function preloadAllStructures() {
     structureLoaders.tallWell.load(),
     structureLoaders.desertTempleTube.load()
   ]);
-  console.log('All structures preloaded');
 }
 
 /**
