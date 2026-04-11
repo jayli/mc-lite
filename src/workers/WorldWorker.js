@@ -227,6 +227,121 @@ function buildMeshData(fakeChunk, d, cx, cz) {
   return meshDataArray;
 }
 
+/**
+ * 按纹理分组构建 meshData — 材质合批优化
+ * @param {Object} fakeChunk - 模拟 chunk（提供 getBlock 方法）
+ * @param {Object} d - 渲染数据 {type: [positions]}
+ * @param {Object} textureGroups - 纹理分组配置
+ * @returns {Array} meshDataArray
+ */
+function buildBatchedMeshData(fakeChunk, d, textureGroups) {
+  const meshDataArray = [];
+  const dummy = new THREE.Object3D();
+
+  // 为每种纹理创建逆映射：方块类型 → 纹理索引
+  const typeToTextureIndex = {};
+  const textureUrls = Object.keys(textureGroups);
+
+  for (let i = 0; i < textureUrls.length; i++) {
+    const textureUrl = textureUrls[i];
+    for (const type of textureGroups[textureUrl]) {
+      typeToTextureIndex[type] = i;
+    }
+  }
+
+  // 按纹理组处理
+  for (const [textureUrl, types] of Object.entries(textureGroups)) {
+    const allPositions = [];
+
+    // 收集该组内所有类型的 positions
+    for (const type of types) {
+      const positions = d[type];
+      if (!positions) continue;
+
+      for (const pos of positions) {
+        allPositions.push({
+          ...pos,
+          type,
+          textureIndex: typeToTextureIndex[type]
+        });
+      }
+    }
+
+    if (allPositions.length === 0) continue;
+
+    // 构建该纹理组的 meshData
+    const count = allPositions.length;
+    const matrices = new Float32Array(count * 16);
+    const aoLow = new Float32Array(count);
+    const aoHigh = new Float32Array(count);
+    const orientation = new Float32Array(count);
+    const textureIndexAttr = new Float32Array(count);
+    const instanceIndexMap = {};
+
+    for (let i = 0; i < count; i++) {
+      const pos = allPositions[i];
+
+      dummy.position.set(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
+      dummy.rotation.set(0, getRotationAngle(pos.orientation || 0), 0);
+      dummy.updateMatrix();
+
+      matrices.set(dummy.matrix.elements, i * 16);
+      aoLow[i] = pos.aoLow || 0;
+      aoHigh[i] = pos.aoHigh || 0;
+      orientation[i] = pos.orientation || 0;
+      textureIndexAttr[i] = pos.textureIndex;
+
+      const posKey = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
+      instanceIndexMap[posKey] = { index: i, type: pos.type };
+    }
+
+    meshDataArray.push({
+      type: textureUrl,  // 使用纹理 URL 作为"类型"
+      count, matrices, aoLow, aoHigh, orientation,
+      textureIndex: textureIndexAttr,
+      instanceIndexMap,
+      blockTypes: types  // 记录该组包含的方块类型
+    });
+  }
+
+  // 处理不在任何组中的方块（回退到旧逻辑）
+  const batchedTypes = new Set(Object.values(textureGroups).flat());
+  for (const type in d) {
+    if (batchedTypes.has(type)) continue;
+
+    const positions = d[type];
+    if (positions.length === 0) continue;
+
+    // 使用原始 buildMeshData 逻辑处理
+    const count = positions.length;
+    const matrices = new Float32Array(count * 16);
+    const aoLow = new Float32Array(count);
+    const aoHigh = new Float32Array(count);
+    const orientation = new Float32Array(count);
+    const instanceIndexMap = {};
+
+    for (let i = 0; i < count; i++) {
+      const pos = positions[i];
+      dummy.position.set(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5);
+      dummy.rotation.set(0, getRotationAngle(pos.orientation || 0), 0);
+      dummy.updateMatrix();
+      matrices.set(dummy.matrix.elements, i * 16);
+      aoLow[i] = pos.aoLow || 0;
+      aoHigh[i] = pos.aoHigh || 0;
+      orientation[i] = pos.orientation || 0;
+      const posKey = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
+      instanceIndexMap[posKey] = i;
+    }
+
+    meshDataArray.push({
+      type, count, matrices, aoLow, aoHigh, orientation,
+      instanceIndexMap
+    });
+  }
+
+  return meshDataArray;
+}
+
 onmessage = async function(e) {
   const {
     cx,
@@ -1700,7 +1815,11 @@ onmessage = async function(e) {
 
   // 返回数据
   // 构建 mesh 数据（包含预计算的矩阵和 AO）
-  const meshData = buildMeshData(fakeChunk, d, cx, cz);
+  // 判断是否启用材质合批
+  const useBatching = Object.keys(textureGroups).length > 0 && isOptimization;
+  const meshData = useBatching
+    ? buildBatchedMeshData(fakeChunk, d, textureGroups)
+    : buildMeshData(fakeChunk, d, cx, cz);
 
   // 收集可传输的 buffer
   const transferables = [];
