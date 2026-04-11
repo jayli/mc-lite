@@ -3,6 +3,7 @@
 // 支持纹理预加载、程序化纹理生成和材质定义注册
 
 import * as THREE from 'three';
+import { BatchedMaterial } from './BatchedMaterial.js';
 import { getBlockProperties } from '../constants/BlockData.js';
 import { DEFAULT_TEXTURE_BLUR_LEVEL } from '../constants/GameConfig.js';
 
@@ -227,20 +228,23 @@ export class MaterialManager {
       return this.batchedMaterials.get(cacheKey);
     }
 
-    // 获取第一个方块类型的材质作为基础
-    const baseMaterial = this.getMaterial(blockTypes[0]);
-
-    // 创建合批材质（克隆基础材质）
-    const batchedMaterial = baseMaterial.clone();
-
-    // 存储纹理列表供着色器使用
-    batchedMaterial.userData.batchedTextures = blockTypes.map(type => {
+    // 加载所有纹理
+    const textureObjects = blockTypes.map(type => {
       const def = this.definitions.get(type);
-      return def?.textureUrl || null;
+      if (def?.textureUrl) {
+        return this.textureCache.get(def.textureUrl);
+      }
+      return null;
     }).filter(Boolean);
 
-    this.batchedMaterials.set(cacheKey, batchedMaterial);
-    return batchedMaterial;
+    // 创建 BatchedMaterial
+    const batchedMat = new BatchedMaterial({
+      textures: textureObjects,
+      baseColor: 0xffffff
+    });
+
+    this.batchedMaterials.set(cacheKey, batchedMat);
+    return batchedMat;
   }
 
   /**
