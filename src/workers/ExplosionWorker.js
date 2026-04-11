@@ -40,12 +40,12 @@ self.onmessage = function(e) {
       for (let dy = -2; dy <= 2; dy++) {
         for (let dz = -2; dz <= 2; dz++) {
           if (dx === 0 && dy === 0 && dz === 0) continue;
-          
+
           const tx = bx + dx;
           const ty = by + dy;
           const tz = bz + dz;
           const key = `${tx},${ty},${tz}`;
-          
+
           if (nearbyDeltas[key] === 'tnt') {
             tntToIgnite.push({
               x: tx, y: ty, z: tz,

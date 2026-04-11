@@ -262,7 +262,7 @@ export function applyFaceCullingSystemDebug(FaceCullingSystem) {
               duration
             };
 
-            var retMsg = `地图绘制审计完成（耗时: ${duration.toFixed(2)}ms）<br />`;
+            let retMsg = `地图绘制审计完成（耗时: ${duration.toFixed(2)}ms）<br />`;
             retMsg += `- 总方块数: ${stats.totalBlocks}<br />`;
             retMsg += `- 总面数: ${stats.totalFaces}<br />`;
             retMsg += `- 隐藏面 (被剔除): ${stats.hiddenFaces}<br />`;

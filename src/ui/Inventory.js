@@ -43,8 +43,8 @@ export class InventoryUI {
     window.addEventListener('keydown', (e) => {
       // 按下 I 键关闭信息看板
       if (e.code === 'KeyI') {
-        var hud = document.getElementById("hud");
-        var msg = document.getElementById("msg");
+        let hud = document.getElementById("hud");
+        let msg = document.getElementById("msg");
         if (hud) {
           if (isDisplayNone("hud")) {
             hud.style.display = "block";
