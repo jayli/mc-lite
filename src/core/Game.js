@@ -295,6 +295,9 @@ export class Game {
     // 预加载 JSON 结构数据
     preloadAllStructures().then(() => {
       console.log('[Game] All JSON structures preloaded');
+
+      // 材质合批报告（调试用）
+      materials.reportTextureGroups();
     }).catch(err => {
       console.warn('[Game] Failed to preload structures:', err);
     });
