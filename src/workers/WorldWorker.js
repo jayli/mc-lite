@@ -235,7 +235,8 @@ onmessage = async function(e) {
     snapshot,
     structureCenters: incomingStructureCenters,
     callbackKey,
-    isOptimization = false
+    isOptimization = false,
+    textureGroups = {}  // 新增：纹理分组配置
   } = e.data;
 
   // 同步种子

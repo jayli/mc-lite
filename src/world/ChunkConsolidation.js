@@ -351,7 +351,8 @@ export function extendChunk(Chunk) {
         }
       },
       structureCenters: this.structureCenters,
-      isOptimization: true
+      isOptimization: true,
+      textureGroups: this.world?.engine?.materials?.getTextureGroups() || {}  // 新增：纹理分组配置
     });
   };
 
