@@ -33,6 +33,7 @@ export class BatchedMaterial extends THREE.ShaderMaterial {
         attribute float aTextureIndex;
         attribute float aAoLow;
         attribute float aAoHigh;
+        attribute float aVertexId;
 
         void main() {
           vUv = uv;
