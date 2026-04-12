@@ -85,6 +85,8 @@ export class World {
     this._lastReadyChunkKeys = new Set();
     // 内存优化：预分配复用的 Set，避免每帧创建
     this._readyChunkKeysCache = new Set();
+    // 内存优化：预分配复用的 Vector3，避免每帧 clone()
+    this._lastPlayerPos = new THREE.Vector3();
 
     // 阴影按需刷新回调（由 Game/Engine 注入）
     this.shadowUpdateCallback = null;
@@ -334,7 +336,7 @@ export class World {
    */
   update(playerPos = new THREE.Vector3(), dt = 0) {
     let chunkTopologyChanged = false;
-    this._lastPlayerPos = playerPos.clone ? playerPos.clone() : new THREE.Vector3(playerPos.x, playerPos.y, playerPos.z);
+    this._lastPlayerPos.copy(playerPos);
 
     // 计算玩家所在的区块坐标
     const cx = Math.floor(playerPos.x / CHUNK_SIZE);
@@ -393,10 +395,18 @@ export class World {
         this._readyChunkKeysCache.add(`${chunk.cx},${chunk.cz}`);
       }
     }
+    // 内存优化：直接遍历 Set，避免 [...] 创建临时数组
+    let hasNewKey = false;
+    for (const key of this._readyChunkKeysCache) {
+      if (!this._lastReadyChunkKeys.has(key)) {
+        hasNewKey = true;
+        break;
+      }
+    }
     const readyStateChanged =
       readyChunkCount !== this._lastReadyChunkCount ||
       this._readyChunkKeysCache.size !== this._lastReadyChunkKeys.size ||
-      [...this._readyChunkKeysCache].some(key => !this._lastReadyChunkKeys.has(key));
+      hasNewKey;
 
     if (readyStateChanged) {
       // 移除 _dedupeLoadedChunkOwners 调用：Worker 已按坐标正确归属方块，不再需要兜底清理
