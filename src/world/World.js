@@ -83,6 +83,8 @@ export class World {
     // 用于检测 Chunk 就绪状态变化，触发阴影更新
     this._lastReadyChunkCount = 0;
     this._lastReadyChunkKeys = new Set();
+    // 内存优化：预分配复用的 Set，避免每帧创建
+    this._readyChunkKeysCache = new Set();
 
     // 阴影按需刷新回调（由 Game/Engine 注入）
     this.shadowUpdateCallback = null;
@@ -383,24 +385,28 @@ export class World {
 
     // Chunk 就绪数量变化时执行一次去重，避免历史重复 owner 长期存在
     let readyChunkCount = 0;
-    const readyChunkKeys = new Set();
+    // 内存优化：复用预分配的 Set，避免每帧创建新对象
+    this._readyChunkKeysCache.clear();
     for (const [, chunk] of this.chunks) {
       if (chunk?.isReady) {
         readyChunkCount++;
-        readyChunkKeys.add(`${chunk.cx},${chunk.cz}`);
+        this._readyChunkKeysCache.add(`${chunk.cx},${chunk.cz}`);
       }
     }
     const readyStateChanged =
       readyChunkCount !== this._lastReadyChunkCount ||
-      readyChunkKeys.size !== this._lastReadyChunkKeys.size ||
-      [...readyChunkKeys].some(key => !this._lastReadyChunkKeys.has(key));
+      this._readyChunkKeysCache.size !== this._lastReadyChunkKeys.size ||
+      [...this._readyChunkKeysCache].some(key => !this._lastReadyChunkKeys.has(key));
 
     if (readyStateChanged) {
       // 移除 _dedupeLoadedChunkOwners 调用：Worker 已按坐标正确归属方块，不再需要兜底清理
       // 同时移除 AO 边界重算：方块只被一个 Chunk 渲染一次，AO 不会重复着色
 
       this._lastReadyChunkCount = readyChunkCount;
-      this._lastReadyChunkKeys = readyChunkKeys;
+      // 交换两个 Set 的引用，避免复制
+      const tempSet = this._lastReadyChunkKeys;
+      this._lastReadyChunkKeys = this._readyChunkKeysCache;
+      this._readyChunkKeysCache = tempSet;
       this.requestShadowMapUpdate('chunk-ready-count-changed');
     }
 

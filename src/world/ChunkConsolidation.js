@@ -419,15 +419,25 @@ export function extendChunk(Chunk) {
    * 同步可见性状态与碰撞状态
    */
   Chunk.prototype._syncVisibilityAndCollision = function(visibleKeys, solidBlocks) {
+    // 内存优化：复用现有 Set，避免创建新对象
+    if (!this.visibleKeys) this.visibleKeys = new Set();
+    if (!this.solidBlocks) this.solidBlocks = new Set();
+
     if (visibleKeys) {
-      this.visibleKeys = new Set(visibleKeys);
+      this.visibleKeys.clear();
+      for (const key of visibleKeys) {
+        this.visibleKeys.add(key);
+      }
       for (const key of this.dynamicMeshes.keys()) {
         this.visibleKeys.add(key);
       }
     }
 
     if (solidBlocks) {
-      this.solidBlocks = new Set(solidBlocks);
+      this.solidBlocks.clear();
+      for (const key of solidBlocks) {
+        this.solidBlocks.add(key);
+      }
       for (const [key, mesh] of this.dynamicMeshes.entries()) {
         const type = mesh.userData.type;
         if (this.blockData[key] && getBlockProps(type).isSolid) {

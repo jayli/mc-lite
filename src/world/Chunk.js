@@ -1260,8 +1260,24 @@ export class Chunk {
     } = payload;
 
     if (allBlockTypes) this.blockData = allBlockTypes;
-    this.visibleKeys = new Set(visibleKeys || []);
-    this.solidBlocks = new Set(solidBlocks || []);
+    // 内存优化：复用现有 Set，避免创建新对象
+    if (!this.visibleKeys) this.visibleKeys = new Set();
+    if (!this.solidBlocks) this.solidBlocks = new Set();
+
+    this.visibleKeys.clear();
+    this.solidBlocks.clear();
+
+    if (visibleKeys) {
+      for (const key of visibleKeys) {
+        this.visibleKeys.add(key);
+      }
+    }
+    if (solidBlocks) {
+      for (const key of solidBlocks) {
+        this.solidBlocks.add(key);
+      }
+    }
+
     this.structureCenters = structureCenters || [];
     this.entities.staticTrees = (structureCenters || [])
       .filter(c => c.type === 'static_tree')
