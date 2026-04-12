@@ -23,6 +23,7 @@ export class MaterialManager {
     this.batchedMaterials = new Map(); // 合批材质缓存
     this.textureBlurLevel = DEFAULT_TEXTURE_BLUR_LEVEL; // 贴图模糊参数（0-1）
     this.defaultMaterial = new THREE.MeshStandardMaterial({ color: 0xff00ff }); // 默认材质（洋红色，用于调试）
+    this.aoEnabled = true;             // AO 着色开关（用于性能对比调试）
   }
 
   /**
@@ -349,6 +350,15 @@ export class MaterialManager {
    */
   _applyShaderModifications(material) {
     material.onBeforeCompile = (shader) => {
+      // 注入 AO 开关 uniform
+      shader.uniforms = {
+        ...shader.uniforms,
+        uAoEnabled: { value: this.aoEnabled ? 1.0 : 0.0 }
+      };
+
+      // 存储 shader 引用以便后续更新
+      material._aoShader = shader;
+
       // 顶点着色器修改
       shader.vertexShader = `
         attribute float aVertexId;
@@ -471,6 +481,7 @@ export class MaterialManager {
 
       // 片元着色器修改
       shader.fragmentShader = `
+        uniform float uAoEnabled;
         varying float vAo;
       ` + shader.fragmentShader;
 
@@ -478,10 +489,72 @@ export class MaterialManager {
         '#include <color_fragment>',
         `
         #include <color_fragment>
-        diffuseColor.rgb *= vAo;
+        // 根据 uAoEnabled 开关决定是否应用 AO
+        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vAo, uAoEnabled);
         `
       );
     };
+  }
+
+  /**
+   * 切换 AO 着色开关
+   */
+  toggleAO() {
+    this.aoEnabled = !this.aoEnabled;
+    const enabled = this.aoEnabled;
+    console.log(`[MaterialManager] AO 着色已${enabled ? '开启' : '关闭'}`);
+
+    // 更新合批材质（ShaderMaterial）
+    for (const mat of this.batchedMaterials.values()) {
+      if (mat && mat.uniforms && mat.uniforms.uAoEnabled) {
+        mat.uniforms.uAoEnabled.value = enabled ? 1.0 : 0.0;
+      }
+    }
+
+    // 更新普通材质（MeshStandardMaterial）- 通过存储的 shader 引用
+    for (const matOrMats of this.materials.values()) {
+      const mats = Array.isArray(matOrMats) ? matOrMats : [matOrMats];
+      for (const mat of mats) {
+        if (mat && mat._aoShader && mat._aoShader.uniforms) {
+          mat._aoShader.uniforms.uAoEnabled.value = enabled ? 1.0 : 0.0;
+        }
+      }
+    }
+  }
+
+  /**
+   * 设置 AO 着色状态
+   * @param {boolean} enabled - 是否启用 AO
+   */
+  setAOEnabled(enabled) {
+    if (this.aoEnabled === enabled) return;
+    this.aoEnabled = enabled;
+    console.log(`[MaterialManager] AO 着色已${enabled ? '开启' : '关闭'}`);
+
+    // 更新合批材质（ShaderMaterial）
+    for (const mat of this.batchedMaterials.values()) {
+      if (mat && mat.uniforms && mat.uniforms.uAoEnabled) {
+        mat.uniforms.uAoEnabled.value = enabled ? 1.0 : 0.0;
+      }
+    }
+
+    // 更新普通材质（MeshStandardMaterial）- 通过存储的 shader 引用
+    for (const matOrMats of this.materials.values()) {
+      const mats = Array.isArray(matOrMats) ? matOrMats : [matOrMats];
+      for (const mat of mats) {
+        if (mat && mat._aoShader && mat._aoShader.uniforms) {
+          mat._aoShader.uniforms.uAoEnabled.value = enabled ? 1.0 : 0.0;
+        }
+      }
+    }
+  }
+
+  /**
+   * 获取 AO 着色状态
+   * @returns {boolean}
+   */
+  isAOEnabled() {
+    return this.aoEnabled;
   }
 }
 

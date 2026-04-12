@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { materials } from './MaterialManager.js';
 
 /**
  * 合批材质 — 支持多纹理采样
@@ -23,7 +24,8 @@ export class BatchedMaterial extends THREE.ShaderMaterial {
     super({
       uniforms: {
         uTextures: { value: textureArray },
-        uBaseColor: { value: new THREE.Color(baseColor) }
+        uBaseColor: { value: new THREE.Color(baseColor) },
+        uAoEnabled: { value: materials.aoEnabled ? 1.0 : 0.0 } // AO 开关
       },
       vertexShader: `
         varying vec2 vUv;
@@ -63,6 +65,7 @@ export class BatchedMaterial extends THREE.ShaderMaterial {
       fragmentShader: `
         uniform sampler2D uTextures[16];
         uniform vec3 uBaseColor;
+        uniform float uAoEnabled;
 
         varying vec2 vUv;
         varying float vTextureIndex;
@@ -92,8 +95,8 @@ export class BatchedMaterial extends THREE.ShaderMaterial {
           else if (idx == 15) color = texture2D(uTextures[15], vUv);
           else color = vec4(uBaseColor, 1.0);
 
-          // 应用 AO
-          color.rgb *= vAo;
+          // 应用 AO（根据 uAoEnabled 开关）
+          color.rgb = mix(color.rgb, color.rgb * vAo, uAoEnabled);
 
           gl_FragColor = color;
         }

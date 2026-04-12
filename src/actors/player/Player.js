@@ -21,6 +21,7 @@ import { SnowLand } from '../../workers/maps/SnowLand.js';
 import { CityMap } from '../../workers/maps/CityMap.js';
 import { getRegionSeededCenter } from '../../workers/maps/RegionCenterUtils.js';
 import { PlayerInteraction } from './PlayerInteraction.js';
+import { materials } from '../../core/MaterialManager.js';
 
 /**
  * 获取指定区域内的雪地中心位置
@@ -234,6 +235,10 @@ export class Player {
         if (this.weaponMode !== WEAPON_TYPES.ARM) {
           audioManager.playSound('gun_load', 0.4);
         }
+      }
+      // O 键切换 AO 着色
+      if (e.code === 'KeyO') {
+        materials.toggleAO();
       }
     });
     window.addEventListener('keyup', e => {
