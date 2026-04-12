@@ -13,6 +13,8 @@ import { VISUAL_STYLE_KEYS } from '../core/Engine.js';
 
 const TEXTURE_BLUR_LEVEL_CLEAR = 0;
 const TEXTURE_BLUR_LEVEL_SOFT = 0.2;
+const RENDER_DISTANCE_NEAR = 2;
+const RENDER_DISTANCE_FAR = 3;
 
 /**
  * UI 管理器 - 负责协调所有 UI 组件的初始化和更新
@@ -57,6 +59,8 @@ export class UIManager {
     const btnZombie50 = document.getElementById('btn-zombie-50');
     const btnTextureBlurClear = document.getElementById('btn-texture-blur-clear');
     const btnTextureBlurSoft = document.getElementById('btn-texture-blur-soft');
+    const btnRenderDist2 = document.getElementById('btn-render-dist-2');
+    const btnRenderDist3 = document.getElementById('btn-render-dist-3');
     const btnColorNormal = document.getElementById('btn-color-normal');
     const btnColorCool = document.getElementById('btn-color-cool');
     const btnTntDestroyToggle = document.getElementById('btn-tnt-destroy-toggle');
@@ -245,6 +249,23 @@ export class UIManager {
         e.stopPropagation();
         this.game.setTextureBlurLevel(TEXTURE_BLUR_LEVEL_SOFT);
         this.hud.showMessage('贴图模糊已设为：模糊');
+        this.updateActiveButtons();
+      };
+    }
+
+    if (btnRenderDist2 && btnRenderDist3) {
+      btnRenderDist2.onclick = (e) => {
+        e.stopPropagation();
+        if (this.game.setRenderDistance(RENDER_DISTANCE_NEAR)) {
+          this.hud.showMessage('视距已设为 2');
+        }
+        this.updateActiveButtons();
+      };
+      btnRenderDist3.onclick = (e) => {
+        e.stopPropagation();
+        if (this.game.setRenderDistance(RENDER_DISTANCE_FAR)) {
+          this.hud.showMessage('视距已设为 3');
+        }
         this.updateActiveButtons();
       };
     }
@@ -570,6 +591,8 @@ export class UIManager {
     const btnZombie50 = document.getElementById('btn-zombie-50');
     const btnTextureBlurClear = document.getElementById('btn-texture-blur-clear');
     const btnTextureBlurSoft = document.getElementById('btn-texture-blur-soft');
+    const btnRenderDist2 = document.getElementById('btn-render-dist-2');
+    const btnRenderDist3 = document.getElementById('btn-render-dist-3');
     const btnColorNormal = document.getElementById('btn-color-normal');
     const btnColorCool = document.getElementById('btn-color-cool');
     const btnTntDestroyToggle = document.getElementById('btn-tnt-destroy-toggle');
@@ -602,6 +625,12 @@ export class UIManager {
       const blurLevel = this.game.textureBlurLevel || 0;
       btnTextureBlurClear.classList.toggle('active', Math.abs(blurLevel - TEXTURE_BLUR_LEVEL_CLEAR) < 0.01);
       btnTextureBlurSoft.classList.toggle('active', Math.abs(blurLevel - TEXTURE_BLUR_LEVEL_SOFT) < 0.01);
+    }
+
+    if (btnRenderDist2 && btnRenderDist3) {
+      const renderDistance = this.game.getRenderDistance();
+      btnRenderDist2.classList.toggle('active', renderDistance === RENDER_DISTANCE_NEAR);
+      btnRenderDist3.classList.toggle('active', renderDistance === RENDER_DISTANCE_FAR);
     }
 
     if (btnColorNormal && btnColorCool) {

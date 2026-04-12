@@ -281,13 +281,13 @@ describe('World 真实类测试', (test) => {
     // 等待区块加载完成
     await waitForChunkReady(world, '0,0');
 
-    // 验证 7x7 的区块已加载 (渲染距离 3)
-    assertEqual(world.chunks.size, 49, '应该加载 49 个区块 (7x7)');
+    // 验证 5x5 的区块已加载 (渲染距离 2)
+    assertEqual(world.chunks.size, 25, '应该加载 25 个区块 (5x5)');
 
     // 验证特定区块存在
     assertTrue(world.chunks.has('0,0'), '区块 0,0 应该存在');
-    assertTrue(world.chunks.has('3,3'), '区块 3,3 应该存在');
-    assertTrue(world.chunks.has('-3,-3'), '区块 -3,-3 应该存在');
+    assertTrue(world.chunks.has('2,2'), '区块 2,2 应该存在');
+    assertTrue(world.chunks.has('-2,-2'), '区块 -2,-2 应该存在');
 
     teardownEnvironment();
   });
@@ -303,7 +303,7 @@ describe('World 真实类测试', (test) => {
     await waitForChunkReady(world, '0,0');
 
     const initialSize = world.chunks.size;
-    assertEqual(initialSize, 49, '初始应该有 49 个区块');
+    assertEqual(initialSize, 25, '初始应该有 25 个区块');
 
     // 移动到远处 (100, 100) -> 区块 (6, 6)
     world.update(new THREE.Vector3(100, 10, 100), 0.016);

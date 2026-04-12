@@ -18,8 +18,10 @@ const getParticleSystem = () => globalThis._ParticleSystem || ParticleSystem;
 // --- 全局世界常量 ---
 /** 每个区块在 X 和 Z 方向上的大小 (16x16) */
 const CHUNK_SIZE = 16;
-/** 渲染距离（以区块为单位），玩家周围 3x3 的区块将被加载 */
-const RENDER_DIST = 3;
+/** 默认渲染距离（以区块为单位） */
+const DEFAULT_RENDER_DIST = 2;
+const MIN_RENDER_DIST = 2;
+const MAX_RENDER_DIST = 3;
 const RUNTIME_DEFERRED_FINALIZE_IDLE_GRACE_MS = 800;
 const RUNTIME_DEFERRED_FINALIZE_MAX_CHUNKS = 1;
 /**
@@ -32,6 +34,7 @@ export class World {
    */
   constructor(scene) {
     this.scene = scene;
+    this.renderDistance = DEFAULT_RENDER_DIST;
     /** 存储当前加载的所有区块，Key 为 "cx,cz" 字符串 */
     this.chunks = new Map();
 
@@ -149,11 +152,22 @@ export class World {
   _ensureBootstrapTargets(cx, cz) {
     if (this.bootstrapState.phase !== 'bootstrapping') return;
     if (this.bootstrapState.targetChunkKeys.size > 0) return;
-    for (let i = -RENDER_DIST; i <= RENDER_DIST; i++) {
-      for (let j = -RENDER_DIST; j <= RENDER_DIST; j++) {
+    for (let i = -this.renderDistance; i <= this.renderDistance; i++) {
+      for (let j = -this.renderDistance; j <= this.renderDistance; j++) {
         this.bootstrapState.targetChunkKeys.add(`${cx + i},${cz + j}`);
       }
     }
+  }
+
+  getRenderDistance() {
+    return this.renderDistance;
+  }
+
+  setRenderDistance(distance) {
+    const normalized = Math.max(MIN_RENDER_DIST, Math.min(MAX_RENDER_DIST, Math.round(distance)));
+    if (normalized === this.renderDistance) return false;
+    this.renderDistance = normalized;
+    return true;
   }
 
   _computeChunkAssemblyPriority(chunk) {
@@ -345,8 +359,8 @@ export class World {
 
     // --- 加载新区块 ---
     // 遍历渲染距离范围内的所有坐标，如果未加载则创建新区块
-    for (let i = -RENDER_DIST; i <= RENDER_DIST; i++) {
-      for (let j = -RENDER_DIST; j <= RENDER_DIST; j++) {
+    for (let i = -this.renderDistance; i <= this.renderDistance; i++) {
+      for (let j = -this.renderDistance; j <= this.renderDistance; j++) {
         const key = `${cx + i},${cz + j}`;
         if (!this.chunks.has(key)) {
           const chunk = new Chunk(cx + i, cz + j, this);
@@ -360,7 +374,7 @@ export class World {
     // --- 卸载过期区块 ---
     // 遍历已加载区块，卸载超出渲染距离（额外加1作为缓冲）的区块
     for (const [key, chunk] of this.chunks) {
-      if (Math.abs(chunk.cx - cx) > RENDER_DIST + 1 || Math.abs(chunk.cz - cz) > RENDER_DIST + 1) {
+      if (Math.abs(chunk.cx - cx) > this.renderDistance + 1 || Math.abs(chunk.cz - cz) > this.renderDistance + 1) {
         // 重要：在卸载前通知 MinecartManager 停止该 Chunk 内的矿车运动并保存状态
         if (this.minecartManager) {
           this.minecartManager.stopMinecartsForChunk(chunk.cx, chunk.cz);

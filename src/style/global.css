@@ -394,17 +394,8 @@ button.active {
   background: #d4a373;
 }
 
-/* 位置记录按钮行 */
-.position-btn-row {
-  display: flex;
-  gap: 8px;
+.position-control-box {
   margin-top: 8px;
-  flex-wrap: wrap;
-}
-
-.position-btn-row button {
-  flex: 1;
-  min-width: 120px;
 }
 
 #btn-record-position {

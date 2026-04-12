@@ -554,7 +554,8 @@ export class Game {
         maxActiveZombies: this.maxActiveZombies,
         visualStyle: this.engine.currentVisualStyle,
         textureBlurLevel: this.textureBlurLevel,
-        colorHueShift: this.colorHueShift
+        colorHueShift: this.colorHueShift,
+        renderDistance: this.getRenderDistance()
       }
     };
   }
@@ -575,6 +576,19 @@ export class Game {
   setColorHueShift(hueShift) {
     this.engine.setColorHueShift(hueShift);
     this.colorHueShift = this.engine.getColorHueShift();
+  }
+
+  getRenderDistance() {
+    return this.world?.getRenderDistance?.() ?? 2;
+  }
+
+  setRenderDistance(distance) {
+    if (!this.world?.setRenderDistance) return false;
+    const changed = this.world.setRenderDistance(distance);
+    if (changed && this.player) {
+      this.world.update(this.player.position, 0);
+    }
+    return changed;
   }
 
   /**
@@ -736,6 +750,10 @@ export class Game {
         ? saveData.settings.colorHueShift
         : DEFAULT_COLOR_HUE_SHIFT;
       this.setColorHueShift(colorHueShift);
+      const renderDistance = saveData.settings.renderDistance !== undefined
+        ? saveData.settings.renderDistance
+        : 2;
+      this.setRenderDistance(renderDistance);
     }
 
     // 4. 从存档恢复丧尸巢穴和炮塔实例
