@@ -52,6 +52,14 @@ export class PlayerInteraction {
 
     for (const chunk of this.player.world.chunks.values()) pushTarget(chunk.group);
 
+    // 跨 Chunk 合批模式下，方块 InstancedMesh 在 batchManager 中而非 chunk.group
+    const batchManager = this.player.world.batchManager;
+    if (batchManager?.enabled) {
+      for (const group of batchManager.textureGroups.values()) {
+        if (group.instancedMesh) pushTarget(group.instancedMesh);
+      }
+    }
+
     // 添加丧尸作为交互目标（如果游戏有敌人管理器）
     if (this.player.game && this.player.game.enemyManager) {
       let hasRenderMeshes = false;
@@ -491,8 +499,8 @@ export class PlayerInteraction {
 
       // 在所有相同类型的 InstancedMesh 中查找该位置的实例
       let instanceHidden = false;
-      if (targetType && m.userData.type === targetType) {
-        // 如果命中的 mesh 类型匹配，直接在该 mesh 中查找
+      if (targetType && (m.userData.type === targetType || m.userData.type === 'batched')) {
+        // 如果命中的 mesh 类型匹配（或为合批 mesh），直接在该 mesh 中查找
         instanceHidden = this._hideInstancedMeshAtPosition(m, finalBx, finalBy, finalBz);
       }
 
@@ -524,7 +532,8 @@ export class PlayerInteraction {
       }
       this.player.world.removeBlock(finalBx, finalBy, finalBz);
       audioManager.playSound('delete_get', 0.3);
-      if (type !== 'water' && type !== 'cloud') this.player.inventory.add(type === 'grass' ? 'dirt' : type, 1);
+      const inventoryType = targetType === 'grass' ? 'dirt' : (targetType || type);
+      if (inventoryType !== 'water' && inventoryType !== 'cloud') this.player.inventory.add(inventoryType, 1);
     } else {
       if (m.userData.isEntity) {
         if (m.userData.collisionBlocks) m.userData.collisionBlocks.forEach(p => this.player.world.removeBlockCollider(p.x, p.y, p.z));

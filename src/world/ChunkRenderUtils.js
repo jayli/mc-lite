@@ -39,6 +39,13 @@ export function extendChunk(Chunk) {
     // 注销该区块的所有光源
     this._unregisterLightSources();
 
+    // 通知跨 Chunk 合批管理器注销该区块
+    const batchManager = this.world?.batchManager;
+    if (batchManager?.enabled) {
+      const chunkKey = `${this.cx},${this.cz}`;
+      batchManager.unregisterChunk(chunkKey);
+    }
+
     // 清除合并定时器
     if (this.consolidationTimer) {
       clearTimeout(this.consolidationTimer);

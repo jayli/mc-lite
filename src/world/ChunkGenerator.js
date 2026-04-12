@@ -102,7 +102,29 @@ export function extendChunk(Chunk) {
       return;
     }
 
-    // 遍历每种方块类型的 mesh 数据
+    // 存储最后一次 mesh 数据（用于 batch manager rebuild 和 consolidation）
+    this._lastMeshData = meshDataArray;
+
+    // 跨 Chunk 合批模式：将数据注册到 BatchManager 而非创建 per-chunk InstancedMesh
+    const batchManager = this.world?.batchManager;
+    if (batchManager?.enabled) {
+      // 仍填充 instanceIndexMap（用于方块交互查找）
+      for (const data of meshDataArray) {
+        if (data.blockTypes) {
+          this.instanceIndexMap['batched_' + data.type] = new Map(Object.entries(data.instanceIndexMap || {}));
+        } else {
+          const type = data.type;
+          if (type !== 'realistic_trunk' && type !== 'realistic_leaves') {
+            this.instanceIndexMap[type] = new Map(Object.entries(data.instanceIndexMap || {}));
+          }
+        }
+      }
+      const chunkKey = `${this.cx},${this.cz}`;
+      batchManager.registerChunk(chunkKey, meshDataArray);
+      return;
+    }
+
+    // 原有逻辑：遍历每种方块类型的 mesh 数据
     for (const data of meshDataArray) {
       // 判断是否为合批数据（包含 blockTypes 数组）
       if (data.blockTypes) {
