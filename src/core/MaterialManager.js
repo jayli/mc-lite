@@ -167,12 +167,8 @@ export class MaterialManager {
         groups[def.textureUrl].push(type);
       }
 
-      // 处理纯色材质（按颜色值分组）
-      if (def.color) {
-        const colorKey = `color:${def.color}`;
-        if (!groups[colorKey]) groups[colorKey] = [];
-        groups[colorKey].push(type);
-      }
+      // 纯色材质（def.color）不参与 batched 合批，
+      // getBatchedMaterial 只支持 textureUrl，纯色材质会采样到空纹理
     }
 
     // 过滤掉只有一个成员的组（无法合批）
