@@ -202,3 +202,10 @@ npm run lint
 ## 代码提交
 任何修改都不能自动提交代码，必须等待明确的指令才能提交。
 
+
+## Active Technologies
+- JavaScript (ES2022+), Three.js + Three.js (InstancedMesh, Scene), 现有 MaterialManager (001-cross-chunk-batching)
+- N/A（纯渲染层优化） (001-cross-chunk-batching)
+
+## Recent Changes
+- 001-cross-chunk-batching: Added JavaScript (ES2022+), Three.js + Three.js (InstancedMesh, Scene), 现有 MaterialManager

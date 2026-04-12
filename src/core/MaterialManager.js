@@ -158,18 +158,8 @@ export class MaterialManager {
       const props = getBlockProperties(type);
       if (!props.isSolid || props.isTransparent) continue;
 
-      // 处理多面材质
-      if (def.faces) {
-        for (const faceDef of Object.values(def.faces)) {
-          if (faceDef.textureUrl) {
-            if (!groups[faceDef.textureUrl]) groups[faceDef.textureUrl] = [];
-            if (!groups[faceDef.textureUrl].includes(type)) {
-              groups[faceDef.textureUrl].push(type);
-            }
-          }
-        }
-        continue;
-      }
+      // 多面材质方块不支持 batched 合批（getBatchedMaterial 无法正确构建材质），跳过
+      if (def.faces) continue;
 
       // 处理单一纹理
       if (def.textureUrl) {

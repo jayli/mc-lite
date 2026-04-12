@@ -1124,6 +1124,29 @@ export class PlayerInteraction {
     const posKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
     const type = mesh.userData.type;
 
+    // === 合批模式快速路径：通过 batchManager 的 resolveInstanceIndex 查找全局索引 ===
+    if (mesh.userData._isBatchManaged && this.player.world.batchManager) {
+      const batchManager = this.player.world.batchManager;
+      const cx = Math.floor(x / 16);
+      const cz = Math.floor(z / 16);
+      const chunkKey = `${cx},${cz}`;
+      const textureKey = mesh.userData._textureKey;
+      const resolved = batchManager.resolveInstanceIndex(chunkKey, textureKey, posKey);
+      if (resolved && resolved.mesh === mesh) {
+        const dummy = new THREE.Matrix4();
+        mesh.getMatrixAt(resolved.globalIndex, dummy);
+        const s = new THREE.Vector3();
+        dummy.decompose(new THREE.Vector3(), new THREE.Quaternion(), s);
+        if (s.lengthSq() < 0.001) return true; // 已隐藏
+        dummy.scale(this.player._zeroVector);
+        mesh.setMatrixAt(resolved.globalIndex, dummy);
+        mesh.instanceMatrix.needsUpdate = true;
+        return true;
+      }
+      return false; // 合批模式下未找到，不降级到全量扫描
+    }
+
+    // === 原有非合批路径 ===
     // 获取该坐标所属的 chunk
     const cx = Math.floor(x / 16);
     const cz = Math.floor(z / 16);

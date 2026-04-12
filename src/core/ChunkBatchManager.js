@@ -17,6 +17,8 @@ const isGlassType = (type) => typeof type === 'string' && type.includes('glass')
 const INITIAL_CAPACITY = 2048;
 const MAX_CAPACITY = 65536;
 const GROWTH_FACTOR = 2;
+// 惰性压缩阈值：waste 超过此比例时触发全量重建
+const WASTE_THRESHOLD = 0.25;
 
 export class ChunkBatchManager {
   /**
@@ -67,7 +69,7 @@ export class ChunkBatchManager {
     this.chunkRegistry.clear();
 
     // 2. 让每个活跃区块重新构建 mesh（会根据 enabled 走不同路径）
-    for (const [chunkKey, chunk] of activeChunks) {
+    for (const [_chunkKey, chunk] of activeChunks) {
       if (chunk.disposed || !chunk._lastMeshData) continue;
       // 清理 chunk.group 中旧的 InstancedMesh（如果有的话）
       this._cleanupChunkGroup(chunk);
@@ -83,7 +85,13 @@ export class ChunkBatchManager {
     for (let i = chunk.group.children.length - 1; i >= 0; i--) {
       const child = chunk.group.children[i];
       if (child.isInstancedMesh) {
-        if (child.geometry) child.geometry.dispose();
+        const type = child.userData.type;
+        // 保护共享几何体不被误释放（与 ChunkConsolidation._cleanupOldMeshes 一致）
+        if (child.geometry &&
+            child.geometry !== geomMap[type] &&
+            child.geometry !== geomMap['default']) {
+          child.geometry.dispose();
+        }
         chunk.group.remove(child);
       }
     }
@@ -91,6 +99,7 @@ export class ChunkBatchManager {
 
   /**
    * 注册一个 Chunk 的 mesh 数据到合批系统
+   * 当已有 InstancedMesh 且容量足够时，增量追加数据；否则全量重建
    * @param {string} chunkKey - 区块键 `${cx},${cz}`
    * @param {Array} meshDataArray - Worker 返回的 mesh 数据数组
    */
@@ -104,6 +113,8 @@ export class ChunkBatchManager {
     const chunkEntry = { meshDataArray, entries: new Map() };
     this.chunkRegistry.set(chunkKey, chunkEntry);
 
+    const needsRebuildKeys = new Set();
+
     for (const data of meshDataArray) {
       const textureKey = this._getTextureKey(data);
       if (!textureKey) continue;
@@ -111,74 +122,150 @@ export class ChunkBatchManager {
       let group = this.textureGroups.get(textureKey);
       if (!group) {
         group = this._createTextureGroup(textureKey, data);
+        if (!group) continue;
         this.textureGroups.set(textureKey, group);
       }
 
-      // 追加该 Chunk 的数据
-      const offset = group.totalCount;
       const count = data.count || 0;
+
+      // 尝试增量追加（组已有 mesh 且容量足够）
+      if (count > 0 && group.instancedMesh && group.totalCount + count <= group.instancedMesh._capacity) {
+        const offset = group.totalCount;
+        this._appendDataToGroup(group, chunkKey, data, count, offset);
+        chunkEntry.entries.set(textureKey, { offset, count });
+        continue; // 增量成功，跳过重建
+      }
+
+      // 回退到全量注册路径
+      const offset = group.totalCount;
       group.chunkData.set(chunkKey, { data, count });
       group.totalCount += count;
-
       chunkEntry.entries.set(textureKey, { offset, count });
+      needsRebuildKeys.add(textureKey);
     }
 
-    // 重建所有受影响的纹理组
-    this._rebuildAffectedGroups(meshDataArray);
+    // 只重建必要的组
+    for (const textureKey of needsRebuildKeys) {
+      this._rebuildGroup(textureKey);
+    }
   }
 
   /**
    * 注销一个 Chunk，释放其占用的合批资源
+   * 惰性策略：zero out 实例，不立即重建；waste 超过阈值时触发压缩
    * @param {string} chunkKey - 区块键
    */
   unregisterChunk(chunkKey) {
     const chunkEntry = this.chunkRegistry.get(chunkKey);
     if (!chunkEntry) return;
 
-    const affectedKeys = new Set();
-
-    // 从所有纹理组中移除该 Chunk 的数据
-    for (const [textureKey] of chunkEntry.entries) {
+    for (const [textureKey, slot] of chunkEntry.entries) {
       const group = this.textureGroups.get(textureKey);
-      if (group) {
-        group.chunkData.delete(chunkKey);
-        group.totalCount = 0;
-        for (const cd of group.chunkData.values()) {
-          group.totalCount += cd.count;
-        }
-        affectedKeys.add(textureKey);
+      if (!group) continue;
+
+      // Zero out 该 chunk 的实例（视觉隐藏，不释放 slot）
+      if (group.instancedMesh) {
+        this._zeroOutInstances(group.instancedMesh, slot.offset, slot.count);
       }
+
+      group.chunkData.delete(chunkKey);
     }
 
     this.chunkRegistry.delete(chunkKey);
 
-    // 重建受影响的纹理组
-    for (const textureKey of affectedKeys) {
-      const group = this.textureGroups.get(textureKey);
-      if (group.totalCount === 0) {
-        // 没有数据了，清理整个组
+    // 惰性压缩：检查各组 waste 比例
+    const keysToDelete = [];
+    for (const [textureKey, group] of this.textureGroups) {
+      if (group.chunkData.size === 0) {
+        // 组完全空了，直接清理
         if (group.instancedMesh) {
           this.scene.remove(group.instancedMesh);
           group.instancedMesh.geometry.dispose();
           group.instancedMesh.dispose();
           group.instancedMesh = null;
         }
-        this.textureGroups.delete(textureKey);
-      } else {
-        this._rebuildGroup(textureKey);
+        keysToDelete.push(textureKey);
+      } else if (group.instancedMesh) {
+        // 计算 waste 比例
+        const usedCount = [...group.chunkData.values()].reduce((sum, cd) => sum + cd.count, 0);
+        const allocatedCount = group.instancedMesh.count;
+        if (allocatedCount > 0 && (allocatedCount - usedCount) / allocatedCount > WASTE_THRESHOLD) {
+          // waste 超过阈值，触发压缩重建
+          group.totalCount = usedCount;
+          this._rebuildGroup(textureKey);
+        }
       }
+    }
+
+    for (const key of keysToDelete) {
+      this.textureGroups.delete(key);
     }
   }
 
   /**
    * 更新一个 Chunk 的 mesh 数据
+   * 当新数据 count <= 旧数据 count 时原地覆盖；否则回退到全量重建
    * @param {string} chunkKey - 区块键
    * @param {Array} meshDataArray - 新的 mesh 数据
    */
   updateChunk(chunkKey, meshDataArray) {
-    // 先注销再重新注册（简单可靠）
-    this.unregisterChunk(chunkKey);
-    this.registerChunk(chunkKey, meshDataArray);
+    const oldEntry = this.chunkRegistry.get(chunkKey);
+    if (!oldEntry) {
+      this.registerChunk(chunkKey, meshDataArray);
+      return;
+    }
+
+    // Phase 1: 预检所有 textureKey 能否原地更新
+    let canAllInPlace = true;
+    for (const data of meshDataArray) {
+      const textureKey = this._getTextureKey(data);
+      if (!textureKey) continue;
+      const group = this.textureGroups.get(textureKey);
+      if (!group?.instancedMesh) { canAllInPlace = false; break; }
+      const newCount = data.count || 0;
+      const oldSlot = oldEntry.entries.get(textureKey);
+      if (!oldSlot || newCount > oldSlot.count) { canAllInPlace = false; break; }
+    }
+
+    if (!canAllInPlace) {
+      // 回退：unregister + register（全量重建）
+      this.unregisterChunk(chunkKey);
+      this.registerChunk(chunkKey, meshDataArray);
+      return;
+    }
+
+    // Phase 2: 执行原地更新
+    const newEntry = { meshDataArray, entries: new Map() };
+
+    for (const data of meshDataArray) {
+      const textureKey = this._getTextureKey(data);
+      if (!textureKey) continue;
+      const group = this.textureGroups.get(textureKey);
+      const newCount = data.count || 0;
+      const oldSlot = oldEntry.entries.get(textureKey);
+      const offset = oldSlot.offset;
+
+      // 覆盖数据
+      this._writeDataAtOffset(group, data, newCount, offset);
+      // 多余实例 zero-scale
+      if (newCount < oldSlot.count) {
+        this._zeroOutInstances(group.instancedMesh, offset + newCount, oldSlot.count - newCount);
+      }
+      group.chunkData.set(chunkKey, { data, count: newCount });
+      newEntry.entries.set(textureKey, { offset, count: newCount });
+    }
+
+    // 处理旧 entry 中存在但新 entry 中不存在的 textureKey
+    for (const [textureKey, oldSlot] of oldEntry.entries) {
+      if (newEntry.entries.has(textureKey)) continue;
+      const group = this.textureGroups.get(textureKey);
+      if (group?.instancedMesh) {
+        this._zeroOutInstances(group.instancedMesh, oldSlot.offset, oldSlot.count);
+      }
+      if (group) group.chunkData.delete(chunkKey);
+    }
+
+    this.chunkRegistry.set(chunkKey, newEntry);
   }
 
   /**
@@ -205,6 +292,31 @@ export class ChunkBatchManager {
         }
       }
     }
+  }
+
+  /**
+   * 查找指定位置在全局 batch mesh 中的实例索引
+   * @param {string} chunkKey - 区块键 `${cx},${cz}`
+   * @param {string} textureKey - 纹理键 (如 "single:stone" 或 "batched:url")
+   * @param {string} posKey - 位置键 "x,y,z"
+   * @returns {{ mesh: THREE.InstancedMesh, globalIndex: number } | null}
+   */
+  resolveInstanceIndex(chunkKey, textureKey, posKey) {
+    const chunkEntry = this.chunkRegistry.get(chunkKey);
+    if (!chunkEntry) return null;
+    const entry = chunkEntry.entries.get(textureKey);
+    if (!entry) return null;
+    const group = this.textureGroups.get(textureKey);
+    if (!group?.instancedMesh) return null;
+
+    const data = chunkEntry.meshDataArray.find(d => this._getTextureKey(d) === textureKey);
+    if (!data?.instanceIndexMap) return null;
+    const localValue = data.instanceIndexMap[posKey];
+    if (localValue === undefined) return null;
+
+    // single 类型值是数字，batched 类型值是 { index, type } 对象
+    const localIndex = typeof localValue === 'object' ? localValue.index : localValue;
+    return { mesh: group.instancedMesh, globalIndex: entry.offset + localIndex };
   }
 
   /**
@@ -310,6 +422,94 @@ export class ChunkBatchManager {
   }
 
   /**
+   * 增量追加 chunk 数据到现有 group（无需重建 InstancedMesh）
+   * @param {Object} group - 纹理组
+   * @param {string} chunkKey - 区块键
+   * @param {Object} data - mesh 数据
+   * @param {number} count - 实例数
+   * @param {number} offset - 写入偏移量
+   */
+  _appendDataToGroup(group, chunkKey, data, count, offset) {
+    const mesh = group.instancedMesh;
+
+    // 写入矩阵数据到尾部
+    if (data.matrices) {
+      mesh.instanceMatrix.array.set(data.matrices, offset * 16);
+    }
+
+    // 写入 AO 和方向数据
+    if (data.aoLow) {
+      mesh.geometry.getAttribute('aAoLow').array.set(data.aoLow, offset);
+    }
+    if (data.aoHigh) {
+      mesh.geometry.getAttribute('aAoHigh').array.set(data.aoHigh, offset);
+    }
+    if (data.orientation) {
+      mesh.geometry.getAttribute('aOrientation').array.set(data.orientation, offset);
+    }
+    if (data.textureIndex && group.isBatched) {
+      const attr = mesh.geometry.getAttribute('aTextureIndex');
+      if (attr) attr.array.set(data.textureIndex, offset);
+    }
+
+    // 更新 mesh count
+    mesh.count = offset + count;
+    mesh.instanceMatrix.needsUpdate = true;
+
+    const attrs = mesh.geometry.attributes;
+    if (attrs.aAoLow) attrs.aAoLow.needsUpdate = true;
+    if (attrs.aAoHigh) attrs.aAoHigh.needsUpdate = true;
+    if (attrs.aOrientation) attrs.aOrientation.needsUpdate = true;
+    if (attrs.aTextureIndex) attrs.aTextureIndex.needsUpdate = true;
+
+    // 更新 group 元数据
+    group.chunkData.set(chunkKey, { data, count });
+    group.totalCount = offset + count;
+  }
+
+  /**
+   * 在指定偏移量覆盖写入数据（不重建 mesh）
+   * @param {Object} group - 纹理组
+   * @param {Object} data - mesh 数据
+   * @param {number} count - 实例数
+   * @param {number} offset - 写入偏移量
+   */
+  _writeDataAtOffset(group, data, count, offset) {
+    const mesh = group.instancedMesh;
+    if (data.matrices) mesh.instanceMatrix.array.set(data.matrices, offset * 16);
+    if (data.aoLow) mesh.geometry.getAttribute('aAoLow').array.set(data.aoLow, offset);
+    if (data.aoHigh) mesh.geometry.getAttribute('aAoHigh').array.set(data.aoHigh, offset);
+    if (data.orientation) mesh.geometry.getAttribute('aOrientation').array.set(data.orientation, offset);
+    if (data.textureIndex && group.isBatched) {
+      const attr = mesh.geometry.getAttribute('aTextureIndex');
+      if (attr) attr.array.set(data.textureIndex, offset);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    const attrs = mesh.geometry.attributes;
+    if (attrs.aAoLow) attrs.aAoLow.needsUpdate = true;
+    if (attrs.aAoHigh) attrs.aAoHigh.needsUpdate = true;
+    if (attrs.aOrientation) attrs.aOrientation.needsUpdate = true;
+    if (attrs.aTextureIndex) attrs.aTextureIndex.needsUpdate = true;
+  }
+
+  /**
+   * 将指定范围的实例缩放到 0（视觉隐藏，不释放 slot）
+   * @param {THREE.InstancedMesh} mesh - InstancedMesh
+   * @param {number} startIdx - 起始索引
+   * @param {number} count - 实例数
+   */
+  _zeroOutInstances(mesh, startIdx, count) {
+    const dummy = new THREE.Matrix4();
+    const zeroVec = new THREE.Vector3(0, 0, 0);
+    for (let i = startIdx; i < startIdx + count; i++) {
+      mesh.getMatrixAt(i, dummy);
+      dummy.scale(zeroVec);
+      mesh.setMatrixAt(i, dummy);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+
+  /**
    * 重建所有受影响的纹理组
    */
   _rebuildAffectedGroups(meshDataArray) {
@@ -371,6 +571,7 @@ export class ChunkBatchManager {
       mesh.userData = { type: blockType };
     }
     mesh.userData._isBatchManaged = true; // 标记为合批管理器的 mesh
+    mesh.userData._textureKey = group.textureKey; // 用于 resolveInstanceIndex 查找
 
     // 阴影配置
     this._configureShadow(mesh, group);
