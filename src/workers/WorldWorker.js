@@ -418,6 +418,15 @@ onmessage = async function(e) {
   const fakeChunk = {
     add: (x, y, z, type, dObj, solid = true, orientation = 0) => {
       const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+      // 关键修复：严格检查该位置是否已有方块
+      // 规则：只要该位置已有任何非空气方块，就不允许再放置任何方块
+      // 唯一例外：空气方块（用于挖掘/清除）可以放置
+      const existing = blockMap.get(key);
+      if (existing && existing.type !== 'air' && type !== 'air') {
+        // 跳过，不覆盖已有方块（调试日志）
+        // console.log(`[fakeChunk.add] SKIP: ${type} at ${key} (existing: ${existing.type})`);
+        return;
+      }
       blockMap.set(key, { x, y, z, type, solid, orientation });
       if (activeStructureType) {
         blockSourceTypeMap.set(key, activeStructureType);
