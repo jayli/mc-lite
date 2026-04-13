@@ -1815,6 +1815,14 @@ export class Chunk {
   removeBlocksBatch(positions, isBatch = true) {
     if (positions.length === 0) return;
 
+    // === 新增：批量通知 BatchManager 隐藏实例 ===
+    const batchManager = this.world?.batchManager;
+    if (batchManager?.enabled) {
+      for (const p of positions) {
+        batchManager.hideInstanceAt(p.x, p.y, p.z);
+      }
+    }
+
     const dummy = new THREE.Matrix4();
     const pos = new THREE.Vector3();
     const affectedTypes = new Set();
@@ -2028,6 +2036,15 @@ export class Chunk {
     }
 
     // 使用 addBlockDynamic 统一处理逻辑状态更新、内存缓存同步和隐藏面剔除
+    // === 新增：优先通知 BatchManager 隐藏实例 ===
+    const batchManager = this.world?.batchManager;
+    if (batchManager?.enabled) {
+      const hidden = batchManager.hideInstanceAt(x, y, z);
+      if (hidden) {
+        // 实例已在 batch mesh 中隐藏，继续更新逻辑数据
+        // 注意：仍然需要调用 addBlockDynamic 更新 blockData 和持久化
+      }
+    }
     this.addBlockDynamic(x, y, z, 'air');
   }
 
