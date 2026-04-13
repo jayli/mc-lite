@@ -1093,6 +1093,11 @@ export class World {
    * @param {number} z - 世界坐标 Z
    */
   removeBlock(x, y, z) {
+    // === 新增：优先通知 BatchManager 隐藏实例 ===
+    if (this.batchManager?.enabled) {
+      this.batchManager.hideInstanceAt(x, y, z);
+    }
+
     // 防御式处理：移除该坐标在所有 Chunk 的重复 owner，避免历史脏数据导致一键只删一层
     const owners = this.getAllBlockOwners(x, y, z);
     if (owners.length === 0) {
