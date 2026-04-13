@@ -480,7 +480,7 @@ export class PlayerInteraction {
         faceNormal: hit.face?.normal || null,
         matrixPosition,
         getBlockEntry: (x, y, z) => this.player.world.getBlockEntry(x, y, z),
-        preferredType: m.userData.type
+        preferredType: this._getPreferredTypeFromHit(hit, m)
       });
       if (!resolved) return;
 
@@ -1098,6 +1098,35 @@ export class PlayerInteraction {
       bz,
       type: this.player.world.getBlock(bx, by, bz)
     };
+  }
+
+  /**
+   * 从射线命中信息中获取 preferredType
+   * 对于 batched mesh，从 world.getBlockEntry 获取真实类型
+   * @param {Object} hit - 射线命中信息
+   * @param {THREE.Object3D} mesh - 命中的网格对象
+   * @returns {string} preferredType
+   */
+  _getPreferredTypeFromHit(hit, mesh) {
+    // 如果是 batched mesh 且有 instanceId，尝试获取真实类型
+    if (mesh.userData.type === 'batched' && hit.instanceId !== undefined) {
+      // 从矩阵中还原世界坐标
+      const matrix = new THREE.Matrix4();
+      mesh.instanceMatrix.getMatrixAt(hit.instanceId, matrix);
+      const pos = new THREE.Vector3().setFromMatrixPosition(matrix);
+      const bx = Math.floor(pos.x);
+      const by = Math.floor(pos.y);
+      const bz = Math.floor(pos.z);
+
+      // 从 world.getBlockEntry 获取真实类型
+      const entry = this.player.world.getBlockEntry(bx, by, bz);
+      if (entry?.type) {
+        return entry.type;
+      }
+    }
+
+    // 默认返回 mesh.userData.type
+    return mesh.userData.type || 'unknown';
   }
 
   /**
