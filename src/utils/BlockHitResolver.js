@@ -100,8 +100,17 @@ export function resolveBreakBlockPos(params) {
   if (preferredType) {
     for (const p of candidates) {
       const entry = getBlockEntry(p.x, p.y, p.z);
-      if (entry && entry.type === preferredType) {
-        return { ...p, entry };
+      if (entry) {
+        // === 新增：batched 类型宽松匹配 ===
+        // 当 preferredType 为 'batched' 时，说明命中了合批 mesh，
+        // 但无法从 mesh 本身获取真实类型。此时接受任何有真实 blockData 的候选。
+        if (preferredType === 'batched') {
+          return { ...p, entry };
+        }
+        // 精确匹配：类型必须一致
+        if (entry.type === preferredType) {
+          return { ...p, entry };
+        }
       }
     }
   }
