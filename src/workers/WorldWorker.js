@@ -1631,6 +1631,33 @@ onmessage = async function(e) {
     return belongsToCrossChunkStructure(block.x, block.y, block.z);
   };
 
+  /**
+   * 判断方块的渲染数据是否应该输出到当前 chunk
+   * 与逻辑 owner 分离：结构中心可以多 owner，但渲染数据只能属于 canonical owner
+   * 这是修复跨 chunk 合批方块删除问题的关键：确保每个世界坐标的方块只被一个 chunk 注册到 batch manager
+   * @param {number} bx - 方块世界坐标 X
+   * @param {number} by - 方块世界坐标 Y
+   * @param {number} bz - 方块世界坐标 Z
+   * @param {string} blockType - 方块类型
+   * @returns {boolean}
+   */
+  const shouldRenderInCurrentChunk = (bx, by, bz, blockType) => {
+    // 计算方块的 canonical owner chunk
+    const blockCx = Math.floor(bx / CHUNK_SIZE);
+    const blockCz = Math.floor(bz / CHUNK_SIZE);
+    const isCanonicalOwner = (blockCx === cx && blockCz === cz);
+
+    // 小型实体（tree, gunman, rover）的渲染数据可以跨 chunk
+    const sourceType = blockSourceTypeMap.get(`${bx},${by},${bz}`);
+    if (sourceType && isCrossChunkOwnerType(sourceType)) {
+      return belongsToCrossChunkStructure(bx, by, bz);
+    }
+
+    // 其他所有方块：只有 canonical owner 才能输出渲染数据
+    // 这确保了跨 chunk 结构（如树木）的方块不会被多个 chunk 同时注册到 batch manager
+    return isCanonicalOwner;
+  };
+
   // 如果有 snapshot，用 snapshot 中的方块覆盖 blockMap（保留玩家修改）
   if (savedSnapshot) {
     const incomingOwnershipVersion = Number(savedSnapshot.meta?.ownershipVersion || 1);
@@ -1805,7 +1832,9 @@ onmessage = async function(e) {
     // 渲染条件：在当前 Chunk 内，或者属于当前 Chunk 的跨区结构
     // 并且方块必须是可以渲染的（排除 collider 等不可见方块）
     const props = getBlockProperties(block.type);
-    const shouldRender = shouldOwnBlock && props.isRendered !== false;
+    // === 修复：使用 shouldRenderInCurrentChunk 替代 shouldOwnBlock 判断渲染归属 ===
+    // 确保每个世界坐标的方块只被一个 chunk 注册到 batch manager，避免重复实例
+    const shouldRender = shouldRenderInCurrentChunk(block.x, block.y, block.z, block.type) && props.isRendered !== false;
 
     if (shouldRender && visible) {
       if (!d[block.type]) d[block.type] = [];
