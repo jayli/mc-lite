@@ -23,6 +23,7 @@ import { MinecartPlacementHandler } from '../actors/minecart/MinecartPlacementHa
 import { preloadAllStructures } from '../world/entity-system/StructureLoader.js';
 import { DEFAULT_INVENTORY_COUNT, DEFAULT_TEXTURE_BLUR_LEVEL, DEFAULT_COLOR_HUE_SHIFT } from '../constants/GameConfig.js';
 import { materials } from './MaterialManager.js';
+import { ChunkBatchManager } from './ChunkBatchManager.js';
 import { LightSourceManager } from './LightSourceManager.js';
 import { RainEffect } from '../world/effects/RainEffect.js';
 import { audioManager } from './AudioManager.js';
@@ -45,6 +46,11 @@ export class Game {
     // 初始化光源管理器（追踪发光方块并创建 PointLight）
     this.lightSourceManager = new LightSourceManager(this.engine.scene);
     this.world.lightSourceManager = this.lightSourceManager;
+
+    // 初始化跨 Chunk 材质合批管理器
+    this.batchManager = new ChunkBatchManager(this.engine.scene, materials);
+    this.batchManager._getActiveChunks = () => this.world.chunks;
+    this.world.batchManager = this.batchManager;
 
     // 阴影按需刷新：由 World 在区块/方块变化时请求
     this.world.setShadowUpdateCallback(() => this.engine.requestShadowMapUpdate());

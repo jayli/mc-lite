@@ -1631,6 +1631,21 @@ onmessage = async function(e) {
     return belongsToCrossChunkStructure(block.x, block.y, block.z);
   };
 
+  /**
+   * 判断方块的渲染数据是否应该输出到当前 chunk
+   * 与逻辑 owner 分离：每个世界坐标的方块只按坐标归属到一个 chunk 的 meshData
+   * 这从根本上杜绝了同一坐标被多个 chunk 重复注册到 batch manager 的问题
+   * @param {Object} block - 方块对象 { x, y, z, type, ... }
+   * @returns {boolean}
+   */
+  const shouldRenderInCurrentChunk = (block) => {
+    const bx = Math.floor(block.x);
+    const bz = Math.floor(block.z);
+    const blockCx = Math.floor(bx / CHUNK_SIZE);
+    const blockCz = Math.floor(bz / CHUNK_SIZE);
+    return blockCx === cx && blockCz === cz;
+  };
+
   // 如果有 snapshot，用 snapshot 中的方块覆盖 blockMap（保留玩家修改）
   if (savedSnapshot) {
     const incomingOwnershipVersion = Number(savedSnapshot.meta?.ownershipVersion || 1);
@@ -1805,7 +1820,7 @@ onmessage = async function(e) {
     // 渲染条件：在当前 Chunk 内，或者属于当前 Chunk 的跨区结构
     // 并且方块必须是可以渲染的（排除 collider 等不可见方块）
     const props = getBlockProperties(block.type);
-    const shouldRender = shouldOwnBlock && props.isRendered !== false;
+    const shouldRender = shouldRenderInCurrentChunk(block) && props.isRendered !== false;
 
     if (shouldRender && visible) {
       if (!d[block.type]) d[block.type] = [];

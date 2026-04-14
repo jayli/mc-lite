@@ -1093,7 +1093,12 @@ export class World {
    * @param {number} z - 世界坐标 Z
    */
   removeBlock(x, y, z) {
-    // 防御式处理：移除该坐标在所有 Chunk 的重复 owner，避免历史脏数据导致一键只删一层
+    // 1. 渲染隐藏（BatchManager 是唯一渲染事实源）
+    if (this.batchManager?.enabled) {
+      this.batchManager.hideInstanceAt(x, y, z);
+    }
+
+    // 2. 逻辑删除（所有 owner，兼容历史重复 owner）
     const owners = this.getAllBlockOwners(x, y, z);
     if (owners.length === 0) {
       const specialCollision = this.getSpecialEntityCollision(x, y, z);
@@ -1105,6 +1110,8 @@ export class World {
     }
     owners.forEach(owner => owner.ownerChunk.markPlayerMutation?.());
     owners.forEach(owner => owner.ownerChunk.removeBlock(x, y, z));
+
+    // 3. 清理缓存 + 更新阴影
     this.clearBlockLookupCaches();
     this.requestShadowMapUpdate('remove-block');
   }

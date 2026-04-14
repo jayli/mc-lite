@@ -385,6 +385,13 @@ export function extendChunk(Chunk) {
     // 清理旧网格
     this._cleanupOldMeshes(consolidatedMeshKeys);
 
+    // 先从 BatchManager 注销旧数据，再注册新的
+    const batchManager = this.world?.batchManager;
+    if (batchManager?.enabled) {
+      const chunkKey = `${this.cx},${this.cz}`;
+      batchManager.unregisterChunk(chunkKey);
+    }
+
     // 构建新的渲染网格（Worker 已计算 AO，buildMeshes 直接应用）
     this.buildMeshes(meshData || []);
 

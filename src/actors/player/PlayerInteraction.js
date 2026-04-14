@@ -52,6 +52,13 @@ export class PlayerInteraction {
 
     for (const chunk of this.player.world.chunks.values()) pushTarget(chunk.group);
 
+    // 添加 BatchManager 的 InstancedMesh 作为交互目标
+    if (this.player.world.batchManager?.enabled) {
+      for (const group of this.player.world.batchManager.textureGroups.values()) {
+        if (group.instancedMesh) pushTarget(group.instancedMesh);
+      }
+    }
+
     // 添加丧尸作为交互目标（如果游戏有敌人管理器）
     if (this.player.game && this.player.game.enemyManager) {
       let hasRenderMeshes = false;
@@ -112,6 +119,7 @@ export class PlayerInteraction {
     const hits = this.player.raycaster.intersectObjects(targets, true);
 
     if (button === 2) {
+      // 玩家不能放置方块
       const heldItem = this.player.inventory.getSelected()?.item;
       if (hits.length > 0 && hits[0].distance < 15) {
         const hit = hits[0], m = hit.object, instanceId = hit.instanceId;
@@ -129,6 +137,7 @@ export class PlayerInteraction {
             return;
           }
         }
+        // 放置方块逻辑
         if (heldItem && this.player.inventory.has(heldItem)) {
           // 统一使用 hit.point 计算点击的面，确保旋转方块的正确性
           const blockPos = this._getBlockPositionFromHit(hit);
@@ -463,6 +472,10 @@ export class PlayerInteraction {
     if (type === 'end_stone' || type === 'playground_block' || type === 'playground_center_block') return;
 
     if (m.isInstancedMesh) {
+      // 从 instanceId 恢复真实类型
+      const preferredType = this._getPreferredTypeFromHit(hit, m);
+
+      // 解析命中坐标
       let matrixPosition = null;
       if (hit.instanceId !== undefined) {
         m.getMatrixAt(hit.instanceId, this.player._dummyMatrix);
@@ -480,51 +493,22 @@ export class PlayerInteraction {
         faceNormal: hit.face?.normal || null,
         matrixPosition,
         getBlockEntry: (x, y, z) => this.player.world.getBlockEntry(x, y, z),
-        preferredType: m.userData.type
+        preferredType
       });
       if (!resolved) return;
 
       const { x: finalBx, y: finalBy, z: finalBz, entry } = resolved;
       this.player._tempVector.set(finalBx + 0.5, finalBy + 0.5, finalBz + 0.5);
+
+      // 记录方块信息用于粒子特效
       this.recordRemovedBlock(finalBx, finalBy, finalBz, entry.type, entry.orientation);
-      const targetType = entry.type;
 
-      // 在所有相同类型的 InstancedMesh 中查找该位置的实例
-      let instanceHidden = false;
-      if (targetType && m.userData.type === targetType) {
-        // 如果命中的 mesh 类型匹配，直接在该 mesh 中查找
-        instanceHidden = this._hideInstancedMeshAtPosition(m, finalBx, finalBy, finalBz);
-      }
-
-      // 如果没找到，遍历该 chunk 的所有 InstancedMesh 查找
-      if (!instanceHidden) {
-        const owner = this.player.world.resolveBlockOwner(finalBx, finalBy, finalBz, { allowScan: true });
-        const candidateChunks = [];
-        if (owner?.ownerChunk) candidateChunks.push(owner.ownerChunk);
-        if (owner?.coordChunk && owner.coordChunk !== owner.ownerChunk) candidateChunks.push(owner.coordChunk);
-
-        for (const chunk of candidateChunks) {
-          for (const child of chunk.group.children) {
-            if (child.isInstancedMesh && child.userData.type === targetType) {
-              if (this._hideInstancedMeshAtPosition(child, finalBx, finalBy, finalBz)) {
-                instanceHidden = true;
-                break;
-              }
-            }
-          }
-          if (instanceHidden) break;
-        }
-      }
-
-      // 徒手破坏时使用新的破碎特效，否则使用原有粒子特效
-      if (isHandBreak) {
-        this.player.world.spawnBlockCrashParticles(this.player._tempVector);
-      } else {
-        this.player.spawnParticles(this.player._tempVector, targetType || type);
-      }
+      // 统一删除（渲染 + 逻辑都由 World.removeBlock 处理）
       this.player.world.removeBlock(finalBx, finalBy, finalBz);
-      audioManager.playSound('delete_get', 0.3);
-      if (type !== 'water' && type !== 'cloud') this.player.inventory.add(type === 'grass' ? 'dirt' : type, 1);
+
+      // 生成破碎粒子效果
+      this.player.world.spawnBlockCrashParticles(this.player._tempVector);
+      return;
     } else {
       if (m.userData.isEntity) {
         if (m.userData.collisionBlocks) m.userData.collisionBlocks.forEach(p => this.player.world.removeBlockCollider(p.x, p.y, p.z));
@@ -1101,6 +1085,30 @@ export class PlayerInteraction {
   }
 
   /**
+   * 从 batched mesh 命中恢复真实方块类型
+   * 当命中 mesh.userData.type === 'batched' 时，通过 instanceId 查世界坐标再查 world.getBlockEntry
+   * 避免多类型 batched mesh 用 'batched' 参与宽松匹配导致误删
+   * @param {Object} hit - 射线命中结果
+   * @param {THREE.InstancedMesh} mesh - 命中的 InstancedMesh
+   * @returns {string} 真实方块类型或 mesh.userData.type
+   */
+  _getPreferredTypeFromHit(hit, mesh) {
+    if (mesh.userData.type === 'batched' && hit.instanceId !== undefined) {
+      mesh.getMatrixAt(hit.instanceId, this.player._dummyMatrix);
+      this.player._dummyMatrix.decompose(this.player._tempVector, this.player._dummyQuaternion, this.player._dummyScale);
+      const bx = Math.floor(this.player._tempVector.x);
+      const by = Math.floor(this.player._tempVector.y);
+      const bz = Math.floor(this.player._tempVector.z);
+      const entry = this.player.world.getBlockEntry(bx, by, bz);
+      if (entry && entry.type) return entry.type;
+    }
+    return mesh.userData.type;
+  }
+
+  /**
+   * 兼容降级：仅用于非 BatchManager 管理的 InstancedMesh
+   * 主删除路径已统一为 World.removeBlock() → BatchManager.hideInstanceAt()
+   * @deprecated
    * 在指定位置隐藏 InstancedMesh 中的实例
    * 通过查找 instanceIndexMap 或遍历所有实例来找到对应位置的实例并缩放到0
    * @param {THREE.InstancedMesh} mesh - InstancedMesh 对象

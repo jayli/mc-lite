@@ -1815,9 +1815,6 @@ export class Chunk {
   removeBlocksBatch(positions, isBatch = true) {
     if (positions.length === 0) return;
 
-    const dummy = new THREE.Matrix4();
-    const pos = new THREE.Vector3();
-    const affectedTypes = new Set();
     const neighborsToUpdate = new Set();
 
     // 1. 更新逻辑数据和物理数据，并收集需要更新的邻居
@@ -1829,9 +1826,6 @@ export class Chunk {
       const oldEntry = this.blockData[key];
 
       if (oldEntry) {
-        // 解析方块类型，兼容新旧格式
-        const oldParsed = typeof oldEntry === 'string' ? { type: oldEntry, orientation: 0 } : parseBlockEntry(oldEntry);
-        affectedTypes.add(oldParsed.type);
         delete this.blockData[key];
         this.visibleKeys.delete(key);
         this.solidBlocks.delete(key);
@@ -1846,87 +1840,8 @@ export class Chunk {
       }
     });
 
-    // 2. 移除当前待删除方块的渲染网格
-    for (let i = this.group.children.length - 1; i >= 0; i--) {
-      const child = this.group.children[i];
-
-      if (child.isInstancedMesh) {
-        const type = child.userData.type;
-        if (affectedTypes.has(type)) {
-          const typeMap = this.instanceIndexMap[type];
-          let updated = false;
-
-          if (typeMap) {
-            // 优化：使用 Map 直接查找索引，避免扫描全量实例
-            positions.forEach(p => {
-              const key = `${Math.floor(p.x)},${Math.floor(p.y)},${Math.floor(p.z)}`;
-              if (typeMap.has(key)) {
-                const idx = typeMap.get(key);
-                dummy.makeScale(0, 0, 0);
-                child.setMatrixAt(idx, dummy);
-                typeMap.delete(key);
-                updated = true;
-              }
-            });
-          } else {
-            // Fallback: 如果没有 Map，进行全量扫描 (降级处理)
-            for (let j = 0; j < child.count; j++) {
-              child.getMatrixAt(j, dummy);
-              pos.setFromMatrixPosition(dummy);
-              const mx = Math.floor(pos.x);
-              const my = Math.floor(pos.y);
-              const mz = Math.floor(pos.z);
-
-              const isMatch = positions.some(p =>
-                Math.floor(p.x) === mx && Math.floor(p.y) === my && Math.floor(p.z) === mz
-              );
-
-              if (isMatch) {
-                dummy.makeScale(0, 0, 0);
-                child.setMatrixAt(j, dummy);
-                updated = true;
-              }
-            }
-          }
-          if (updated) child.instanceMatrix.needsUpdate = true;
-        }
-      } else if (child.userData.isEntity) {
-        // 处理实体批量移除逻辑 (如 TNT 爆炸)
-        if (child.userData.collisionBlocks) {
-          const isHit = child.userData.collisionBlocks.some(b =>
-            positions.some(p =>
-              Math.floor(p.x) === Math.floor(b.x) &&
-              Math.floor(p.y) === Math.floor(b.y) &&
-              Math.floor(p.z) === Math.floor(b.z)
-            )
-          );
-
-          if (isHit) {
-            this._removeEntityWithCollisionBlocks(child);
-          }
-        }
-      } else {
-        // 处理动态网格 (玩家放置的单体 Mesh)
-        // 核心修复：移除该位置的所有动态 mesh，防止"方块消除后又重新出现"的 bug
-        const cx = Math.floor(child.position.x);
-        const cy = Math.floor(child.position.y);
-        const cz = Math.floor(child.position.z);
-        const isMatch = positions.some(p =>
-          Math.floor(p.x) === cx && Math.floor(p.y) === cy && Math.floor(p.z) === cz
-        );
-
-        if (isMatch) {
-          const key = `${cx},${cy},${cz}`;
-          this.dynamicMeshes.delete(key);
-          if (child.geometry) child.geometry.dispose();
-          if (child.material) {
-            if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
-            else child.material.dispose();
-          }
-          this.group.remove(child);
-        }
-      }
-    }
+    // 2. 渲染隐藏由 World.removeBlock 通过 BatchManager 统一处理
+    // Chunk 不再直接操作 InstancedMesh，避免与 BatchManager 冲突
 
     // 3. 核心修复：更新周围邻居的 Face Culling 状态，让原本隐藏的面显示出来
     // 关键优化：在批量删除场景（如 Mag7、TNT）中，将需要更新的邻居收集起来，
