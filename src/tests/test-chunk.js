@@ -11,10 +11,11 @@
  * 使用真实的 Chunk 类和 Three.js，仅模拟 Worker 和外部依赖
  */
 
-import { describe, test } from './runner.js';
+import { describe } from './runner.js';
 import { assertEqual, assertTrue, assertFalse, assertNotNull } from './assert.js';
 import * as THREE from 'three';
 import { Chunk } from '../world/Chunk.js';
+import { GlobalBlockMeshManager } from '../world/GlobalBlockMeshManager.js';
 import { mockFaceCullingSystem, mockMaterials, mockBlockData } from './test-mocks.js';
 
 // 模拟 WorldWorker
@@ -63,10 +64,12 @@ const mockPersistenceService = {
 
 // 创建模拟的 World 对象
 const createMockWorld = () => ({
+  scene: new THREE.Scene(),
   chunks: new Map(),
-  isSolid: (x, y, z) => false,
-  getBlock: (x, y, z) => null,
-  resolveBlockOwner(x, y, z, options = {}) {
+  isSolid: (_x, _y, _z) => false,
+  getBlock: (_x, _y, _z) => null,
+  isGlobalBlockMeshEnabled: () => false,
+  resolveBlockOwner(x, y, z, _options = {}) {
     const ix = Math.floor(x);
     const iy = Math.floor(y);
     const iz = Math.floor(z);
@@ -90,6 +93,24 @@ const createMockWorld = () => ({
     return null;
   }
 });
+
+const attachGlobalBlockMeshManager = (world) => {
+  world.isGlobalBlockMeshEnabled = () => true;
+  world.shouldUseGlobalBlockMesh = (blockType) => blockType !== 'chest' && blockType !== 'batched';
+  world.globalBlockMeshManager = new GlobalBlockMeshManager({
+    scene: world.scene,
+    initialCapacity: 2,
+    geometryResolver: () => new THREE.BoxGeometry(1, 1, 1),
+    materialResolver: () => new THREE.MeshBasicMaterial(),
+    attributePolicy: () => ({
+      usesAO: true,
+      usesOrientation: true,
+      castsShadow: true,
+      receivesShadow: true
+    })
+  });
+  return world.globalBlockMeshManager;
+};
 
 describe('Chunk 真实类测试', (test) => {
 
@@ -168,6 +189,104 @@ describe('Chunk 真实类测试', (test) => {
     assertNotNull(chunk.group, 'group 不应该为 null');
     assertTrue(Array.isArray(chunk.group.children), 'group.children 应该是数组');
 
+    teardownEnvironment();
+  });
+
+  test('_buildSingleTypeMesh - 开启全局合批后应注册到 GlobalBlockMeshManager', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const globalManager = attachGlobalBlockMeshManager(world);
+    const chunk = new Chunk(0, 0, world);
+
+    chunk._buildSingleTypeMesh({
+      type: 'stone',
+      count: 1,
+      matrices: new Float32Array(new THREE.Matrix4().makeTranslation(1, 2, 3).elements),
+      aoLow: new Float32Array([3]),
+      aoHigh: new Float32Array([7]),
+      orientation: new Float32Array([2]),
+      instanceIndexMap: {
+        '1,2,3': 0
+      }
+    });
+
+    assertEqual(chunk.group.children.length, 0, '开启全局合批后不应向 chunk.group 添加本地 mesh');
+    assertEqual(globalManager.getStats().totalBlocks, 1, '全局管理器应收到实例注册');
+    assertEqual(globalManager.getWorldKeyFromInstance('stone', 0), '1,2,3', '全局实例索引应可反查');
+    assertTrue(globalManager.validateInvariants().ok, '接入后全局管理器不变量应成立');
+
+    globalManager.dispose();
+    teardownEnvironment();
+  });
+
+  test('buildMeshes - 开启全局合批后应累计同一 chunk 的多个类型', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const globalManager = attachGlobalBlockMeshManager(world);
+    const chunk = new Chunk(0, 0, world);
+
+    chunk.buildMeshes([
+      {
+        type: 'stone',
+        count: 1,
+        matrices: new Float32Array(new THREE.Matrix4().makeTranslation(1, 2, 3).elements),
+        aoLow: new Float32Array([1]),
+        aoHigh: new Float32Array([2]),
+        orientation: new Float32Array([0]),
+        instanceIndexMap: {
+          '1,2,3': 0
+        }
+      },
+      {
+        type: 'glass_block',
+        count: 1,
+        matrices: new Float32Array(new THREE.Matrix4().makeTranslation(2, 3, 4).elements),
+        aoLow: new Float32Array([0]),
+        aoHigh: new Float32Array([0]),
+        orientation: new Float32Array([1]),
+        instanceIndexMap: {
+          '2,3,4': 0
+        }
+      }
+    ]);
+
+    assertEqual(globalManager.getStats().totalBlocks, 2, '同一 chunk 的多个类型都应进入全局管理器');
+    assertEqual(globalManager.getWorldKeyFromInstance('stone', 0), '1,2,3', 'stone 应保留');
+    assertEqual(globalManager.getWorldKeyFromInstance('glass_block', 0), '2,3,4', 'glass_block 应保留');
+
+    globalManager.dispose();
+    teardownEnvironment();
+  });
+
+  test('dispose - 开启全局合批后应卸载该 chunk 的全局实例', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const globalManager = attachGlobalBlockMeshManager(world);
+    const chunk = new Chunk(0, 0, world);
+
+    chunk._buildSingleTypeMesh({
+      type: 'stone',
+      count: 1,
+      matrices: new Float32Array(new THREE.Matrix4().makeTranslation(4, 5, 6).elements),
+      aoLow: new Float32Array([1]),
+      aoHigh: new Float32Array([2]),
+      orientation: new Float32Array([0]),
+      instanceIndexMap: {
+        '4,5,6': 0
+      }
+    });
+
+    assertEqual(globalManager.getStats().totalBlocks, 1, '预检查：全局实例应已注册');
+
+    chunk.dispose();
+
+    assertEqual(globalManager.getStats().totalBlocks, 0, 'dispose 后该 chunk 的全局实例应被清理');
+    assertFalse(globalManager.chunkIndex.has('0,0'), 'dispose 后 chunk 索引应被移除');
+
+    globalManager.dispose();
     teardownEnvironment();
   });
 

@@ -51,6 +51,8 @@ export class PlayerInteraction {
     };
 
     for (const chunk of this.player.world.chunks.values()) pushTarget(chunk.group);
+    const globalMeshes = this.player.world.globalBlockMeshManager?.getMeshes?.() || [];
+    for (const mesh of globalMeshes) pushTarget(mesh);
 
     // 添加丧尸作为交互目标（如果游戏有敌人管理器）
     if (this.player.game && this.player.game.enemyManager) {
@@ -89,6 +91,23 @@ export class PlayerInteraction {
     }
 
     return targets;
+  }
+
+  _getGlobalWorldKeyFromHit(hit) {
+    const obj = hit?.object;
+    if (!obj?.isInstancedMesh || hit?.instanceId === undefined) return null;
+    if (!obj.userData?.isGlobalBlockMesh) return null;
+    return this.player.world.globalBlockMeshManager?.getWorldKeyFromInstance?.(
+      obj.userData.type,
+      hit.instanceId
+    ) || null;
+  }
+
+  _getCoordsFromWorldKey(worldKey) {
+    if (!worldKey || typeof worldKey !== 'string') return null;
+    const [bx, by, bz] = worldKey.split(',').map(Number);
+    if ([bx, by, bz].some(Number.isNaN)) return null;
+    return { bx, by, bz };
   }
 
   /**
@@ -443,6 +462,34 @@ export class PlayerInteraction {
     let m = hit.object;
     while (m && !m.userData.isEntity && !m.userData.type && m.parent && !m.isInstancedMesh && m.type !== 'Scene') m = m.parent;
     const type = m.userData.type || 'unknown';
+    const globalWorldKey = this._getGlobalWorldKeyFromHit(hit);
+
+    if (globalWorldKey) {
+      const coords = this._getCoordsFromWorldKey(globalWorldKey);
+      if (!coords) return;
+
+      const { bx: finalBx, by: finalBy, bz: finalBz } = coords;
+      const entry = this.player.world.getBlockEntry(finalBx, finalBy, finalBz);
+      const targetType = entry?.type || type;
+
+      this.player._tempVector.set(finalBx + 0.5, finalBy + 0.5, finalBz + 0.5);
+      if (entry) {
+        this.recordRemovedBlock(finalBx, finalBy, finalBz, entry.type, entry.orientation);
+      }
+
+      this.player.world.globalBlockMeshManager?.removeBlock?.(globalWorldKey);
+      if (isHandBreak) {
+        this.player.world.spawnBlockCrashParticles(this.player._tempVector);
+      } else {
+        this.player.spawnParticles(this.player._tempVector, targetType);
+      }
+      this.player.world.removeBlock(finalBx, finalBy, finalBz);
+      audioManager.playSound('delete_get', 0.3);
+      if (targetType !== 'water' && targetType !== 'cloud') {
+        this.player.inventory.add(targetType === 'grass' ? 'dirt' : targetType, 1);
+      }
+      return;
+    }
 
     if (m.isInstancedMesh && m.userData?.specialEntityRenderer) {
       const record = m.userData.specialEntityRenderer.getEntityAt(hit.instanceId);
@@ -1071,6 +1118,18 @@ export class PlayerInteraction {
     if (!hit || !hit.object) return null;
 
     const obj = hit.object;
+    const globalWorldKey = this._getGlobalWorldKeyFromHit(hit);
+    if (globalWorldKey) {
+      const coords = this._getCoordsFromWorldKey(globalWorldKey);
+      if (!coords) return null;
+      return {
+        bx: coords.bx,
+        by: coords.by,
+        bz: coords.bz,
+        type: this.player.world.getBlock(coords.bx, coords.by, coords.bz)
+      };
+    }
+
     let bx;
     let by;
     let bz;

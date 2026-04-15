@@ -36,6 +36,7 @@ export function extendChunk(Chunk) {
    */
   Chunk.prototype.dispose = function() {
     this.disposed = true;
+    this.world?.globalBlockMeshManager?.unregisterChunk?.(`${this.cx},${this.cz}`);
     // 注销该区块的所有光源
     this._unregisterLightSources();
 

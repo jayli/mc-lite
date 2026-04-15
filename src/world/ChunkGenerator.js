@@ -21,6 +21,40 @@ const isSolidShadowCaster = (props) => props.isSolid && props.isRendered !== fal
 const isGlassType = (type) => typeof type === 'string' && type.includes('glass');
 
 export function extendChunk(Chunk) {
+  Chunk.prototype._registerSingleTypeMeshToGlobalManager = function(data) {
+    const manager = this.world?.globalBlockMeshManager;
+    if (!manager) return false;
+
+    const { type, count, matrices, aoLow, aoHigh, orientation, instanceIndexMap } = data;
+    if (!type || count === 0 || !instanceIndexMap) return false;
+
+    const chunkKey = `${this.cx},${this.cz}`;
+    const records = [];
+    const entries = Object.entries(instanceIndexMap);
+
+    for (const [worldKey, index] of entries) {
+      if (typeof index !== 'number' || index < 0 || index >= count) continue;
+
+      const matrix = new THREE.Matrix4();
+      matrix.fromArray(matrices, index * 16);
+
+      records.push({
+        worldKey,
+        chunkKey,
+        blockType: type,
+        matrix,
+        aoLow: aoLow?.[index] ?? 0,
+        aoHigh: aoHigh?.[index] ?? 0,
+        orientation: orientation?.[index] ?? 0
+      });
+    }
+
+    for (const record of records) {
+      manager.upsertBlock(record);
+    }
+    return true;
+  };
+
   /**
    * 生成区块内容
    * 将计算压力较大的地形和结构生成逻辑分解到 Worker 线程中执行
@@ -102,6 +136,10 @@ export function extendChunk(Chunk) {
       return;
     }
 
+    if (this.world?.isGlobalBlockMeshEnabled?.()) {
+      this.world.globalBlockMeshManager?.unregisterChunk?.(`${this.cx},${this.cz}`);
+    }
+
     // 遍历每种方块类型的 mesh 数据
     for (const data of meshDataArray) {
       // 判断是否为合批数据（包含 blockTypes 数组）
@@ -153,6 +191,14 @@ export function extendChunk(Chunk) {
 
     const props = getBlockProps(type);
     if (!props.isRendered || count === 0) return;
+
+    const useGlobalBlockMesh = this.world?.shouldUseGlobalBlockMesh?.(type)
+      ?? Boolean(this.world?.isGlobalBlockMeshEnabled?.() && this.world?.globalBlockMeshManager);
+
+    if (useGlobalBlockMesh) {
+      this._registerSingleTypeMeshToGlobalManager(data);
+      return;
+    }
 
     // 检查是否已存在相同类型的 InstancedMesh（如树叶在合并时被保留）
     const existingMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === type);

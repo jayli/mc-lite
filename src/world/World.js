@@ -3,17 +3,23 @@
 // 负责区块的加载/卸载、粒子效果、方块放置/移除逻辑、爆炸效果和物理查询
 import * as THREE from 'three';
 import { Chunk } from './Chunk.js';
+import { GlobalBlockMeshManager } from './GlobalBlockMeshManager.js';
 import { chestManager } from './entities/Chest.js';
 import { persistenceService } from '../services/PersistenceService.js';
 import { noise } from '../utils/MathUtils.js';
 import { ParticleSystem } from './effects/ParticleSystem.js';
 import { parseBlockEntry } from '../utils/OrientationUtils.js';
 import { ChunkAssemblyScheduler } from './ChunkAssemblyScheduler.js';
+import { getBlockProperties, createBlockPropsResolver } from '../constants/BlockData.js';
+import { materials } from '../core/MaterialManager.js';
+import { geomMap } from './ChunkConsolidation.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
 const getChestManager = () => globalThis._chestManager || chestManager;
 const getParticleSystem = () => globalThis._ParticleSystem || ParticleSystem;
+const getMaterials = () => globalThis._materials || materials;
+const getBlockProps = createBlockPropsResolver(getBlockProperties);
 
 // --- 全局世界常量 ---
 /** 每个区块在 X 和 Z 方向上的大小 (16x16) */
@@ -24,6 +30,23 @@ const MIN_RENDER_DIST = 2;
 const MAX_RENDER_DIST = 3;
 const RUNTIME_DEFERRED_FINALIZE_IDLE_GRACE_MS = 800;
 const RUNTIME_DEFERRED_FINALIZE_MAX_CHUNKS = 1;
+const GLOBAL_BATCH_ALLOWED_TYPES = new Set([
+  'stone',
+  'dirt',
+  'grass',
+  'snow_grass',
+  'sand',
+  'glass_block',
+  'water',
+  'cloud',
+  'flower',
+  'short_grass',
+  'allium',
+  'azure_bluet',
+  'oxeye_daisy',
+  'red_mushroom',
+  'dead_bush'
+]);
 /**
  * 世界管理器类
  * 管理游戏世界中的所有区块、粒子效果和方块操作，是世界数据的中央访问点
@@ -34,6 +57,25 @@ export class World {
    */
   constructor(scene) {
     this.scene = scene;
+    this.globalBlockMeshEnabled = globalThis.__enableGlobalBlockMeshes === true;
+    this.globalBlockMeshManager = new GlobalBlockMeshManager({
+      scene,
+      geometryResolver: (blockType) => {
+        const props = getBlockProps(blockType);
+        return geomMap[props.geometryType] || geomMap.default;
+      },
+      materialResolver: (blockType) => getMaterials().getMaterial(blockType),
+      attributePolicy: (blockType) => {
+        const props = getBlockProps(blockType);
+        const isGlassType = typeof blockType === 'string' && blockType.includes('glass');
+        return {
+          usesAO: props.isSolid && !props.isTransparent,
+          usesOrientation: props.isRendered !== false,
+          castsShadow: Boolean(props.isShadowEnabled && !isGlassType && props.isSolid && props.isRendered !== false),
+          receivesShadow: Boolean(props.isShadowEnabled && !isGlassType)
+        };
+      }
+    });
     this.renderDistance = DEFAULT_RENDER_DIST;
     /** 存储当前加载的所有区块，Key 为 "cx,cz" 字符串 */
     this.chunks = new Map();
@@ -106,6 +148,20 @@ export class World {
     this._staticTreeTerrainBoostChunkKeys = new Set();
     this._lastStreamingActivityAt = 0;
     this._pendingDeferredFinalizeChunkKeys = new Set();
+  }
+
+  isGlobalBlockMeshEnabled() {
+    return this.globalBlockMeshEnabled;
+  }
+
+  shouldUseGlobalBlockMesh(blockType) {
+    if (!this.globalBlockMeshEnabled) return false;
+    if (!blockType || !GLOBAL_BATCH_ALLOWED_TYPES.has(blockType)) return false;
+
+    const props = getBlockProps(blockType);
+    if (!props || props.isRendered === false) return false;
+
+    return true;
   }
 
   /**
