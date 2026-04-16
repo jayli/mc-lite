@@ -1894,6 +1894,11 @@ onmessage = async function(e) {
     scatteredBlocks,
     solidBlocks,
     realisticTrees, modGunMan, rovers,
+    entities: {
+      realisticTrees,
+      modGunMan,
+      rovers
+    },
     visibleKeys: Array.from(visibleKeysSet),
     structureCenters,
     snapshot: {

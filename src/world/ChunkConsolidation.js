@@ -254,11 +254,11 @@ export function extendChunk(Chunk) {
     const {
       cx, cz, callbackKey,
       scatteredBlocks,
-      solidBlocks, realisticTrees, modGunMan, rovers, visibleKeys, snapshot, structureCenters
+      solidBlocks, realisticTrees, modGunMan, rovers, entities, visibleKeys, snapshot, structureCenters
     } = e.data;
     const key = callbackKey || `${cx},${cz}`;
     if (workerCallbacks.has(key)) {
-      workerCallbacks.get(key)({ scatteredBlocks, solidBlocks, realisticTrees, modGunMan, rovers, visibleKeys, snapshot, structureCenters });
+      workerCallbacks.get(key)({ scatteredBlocks, solidBlocks, realisticTrees, modGunMan, rovers, entities, visibleKeys, snapshot, structureCenters });
       workerCallbacks.delete(key);
     }
   };
