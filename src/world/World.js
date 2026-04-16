@@ -3,6 +3,7 @@
 // 负责区块的加载/卸载、粒子效果、方块放置/移除逻辑、爆炸效果和物理查询
 import * as THREE from 'three';
 import { Chunk } from './Chunk.js';
+import { BlockScatterManager } from './BlockScatterManager.js';
 import { chestManager } from './entities/Chest.js';
 import { persistenceService } from '../services/PersistenceService.js';
 import { noise } from '../utils/MathUtils.js';
@@ -106,6 +107,9 @@ export class World {
     this._staticTreeTerrainBoostChunkKeys = new Set();
     this._lastStreamingActivityAt = 0;
     this._pendingDeferredFinalizeChunkKeys = new Set();
+
+    // 方块分发管理器
+    this.scatterManager = new BlockScatterManager(this);
   }
 
   /**
@@ -211,6 +215,16 @@ export class World {
         }
       }
     }
+  }
+
+  /**
+   * 处理 Chunk 生成完成后的结果
+   * 替代原有的 chunk.acceptWorkerResult 直接调用
+   * @param {Chunk} chunk - 完成生成的 chunk
+   * @param {Object} workerResult - Worker 返回的数据
+   */
+  _onChunkGenResult(chunk, workerResult) {
+    this.scatterManager.scatter(workerResult);
   }
 
   onChunkWorkerReady(chunk) {
@@ -379,6 +393,8 @@ export class World {
         if (this.minecartManager) {
           this.minecartManager.stopMinecartsForChunk(chunk.cx, chunk.cz);
         }
+        // 清理方块分发 buffer
+        this.scatterManager?.unloadChunk(key);
         this.scene.remove(chunk.group);
         // 重要：在卸载前请求持久化，确保修改不丢失
         getPersistenceService().saveChunkData(chunk.cx, chunk.cz);
