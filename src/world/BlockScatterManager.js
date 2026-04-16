@@ -1,0 +1,99 @@
+// src/world/BlockScatterManager.js
+/**
+ * 方块分发管理器 — 将 Worker 返回的 scatteredBlocks 按坐标分发到对应 chunk
+ * 职责：
+ * 1. 接收 Worker 返回的 scatteredBlocks 数组
+ * 2. 按 (floor(x/CHUNK_SIZE), floor(z/CHUNK_SIZE)) 分发到对应 chunk 的 buffer
+ * 3. 跟踪每个 chunk 的加载状态
+ * 4. 通知就绪的 chunk 进行渲染
+ */
+import { CHUNK_SIZE } from './ChunkConsolidation.js';
+
+export class BlockScatterManager {
+  constructor(world) {
+    this.world = world;
+    // chunkKey → { blocks: [], loading: true/false, sourceWorkers: Set }
+    this.chunkBuffers = new Map();
+  }
+
+  /**
+   * 入口：接收 Worker 返回的完整结果
+   * @param {Object} workerResult - Worker 返回的数据
+   */
+  scatter(workerResult) {
+    const { scatteredBlocks, cx, cz, entities } = workerResult;
+
+    // 1. 遍历所有方块，按坐标分发
+    for (const block of scatteredBlocks) {
+      const chunkCx = Math.floor(block.x / CHUNK_SIZE);
+      const chunkCz = Math.floor(block.z / CHUNK_SIZE);
+      const chunkKey = `${chunkCx},${chunkCz}`;
+
+      let buffer = this.chunkBuffers.get(chunkKey);
+      if (!buffer) {
+        buffer = { blocks: [], loading: true, sourceWorkers: new Set() };
+        this.chunkBuffers.set(chunkKey, buffer);
+      }
+      buffer.blocks.push(block);
+      buffer.sourceWorkers.add(`${cx},${cz}`);
+    }
+
+    // 2. 标记发起 Worker 的 chunk 为"已加载"
+    const ownKey = `${cx},${cz}`;
+    const ownBuffer = this.chunkBuffers.get(ownKey);
+    if (ownBuffer) {
+      ownBuffer.loading = false;
+    }
+
+    // 3. 特殊实体直接分发给对应 chunk
+    if (entities) {
+      this.scatterEntities(entities, cx, cz);
+    }
+
+    // 4. 通知就绪的 chunk 进行渲染
+    this.flushReadyChunks();
+  }
+
+  /**
+   * 特殊实体分发（RealisticTree、modGunMan、Rover）
+   */
+  scatterEntities(entities, cx, cz) {
+    const chunk = this.world.chunks.get(`${cx},${cz}`);
+    if (!chunk) return;
+
+    if (entities.realisticTrees?.length) {
+      chunk.entities.realisticTrees = entities.realisticTrees;
+    }
+    if (entities.modGunMan?.length) {
+      chunk.entities.modGunMan = entities.modGunMan;
+    }
+    if (entities.rovers?.length) {
+      chunk.entities.rovers = entities.rovers;
+    }
+  }
+
+  /**
+   * 检查 chunk 是否就绪并通知渲染
+   */
+  flushReadyChunks() {
+    for (const [key, buffer] of this.chunkBuffers) {
+      if (buffer.loading) continue;
+
+      const chunk = this.world.chunks.get(key);
+      if (!chunk) continue;
+
+      // 数据已就位，通知 chunk 渲染
+      chunk.acceptScatteredBlocks(buffer.blocks);
+
+      // 清理 buffer
+      this.chunkBuffers.delete(key);
+    }
+  }
+
+  /**
+   * 清理：chunk unload 时清除 buffer
+   */
+  unloadChunk(chunkKey) {
+    this.chunkBuffers.delete(chunkKey);
+  }
+}
