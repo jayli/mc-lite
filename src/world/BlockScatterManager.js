@@ -21,7 +21,10 @@ export class BlockScatterManager {
    * @param {Object} workerResult - Worker 返回的数据
    */
   scatter(workerResult) {
-    const { scatteredBlocks, cx, cz, entities } = workerResult;
+    const { scatteredBlocks, visibleKeys, cx, cz, entities } = workerResult;
+
+    // visibleKeys 从 Worker 传来是数组，先转为 Set 方便查找
+    const visibleKeysSet = Array.isArray(visibleKeys) ? new Set(visibleKeys) : null;
 
     // 1. 遍历所有方块，按坐标分发
     for (const block of scatteredBlocks) {
@@ -31,11 +34,17 @@ export class BlockScatterManager {
 
       let buffer = this.chunkBuffers.get(chunkKey);
       if (!buffer) {
-        buffer = { blocks: [], loading: true, sourceWorkers: new Set() };
+        buffer = { blocks: [], loading: true, sourceWorkers: new Set(), visibleBlockKeys: new Set() };
         this.chunkBuffers.set(chunkKey, buffer);
       }
       buffer.blocks.push(block);
       buffer.sourceWorkers.add(`${cx},${cz}`);
+
+      // 提取 visibleKeys，标记哪些方块是面剔除可见的
+      const blockKey = `${block.x},${block.y},${block.z}`;
+      if (visibleKeysSet?.has(blockKey)) {
+        buffer.visibleBlockKeys.add(blockKey);
+      }
     }
 
     // 2. 标记发起 Worker 的 chunk 为"已加载"
@@ -82,8 +91,8 @@ export class BlockScatterManager {
       const chunk = this.world.chunks.get(key);
       if (!chunk) continue;
 
-      // 数据已就位，通知 chunk 渲染
-      chunk.acceptScatteredBlocks(buffer.blocks);
+      // 数据已就位，通知 chunk 渲染，传入 visibleBlockKeys
+      chunk.acceptScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys);
 
       // 清理 buffer
       this.chunkBuffers.delete(key);

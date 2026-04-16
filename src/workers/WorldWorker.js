@@ -235,9 +235,10 @@ function buildMeshData(fakeChunk, d, cx, cz) {
 
 /**
  * 构建打散方块列表 — 替代 buildMeshData
- * 返回所有可见方块的扁平数组，每个方块独立存储坐标、类型、方向、AO、矩阵
+ * 返回所有可渲染方块的扁平数组（包括被面剔除的隐藏方块）
+ * 每个方块独立存储坐标、类型、方向、AO、矩阵
  * @param {Map} blockMap - 所有方块的 Map (key -> {x, y, z, type, solid, orientation})
- * @param {Set} visibleKeysSet - 可见方块 keys Set
+ * @param {Set} visibleKeysSet - 可见方块 keys Set（用于渲染路径）
  * @param {Map} aoMap - AO 数据 Map (key -> {aoLow, aoHigh})
  * @returns {Array} scatteredBlocks 数组
  */
@@ -246,9 +247,15 @@ function buildScatteredBlocks(blockMap, visibleKeysSet, aoMap) {
   const dummy = new THREE.Object3D();
 
   for (const [key, block] of blockMap) {
-    if (!visibleKeysSet.has(key)) continue;
-
     const { x, y, z, type, orientation } = block;
+
+    // 跳过空气方块
+    if (type === 'air') continue;
+
+    // 跳过不可渲染的方块（如 collider）
+    const props = getBlockProperties(type);
+    if (props.isRendered === false) continue;
+
     const ao = aoMap.get(key) || { aoLow: 1, aoHigh: 1 };
 
     // 计算变换矩阵
@@ -1859,10 +1866,10 @@ onmessage = async function(e) {
       allBlockTypes[key] = { type: block.type, orientation: block.orientation || 0 };
     }
 
-    // 渲染条件：在当前 Chunk 内，或者属于当前 Chunk 的跨区结构
-    // 并且方块必须是可以渲染的（排除 collider 等不可见方块）
+    // 渲染条件：所有可渲染的方块都进入 scatteredBlocks
+    // 不再受 shouldOwnBlock 限制，跨 Chunk 结构方块由主线程 BlockScatterManager 按坐标分发
     const props = getBlockProperties(block.type);
-    const shouldRender = shouldOwnBlock && props.isRendered !== false;
+    const shouldRender = props.isRendered !== false;
 
     if (shouldRender && visible) {
       if (!d[block.type]) d[block.type] = [];

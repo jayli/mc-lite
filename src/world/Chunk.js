@@ -2118,10 +2118,15 @@ export class Chunk {
   /**
    * 接收 BlockScatterManager 分发来的方块数据
    * @param {Array} scatteredBlocks - 方块列表（含溢出）
+   * @param {Set} visibleBlockKeys - 面剔除可见的方块 key 集合
    */
-  acceptScatteredBlocks(scatteredBlocks) {
+  acceptScatteredBlocks(scatteredBlocks, visibleBlockKeys) {
     const minX = this.cx * CHUNK_SIZE;
     const minZ = this.cz * CHUNK_SIZE;
+
+    // 确保数据结构已初始化
+    if (!this.visibleKeys) this.visibleKeys = new Set();
+    if (!this.solidBlocks) this.solidBlocks = new Set();
 
     for (const block of scatteredBlocks) {
       const localX = block.x - minX;
@@ -2147,6 +2152,14 @@ export class Chunk {
       }
     }
 
+    // 从 Worker 传来的 visibleBlockKeys 初始化 visibleKeys
+    // 只有面剔除可见的方块才加入 visibleKeys，被遮挡的地下方块不加入
+    if (visibleBlockKeys) {
+      for (const key of visibleBlockKeys) {
+        this.visibleKeys.add(key);
+      }
+    }
+
     // 初始化数组存储
     this._initArrayStorageFromBlockData();
 
@@ -2156,6 +2169,9 @@ export class Chunk {
     // 标记 chunk 为已加载
     this.loadState = 'terrain-built';
     this.isReady = true;
+
+    // 通知 World 继续后续装配流程（entities → finalize）
+    this.world?.onChunkWorkerReady?.(this);
   }
 
   /**
