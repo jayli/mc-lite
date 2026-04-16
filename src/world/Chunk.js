@@ -2120,6 +2120,105 @@ export class Chunk {
     this.dirtyBlocks += positions.length;
     this.scheduleConsolidation();
   }
+
+  /**
+   * 接收 BlockScatterManager 分发来的方块数据
+   * @param {Array} scatteredBlocks - 方块列表（含溢出）
+   */
+  acceptScatteredBlocks(scatteredBlocks) {
+    const minX = this.cx * CHUNK_SIZE;
+    const minZ = this.cz * CHUNK_SIZE;
+
+    for (const block of scatteredBlocks) {
+      const localX = block.x - minX;
+      const localZ = block.z - minZ;
+      // 只处理属于本 chunk 范围的方块
+      if (localX < 0 || localX >= CHUNK_SIZE || localZ < 0 || localZ >= CHUNK_SIZE) {
+        continue;
+      }
+
+      const key = `${block.x},${block.y},${block.z}`;
+
+      // 写入 blockData（唯一真相源）
+      if (block.orientation !== 0) {
+        this.blockData[key] = { type: block.type, orientation: block.orientation };
+      } else {
+        this.blockData[key] = block.type;
+      }
+
+      // 写入 solidBlocks
+      const props = getBlockProps(block.type);
+      if (props.isSolid) {
+        this.solidBlocks.add(key);
+      }
+    }
+
+    // 初始化数组存储
+    this._initArrayStorageFromBlockData();
+
+    // 从已填充的 blockData 构建渲染 mesh
+    this.buildMeshesFromScatteredData();
+
+    // 标记 chunk 为已加载
+    this.loadState = 'terrain-built';
+    this.isReady = true;
+  }
+
+  /**
+   * 从散装的方块数据构建渲染 mesh
+   * 按 type 分组后，自动选择合批模式或 per-chunk 模式
+   */
+  buildMeshesFromScatteredData() {
+    // 按 type 分组
+    const groupedByType = {};
+
+    for (const [key, entry] of Object.entries(this.blockData)) {
+      const parsed = parseBlockEntry(entry);
+      const type = parsed.type;
+      const orientation = parsed.orientation || 0;
+      const [x, y, z] = key.split(',').map(Number);
+
+      if (!groupedByType[type]) groupedByType[type] = [];
+      groupedByType[type].push({ key, orientation, x, y, z });
+    }
+
+    // 构建 meshDataArray（兼容现有 buildMeshes 的输入格式）
+    const meshDataArray = [];
+    const dummy = new THREE.Object3D();
+
+    for (const [type, blocks] of Object.entries(groupedByType)) {
+      const props = getBlockProps(type);
+      if (!props.isRendered) continue;
+
+      const count = blocks.length;
+      if (count === 0) continue;
+
+      const matrices = new Float32Array(count * 16);
+      const aoLow = new Float32Array(count);
+      const aoHigh = new Float32Array(count);
+      const orientationArr = new Float32Array(count);
+      const instanceIndexMap = {};
+
+      for (let i = 0; i < count; i++) {
+        const b = blocks[i];
+        dummy.position.set(b.x + 0.5, b.y + 0.5, b.z + 0.5);
+        dummy.rotation.set(0, getRotationAngle(b.orientation), 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        matrices.set(dummy.matrix.elements, i * 16);
+        // AO 在 consolidation 时重新计算
+        aoLow[i] = 1;
+        aoHigh[i] = 1;
+        orientationArr[i] = b.orientation;
+        instanceIndexMap[b.key] = i;
+      }
+
+      meshDataArray.push({ type, count, matrices, aoLow, aoHigh, orientation: orientationArr, instanceIndexMap });
+    }
+
+    // 复用现有 buildMeshes 方法（自动处理合批/非合批模式）
+    this.buildMeshes(meshDataArray);
+  }
 }
 
 // 扩展Chunk类功能
