@@ -78,6 +78,12 @@ const CITY_PAVILION_CHANCE = CITY_FLOWER_BED_CHANCE * 6;
 const CITY_TALL_WELL_CHANCE = CITY_FLOWER_BED_CHANCE * 3; // 与 pavilion 相同概率
 // 方块归属机制版本号（用于存档兼容性判断）
 const OWNERSHIP_SCHEMA_VERSION = 2;
+// 不打散的实体类型 — 这些类型不进入 blockMap，单独收集
+const NON_SCATTERED_TYPES = new Set([
+  'realistic_trunk',
+  'realistic_leaves'
+  // modGunMan、Rover 通过其他方式收集，不经过 fakeChunk.add
+]);
 // 旧档归属迁移调试开关（默认关闭）
 const DEBUG_OWNERSHIP_MIGRATION = false;
 
@@ -457,6 +463,16 @@ onmessage = async function(e) {
   const fakeChunk = {
     add: (x, y, z, type, dObj, solid = true, orientation = 0) => {
       const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+
+      // 不打散的实体类型：跳过 blockMap，只写入 d（渲染数据收集）
+      if (NON_SCATTERED_TYPES.has(type)) {
+        if (dObj) {
+          if (!dObj[type]) dObj[type] = [];
+          dObj[type].push({ x, y, z, orientation: orientation || 0 });
+        }
+        return;
+      }
+
       // 关键修复：严格检查该位置是否已有方块
       // 规则：只要该位置已有任何非空气方块，就不允许再放置任何方块
       // 唯一例外：空气方块（用于挖掘/清除）可以放置
