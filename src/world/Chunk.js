@@ -1342,19 +1342,20 @@ export class Chunk {
    * @returns {boolean} 是否完成该阶段
    */
   assembleTerrainPhase() {
-    if (this.loadState !== 'worker-ready') return this.loadState === 'terrain-built' || this.loadState === 'entities-built' || this.loadState === 'finalized';
-    this.buildMeshes(this.pendingTerrainData || {});
-    this.loadState = 'terrain-built';
-    return true;
+    if (this.loadState === 'worker-ready') {
+      // worker-ready 后等待 BlockScatterManager 分发
+      // acceptScatteredBlocks 会自动将 loadState 设为 terrain-built
+      return false;
+    }
+    return this.loadState === 'terrain-built' || this.loadState === 'entities-built' || this.loadState === 'finalized';
   }
 
   assembleRuntimeBuildPhase() {
     if (this.loadState === 'finalized') return true;
     if (this.loadState === 'created') return false;
-    if (this.loadState === 'worker-ready') {
-      this.buildMeshes(this.pendingTerrainData || {});
-      this.loadState = 'terrain-built';
-    }
+    // worker-ready 后等待 BlockScatterManager 分发
+    if (this.loadState === 'worker-ready') return false;
+
     if (this.loadState === 'terrain-built') {
       this.assembleEntityPhase();
     }
