@@ -1247,23 +1247,19 @@ export class Chunk {
    */
   acceptWorkerResult(payload = {}) {
     const {
-      meshData,
-      d,
+      scatteredBlocks,
       solidBlocks,
       realisticTrees,
       modGunMan,
       rovers,
-      allBlockTypes,
       visibleKeys,
       snapshot,
       structureCenters
     } = payload;
 
-    if (allBlockTypes) this.blockData = allBlockTypes;
-    // 内存优化：复用现有 Set，避免创建新对象
+    // 初始化数据结构
     if (!this.visibleKeys) this.visibleKeys = new Set();
     if (!this.solidBlocks) this.solidBlocks = new Set();
-
     this.visibleKeys.clear();
     this.solidBlocks.clear();
 
@@ -1282,24 +1278,21 @@ export class Chunk {
     this.entities.staticTrees = (structureCenters || [])
       .filter(c => c.type === 'static_tree')
       .map(c => ({ x: c.x, y: c.y, z: c.z }));
+
+    // 特殊实体
     this.entities.realisticTrees = realisticTrees || [];
 
-    // === 初始化新的数组存储（高性能查询支持） ===
-    this._initArrayStorageFromBlockData();
-
-    // 使用 meshData（新格式）或 d（旧格式）
-    this.pendingTerrainData = meshData || d || {};
+    // 保存 snapshot 和特殊实体数据（供后续阶段使用）
     this.pendingSnapshot = snapshot || null;
-    this.pendingRuntimeEntities = {
-      zombieNests: snapshot?.entities?.zombieNests || [],
-      turrets: snapshot?.entities?.turrets || [],
-      minecarts: snapshot?.entities?.minecarts || []
-    };
     this.pendingSpecialEntityData = {
       realisticTrees: realisticTrees || [],
       modGunMan: modGunMan || [],
       rovers: rovers || []
     };
+
+    // 注意：blockData 和 mesh 构建不再在此处处理
+    // 由 BlockScatterManager.scatter() → acceptScatteredBlocks() 处理
+
     this.loadState = 'worker-ready';
   }
 
