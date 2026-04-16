@@ -228,6 +228,45 @@ function buildMeshData(fakeChunk, d, cx, cz) {
 }
 
 /**
+ * 构建打散方块列表 — 替代 buildMeshData
+ * 返回所有可见方块的扁平数组，每个方块独立存储坐标、类型、方向、AO、矩阵
+ * @param {Map} blockMap - 所有方块的 Map (key -> {x, y, z, type, solid, orientation})
+ * @param {Set} visibleKeysSet - 可见方块 keys Set
+ * @param {Map} aoMap - AO 数据 Map (key -> {aoLow, aoHigh})
+ * @returns {Array} scatteredBlocks 数组
+ */
+function buildScatteredBlocks(blockMap, visibleKeysSet, aoMap) {
+  const blocks = [];
+  const dummy = new THREE.Object3D();
+
+  for (const [key, block] of blockMap) {
+    if (!visibleKeysSet.has(key)) continue;
+
+    const { x, y, z, type, orientation } = block;
+    const ao = aoMap.get(key) || { aoLow: 1, aoHigh: 1 };
+
+    // 计算变换矩阵
+    dummy.position.set(x + 0.5, y + 0.5, z + 0.5);
+    dummy.rotation.set(0, getRotationAngle(orientation || 0), 0);
+    dummy.updateMatrix();
+
+    const matrix = new Float32Array(16);
+    matrix.set(dummy.matrix.elements);
+
+    blocks.push({
+      x, y, z,
+      type,
+      orientation: orientation || 0,
+      aoLow: ao.aoLow,
+      aoHigh: ao.aoHigh,
+      matrix
+    });
+  }
+
+  return blocks;
+}
+
+/**
  * 按纹理分组构建 meshData — 材质合批优化
  * @param {Object} fakeChunk - 模拟 chunk（提供 getBlock 方法）
  * @param {Object} d - 渲染数据 {type: [positions]}
@@ -1768,7 +1807,9 @@ onmessage = async function(e) {
   // 记录所有方块的类型（包括被剔除的），用于主线程在挖掘时恢复
   const allBlockTypes = {};
   // 记录当前可见（已添加进d）的方块Key
-  const visibleKeys = [];
+  const visibleKeysSet = new Set();
+  // 记录每个方块的 AO 数据，供 buildScatteredBlocks 使用
+  const aoMap = new Map();
 
   // --- 跨区块实体渲染支持 ---
   // structureCenters 已在前面完成去重构建，避免重复追加导致 ownership 判定膨胀
@@ -1818,33 +1859,26 @@ onmessage = async function(e) {
         ({ aoLow, aoHigh } = calculateAOForBlock(block.x, block.y, block.z, isOccluding));
       }
       d[block.type].push({x: block.x, y: block.y, z: block.z, aoLow, aoHigh, orientation: block.orientation || 0});
-      visibleKeys.push(key);
+      visibleKeysSet.add(key);
+      aoMap.set(key, { aoLow, aoHigh });
     }
   }
 
-  // 返回数据
-  // 构建 mesh 数据（包含预计算的矩阵和 AO）
-  // 判断是否启用材质合批
-  const useBatching = Object.keys(textureGroups).length > 0 && isOptimization;
-  const meshData = useBatching
-    ? buildBatchedMeshData(fakeChunk, d, textureGroups)
-    : buildMeshData(fakeChunk, d, cx, cz);
+  // 构建打散方块列表（替代 meshData）
+  const scatteredBlocks = buildScatteredBlocks(blockMap, visibleKeysSet, aoMap);
 
-  // 收集可传输的 buffer
+  // 收集可传输的 buffer（每个方块的 matrix buffer）
   const transferables = [];
-  for (const data of meshData) {
-    transferables.push(
-      data.matrices.buffer,
-      data.aoLow.buffer,
-      data.aoHigh.buffer,
-      data.orientation.buffer
-    );
+  for (const block of scatteredBlocks) {
+    transferables.push(block.matrix.buffer);
   }
 
   postMessage({
     cx, cz, callbackKey,
-    meshData,  // 替换原来的 d
-    solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys,
+    scatteredBlocks,
+    solidBlocks,
+    realisticTrees, modGunMan, rovers,
+    visibleKeys: Array.from(visibleKeysSet),
     structureCenters,
     snapshot: {
       meta: {
