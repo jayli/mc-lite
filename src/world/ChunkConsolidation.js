@@ -253,11 +253,12 @@ export function extendChunk(Chunk) {
   worldWorker.onmessage = (e) => {
     const {
       cx, cz, callbackKey,
-      meshData, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters
+      scatteredBlocks,
+      solidBlocks, realisticTrees, modGunMan, rovers, visibleKeys, snapshot, structureCenters
     } = e.data;
     const key = callbackKey || `${cx},${cz}`;
     if (workerCallbacks.has(key)) {
-      workerCallbacks.get(key)({ meshData, d, solidBlocks, realisticTrees, modGunMan, rovers, allBlockTypes, visibleKeys, snapshot, structureCenters });
+      workerCallbacks.get(key)({ scatteredBlocks, solidBlocks, realisticTrees, modGunMan, rovers, visibleKeys, snapshot, structureCenters });
       workerCallbacks.delete(key);
     }
   };
@@ -363,15 +364,28 @@ export function extendChunk(Chunk) {
    * @param {Set} consolidatedMeshKeys - 合并前的动态 Mesh 键集合
    */
   Chunk.prototype._applyConsolidateResult = function(data, consolidatedCount, consolidatedMeshKeys) {
-    let { meshData, visibleKeys, solidBlocks, structureCenters: newStructureCenters } = data;
+    let { scatteredBlocks, visibleKeys, solidBlocks, structureCenters: newStructureCenters } = data;
 
     // 更新结构中心列表
     if (newStructureCenters && newStructureCenters.length > 0) {
       this.structureCenters = newStructureCenters;
     }
 
-    // 过滤 Worker 结果，防止幻影方块
-    ({ visibleKeys, solidBlocks, meshData } = this._filterWorkerResult(data));
+    // 过滤 scatteredBlocks：只保留 blockData 中存在的方块
+    const filteredBlocks = [];
+    if (scatteredBlocks && Array.isArray(scatteredBlocks)) {
+      for (const block of scatteredBlocks) {
+        const key = `${block.x},${block.y},${block.z}`;
+        const entry = this.blockData[key];
+        if (!entry) continue;
+        const entryType = typeof entry === 'string' ? entry : entry.type;
+        if (entryType !== block.type) continue;
+        filteredBlocks.push(block);
+      }
+    }
+
+    // 将过滤后的 scatteredBlocks 转换为 meshData 格式
+    const meshData = this._convertScatteredBlocksToMeshData(filteredBlocks);
 
     // 保存原始 solidBlocks 用于跨 Chunk 碰撞体
     this._tempOriginalSolidBlocks = solidBlocks ? [...solidBlocks] : [];
@@ -385,7 +399,7 @@ export function extendChunk(Chunk) {
     // 清理旧网格
     this._cleanupOldMeshes(consolidatedMeshKeys);
 
-    // 构建新的渲染网格（Worker 已计算 AO，buildMeshes 直接应用）
+    // 构建新的渲染网格
     this.buildMeshes(meshData || []);
 
     // 恢复宝箱状态
@@ -405,6 +419,47 @@ export function extendChunk(Chunk) {
     }
 
     if (this.dirtyBlocks > 0) this.scheduleConsolidation();
+  };
+
+  /**
+   * 将 scatteredBlocks 转换为 meshData 格式（按 type 分组）
+   */
+  Chunk.prototype._convertScatteredBlocksToMeshData = function(scatteredBlocks) {
+    if (!scatteredBlocks || scatteredBlocks.length === 0) return [];
+
+    // 按 type 分组
+    const groupedByType = {};
+    for (const block of scatteredBlocks) {
+      if (!groupedByType[block.type]) groupedByType[block.type] = [];
+      groupedByType[block.type].push(block);
+    }
+
+    // 转换为 meshData 格式
+    const meshData = [];
+    for (const [type, blocks] of Object.entries(groupedByType)) {
+      const count = blocks.length;
+      if (count === 0) continue;
+
+      const matrices = new Float32Array(count * 16);
+      const aoLow = new Float32Array(count);
+      const aoHigh = new Float32Array(count);
+      const orientation = new Float32Array(count);
+      const instanceIndexMap = {};
+
+      for (let i = 0; i < count; i++) {
+        const b = blocks[i];
+        matrices.set(b.matrix, i * 16);
+        aoLow[i] = b.aoLow;
+        aoHigh[i] = b.aoHigh;
+        orientation[i] = b.orientation;
+        const key = `${b.x},${b.y},${b.z}`;
+        instanceIndexMap[key] = i;
+      }
+
+      meshData.push({ type, count, matrices, aoLow, aoHigh, orientation, instanceIndexMap });
+    }
+
+    return meshData;
   };
 
   /**
