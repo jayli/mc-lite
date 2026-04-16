@@ -49,8 +49,8 @@ export function extendChunk(Chunk) {
 
       // 注册 Worker 回调
       workerCallbacks.set(callbackKey, (data) => {
-        this.acceptWorkerResult(data);
-        this.world?.onChunkWorkerReady?.(this);
+        // 新链路：通过 World.scatterManager 分发
+        this.world?._onChunkGenResult?.(this, data);
         resolve();
       });
 
