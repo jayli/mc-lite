@@ -1685,12 +1685,12 @@ onmessage = async function(e) {
     // 检查是否属于允许跨 Chunk 的小型实体
     const sourceType = blockSourceTypeMap.get(`${Math.floor(block.x)},${Math.floor(block.y)},${Math.floor(block.z)}`);
     if (sourceType && isCrossChunkOwnerType(sourceType)) {
-      return belongsToCrossChunkStructure(block.x, block.y, block.z);
+      return belongsToCrossChunkStructure(block.x, block.y, block.z, structureCenters);
     }
 
     // 对于没有 sourceType 的方块（如从相邻 chunk 传来的空岛/云朵），
     // 直接检查是否属于跨 Chunk 结构
-    return belongsToCrossChunkStructure(block.x, block.y, block.z);
+    return belongsToCrossChunkStructure(block.x, block.y, block.z, structureCenters);
   };
 
   // 如果有 snapshot，用 snapshot 中的方块覆盖 blockMap（保留玩家修改）

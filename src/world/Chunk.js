@@ -2175,6 +2175,62 @@ export class Chunk {
   }
 
   /**
+   * 增量追加 BlockScatterManager 分发来的方块数据
+   * 用于后加载 chunk 的溢出方块追加到已渲染的 chunk 中
+   * @param {Array} scatteredBlocks - 方块列表（含溢出）
+   * @param {Set} visibleBlockKeys - 面剔除可见的方块 key 集合
+   */
+  appendScatteredBlocks(scatteredBlocks, visibleBlockKeys) {
+    const minX = this.cx * CHUNK_SIZE;
+    const minZ = this.cz * CHUNK_SIZE;
+
+    let appendedCount = 0;
+
+    for (const block of scatteredBlocks) {
+      const localX = block.x - minX;
+      const localZ = block.z - minZ;
+      // 只处理属于本 chunk 范围的方块
+      if (localX < 0 || localX >= CHUNK_SIZE || localZ < 0 || localZ >= CHUNK_SIZE) {
+        continue;
+      }
+
+      const key = `${block.x},${block.y},${block.z}`;
+
+      // 跳过已存在的方块，尊重玩家修改或已有数据
+      if (key in this.blockData) continue;
+
+      // 写入 blockData
+      if (block.orientation !== 0) {
+        this.blockData[key] = { type: block.type, orientation: block.orientation };
+      } else {
+        this.blockData[key] = block.type;
+      }
+
+      // 写入 solidBlocks
+      const props = getBlockProps(block.type);
+      if (props.isSolid) {
+        this.solidBlocks.add(key);
+      }
+
+      appendedCount++;
+    }
+
+    // 从 visibleBlockKeys 追加可见标记
+    if (visibleBlockKeys) {
+      for (const key of visibleBlockKeys) {
+        this.visibleKeys.add(key);
+      }
+    }
+
+    if (appendedCount === 0) return;
+
+    // 同步数组存储并触发合并重建
+    this.dirtyBlocks += appendedCount;
+    this._initArrayStorageFromBlockData();
+    this.scheduleConsolidation();
+  }
+
+  /**
    * 从散装的方块数据构建渲染 mesh
    * 按 type 分组后，自动选择合批模式或 per-chunk 模式
    */

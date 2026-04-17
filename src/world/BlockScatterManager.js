@@ -34,7 +34,7 @@ export class BlockScatterManager {
 
       let buffer = this.chunkBuffers.get(chunkKey);
       if (!buffer) {
-        buffer = { blocks: [], loading: true, sourceWorkers: new Set(), visibleBlockKeys: new Set() };
+        buffer = { blocks: [], ready: false, sourceWorkers: new Set(), visibleBlockKeys: new Set() };
         this.chunkBuffers.set(chunkKey, buffer);
       }
       buffer.blocks.push(block);
@@ -51,7 +51,7 @@ export class BlockScatterManager {
     const ownKey = `${cx},${cz}`;
     const ownBuffer = this.chunkBuffers.get(ownKey);
     if (ownBuffer) {
-      ownBuffer.loading = false;
+      ownBuffer.ready = true;
     }
 
     // 3. 特殊实体直接分发给对应 chunk
@@ -83,19 +83,25 @@ export class BlockScatterManager {
 
   /**
    * 检查 chunk 是否就绪并通知渲染
+   * 支持首次渲染和已 ready chunk 的增量追加
    */
   flushReadyChunks() {
     for (const [key, buffer] of this.chunkBuffers) {
-      if (buffer.loading) continue;
+      if (!buffer.ready) continue;
 
       const chunk = this.world.chunks.get(key);
       if (!chunk) continue;
 
-      // 数据已就位，通知 chunk 渲染，传入 visibleBlockKeys
-      chunk.acceptScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys);
-
-      // 清理 buffer
-      this.chunkBuffers.delete(key);
+      if (!chunk.isReady) {
+        // 首次渲染：完整接受并构建 mesh
+        chunk.acceptScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys);
+      } else {
+        // 增量追加：只追加新方块并触发 consolidation
+        chunk.appendScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys);
+        // 清空已处理的方块，释放内存，保留 buffer 结构以接收后续溢出
+        buffer.blocks = [];
+        buffer.visibleBlockKeys = new Set();
+      }
     }
   }
 

@@ -152,11 +152,15 @@ export function extendChunk(Chunk) {
     const { type, count, matrices, aoLow, aoHigh, orientation, instanceIndexMap } = data;
 
     const props = getBlockProps(type);
-    if (!props.isRendered || count === 0) return;
+    if (!props.isRendered) return;
 
-    // 检查是否已存在相同类型的 InstancedMesh（如树叶在合并时被保留）
+    // 检查是否已存在相同类型的 InstancedMesh，若有则移除旧 mesh 以便重建
     const existingMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === type);
-    if (existingMesh) return; // 跳过已存在的类型，避免重复创建
+    if (existingMesh) {
+      this.group.remove(existingMesh);
+    }
+
+    if (count === 0) return;
 
     // 从材质管理器和几何体映射表获取资源
     const geometry = geomMap[props.geometryType] || geomMap['default'];
