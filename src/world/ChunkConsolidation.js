@@ -409,6 +409,9 @@ export function extendChunk(Chunk) {
     this._unregisterLightSources();
     this._registerLightSources();
 
+    // 重建数组存储，确保 blockDataArray 与 blockData 权威源同步
+    this._initArrayStorageFromBlockData();
+
     // 重置状态
     this.dirtyBlocks = Math.max(0, this.dirtyBlocks - consolidatedCount);
     this.isConsolidating = false;

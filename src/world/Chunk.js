@@ -70,6 +70,7 @@ export class Chunk {
     // 基础属性
     this.cx = cx;
     this.cz = cz;
+    this.worldY = 0; // 当前区块为单层 16x16x16，base Y = 0
     this.world = world;
     this.group = new THREE.Group();
     this.isReady = false;
@@ -2000,6 +2001,9 @@ export class Chunk {
     positions.forEach(p => {
       this._markDirtyAO(p.x, p.y, p.z, false);
     });
+
+    // 8. 重建数组存储，确保 blockDataArray 与 blockData 权威源同步
+    this._initArrayStorageFromBlockData();
   }
 
   /**
