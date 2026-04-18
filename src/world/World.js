@@ -9,6 +9,7 @@ import { persistenceService } from '../services/PersistenceService.js';
 import { noise } from '../utils/MathUtils.js';
 import { ParticleSystem } from './effects/ParticleSystem.js';
 import { parseBlockEntry } from '../utils/OrientationUtils.js';
+import { getBlockProps } from '../constants/BlockData.js';
 import { ChunkAssemblyScheduler } from './ChunkAssemblyScheduler.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
@@ -882,7 +883,21 @@ export class World {
 
     // --- 回退路径：使用 solidBlocks Set（覆盖 Y:16+ 和动态方块） ---
     const blockKey = `${ix},${iy},${iz}`;
-    return chunk.solidBlocks.has(blockKey);
+    if (chunk.solidBlocks.has(blockKey)) {
+      return true;
+    }
+
+    // --- blockData 回退（覆盖 RealisticTree 树干等 blockData 条目） ---
+    const type = chunk.blockData?.[blockKey];
+    if (type) {
+      const typeStr = typeof type === 'string' ? type : (type?.type || '');
+      if (typeStr && getBlockProps(typeStr).isSolid) {
+        return true;
+      }
+    }
+
+    // --- 特殊实体占位（modGunMan、rover 等通过 entityCollisionIndex 注册） ---
+    return !!chunk.getSpecialEntityCollisionAt?.(ix, iy, iz);
   }
 
   /**

@@ -88,30 +88,100 @@ export class Chunk {
     this._needsDeferredLightRegistration = false;
     this.disposed = false;
 
-    // 数据存储 (旧的对象存储 - 将逐步迁移)
+    // =========================================
+    // 数据存储
+    // =========================================
+
+    /**
+     * blockData — 权威数据源（Object）
+     * 存储该 Chunk 中所有动态方块（放置、挖掘、特殊结构产生的方块）。
+     * 格式: { "x,y,z": entry }，entry 可以是字符串类型或 { type, orientation } 对象。
+     * 读写者: World.setBlockDataState, World.removeBlock, Worker 结果接收, 持久化加载
+     * 包含: 所有被修改过的方块（地形生成后放置的方块、RealisticTree 树干占位等）。
+     * 不包含: 原始地形生成的方块（这些走 blockDataArray 路径）。
+     * 同步关系: 是 blockDataArray + solidBlockIds + solidBlocks 的权威来源。
+     *           当 blockData 变更时，需要同步更新上述派生结构。
+     */
     this.blockData = {};
+
+    /**
+     * solidBlocks — 实心方块世界坐标集合（Set<string>）
+     * 存储该 Chunk 中所有 isSolid=true 的方块的世界坐标字符串 "x,y,z"。
+     * 覆盖范围: Y:0~31（包含所有高度，不限于 blockDataArray 的 Y:0~15 范围）。
+     * 读写者: setBlockDataState（跟随 blockData 同步）、
+     *          acceptWorkerResult / buildMeshesForRegion（Worker 回传直接填充）、
+     *          FaceCullingWorker（面剔除结果回传）、_markBoundaryDirtyAO（AO 脏位遍历时间接读取）。
+     * 包含: blockData 中所有 isSolid=true 的方块。
+     * 不包含: 特殊实体占位（modGunMan、rover、RealisticTree）— 这些走 entityCollisionIndex。
+     * 同步关系: 应保持为 blockData 中实心方块的子集，与 blockData 同步。
+     *           注意: Worker 回传路径中可能先于 blockData 填充，需确保最终一致。
+     */
     this.solidBlocks = new Set();
     this.visibleKeys = new Set();
     this.instanceIndexMap = new Map();
 
-    // === 高性能数组存储 (新) ===
-    // 区块大小 16x16x16 = 4096 个方块
-    // blockDataArray[blockIndex] = blockId (0 = 空气)
-    // blockIndex = (y << 8) | (z << 4) | x = y * 256 + z * 16 + x
+    /**
+     * blockDataArray — 高速紧凑存储（Uint32Array[4096]）
+     * 以局部索引一维数组存储 Y:0~15 范围内所有方块的 blockId。
+     * 索引计算: blockIndex = (localY << 8) | (localZ << 4) | localX，其中 localY = worldY - chunk.worldY。
+     * blockId = 0 表示空气。
+     * 读写者: setBlockDataState（写入 blockId）、rebuildBlockDataArray（从 blockData 重建）、
+     *          World.isSolid（快速读取）、World.resolveBlockOwner（读取）、渲染管线（遍历）。
+     * 包含: Y:0~15 范围内所有方块的 blockId（包括空气=0）。
+     * 不包含: Y:16+ 的方块（这些走 blockData 对象路径）。
+     * 同步关系: 由 blockData 派生，通过 rebuildBlockDataArray 从 blockData 完整重建，
+     *           或通过 setBlockDataState 增量更新。变更后需要同步 solidBlockIds。
+     */
     this.blockDataArray = new Uint32Array(4096);
-    // Palette: blockId -> { type, orientation } 或字符串类型
-    // blockId 从 1 开始，0 保留给空气
+
+    /**
+     * blockPalette — blockId 到方块属性的映射（Map<number → { type, orientation }>）
+     * 与 blockDataArray 配合使用，blockId 从 1 开始递增，0 保留给空气（不存入 palette）。
+     * 读写者: _getOrCreateBlockId（写入）、rebuildBlockDataArray（重建）、
+     *          FaceCullingWorker/渲染（读取）。
+     */
     this.blockPalette = new Map();
-    this.blockPaletteReverse = new Map(); // type+JSON(orientation) -> blockId
-    this.nextBlockId = 1; // 下一个可用的 blockId
-    // 预注册空气（id=0，不存入 palette）
-    this.solidBlockIds = new Set(); // 存储实心方块对应的 blockId
+
+    /**
+     * blockPaletteReverse — 方块属性到 blockId 的反向映射（Map<string → number>）
+     * 键为 type+JSON(orientation) 的序列化字符串，值为对应的 blockId。
+     * 读写者: _getOrCreateBlockId（读写）。
+     */
+    this.blockPaletteReverse = new Map();
+
+    /**
+     * nextBlockId — 下一个可用的 blockId（从 1 开始）
+     * 写入者: _getOrCreateBlockId。
+     */
+    this.nextBlockId = 1;
+
+    /**
+     * solidBlockIds — 实心方块 blockId 集合（Set<number>）
+     * 存储 blockDataArray 中所有 isSolid=true 方块对应的 blockId。
+     * 覆盖范围: 仅 Y:0~15（与 blockDataArray 一致）。
+     * 读写者: setBlockDataState（增量更新 add/delete）、
+     *          rebuildBlockDataArray（完整重建）、
+     *          World.isSolid（快速读取，配合 blockDataArray 做 O(1) 实心查询）、
+     *          _markBoundaryDirtyAO（遍历 blockDataArray + solidBlockIds 标记 AO 脏位）。
+     * 包含: blockDataArray 中所有 isSolid=true 方块的 blockId。
+     * 不包含: 非实心方块、Y:16+ 方块、特殊实体占位。
+     * 同步关系: 由 blockDataArray 派生，与 blockDataArray 中的实心方块保持同步。
+     *           职责单一，仅服务于 World.isSolid 的快速路径。
+     */
+    this.solidBlockIds = new Set();
 
     // 实体与结构数据
-    this.entities = { realisticTrees: [], modGunMan: [], rovers: [] };
-    this.structureCenters = [];
-    this._tempOriginalSolidBlocks = null;
-    this.specialEntityRenderers = new Map();
+
+    /**
+     * entityCollisionIndex — 特殊实体碰撞占位索引（Map<string → { entityType, entityId, x, y, z }>）
+     * 存储特殊实体（modGunMan、rover 等）占据的方块坐标及其归属信息。
+     * 这些方块不属于 blockData，是纯碰撞占位。
+     * 读写者: _registerSpecialEntityCollision（写入）、_unregisterSpecialEntityCollision（删除）、
+     *          getSpecialEntityCollisionAt（读取）、World.isSolid（最终回退查询）。
+     * 包含: modGunMan（2格高柱体）、rover（3×3×5包围盒）等特殊实体的占位坐标。
+     * 不包含: 普通方块（走 blockData/solidBlocks）、矿车碰撞（走 MinecartManager 独立路径）。
+     * 同步关系: 独立注册/注销，与 blockData/solidBlocks 无同步依赖。
+     */
     this.entityCollisionIndex = new Map();
 
     // 后台合并系统
@@ -1117,7 +1187,6 @@ export class Chunk {
         y: record.y,
         z: record.z
       });
-      this.solidBlocks.add(key);
     });
   }
 
@@ -1133,7 +1202,6 @@ export class Chunk {
       const existing = this.entityCollisionIndex.get(key);
       if (existing && existing.entityId === record.id) {
         this.entityCollisionIndex.delete(key);
-        this.solidBlocks.delete(key);
       }
     });
   }

@@ -34,8 +34,7 @@ export class RealisticTree {
       if (template) {
         for (let i = 0; i < Math.ceil(template.trunkHeight); i++) {
           const key = `${Math.floor(x)},${Math.floor(y + i)},${Math.floor(z)}`;
-          chunk.solidBlocks.add(key);
-          // 添加到 blockData，使 removeBlock 能够正确处理
+          // 树干碰撞体通过 blockData 记录，由 isSolid 路径处理
           chunk.blockData[key] = 'realistic_trunk_collider';
         }
       }
