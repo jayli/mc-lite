@@ -173,6 +173,28 @@ export class Chunk {
     // 实体与结构数据
 
     /**
+     * entities — 特殊实体实例列表
+     * 存储 modGunMan、rover、realisticTrees 等实体的实例数据。
+     */
+    this.entities = { realisticTrees: [], modGunMan: [], rovers: [] };
+
+    /**
+     * structureCenters — 结构中心位置列表
+     */
+    this.structureCenters = [];
+
+    /**
+     * _tempOriginalSolidBlocks — 合并过程中临时保存的原始 solidBlocks
+     */
+    this._tempOriginalSolidBlocks = null;
+
+    /**
+     * specialEntityRenderers — 特殊实体渲染器缓存（Map<entityType → InstancedRenderer>）
+     * 存储 modGunMan、rover 等实体的实例化渲染器。
+     */
+    this.specialEntityRenderers = new Map();
+
+    /**
      * entityCollisionIndex — 特殊实体碰撞占位索引（Map<string → { entityType, entityId, x, y, z }>）
      * 存储特殊实体（modGunMan、rover 等）占据的方块坐标及其归属信息。
      * 这些方块不属于 blockData，是纯碰撞占位。
