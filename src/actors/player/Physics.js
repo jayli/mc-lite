@@ -345,8 +345,21 @@ export class Physics {
   }
 
   /**
-  * 判断指定方块坐标是否为实心
-  */
+   * 判断指定方块坐标是否为实心（玩家碰撞检测统一入口）
+   *
+   * 查询顺序（由快到慢，短路返回）：
+   *   1. 帧缓存 — 同帧内同一坐标的查询结果直接复用
+   *   2. World.isSolid() — 四级查询链：
+   *      a. solidBlockIds      → Y:0~15 的实心方块快速查询（Set<number>）
+   *      b. solidBlocks        → Y:16+ 和动态方块的实心查询（Set<string>）
+   *      c. blockData          → 通过 getBlockProps(type).isSolid 判断（RealisticTree 树干等）
+   *      d. entityCollisionIndex → 特殊实体占位（modGunMan、rover）
+   *   3. getBlock().isSolid   → 未加载 chunk 时的噪声地形回退
+   *   4. MinecartManager      → 矿车实体碰撞（独立路径，不走方块体系）
+   *
+   * 注意：炮弹碰撞（Projectile.js）和丧尸碰撞不走此路径，
+   *       它们有独立的碰撞检测实现。
+   */
   isSolid(x, y, z) {
     const cacheKey = `${x},${y},${z}`;
 
