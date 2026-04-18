@@ -450,12 +450,15 @@ export class Player {
       const px = Math.floor(this.position.x);
       const pz = Math.floor(this.position.z);
       const py = Math.floor(this.position.y);
+      const wasFalling = this.velocity.y < -0.1; // 记录是否在下落
 
       // 向下检查固体方块（最多 10 格，增加检查深度以应对海底沙块填充）
       for(let k=0; k<=10; k++) {
-        const blockType = this.world.getBlock(px, py - k, pz);
-        if(this.physics.isSolid(px, py - k, pz) || blockType === 'cloud') {
-          gy = py - k + 1;
+        const checkY = py - k;
+        const blockType = this.world.getBlock(px, checkY, pz);
+        const solid = this.physics.isSolid(px, checkY, pz);
+        if(solid || blockType === 'cloud') {
+          gy = checkY + 1;
           break;
         }
       }
@@ -468,9 +471,7 @@ export class Player {
         // 检查海平面附近是否有沙块支撑
         for(let k=0; k<=5; k++) {
           const checkY = seaLevel - k;
-          const blockType = this.world.getBlock(px, checkY, pz);
           if(this.physics.isSolid(px, checkY, pz)) {
-            // 找到支撑，地面高度为支撑方块上方
             gy = checkY + 1;
             break;
           }
@@ -478,7 +479,9 @@ export class Player {
       }
 
       // 如果仍然没有检测到地面，回退到噪声地形高度
-      if(gy === -100) gy = Math.floor(noise(px, pz) * 0.5) + 1;
+      if(gy === -100) {
+        gy = Math.floor(noise(px, pz) * 0.5) + 1;
+      }
 
       this.position.y += this.velocity.y * dt;
       if (this.position.y < gy) {

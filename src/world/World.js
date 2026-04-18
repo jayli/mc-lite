@@ -696,28 +696,7 @@ export class World {
     if (ownerChunkKey) {
       const ownerChunk = this.chunks.get(ownerChunkKey);
       if (ownerChunk?.isReady) {
-        // 尝试新存储
-        const olx = ix & 15;
-        const oly = iy - ownerChunk.worldY;
-        const olz = iz & 15;
-        if (oly >= 0 && oly < 16) {
-          const blockIndex = (oly << 8) | (olz << 4) | olx;
-          const blockId = ownerChunk.blockDataArray?.[blockIndex];
-          if (blockId) {
-            const entry = ownerChunk._getEntryFromBlockId(blockId);
-            if (entry) {
-              return {
-                ownerChunk,
-                ownerChunkKey,
-                coordChunk,
-                coordChunkKey,
-                blockKey,
-                entry
-              };
-            }
-          }
-        }
-        // 回退到旧存储
+        // 跨 chunk 查找：不能使用 blockDataArray（它是 chunk 局部坐标），直接用 blockData
         const entry = ownerChunk.blockData[blockKey];
         if (entry) {
           return {
@@ -743,29 +722,7 @@ export class World {
     for (const [otherKey, otherChunk] of this.chunks) {
       if (!otherChunk?.isReady || otherKey === coordChunkKey) continue;
 
-      // 尝试新存储
-      const olx = ix & 15;
-      const oly = iy - otherChunk.worldY;
-      const olz = iz & 15;
-      if (oly >= 0 && oly < 16) {
-        const blockIndex = (oly << 8) | (olz << 4) | olx;
-        const blockId = otherChunk.blockDataArray?.[blockIndex];
-        if (blockId) {
-          const entry = otherChunk._getEntryFromBlockId(blockId);
-          if (entry) {
-            this.crossChunkOwnerCache.set(blockKey, otherKey);
-            return {
-              ownerChunk: otherChunk,
-              ownerChunkKey: otherKey,
-              coordChunk,
-              coordChunkKey,
-              blockKey,
-              entry
-            };
-          }
-        }
-      }
-      // 回退到旧存储
+      // 全量扫描：不能使用 blockDataArray（chunk 局部坐标），直接用 blockData
       const entry = otherChunk.blockData[blockKey];
       if (entry) {
         this.crossChunkOwnerCache.set(blockKey, otherKey);
@@ -896,7 +853,7 @@ export class World {
    * @returns {boolean} 是否发生碰撞
    */
   isSolid(x, y, z) {
-    const cx = x >> 4;  // Math.floor(x / 16)
+    const cx = x >> 4;
     const cz = z >> 4;
     const key = `${cx},${cz}`;
     const chunk = this.chunks.get(key);
@@ -911,7 +868,7 @@ export class World {
     const iy = y | 0;
     const iz = z | 0;
 
-    // --- 快速路径：使用新的数组存储 ---
+    // --- 快速路径：使用 blockDataArray（每个 chunk 的 Uint32Array 局部存储） ---
     const lx = ix & 15;
     const ly = iy - chunk.worldY;
     const lz = iz & 15;
@@ -921,39 +878,11 @@ export class World {
       if (blockId && chunk.solidBlockIds?.has(blockId)) {
         return true;
       }
-      if (blockId === 0) {
-        // 空气，检查跨区块
-      }
     }
 
-    // --- 回退路径：使用旧的 solidBlocks Set ---
+    // --- 回退路径：使用 solidBlocks Set（覆盖 Y:16+ 和动态方块） ---
     const blockKey = `${ix},${iy},${iz}`;
-    if (chunk.solidBlocks.has(blockKey)) {
-      return true;
-    }
-
-    // 查询其他 Chunk（跨区块结构）
-    for (const [, otherChunk] of this.chunks) {
-      if (otherChunk.isReady && otherChunk !== chunk) {
-        // 尝试新存储
-        const olx = ix & 15;
-        const oly = iy - otherChunk.worldY;
-        const olz = iz & 15;
-        if (oly >= 0 && oly < 16) {
-          const blockIndex = (oly << 8) | (olz << 4) | olx;
-          const blockId = otherChunk.blockDataArray?.[blockIndex];
-          if (blockId && otherChunk.solidBlockIds?.has(blockId)) {
-            return true;
-          }
-        }
-        // 回退到旧存储
-        if (otherChunk.solidBlocks.has(blockKey)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
+    return chunk.solidBlocks.has(blockKey);
   }
 
   /**
