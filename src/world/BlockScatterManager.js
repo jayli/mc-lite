@@ -70,9 +70,7 @@ export class BlockScatterManager {
     const chunk = this.world.chunks.get(`${cx},${cz}`);
     if (!chunk) return;
 
-    if (entities.realisticTrees?.length) {
-      chunk.entities.realisticTrees = entities.realisticTrees;
-    }
+
     if (entities.modGunMan?.length) {
       chunk.entities.modGunMan = entities.modGunMan;
     }
