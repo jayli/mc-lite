@@ -13,6 +13,7 @@
   "repository": "git@github.com:jayli/mc-lite.git",
   "license": "ISC",
   "devDependencies": {
-    "eslint": "^9.39.4"
+    "eslint": "^9.39.4",
+    "playwright": "^1.59.1"
   }
 }

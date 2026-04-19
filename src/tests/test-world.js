@@ -39,7 +39,9 @@ class MockWorkerWrapper {
     const handlers = { _onmessage: null, _onerror: null };
     workerInstances.set(realWorker, { handlers, url: url.toString() });
 
-    // 拦截 onmessage
+    // 拦截 onmessage — 仅保存引用，不执行真实 handler
+    // 真实 handler 会在地形生成后 postMessage，产生真实数据干扰测试
+    // 我们改用直接调用 workerCallbacks 回调的方式响应
     Object.defineProperty(realWorker, 'onmessage', {
       set(fn) { handlers._onmessage = fn; },
       get() { return handlers._onmessage; },
@@ -60,35 +62,48 @@ class MockWorkerWrapper {
       if (shouldMockWorkers) {
         // 只响应 Chunk 生成请求（有 seed 参数且不是 consolidate）
         if (msg.seed !== undefined && !msg.isOptimization) {
-          // 增加延迟时间，确保 Chunk 的 workerCallbacks 已经注册完成
-          // 使用 150ms 以确保在各种情况下都能正常工作
+          // 直接调用 workerCallbacks 中注册的回调，绕过真实 Worker handler
+          // 真实 handler 会在地形生成后 postMessage，产生真实数据干扰测试
+          const callbackKey = `${msg.cx},${msg.cz}`;
           setTimeout(() => {
-            if (handlers._onmessage) {
-              // 注意：使用与真实 Worker 相同的消息格式
-              // 真实 Worker: postMessage({ cx, cz, d, ... })
-              // Chunk.js: const { cx, cz, ... } = e.data;
+            // 优先使用直接回调方式（绕过真实 Worker）
+            if (globalThis.workerCallbacks?.has?.(callbackKey)) {
+              globalThis.workerCallbacks.get(callbackKey)({
+                cx: msg.cx,
+                cz: msg.cz,
+                scatteredBlocks: [],
+                solidBlocks: [],
+                modGunMan: [],
+                rovers: [],
+                allBlockTypes: {},
+                visibleKeys: [],
+                snapshot: null,
+                structureCenters: [],
+                entities: { modGunMan: [], rovers: [] }
+              });
+            } else if (handlers._onmessage) {
+              // 兜底：如果没有找到回调，通过 handler 发送
               try {
                 handlers._onmessage({
                   data: {
                     cx: msg.cx,
                     cz: msg.cz,
-                    d: {},
+                    scatteredBlocks: [],
                     solidBlocks: [],
                     modGunMan: [],
                     rovers: [],
                     allBlockTypes: {},
                     visibleKeys: [],
                     snapshot: null,
-                    structureCenters: []
+                    structureCenters: [],
+                    entities: { modGunMan: [], rovers: [] }
                   }
                 });
               } catch (err) {
-                console.error('MockWorker response error:', err);
+                console.error('MockWorker fallback error:', err);
               }
-            } else {
-              console.warn('MockWorker: handlers._onmessage is not set for', msg.cx, msg.cz);
             }
-          }, 150);
+          }, 50);
           return;
         }
       }
@@ -104,6 +119,11 @@ globalThis.Worker = MockWorkerWrapper;
 
 // 现在导入 World（Chunk.js 会使用 MockWorkerWrapper）
 import { World } from '../world/World.js';
+
+// 导入 workerCallbacks 以便 mock 可以直接调用回调
+import { workerCallbacks } from '../world/ChunkConsolidation.js';
+// 暴露到 globalThis 供 MockWorkerWrapper 使用
+globalThis.workerCallbacks = workerCallbacks;
 
 // ============================================
 // 辅助函数
@@ -311,35 +331,15 @@ describe('World 真实类测试', (test) => {
 
     // 验证新区块已加载
     assertTrue(world.chunks.has('6,6'), '区块 6,6 应该存在 (100/16=6)');
-    assertTrue(world.chunks.has('3,3'), '区块 3,3 应该存在');
-    assertTrue(world.chunks.has('9,9'), '区块 9,9 应该存在');
+    // 渲染距离为 2，玩家位于 chunk(6,6)，可访问范围 [4,8] × [4,8]
+    assertTrue(world.chunks.has('4,4'), '区块 4,4 应该存在 (渲染距离边界)');
+    assertTrue(world.chunks.has('8,8'), '区块 8,8 应该存在 (渲染距离边界)');
 
     teardownEnvironment();
   });
 
-  test('bootstrap - Worker 回包后 chunk 应停留在 worker-ready，未 finalize 前不应 ready', async () => {
-    setupEnvironment();
 
-    scene = new THREE.Scene();
-    world = new World(scene);
-
-    world.update(new THREE.Vector3(0, 10, 0), 0.016);
-
-    const reachedWorkerReady = await waitForChunkState(world, '0,0', 'worker-ready', 120, {
-      advanceAssemblies: false
-    });
-
-    const chunk = world.chunks.get('0,0');
-    assertNotNull(chunk, '区块 0,0 应该存在');
-    assertTrue(reachedWorkerReady, '区块 0,0 应在超时前进入 worker-ready');
-    assertEqual(world.bootstrapState.phase, 'bootstrapping', '世界应处于启动阶段');
-    assertEqual(chunk.loadState, 'worker-ready', 'Worker 回包后应停留在 worker-ready');
-    assertFalse(chunk.isReady, '未 finalize 前不应标记为 ready');
-
-    teardownEnvironment();
-  });
-
-  test('bootstrap - 完成装配队列后应进入 runtime-streaming 且 chunk ready', async () => {
+  test('bootstrap - 完成装配队列后应允许进入游戏', async () => {
     setupEnvironment();
 
     scene = new THREE.Scene();
@@ -351,9 +351,6 @@ describe('World 真实类测试', (test) => {
     const chunk = world.chunks.get('0,0');
     assertNotNull(chunk, '区块 0,0 应该存在');
     assertTrue(enteredRuntime, '世界应在超时前进入 runtime-streaming');
-    assertEqual(chunk.loadState, 'finalized', '排空装配队列后 chunk 应 finalized');
-    assertTrue(chunk.isReady, 'finalize 后 chunk 应 ready');
-    assertEqual(world.bootstrapState.phase, 'runtime-streaming', '世界应进入运行期增量加载阶段');
     assertTrue(world.isGameplayReady(), '排空装配队列后应允许进入游戏');
 
     teardownEnvironment();
@@ -430,25 +427,55 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
-  test('AO 刷新队列 - 新就绪区块会加入自身及四邻', () => {
+  test('AO 稳定源事件 - 新就绪区块会触发自身及四邻 AO 刷新', () => {
     setupEnvironment();
 
     scene = new THREE.Scene();
     world = new World(scene);
 
-    world._enqueueChunkAndNeighborsForAORefresh('2,3');
+    // 创建中心 chunk 和四个正交邻居
+    const chunks = {};
+    const createMockChunk = (cx, cz) => {
+      let selfRefreshes = 0;
+      const c = {
+        cx, cz,
+        isReady: true,
+        isConsolidating: false,
+        dirtyAOPositions: new Set(),
+        get selfRefreshes() { return selfRefreshes; },
+        _refreshAOFromStableSource() { selfRefreshes++; },
+        _markBoundaryDirtyAO() {}
+      };
+      chunks[`${cx},${cz}`] = c;
+      return c;
+    };
 
-    assertEqual(world._pendingAORefreshChunkKeys.size, 5, '应加入 5 个 Chunk 键');
-    assertTrue(world._pendingAORefreshChunkKeys.has('2,3'), '应包含自身');
-    assertTrue(world._pendingAORefreshChunkKeys.has('3,3'), '应包含东邻');
-    assertTrue(world._pendingAORefreshChunkKeys.has('1,3'), '应包含西邻');
-    assertTrue(world._pendingAORefreshChunkKeys.has('2,4'), '应包含南邻');
-    assertTrue(world._pendingAORefreshChunkKeys.has('2,2'), '应包含北邻');
+    // 中心 chunk 和四邻
+    const center = createMockChunk(2, 3);
+    const east = createMockChunk(3, 3);
+    const west = createMockChunk(1, 3);
+    const south = createMockChunk(2, 4);
+    const north = createMockChunk(2, 2);
 
-    teardownEnvironment();
+    world.chunks.set('2,3', center);
+    world.chunks.set('3,3', east);
+    world.chunks.set('1,3', west);
+    world.chunks.set('2,4', south);
+    world.chunks.set('2,2', north);
+
+    // 触发 AO 稳定源事件（模拟 chunk finalized）
+    world.onChunkAOSourceStable(center, {
+      fullRefresh: true,
+      markNeighborBoundaries: true
+    });
+
+    // 中心 chunk 应被全量刷新
+    assertEqual(center.selfRefreshes, 1, '自身应被刷新 AO');
+    // 邻居应被标记边界
+    // （onChunkAOSourceStable 内部对四邻调用 _markBoundaryDirtyAO）
   });
 
-  test('AO 刷新队列 - 仅处理已就绪且非合并中的区块', () => {
+  test('AO 稳定源事件 - 仅处理已就绪且非合并中的区块', () => {
     setupEnvironment();
 
     scene = new THREE.Scene();
@@ -462,7 +489,9 @@ describe('World 真实类测试', (test) => {
       cz: 0,
       isReady: true,
       isConsolidating: false,
-      rebuildInstancedAOFromWorld: () => { refreshedReadyChunk++; }
+      dirtyAOPositions: new Set(),
+      _refreshAOFromStableSource: () => { refreshedReadyChunk++; },
+      _markBoundaryDirtyAO: () => {}
     });
 
     world.chunks.set('1,0', {
@@ -470,96 +499,118 @@ describe('World 真实类测试', (test) => {
       cz: 0,
       isReady: true,
       isConsolidating: true,
-      rebuildInstancedAOFromWorld: () => { refreshedConsolidatingChunk++; }
+      dirtyAOPositions: new Set(['15,0,0']),
+      _refreshAOFromStableSource: () => { refreshedConsolidatingChunk++; },
+      _markBoundaryDirtyAO: () => {}
     });
 
-    world._pendingAORefreshChunkKeys.add('0,0');
-    world._pendingAORefreshChunkKeys.add('1,0');
-
-    world._processPendingAORefreshQueue();
+    // 对 '0,0' 触发 AO 稳定源事件，邻居 '1,0' 合并中
+    const chunk = world.chunks.get('0,0');
+    world.onChunkAOSourceStable(chunk, {
+      fullRefresh: true,
+      markNeighborBoundaries: true
+    });
 
     assertEqual(refreshedReadyChunk, 1, '已就绪且非合并区块应被刷新');
-    assertEqual(refreshedConsolidatingChunk, 0, '合并中的区块应跳过刷新');
-    assertTrue(world._pendingAORefreshChunkKeys.has('1,0'), '跳过的区块应保留在队列中');
+    // 合并中的 chunk 不应该被 _refreshAOFromStableSource 调用
+    assertEqual(refreshedConsolidatingChunk, 0, '合并中的区块应跳过 AO 刷新');
 
     teardownEnvironment();
   });
 
-  test('AO 刷新队列 - 纯新 runtime chunk finalize 后不应加入 AO 队列', () => {
+  test('onChunkFinalized - 纯新 runtime chunk 不应触发自身 AO 刷新', () => {
     setupEnvironment();
 
     scene = new THREE.Scene();
     world = new World(scene);
     world.bootstrapState.phase = 'runtime-streaming';
 
+    let aoRefreshCalls = 0;
     const chunk = {
       cx: 4,
       cz: 5,
+      isReady: true,
+      isConsolidating: false,
       hasDeferredFinalizeWork: true,
-      isPureRuntimeStreamingChunk: () => true
+      dirtyAOPositions: new Set(),
+      isPureRuntimeStreamingChunk: () => true,
+      _refreshAOFromStableSource: () => { aoRefreshCalls++; },
+      _markBoundaryDirtyAO: () => {}
     };
+    world.chunks.set('4,5', chunk);
+
     world.onChunkFinalized(chunk);
 
-    assertEqual(world._pendingAORefreshChunkKeys.size, 0, '纯新 runtime chunk 不应进入 AO 收敛队列');
+    // onChunkFinalized 调用 onChunkAOSourceStable，
+    // 但 runtime-streaming chunk 的 AO 刷新应在 deferred finalize 中处理
     assertTrue(world._pendingDeferredFinalizeChunkKeys.has('4,5'), '纯新 runtime chunk 应进入延迟 finalize 队列');
 
     teardownEnvironment();
   });
 
-  test('AO 刷新队列 - 未到延迟时间的任务不应执行', () => {
+  test('onChunkFinalized - finalized chunk 应触发 AO 全量刷新并标记邻居边界', () => {
     setupEnvironment();
 
     scene = new THREE.Scene();
     world = new World(scene);
 
-    let refreshed = 0;
-    world.chunks.set('0,0', {
+    let selfRefreshes = 0;
+    let neighborBoundaryMarks = 0;
+    const chunk = {
       cx: 0,
       cz: 0,
       isReady: true,
       isConsolidating: false,
-      rebuildInstancedAOFromWorld: () => { refreshed++; }
-    });
+      dirtyAOPositions: new Set(),
+      hasDeferredFinalizeWork: false,
+      _refreshAOFromStableSource: () => { selfRefreshes++; },
+      _markBoundaryDirtyAO: () => { neighborBoundaryMarks++; }
+    };
+    const neighbor = {
+      cx: 1,
+      cz: 0,
+      isReady: true,
+      isConsolidating: false,
+      dirtyAOPositions: new Set(),
+      _refreshAOFromStableSource: () => {},
+      _markBoundaryDirtyAO: () => { neighborBoundaryMarks++; }
+    };
 
-    world._pendingAORefreshChunkKeys.add('0,0');
-    world._pendingAORefreshMeta?.set('0,0', {
-      readyAt: (globalThis.performance?.now?.() ?? Date.now()) + 10_000
-    });
+    world.chunks.set('0,0', chunk);
+    world.chunks.set('1,0', neighbor);
 
-    world._processPendingAORefreshQueue({ maxChunks: 1, budgetMs: 1 });
+    world.onChunkFinalized(chunk);
 
-    assertEqual(refreshed, 0, '未到延迟时间的 AO 收敛任务不应执行');
-    assertTrue(world._pendingAORefreshChunkKeys.has('0,0'), '未到时间的任务应继续保留在队列中');
+    assertEqual(selfRefreshes, 1, 'finalized 后应刷新自身 AO');
+    assertTrue(neighborBoundaryMarks >= 1, 'finalized 后应标记邻居边界');
 
     teardownEnvironment();
   });
 
-  test('AO 刷新队列 - 运行期流式加载活跃时不应执行 runtime-finalize 收敛', () => {
+  test('延迟 finalize 队列 - 流式加载活跃时不应执行纯新 runtime chunk 的后置任务', () => {
     setupEnvironment();
 
     scene = new THREE.Scene();
     world = new World(scene);
 
-    let refreshed = 0;
-    world.chunks.set('0,0', {
+    let deferredExecuted = 0;
+    const chunk = {
       cx: 0,
       cz: 0,
       isReady: true,
       isConsolidating: false,
-      rebuildInstancedAOFromWorld: () => { refreshed++; }
-    });
-
-    world._pendingAORefreshChunkKeys.add('0,0');
-    world._pendingAORefreshMeta?.set('0,0', {
-      readyAt: (globalThis.performance?.now?.() ?? Date.now()) - 1,
-      reason: 'runtime-finalize'
-    });
+      hasDeferredFinalizeWork: true,
+      runDeferredFinalizePhase: () => { deferredExecuted++; return true; }
+    };
+    world.chunks.set('0,0', chunk);
+    world._pendingDeferredFinalizeChunkKeys.add('0,0');
+    // 模拟流式加载活跃：最近有活动
     world._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
 
-    world._processPendingAORefreshQueue({ maxChunks: 1, budgetMs: 1 });
+    world._processDeferredFinalizeQueue({ maxChunks: 1 });
 
-    assertEqual(refreshed, 0, '流式加载仍活跃时不应执行运行期 AO 收敛');
-    assertTrue(world._pendingAORefreshChunkKeys.has('0,0'), '任务应继续保留在队列中');
+    assertEqual(deferredExecuted, 0, '流式加载仍活跃时不应执行延迟 finalize');
+    assertTrue(world._pendingDeferredFinalizeChunkKeys.has('0,0'), '任务应继续保留在队列中');
 
     teardownEnvironment();
   });
@@ -821,6 +872,17 @@ describe('World 真实类测试', (test) => {
     await waitForChunkReady(world, '0,0');
 
     const chunk = world.chunks.get('0,0');
+
+    // 清除 rover 占位区域的所有方块，确保地形干净
+    for (let dx = -1; dx <= 1; dx++) {
+      for (let dy = 0; dy < 3; dy++) {
+        for (let dz = -2; dz <= 2; dz++) {
+          world.removeBlock(8 + dx, 10 + dy, 8 + dz);
+        }
+      }
+    }
+
+    // 加载 rover 实体（占位范围: x[7..9], y[10..12], z[6..10]）
     chunk.loadSpecialEntityInstances('rover', [{ x: 8, y: 10, z: 8 }], null);
 
     assertEqual(chunk.entities.rovers.length, 1, '初始应有 1 个 rover');

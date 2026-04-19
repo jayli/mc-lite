@@ -597,7 +597,7 @@ describe('Chunk 真实类测试', (test) => {
 
     // 验证透明方块在 chunk1 中且可见
     assertNotNull(chunk1.blockData.get(Chunk.encodeCoord(16, 10, 8)), '透明方块应该在 chunk1 中');
-    assertTrue(chunk1.visibleKeys.has('16,10,8'), '透明方块应该可见');
+    assertTrue(chunk1.visibleKeys.has(Chunk.encodeCoord(16, 10, 8)), '透明方块应该可见');
 
     teardownEnvironment();
   });
@@ -1007,7 +1007,7 @@ describe('Chunk 真实类测试', (test) => {
     const type = 'stone';
     const entry = { type, orientation: 0 };
 
-    chunk._updateBlockState(key, type, entry);
+    chunk._updateBlockState(5, 10, 5, type, entry);
 
     // 验证状态更新
     assertNotNull(chunk.blockData.get(key), 'blockData 应该包含新方块');

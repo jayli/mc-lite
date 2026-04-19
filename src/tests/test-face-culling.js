@@ -13,6 +13,7 @@ import { describe, test } from './runner.js';
 import { assertEqual, assertTrue, assertFalse, assertNotNull } from './assert.js';
 import { faceMask, countVisibleFaces } from '../utils/FaceCullingUtils.js';
 import { FaceCullingSystem } from '../core/FaceCullingSystem.js';
+import { Chunk } from '../world/Chunk.js';
 
 // ========== 测试套件 ==========
 describe('FaceCullingSystem 测试', (test) => {
@@ -781,11 +782,12 @@ describe('FaceCullingSystem 测试', (test) => {
       { x: 2, y: 0, z: 0, type: 'stone' }
     ];
 
-    const blockData = {
-      '0,0,0': 'stone',
-      '1,0,0': 'glass_block',
-      '2,0,0': 'stone'
-    };
+    // blockData 必须是 Map 格式（与 Chunk.blockData 实际数据结构一致）
+    const blockData = new Map([
+      [Chunk.encodeCoord(0, 0, 0), 'stone'],
+      [Chunk.encodeCoord(1, 0, 0), 'glass_block'],
+      [Chunk.encodeCoord(2, 0, 0), 'stone']
+    ]);
 
     const results = system.calculateMultipleFaceVisibilities(blocks, blockData);
 

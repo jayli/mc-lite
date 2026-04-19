@@ -10,13 +10,25 @@ import { calculateAOForBlock, createOcclusionChecker, unpackAOValue } from '../u
 import { getBlockProperties } from '../constants/BlockData.js';
 import { Chunk } from '../world/Chunk.js';
 
+/**
+ * 将方块数据从普通对象转换为 Map（符合 Chunk.blockData 的实际数据结构）
+ */
+function toBlockDataMap(obj) {
+  const map = new Map();
+  for (const [key, entry] of Object.entries(obj)) {
+    const [x, y, z] = key.split(',').map(Number);
+    map.set(Chunk.encodeCoord(x, y, z), entry);
+  }
+  return map;
+}
+
 describe('AO 遮挡判定一致性测试', (test) => {
   test('邻接 Chunk 未 finalized 时应视为空气（不遮挡）', () => {
     const currentChunk = {
       cx: 0,
       cz: 0,
       isReady: true,
-      blockData: { '15,0,0': { type: 'stone', orientation: 0 } }
+      blockData: toBlockDataMap({ '15,0,0': { type: 'stone', orientation: 0 } })
     };
 
     const pendingNeighborChunk = {
@@ -24,7 +36,7 @@ describe('AO 遮挡判定一致性测试', (test) => {
       cz: 0,
       isReady: false,
       loadState: 'worker-ready',
-      blockData: { '16,0,0': { type: 'stone', orientation: 0 } }
+      blockData: toBlockDataMap({ '16,0,0': { type: 'stone', orientation: 0 } })
     };
 
     const isOccluding = createOcclusionChecker(
@@ -41,7 +53,7 @@ describe('AO 遮挡判定一致性测试', (test) => {
       cx: 0,
       cz: 0,
       isReady: true,
-      blockData: { '0,0,0': { type: 'stone', orientation: 0 } }
+      blockData: toBlockDataMap({ '0,0,0': { type: 'stone', orientation: 0 } })
     };
 
     const isOccluding = createOcclusionChecker(
@@ -59,10 +71,10 @@ describe('AO 遮挡判定一致性测试', (test) => {
       cx: 0,
       cz: 0,
       isReady: true,
-      blockData: {
+      blockData: toBlockDataMap({
         '1,0,0': { type: 'stone', orientation: 0 },
         '2,0,0': { type: 'glass_block', orientation: 0 }
-      }
+      })
     };
 
     const isOccluding = createOcclusionChecker(
@@ -80,10 +92,10 @@ describe('AO 遮挡判定一致性测试', (test) => {
       cx: 0,
       cz: 0,
       isReady: true,
-      blockData: {
+      blockData: toBlockDataMap({
         '1,0,0': { type: 'bed_head', orientation: 0 }, // geometryType=half_block
         '2,0,0': { type: 'stone', orientation: 0 }
-      }
+      })
     };
 
     const isOccluding = createOcclusionChecker(
