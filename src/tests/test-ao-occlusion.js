@@ -98,12 +98,12 @@ describe('AO 遮挡判定一致性测试', (test) => {
 
   test('删除方块后的 AO 影响范围应覆盖 26 邻域', () => {
     const impacted = Chunk.getAOImpactedNeighborKeys(0, 0, 0);
-    const impactedSet = new Set(impacted.map(item => item.key));
+    const impactedSet = new Set(impacted.map(item => item.code));
 
-    assertTrue(impactedSet.has('1,0,0'), '应包含正交邻居');
-    assertTrue(impactedSet.has('1,1,0'), '应包含边邻');
-    assertTrue(impactedSet.has('1,1,1'), '应包含角邻');
-    assertFalse(impactedSet.has('0,0,0'), '不应包含被删除方块自身');
+    assertTrue(impactedSet.has(Chunk.encodeCoord(1, 0, 0)), '应包含正交邻居');
+    assertTrue(impactedSet.has(Chunk.encodeCoord(1, 1, 0)), '应包含边邻');
+    assertTrue(impactedSet.has(Chunk.encodeCoord(1, 1, 1)), '应包含角邻');
+    assertFalse(impactedSet.has(Chunk.encodeCoord(0, 0, 0)), '不应包含被删除方块自身');
     assertTrue(impacted.length >= 26, '至少应覆盖 26 个邻居位置');
   });
 

@@ -4,6 +4,7 @@
  * 使用 InstancedMesh 优化渲染性能，管理区块内的所有方块和实体
  */
 import * as THREE from 'three';
+import { encodeCoord, decodeCoord, blockDataToStringKeys } from '../utils/CoordEncoding.js';
 import { materials } from '../core/MaterialManager.js';
 import { persistenceService } from '../services/PersistenceService.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
@@ -72,7 +73,7 @@ export class Chunk {
    * @returns {number} 编码后的数字 key
    */
   static encodeCoord(x, y, z) {
-    return ((Math.floor(x) + 1000000) * 2049 + (Math.floor(y) + 512)) * 2000001 + (Math.floor(z) + 1000000);
+    return encodeCoord(x, y, z);
   }
 
   /**
@@ -81,11 +82,7 @@ export class Chunk {
    * @returns {{x:number,y:number,z:number}} 世界坐标
    */
   static decodeCoord(code) {
-    const z = (code % 2000001) - 1000000;
-    const t = Math.floor(code / 2000001);
-    const y = (t % 2049) - 512;
-    const x = Math.floor(t / 2049) - 1000000;
-    return { x, y, z };
+    return decodeCoord(code);
   }
 
   /**
@@ -921,7 +918,7 @@ export class Chunk {
       const nc = this.world?.chunks?.get(`${this.cx + dx},${this.cz + dz}`);
       if (nc && nc.isReady) {
         neighborChunks.push({
-          blockData: Object.fromEntries(nc.blockData),
+          blockData: blockDataToStringKeys(nc.blockData),
           cx: nc.cx,
           cz: nc.cz
         });
@@ -945,7 +942,7 @@ export class Chunk {
         requestId,
         chunkKey: `${this.cx},${this.cz}`,
         positions,
-        blockData: Object.fromEntries(this.blockData),
+        blockData: blockDataToStringKeys(this.blockData),
         neighborChunks
       });
     });
@@ -1833,19 +1830,19 @@ export class Chunk {
     if (!owner) return;
 
     const targetChunk = owner.ownerChunk;
-    const { blockKey, entry } = owner;
+    const { blockCode, entry } = owner;
 
     // 使用 visibleKeys（面剔除状态）判断可见性
-    if (!targetChunk.visibleKeys.has(blockKey)) {
+    if (!targetChunk.visibleKeys.has(blockCode)) {
       // 隐藏邻居只创建临时渲染网格，不改 blockData/持久化
       const parsed = parseBlockEntry(entry);
       const props = getBlockProps(parsed.type);
       if (props.isRendered !== false) {
-        targetChunk._refreshBlockRenderMesh(x, y, z, blockKey, entry);
+        targetChunk._refreshBlockRenderMesh(x, y, z, blockCode, entry);
       }
     } else {
       // 如果原本可见，跨区块暴露时也要立即刷新网格补面
-      targetChunk._refreshBlockRenderLightweight(x, y, z, blockKey, entry);
+      targetChunk._refreshBlockRenderLightweight(x, y, z, blockCode, entry);
     }
   }
 

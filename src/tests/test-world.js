@@ -16,6 +16,7 @@ import { assertEqual, assertTrue, assertFalse, assertNotNull, assertUndefined } 
 import * as THREE from 'three';
 import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 import { mockFaceCullingSystem, mockMaterials, mockBlockData } from './test-mocks.js';
+import { Chunk } from '../world/Chunk.js';
 
 // ============================================
 // Worker 模拟 - 在导入 World 之前设置
@@ -732,7 +733,7 @@ describe('World 真实类测试', (test) => {
       cx: 0,
       cz: 0,
       isReady: true,
-      solidBlocks: new Set(['5,10,5'])
+      solidBlocks: new Set([Chunk.encodeCoord(5, 10, 5)])
     });
 
     // 验证 stone 是实心
@@ -774,7 +775,7 @@ describe('World 真实类测试', (test) => {
     assertTrue(world.isSolid(5, 10, 5), 'gunman 占位应参与碰撞');
     assertEqual(world.getBlock(5, 10, 5), 'collider', 'gunman 占位应返回 collider');
     assertEqual(world.getBlock(5, 11, 5), 'collider', 'gunman 头顶占位应返回 collider');
-    assertUndefined(chunk.blockData['5,10,5'], 'gunman 占位不应写入 blockData');
+    assertFalse(chunk.blockData.has(Chunk.encodeCoord(5, 10, 5)), 'gunman 占位不应写入 blockData');
 
     teardownEnvironment();
   });

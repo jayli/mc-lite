@@ -106,16 +106,16 @@ export function extendChunk(Chunk) {
             const bx = center.x + dx;
             const by = center.y + dy;
             const bz = center.z + dz;
-            const key = `${bx},${by},${bz}`;
+            const code = Chunk.encodeCoord(bx, by, bz);
 
             // 主动检查：如果 blockData 中有该方块且是实心的，确保它在 solidBlocks 中
-            const entry = this.blockData[key];
+            const entry = this.blockData.get(code);
             if (entry) {
               const type = typeof entry === 'string' ? entry : entry.type;
               const props = getBlockProps(type);
               if (props.isSolid) {
                 // 关键修复：确保跨 Chunk 结构方块始终在 solidBlocks 中
-                this.solidBlocks.add(key);
+                this.solidBlocks.add(code);
               }
             }
           }
@@ -173,16 +173,17 @@ export function extendChunk(Chunk) {
     }
 
     // 处理所有待更新的邻居
-    this.pendingBatchFaceCullingUpdates.forEach(nKey => {
-      const [nx, ny, nz] = nKey.split(',').map(Number);
+    this.pendingBatchFaceCullingUpdates.forEach(nCode => {
+      const { x: nx, y: ny, z: nz } = Chunk.decodeCoord(nCode);
       const nCx = Math.floor(nx / 16);
       const nCz = Math.floor(nz / 16);
 
       if (nCx === this.cx && nCz === this.cz) {
         // 邻居在当前区块
-        if (this.blockData[nKey]) {
-          this._triggerFaceCullingUpdate(nx, ny, nz, this.blockData[nKey]);
-          this._refreshBlockRenderLightweight(nx, ny, nz, nKey, this.blockData[nKey]);
+        const entry = this.blockData.get(nCode);
+        if (entry) {
+          this._triggerFaceCullingUpdate(nx, ny, nz, entry);
+          this._refreshBlockRenderLightweight(nx, ny, nz, nCode, entry);
         }
       } else {
         // 跨区块邻居处理

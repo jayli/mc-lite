@@ -33,9 +33,9 @@ export class RealisticTree {
       const template = realisticTreeManager.templates[templateIndex];
       if (template) {
         for (let i = 0; i < Math.ceil(template.trunkHeight); i++) {
-          const key = `${Math.floor(x)},${Math.floor(y + i)},${Math.floor(z)}`;
+          const code = Chunk.encodeCoord(Math.floor(x), Math.floor(y + i), Math.floor(z));
           // 树干碰撞体通过 blockData 记录，由 isSolid 路径处理
-          chunk.blockData[key] = 'realistic_trunk_collider';
+          chunk.blockData.set(code, 'realistic_trunk_collider');
         }
       }
     } else {

@@ -75,16 +75,16 @@ const createMockWorld = () => ({
     const cz = Math.floor(iz / CHUNK_SIZE);
     const coordChunkKey = `${cx},${cz}`;
     const coordChunk = this.chunks.get(coordChunkKey) || null;
-    const blockKey = `${ix},${iy},${iz}`;
+    const blockCode = Chunk.encodeCoord(ix, iy, iz);
 
-    if (coordChunk && coordChunk.blockData[blockKey]) {
+    if (coordChunk && coordChunk.blockData.get(blockCode)) {
       return {
         ownerChunk: coordChunk,
         ownerChunkKey: coordChunkKey,
         coordChunk,
         coordChunkKey,
-        blockKey,
-        entry: coordChunk.blockData[blockKey]
+        blockCode,
+        entry: coordChunk.blockData.get(blockCode)
       };
     }
     return null;
@@ -191,7 +191,7 @@ describe('Chunk 真实类测试', (test) => {
     const world = createMockWorld();
     const chunk = new Chunk(0, 0, world);
 
-    assertEqual(chunk.blockData.constructor.name, 'Object', 'blockData 应该是对象');
+    assertEqual(chunk.blockData.constructor.name, 'Map', 'blockData 应该是 Map');
     assertEqual(chunk.solidBlocks.size, 0, '初始 solidBlocks 应该为空');
     assertEqual(chunk.visibleKeys.size, 0, '初始 visibleKeys 应该为空');
     assertEqual(chunk.dirtyBlocks, 0, '初始 dirtyBlocks 应该为 0');
@@ -223,10 +223,10 @@ describe('Chunk 真实类测试', (test) => {
     chunk.addBlockDynamic(5, 10, 5, 'stone', 0);
 
     // 验证 blockData
-    const key = '5,10,5';
-    assertNotNull(chunk.blockData[key], 'blockData 应该包含新方块');
-    assertEqual(chunk.blockData[key].type, 'stone', '方块类型应该是 stone');
-    assertEqual(chunk.blockData[key].orientation, 0, '朝向应该为 0');
+    const key = Chunk.encodeCoord(5, 10, 5);
+    assertNotNull(chunk.blockData.get(key), 'blockData 应该包含新方块');
+    assertEqual(chunk.blockData.get(key).type, 'stone', '方块类型应该是 stone');
+    assertEqual(chunk.blockData.get(key).orientation, 0, '朝向应该为 0');
 
     teardownEnvironment();
   });
@@ -239,9 +239,9 @@ describe('Chunk 真实类测试', (test) => {
 
     chunk.addBlockDynamic(6, 10, 6, 'glass_block', 0);
 
-    const key = '6,10,6';
-    assertNotNull(chunk.blockData[key], 'blockData 应该包含新方块');
-    assertEqual(chunk.blockData[key].type, 'glass_block', '方块类型应该是 glass_block');
+    const key = Chunk.encodeCoord(6, 10, 6);
+    assertNotNull(chunk.blockData.get(key), 'blockData 应该包含新方块');
+    assertEqual(chunk.blockData.get(key).type, 'glass_block', '方块类型应该是 glass_block');
     assertTrue(chunk.visibleKeys.has(key), 'glass_block 应该在 visibleKeys 中');
 
     teardownEnvironment();
@@ -255,8 +255,8 @@ describe('Chunk 真实类测试', (test) => {
 
     chunk.addBlockDynamic(3, 5, 3, { type: 'handrailA', orientation: 2 });
 
-    const key = '3,5,3';
-    const entry = chunk.blockData[key];
+    const key = Chunk.encodeCoord(3, 5, 3);
+    const entry = chunk.blockData.get(key);
     assertNotNull(entry, 'blockData 应该包含新方块');
     assertEqual(entry.type, 'handrailA', '方块类型应该是 handrailA');
     assertEqual(entry.orientation, 2, '朝向应该是 2');
@@ -272,14 +272,14 @@ describe('Chunk 真实类测试', (test) => {
 
     // 先添加一个方块
     chunk.addBlockDynamic(5, 10, 5, 'stone', 0);
-    assertTrue(!!chunk.blockData['5,10,5'], '方块应该存在');
-    assertTrue(chunk.visibleKeys.has('5,10,5'), '方块应该在 visibleKeys 中');
+    assertTrue(!!chunk.blockData.get(Chunk.encodeCoord(5, 10, 5)), '方块应该存在');
+    assertTrue(chunk.visibleKeys.has(Chunk.encodeCoord(5, 10, 5)), '方块应该在 visibleKeys 中');
 
     // 然后删除它（放置空气）
     chunk.addBlockDynamic(5, 10, 5, 'air', 0);
 
-    assertEqual(chunk.blockData['5,10,5'], undefined, '方块应该被删除');
-    assertFalse(chunk.visibleKeys.has('5,10,5'), '方块应该从 visibleKeys 移除');
+    assertEqual(chunk.blockData.get(Chunk.encodeCoord(5, 10, 5)), undefined, '方块应该被删除');
+    assertFalse(chunk.visibleKeys.has(Chunk.encodeCoord(5, 10, 5)), '方块应该从 visibleKeys 移除');
 
     teardownEnvironment();
   });
@@ -310,12 +310,12 @@ describe('Chunk 真实类测试', (test) => {
 
     // 先添加一个方块
     chunk.addBlockDynamic(5, 10, 5, 'stone', 0);
-    assertTrue(!!chunk.blockData['5,10,5'], '方块应该存在');
+    assertTrue(!!chunk.blockData.get(Chunk.encodeCoord(5, 10, 5)), '方块应该存在');
 
     // 然后移除它
     chunk.removeBlock(5, 10, 5);
 
-    assertEqual(chunk.blockData['5,10,5'], undefined, '方块应该被删除');
+    assertEqual(chunk.blockData.get(Chunk.encodeCoord(5, 10, 5)), undefined, '方块应该被删除');
 
     teardownEnvironment();
   });
@@ -330,7 +330,7 @@ describe('Chunk 真实类测试', (test) => {
     chunk.removeBlock(100, 100, 100);
 
     // 状态应该保持不变
-    assertEqual(chunk.blockData['100,100,100'], undefined, '不存在的方块应该保持不存在');
+    assertEqual(chunk.blockData.get(Chunk.encodeCoord(100, 100, 100)), undefined, '不存在的方块应该保持不存在');
 
     teardownEnvironment();
   });
@@ -487,8 +487,8 @@ describe('Chunk 真实类测试', (test) => {
     chunk0.addBlockDynamic(8, 10, 15, 'stone', 0); // chunk0 的 Z 边界
 
     // 验证方块存在
-    assertNotNull(chunk0.blockData['15,10,8'], '边界方块应该存在');
-    assertNotNull(chunk0.blockData['8,10,15'], '边界方块应该存在');
+    assertNotNull(chunk0.blockData.get(Chunk.encodeCoord(15, 10, 8)), '边界方块应该存在');
+    assertNotNull(chunk0.blockData.get(Chunk.encodeCoord(8, 10, 15)), '边界方块应该存在');
 
     teardownEnvironment();
   });
@@ -507,9 +507,9 @@ describe('Chunk 真实类测试', (test) => {
 
     blockTypes.forEach((type, index) => {
       chunk.addBlockDynamic(index, 10, 0, type, 0);
-      const key = `${index},10,0`;
-      assertNotNull(chunk.blockData[key], `${type} 方块应该存在`);
-      assertEqual(chunk.blockData[key].type, type, `方块类型应该是 ${type}`);
+      const key = Chunk.encodeCoord(index, 10, 0);
+      assertNotNull(chunk.blockData.get(key), `${type} 方块应该存在`);
+      assertEqual(chunk.blockData.get(key).type, type, `方块类型应该是 ${type}`);
     });
 
     teardownEnvironment();
@@ -538,8 +538,8 @@ describe('Chunk 真实类测试', (test) => {
     // 验证所有方块都存在
     let successCount = 0;
     addedBlocks.forEach(block => {
-      const key = `${block.x},${block.y},${block.z}`;
-      if (chunk.blockData[key] && chunk.blockData[key].type === block.type) {
+      const key = Chunk.encodeCoord(block.x, block.y, block.z);
+      if (chunk.blockData.get(key) && chunk.blockData.get(key).type === block.type) {
         successCount++;
       }
     });
@@ -564,11 +564,11 @@ describe('Chunk 真实类测试', (test) => {
     chunk.removeBlock(6, 10, 5);
 
     // 验证删除的方块不存在
-    assertEqual(chunk.blockData['6,10,5'], undefined, '中间的方块应该被删除');
+    assertEqual(chunk.blockData.get(Chunk.encodeCoord(6, 10, 5)), undefined, '中间的方块应该被删除');
 
     // 验证其他方块仍然存在
-    assertNotNull(chunk.blockData['5,10,5'], '第一个方块应该存在');
-    assertNotNull(chunk.blockData['7,10,5'], '第三个方块应该存在');
+    assertNotNull(chunk.blockData.get(Chunk.encodeCoord(5, 10, 5)), '第一个方块应该存在');
+    assertNotNull(chunk.blockData.get(Chunk.encodeCoord(7, 10, 5)), '第三个方块应该存在');
 
     teardownEnvironment();
   });
@@ -591,13 +591,13 @@ describe('Chunk 真实类测试', (test) => {
     chunk0.addBlockDynamic(15, 10, 8, 'stone', 0);
 
     // 验证方块在 chunk0 中
-    assertNotNull(chunk0.blockData['15,10,8'], '边界方块应该在 chunk0 中');
+    assertNotNull(chunk0.blockData.get(Chunk.encodeCoord(15, 10, 8)), '边界方块应该在 chunk0 中');
 
     // 在 chunk1 的左边界放置方块 (x=16 是 chunk1 的最左)
     chunk1.addBlockDynamic(16, 10, 8, 'glass_block', 0);
 
     // 验证透明方块在 chunk1 中且可见
-    assertNotNull(chunk1.blockData['16,10,8'], '透明方块应该在 chunk1 中');
+    assertNotNull(chunk1.blockData.get(Chunk.encodeCoord(16, 10, 8)), '透明方块应该在 chunk1 中');
     assertTrue(chunk1.visibleKeys.has('16,10,8'), '透明方块应该可见');
 
     teardownEnvironment();
@@ -622,16 +622,16 @@ describe('Chunk 真实类测试', (test) => {
     chunk1.addBlockDynamic(16, 10, 8, 'stone', 0);
 
     // 验证 chunk1 的方块存在
-    assertNotNull(chunk1.blockData['16,10,8'], 'chunk1 的方块应该存在');
+    assertNotNull(chunk1.blockData.get(Chunk.encodeCoord(16, 10, 8)), 'chunk1 的方块应该存在');
 
     // 移除 chunk0 的方块，应该触发 chunk1 方块的重新计算
     chunk0.removeBlock(15, 10, 8);
 
     // 验证 chunk0 的方块被移除
-    assertEqual(chunk0.blockData['15,10,8'], undefined, 'chunk0 的方块应该被移除');
+    assertEqual(chunk0.blockData.get(Chunk.encodeCoord(15, 10, 8)), undefined, 'chunk0 的方块应该被移除');
 
     // chunk1 的方块应该仍然存在且可能需要重新计算 Face Culling
-    assertNotNull(chunk1.blockData['16,10,8'], 'chunk1 的方块应该仍然存在');
+    assertNotNull(chunk1.blockData.get(Chunk.encodeCoord(16, 10, 8)), 'chunk1 的方块应该仍然存在');
 
     teardownEnvironment();
   });
@@ -684,7 +684,7 @@ describe('Chunk 真实类测试', (test) => {
     chunk0.checkReveal(15, 10, 8);
 
     // 验证方块仍然存在且可见
-    assertNotNull(chunk0.blockData['15,10,8'], '方块应该存在');
+    assertNotNull(chunk0.blockData.get(Chunk.encodeCoord(15, 10, 8)), '方块应该存在');
 
     teardownEnvironment();
   });
@@ -716,7 +716,7 @@ describe('Chunk 真实类测试', (test) => {
     chunk.addBlockDynamic(5, 10, 5, 'stone', 0);
 
     // 验证方块在 visibleKeys 中
-    assertTrue(chunk.visibleKeys.has('5,10,5'), '孤立方块应该可见');
+    assertTrue(chunk.visibleKeys.has(Chunk.encodeCoord(5, 10, 5)), '孤立方块应该可见');
 
     teardownEnvironment();
   });
@@ -761,7 +761,7 @@ describe('Chunk 真实类测试', (test) => {
     // 中心方块应该被隐藏（不在 visibleKeys 中）
     // 注意：由于 Face Culling 计算是在放置时进行的，中心方块在放置时是孤立的
     // 所以需要验证后来放置的方块是否正确处理
-    assertTrue(chunk.visibleKeys.has('5,11,5'), '顶面方块应该可见（至少有一面暴露）');
+    assertTrue(chunk.visibleKeys.has(Chunk.encodeCoord(5, 11, 5)), '顶面方块应该可见（至少有一面暴露）');
 
     teardownEnvironment();
   });
@@ -784,7 +784,7 @@ describe('Chunk 真实类测试', (test) => {
     chunk.removeBlock(5, 10, 5);
 
     // 验证移除后方块不存在
-    assertEqual(chunk.blockData['5,10,5'], undefined, '方块应该被移除');
+    assertEqual(chunk.blockData.get(Chunk.encodeCoord(5, 10, 5)), undefined, '方块应该被移除');
 
     // 验证 dirtyBlocks 增加（触发 consolidation）
     assertTrue(chunk.dirtyBlocks >= initialDirtyBlocks, 'dirtyBlocks 应该在移除操作后增加');
@@ -808,7 +808,7 @@ describe('Chunk 真实类测试', (test) => {
     chunk.removeBlock(6, 10, 5);
 
     // 验证 stone 方块仍然存在
-    assertNotNull(chunk.blockData['5,10,5'], 'stone 方块应该仍然存在');
+    assertNotNull(chunk.blockData.get(Chunk.encodeCoord(5, 10, 5)), 'stone 方块应该仍然存在');
 
     // 验证 dirtyBlocks 变化
     assertTrue(chunk.dirtyBlocks > 0, '应该有脏方块等待合并');
@@ -960,7 +960,7 @@ describe('Chunk 真实类测试', (test) => {
     chunk.addBlockDynamic(5, 10, 5, 'stone', 0);
 
     // 验证方块被添加到 blockData（即使正在合并）
-    assertNotNull(chunk.blockData['5,10,5'], '方块数据应该被记录');
+    assertNotNull(chunk.blockData.get(Chunk.encodeCoord(5, 10, 5)), '方块数据应该被记录');
 
     // 恢复状态
     chunk.isConsolidating = false;
@@ -1004,15 +1004,15 @@ describe('Chunk 真实类测试', (test) => {
     const world = createMockWorld();
     const chunk = new Chunk(0, 0, world);
 
-    const key = '5,10,5';
+    const key = Chunk.encodeCoord(5, 10, 5);
     const type = 'stone';
     const entry = { type, orientation: 0 };
 
     chunk._updateBlockState(key, type, entry);
 
     // 验证状态更新
-    assertNotNull(chunk.blockData[key], 'blockData 应该包含新方块');
-    assertEqual(chunk.blockData[key].type, 'stone', '方块类型应该是 stone');
+    assertNotNull(chunk.blockData.get(key), 'blockData 应该包含新方块');
+    assertEqual(chunk.blockData.get(key).type, 'stone', '方块类型应该是 stone');
     assertTrue(chunk.visibleKeys.has(key), 'visibleKeys 应该包含新方块');
     assertTrue(chunk.solidBlocks.has(key), 'solidBlocks 应该包含固体方块');
 
@@ -1026,16 +1026,16 @@ describe('Chunk 真实类测试', (test) => {
     const chunk = new Chunk(0, 0, world);
 
     // 先添加
-    chunk._updateBlockState('5,10,5', 'stone', { type: 'stone', orientation: 0 });
-    assertNotNull(chunk.blockData['5,10,5'], '方块应该存在');
+    chunk._updateBlockState(5, 10, 5, 'stone', { type: 'stone', orientation: 0 });
+    assertNotNull(chunk.blockData.get(Chunk.encodeCoord(5, 10, 5)), '方块应该存在');
 
     // 再移除（放置空气）
-    chunk._updateBlockState('5,10,5', 'air', null);
+    chunk._updateBlockState(5, 10, 5, 'air', null);
 
     // 验证状态清除
-    assertEqual(chunk.blockData['5,10,5'], undefined, 'blockData 应该删除方块');
-    assertFalse(chunk.visibleKeys.has('5,10,5'), 'visibleKeys 应该移除方块');
-    assertFalse(chunk.solidBlocks.has('5,10,5'), 'solidBlocks 应该移除方块');
+    assertEqual(chunk.blockData.get(Chunk.encodeCoord(5, 10, 5)), undefined, 'blockData 应该删除方块');
+    assertFalse(chunk.visibleKeys.has(Chunk.encodeCoord(5, 10, 5)), 'visibleKeys 应该移除方块');
+    assertFalse(chunk.solidBlocks.has(Chunk.encodeCoord(5, 10, 5)), 'solidBlocks 应该移除方块');
 
     teardownEnvironment();
   });
@@ -1047,11 +1047,11 @@ describe('Chunk 真实类测试', (test) => {
     const chunk = new Chunk(0, 0, world);
 
     // 添加玻璃方块（非固体）
-    chunk._updateBlockState('5,10,5', 'glass_block', { type: 'glass_block', orientation: 0 });
+    chunk._updateBlockState(5, 10, 5, 'glass_block', { type: 'glass_block', orientation: 0 });
 
-    assertNotNull(chunk.blockData['5,10,5'], 'blockData 应该包含玻璃');
-    assertTrue(chunk.visibleKeys.has('5,10,5'), 'visibleKeys 应该包含玻璃');
-    assertFalse(chunk.solidBlocks.has('5,10,5'), 'solidBlocks 不应该包含玻璃（非固体）');
+    assertNotNull(chunk.blockData.get(Chunk.encodeCoord(5, 10, 5)), 'blockData 应该包含玻璃');
+    assertTrue(chunk.visibleKeys.has(Chunk.encodeCoord(5, 10, 5)), 'visibleKeys 应该包含玻璃');
+    assertFalse(chunk.solidBlocks.has(Chunk.encodeCoord(5, 10, 5)), 'solidBlocks 不应该包含玻璃（非固体）');
 
     teardownEnvironment();
   });
@@ -1067,7 +1067,7 @@ describe('Chunk 真实类测试', (test) => {
     // 添加一个方块（会创建动态网格）
     chunk.addBlockDynamic(5, 10, 5, 'stone', 0);
 
-    const key = '5,10,5';
+    const key = Chunk.encodeCoord(5, 10, 5);
     const meshExistsBefore = chunk.dynamicMeshes.has(key);
     assertTrue(meshExistsBefore || true, '动态网格可能存在（取决于合并状态）');
 
@@ -1091,11 +1091,11 @@ describe('Chunk 真实类测试', (test) => {
     chunk.addBlockDynamic(5, 10, 5, 'glass_block', 0);
 
     // 透明方块应该始终在 visibleKeys 中
-    assertTrue(chunk.visibleKeys.has('5,10,5'), '透明方块应该可见');
+    assertTrue(chunk.visibleKeys.has(Chunk.encodeCoord(5, 10, 5)), '透明方块应该可见');
 
     // 再放置一个 leaves 方块
     chunk.addBlockDynamic(6, 10, 5, 'leaves', 0);
-    assertTrue(chunk.visibleKeys.has('6,10,5'), '树叶方块应该可见');
+    assertTrue(chunk.visibleKeys.has(Chunk.encodeCoord(6, 10, 5)), '树叶方块应该可见');
 
     teardownEnvironment();
   });
@@ -1110,7 +1110,7 @@ describe('Chunk 真实类测试', (test) => {
     chunk.addBlockDynamic(5, 10, 5, 'chest', 0);
 
     // 宝箱应该始终在 visibleKeys 中
-    assertTrue(chunk.visibleKeys.has('5,10,5'), '宝箱应该可见');
+    assertTrue(chunk.visibleKeys.has(Chunk.encodeCoord(5, 10, 5)), '宝箱应该可见');
 
     teardownEnvironment();
   });
@@ -1125,10 +1125,10 @@ describe('Chunk 真实类测试', (test) => {
     chunk.addBlockDynamic(5, 10, 5, 'collider', 0);
 
     // collider 应该在 blockData 中
-    assertNotNull(chunk.blockData['5,10,5'], 'collider 应该在 blockData 中');
+    assertNotNull(chunk.blockData.get(Chunk.encodeCoord(5, 10, 5)), 'collider 应该在 blockData 中');
 
     // collider 是实心的
-    assertTrue(chunk.solidBlocks.has('5,10,5'), 'collider 应该在 solidBlocks 中');
+    assertTrue(chunk.solidBlocks.has(Chunk.encodeCoord(5, 10, 5)), 'collider 应该在 solidBlocks 中');
 
     // collider 不应该在 visibleKeys 中（不渲染）
     // 注意：根据实现，collider 可能被添加到 visibleKeys，这取决于具体逻辑

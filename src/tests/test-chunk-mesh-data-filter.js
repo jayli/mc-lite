@@ -1,11 +1,12 @@
 import { assertDeepEqual, assertEqual } from './assert.js';
 import { filterWorkerResultAgainstBlockData } from '../world/ChunkMeshDataFilter.js';
+import { Chunk } from '../world/Chunk.js';
 
 const input = {
-  blockData: {
-    '1,2,3': { type: 'stone', orientation: 0 },
-    '4,5,6': { type: 'glass_block', orientation: 0 }
-  },
+  blockData: new Map([
+    [Chunk.encodeCoord(1, 2, 3), { type: 'stone', orientation: 0 }],
+    [Chunk.encodeCoord(4, 5, 6), { type: 'glass_block', orientation: 0 }]
+  ]),
   workerResult: {
     visibleKeys: ['1,2,3', '4,5,6', '7,8,9'],
     solidBlocks: ['1,2,3', '7,8,9'],
@@ -27,8 +28,8 @@ const input = {
         aoHigh: new Float32Array([33, 44]),
         orientation: new Float32Array([0, 1]),
         instanceIndexMap: {
-          '1,2,3': 0,
-          '7,8,9': 1
+          [Chunk.encodeCoord(1, 2, 3)]: 0,
+          [Chunk.encodeCoord(7, 8, 9)]: 1
         }
       },
       {
@@ -39,7 +40,7 @@ const input = {
         aoHigh: new Float32Array([66]),
         orientation: new Float32Array([0]),
         instanceIndexMap: {
-          '4,5,6': 0
+          [Chunk.encodeCoord(4, 5, 6)]: 0
         }
       }
     ]
@@ -53,10 +54,11 @@ assertDeepEqual(result.solidBlocks, ['1,2,3'], 'solidBlocks 应过滤掉已不�
 assertEqual(result.d.stone.length, 1, '旧格式 d.stone 应只保留一个实例');
 assertEqual(result.meshData.length, 2, '应保留两个类型分组');
 assertEqual(result.meshData[0].count, 1, 'stone meshData 应只保留一个实例');
-assertDeepEqual(Object.keys(result.meshData[0].instanceIndexMap), ['1,2,3'], 'instanceIndexMap 应重建为过滤后的索引');
+// Object key 为数字编码的字符串形式
+assertDeepEqual(Object.keys(result.meshData[0].instanceIndexMap), [String(Chunk.encodeCoord(1, 2, 3))], 'instanceIndexMap 应重建为过滤后的索引');
 assertDeepEqual(Array.from(result.meshData[0].aoLow), [11], 'aoLow 应与保留实例同步过滤');
 assertDeepEqual(Array.from(result.meshData[0].aoHigh), [33], 'aoHigh 应与保留实例同步过滤');
-assertDeepEqual(Array.from(result.meshData[0].orientation), [0], 'orientation 应与保留实例同步过滤');
+assertDeepEqual(Array.from(result.meshData[0].orientation), [0], 'orientation 应同步过滤');
 assertDeepEqual(Array.from(result.meshData[0].matrices), Array.from(new Float32Array(32).map((_, i) => i + 1).slice(0, 16)), 'matrices 应只保留首个实例矩阵');
 
 console.log('test-chunk-mesh-data-filter: ok');

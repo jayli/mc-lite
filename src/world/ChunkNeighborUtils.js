@@ -1,3 +1,5 @@
+import { Chunk } from './Chunk.js';
+
 /**
  * Chunk 邻居采样工具
  * 提供获取单个邻居和六向邻居的通用实现
@@ -17,11 +19,11 @@ export function createChunkNeighborSampler(chunk, formatNeighbor) {
       ? chunk
       : chunk.world.chunks.get(`${cx},${cz}`);
 
-    const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
+    const code = Chunk.encodeCoord(Math.floor(nx), Math.floor(ny), Math.floor(nz));
 
     // 优先走坐标所属 Chunk，命中成本最低
     if (targetChunk && targetChunk.isReady) {
-      const entry = targetChunk.blockData[key];
+      const entry = targetChunk.blockData.get(code);
       if (entry) {
         return formatNeighbor(entry);
       }

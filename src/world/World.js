@@ -81,7 +81,7 @@ export class World {
     this.batchFaceCullingTimeout = null;
 
     // --- 方块查询缓存 ---
-    // 命中缓存：blockKey -> 所属 chunkKey（仅缓存跨区块命中）
+    // 命中缓存：blockCode -> 所属 chunkKey（仅缓存跨区块命中）
     this.crossChunkOwnerCache = new Map();
 
     // --- Chunk 就绪状态跟踪 ---
@@ -637,7 +637,7 @@ export class World {
    *   ownerChunkKey: string,
    *   coordChunk: Chunk|null,
    *   coordChunkKey: string,
-   *   blockKey: string,
+   *   blockCode: number,
    *   entry: string|object
    * }|null}
    */
@@ -651,7 +651,7 @@ export class World {
     const cz = iz >> 4;
     const coordChunkKey = `${cx},${cz}`;
     const coordChunk = this.chunks.get(coordChunkKey) || null;
-    const blockKey = `${ix},${iy},${iz}`;
+    const blockCode = Chunk.encodeCoord(ix, iy, iz);
 
     // 1) 坐标所属 Chunk 优先 - 使用新的数组存储快速查询
     if (coordChunk?.isReady) {
@@ -665,53 +665,53 @@ export class World {
         if (blockId) {
           const entry = coordChunk._getEntryFromBlockId(blockId);
           if (entry) {
-            this.crossChunkOwnerCache.delete(blockKey);
+            this.crossChunkOwnerCache.delete(blockCode);
             return {
               ownerChunk: coordChunk,
               ownerChunkKey: coordChunkKey,
               coordChunk,
               coordChunkKey,
-              blockKey,
+              blockCode,
               entry
             };
           }
         }
       }
       // 回退到旧存储
-      const entry = coordChunk.blockData[blockKey];
+      const entry = coordChunk.blockData.get(blockCode);
       if (entry) {
-        this.crossChunkOwnerCache.delete(blockKey);
+        this.crossChunkOwnerCache.delete(blockCode);
         return {
           ownerChunk: coordChunk,
           ownerChunkKey: coordChunkKey,
           coordChunk,
           coordChunkKey,
-          blockKey,
+          blockCode,
           entry
         };
       }
     }
 
     // 2) 跨 Chunk owner 缓存命中
-    const ownerChunkKey = this.crossChunkOwnerCache.get(blockKey);
+    const ownerChunkKey = this.crossChunkOwnerCache.get(blockCode);
     if (ownerChunkKey) {
       const ownerChunk = this.chunks.get(ownerChunkKey);
       if (ownerChunk?.isReady) {
         // 跨 chunk 查找：不能使用 blockDataArray（它是 chunk 局部坐标），直接用 blockData
-        const entry = ownerChunk.blockData[blockKey];
+        const entry = ownerChunk.blockData.get(blockCode);
         if (entry) {
           return {
             ownerChunk,
             ownerChunkKey,
             coordChunk,
             coordChunkKey,
-            blockKey,
+            blockCode,
             entry
           };
         }
       }
       // 缓存失效，清理后回退
-      this.crossChunkOwnerCache.delete(blockKey);
+      this.crossChunkOwnerCache.delete(blockCode);
     }
 
     // 3) 快速模式不扫描
@@ -724,15 +724,15 @@ export class World {
       if (!otherChunk?.isReady || otherKey === coordChunkKey) continue;
 
       // 全量扫描：不能使用 blockDataArray（chunk 局部坐标），直接用 blockData
-      const entry = otherChunk.blockData[blockKey];
+      const entry = otherChunk.blockData.get(blockCode);
       if (entry) {
-        this.crossChunkOwnerCache.set(blockKey, otherKey);
+        this.crossChunkOwnerCache.set(blockCode, otherKey);
         return {
           ownerChunk: otherChunk,
           ownerChunkKey: otherKey,
           coordChunk,
           coordChunkKey,
-          blockKey,
+          blockCode,
           entry
         };
       }
@@ -800,7 +800,7 @@ export class World {
    *   ownerChunkKey: string,
    *   coordChunk: Chunk|null,
    *   coordChunkKey: string,
-   *   blockKey: string,
+   *   blockCode: number,
    *   entry: string|object
    * }>}
    */
@@ -812,18 +812,18 @@ export class World {
     const cz = Math.floor(iz / CHUNK_SIZE);
     const coordChunkKey = `${cx},${cz}`;
     const coordChunk = this.chunks.get(coordChunkKey) || null;
-    const blockKey = `${ix},${iy},${iz}`;
+    const blockCode = Chunk.encodeCoord(ix, iy, iz);
     const owners = [];
 
     if (coordChunk) {
-      const entry = coordChunk.blockData[blockKey];
+      const entry = coordChunk.blockData.get(blockCode);
       if (entry) {
         owners.push({
           ownerChunk: coordChunk,
           ownerChunkKey: coordChunkKey,
           coordChunk,
           coordChunkKey,
-          blockKey,
+          blockCode,
           entry
         });
       }
@@ -831,14 +831,14 @@ export class World {
 
     for (const [otherKey, otherChunk] of this.chunks) {
       if (!otherChunk || !otherChunk.isReady || otherKey === coordChunkKey) continue;
-      const entry = otherChunk.blockData[blockKey];
+      const entry = otherChunk.blockData.get(blockCode);
       if (!entry) continue;
       owners.push({
         ownerChunk: otherChunk,
         ownerChunkKey: otherKey,
         coordChunk,
         coordChunkKey,
-        blockKey,
+        blockCode,
         entry
       });
     }
@@ -882,13 +882,13 @@ export class World {
     }
 
     // --- 回退路径：使用 solidBlocks Set（覆盖 Y:16+ 和动态方块） ---
-    const blockKey = `${ix},${iy},${iz}`;
-    if (chunk.solidBlocks.has(blockKey)) {
+    const blockCode = Chunk.encodeCoord(ix, iy, iz);
+    if (chunk.solidBlocks.has(blockCode)) {
       return true;
     }
 
     // --- blockData 回退（覆盖 RealisticTree 树干等 blockData 条目） ---
-    const type = chunk.blockData?.[blockKey];
+    const type = chunk.blockData?.get(blockCode);
     if (type) {
       const typeStr = typeof type === 'string' ? type : (type?.type || '');
       if (typeStr && getBlockProps(typeStr).isSolid) {

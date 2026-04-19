@@ -138,8 +138,10 @@ export function extendChunk(Chunk) {
 
     mesh.userData = { type: 'batched', blockTypes, textureUrl };
 
-    // 存储索引映射（用于后续交互）
-    this.instanceIndexMap['batched_' + textureUrl] = new Map(Object.entries(instanceIndexMap));
+    // 存储索引映射（用于后续交互），Worker 返回的 Object key 为字符串，转回数字编码
+    this.instanceIndexMap['batched_' + textureUrl] = new Map(
+      Object.entries(instanceIndexMap).map(([k, v]) => [Number(k), v])
+    );
 
     this.group.add(mesh);
   };
@@ -189,10 +191,12 @@ export function extendChunk(Chunk) {
       mesh.userData.chests = {}; // 如果是箱子，初始化一个子对象存储每个箱子的开启状态
     }
 
-    // 存储索引映射（用于后续交互）
+    // 存储索引映射（用于后续交互），Worker 返回的 Object key 为字符串，转回数字编码
     // 跳过树木类型，因为树木的 instanceIndexMap 已经在 createInstancedTreesForChunk 中设置
     if (type !== 'realistic_trunk' && type !== 'realistic_leaves') {
-      this.instanceIndexMap[type] = new Map(Object.entries(instanceIndexMap));
+      this.instanceIndexMap[type] = new Map(
+        Object.entries(instanceIndexMap).map(([k, v]) => [Number(k), v])
+      );
     }
 
     // 宝箱特殊处理：初始化每个箱子的状态

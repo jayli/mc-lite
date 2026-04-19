@@ -1,3 +1,5 @@
+import { Chunk } from './Chunk.js';
+
 function getEntryType(entry) {
   if (entry == null) return null;
   return typeof entry === 'string' ? entry : entry.type;
@@ -23,6 +25,27 @@ function copyInstanceMatrices(matrices, keepIndices) {
   return result;
 }
 
+function getBlockDataEntry(blockData, key) {
+  if (blockData instanceof Map) {
+    return blockData.get(Number(key));
+  }
+  return blockData[key];
+}
+
+function hasBlockDataEntry(blockData, key) {
+  if (blockData instanceof Map) {
+    return blockData.has(Number(key));
+  }
+  return blockData[key] !== undefined;
+}
+
+function getBlockEntryAt(blockData, x, y, z) {
+  if (blockData instanceof Map) {
+    return blockData.get(Chunk.encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z)));
+  }
+  return blockData[`${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`];
+}
+
 function filterLegacyRenderData(d, blockData) {
   if (!d) return d;
 
@@ -32,8 +55,7 @@ function filterLegacyRenderData(d, blockData) {
     if (type.endsWith('_collider')) continue;
 
     filtered[type] = d[type].filter(pos => {
-      const key = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
-      return getEntryType(blockData[key]) === type;
+      return getEntryType(getBlockEntryAt(blockData, pos.x, pos.y, pos.z)) === type;
     });
   }
   return filtered;
@@ -51,7 +73,7 @@ function filterMeshData(meshData, blockData) {
       .map(([key, index]) => ({ key, index }))
       .sort((a, b) => a.index - b.index);
 
-    const keepEntries = entries.filter(({ key }) => getEntryType(blockData[key]) === item.type);
+    const keepEntries = entries.filter(({ key }) => getEntryType(getBlockDataEntry(blockData, key)) === item.type);
     if (keepEntries.length === 0) continue;
 
     const keepIndices = keepEntries.map(entry => entry.index);
@@ -78,11 +100,11 @@ export function filterWorkerResultAgainstBlockData(data, blockData) {
   let { d, meshData, visibleKeys, solidBlocks } = data;
 
   if (visibleKeys) {
-    visibleKeys = visibleKeys.filter(key => blockData[key] !== undefined);
+    visibleKeys = visibleKeys.filter(key => hasBlockDataEntry(blockData, key));
   }
 
   if (solidBlocks) {
-    solidBlocks = solidBlocks.filter(key => blockData[key] !== undefined);
+    solidBlocks = solidBlocks.filter(key => hasBlockDataEntry(blockData, key));
   }
 
   return {

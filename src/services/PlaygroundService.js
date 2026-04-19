@@ -8,6 +8,7 @@ import { persistenceService } from './PersistenceService.js';
 import { getBlockProperties } from '../constants/BlockData.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { worldWorker, workerCallbacks } from '../world/ChunkConsolidation.js';
+import { Chunk } from '../world/Chunk.js';
 
 /**
  * 创造台服务类 - 单例模式
@@ -58,13 +59,14 @@ export class PlaygroundService {
     for (const [chunkKey, chunk] of this.world.chunks.entries()) {
       // 检查区块是否有修改过的方块
       if (chunk.blockData) {
-        for (const [blockKey, blockData] of Object.entries(chunk.blockData)) {
-          if (blockData.type === 'playground_center_block' || blockData.type === 'playground_block') {
+        for (const [code, entry] of chunk.blockData) {
+          const entryType = typeof entry === 'string' ? entry : entry?.type;
+          if (entryType === 'playground_center_block' || entryType === 'playground_block') {
             // 找到创造台方块，解析坐标
-            const [x, y, z] = blockKey.split(',').map(Number);
+            const { x, y, z } = Chunk.decodeCoord(code);
 
             // 查找中心方块来确定创造台原点
-            if (blockData.type === 'playground_center_block') {
+            if (entryType === 'playground_center_block') {
               this.playgroundOrigin = { x, y, z };
               this.isPlaygroundActive = true;
 

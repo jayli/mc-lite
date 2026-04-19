@@ -6,6 +6,7 @@
 
 import * as THREE from 'three';
 import { faceMask } from '../utils/FaceCullingUtils.js';
+import { Chunk } from '../world/Chunk.js';
 
 /**
  * 应用调试和性能监控方法到 FaceCullingSystem 类
@@ -210,11 +211,11 @@ export function applyFaceCullingSystemDebug(FaceCullingSystem) {
           while (processedChunks < totalChunks && performance.now() - batchStartTime < 5) {
             const chunk = chunks[processedChunks++];
 
-            for (const key of chunk.solidBlocks) {
+            for (const code of chunk.solidBlocks) {
               totalBlocks++;
               totalFaces += 6;
 
-              const [x, y, z] = key.split(',').map(Number);
+              const { x, y, z } = Chunk.decodeCoord(code);
 
               // 检查 6 个方向的邻居
               const directions = [

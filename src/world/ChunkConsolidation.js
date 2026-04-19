@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { getBlockProperties as getBlockProps } from '../constants/BlockData.js';
+import { blockDataToStringKeys } from '../utils/CoordEncoding.js';
 import { filterWorkerResultAgainstBlockData } from './ChunkMeshDataFilter.js';
 
 // 区块大小常量
@@ -345,7 +346,7 @@ export function extendChunk(Chunk) {
       callbackKey,
       seed: WORLD_CONFIG.SEED,
       snapshot: {
-        blocks: { ...this.blockData },
+        blocks: blockDataToStringKeys(this.blockData),
         entities: {
           ...this.entities,
           staticTrees: this.entities.staticTrees || []
@@ -375,8 +376,8 @@ export function extendChunk(Chunk) {
     const filteredBlocks = [];
     if (scatteredBlocks && Array.isArray(scatteredBlocks)) {
       for (const block of scatteredBlocks) {
-        const key = `${block.x},${block.y},${block.z}`;
-        const entry = this.blockData[key];
+        const code = Chunk.encodeCoord(block.x, block.y, block.z);
+        const entry = this.blockData.get(code);
         if (!entry) continue;
         const entryType = typeof entry === 'string' ? entry : entry.type;
         if (entryType !== block.type) continue;
@@ -387,11 +388,28 @@ export function extendChunk(Chunk) {
     // 将过滤后的 scatteredBlocks 转换为 meshData 格式
     const meshData = this._convertScatteredBlocksToMeshData(filteredBlocks);
 
-    // 保存原始 solidBlocks 用于跨 Chunk 碰撞体
-    this._tempOriginalSolidBlocks = solidBlocks ? [...solidBlocks] : [];
+    // 保存原始 solidBlocks 用于跨 Chunk 碰撞体（Worker 返回字符串数组，需编码转换）
+    this._tempOriginalSolidBlocks = solidBlocks
+      ? solidBlocks.map(strKey => {
+        const [sx, sy, sz] = strKey.split(',').map(Number);
+        return Chunk.encodeCoord(sx, sy, sz);
+      })
+      : [];
 
-    // 同步可见性状态与碰撞状态
-    this._syncVisibilityAndCollision(visibleKeys, solidBlocks);
+    // 同步可见性状态与碰撞状态（Worker 返回字符串数组，需编码转换）
+    const encodedVisibleKeys = visibleKeys
+      ? visibleKeys.map(strKey => {
+        const [vx, vy, vz] = strKey.split(',').map(Number);
+        return Chunk.encodeCoord(vx, vy, vz);
+      })
+      : null;
+    const encodedSolidBlocks = solidBlocks
+      ? solidBlocks.map(strKey => {
+        const [sx, sy, sz] = strKey.split(',').map(Number);
+        return Chunk.encodeCoord(sx, sy, sz);
+      })
+      : null;
+    this._syncVisibilityAndCollision(encodedVisibleKeys, encodedSolidBlocks);
 
     // 保存宝箱状态
     const savedChestStates = this._saveChestStates();
@@ -455,8 +473,8 @@ export function extendChunk(Chunk) {
         aoLow[i] = b.aoLow;
         aoHigh[i] = b.aoHigh;
         orientation[i] = b.orientation;
-        const key = `${b.x},${b.y},${b.z}`;
-        instanceIndexMap[key] = i;
+        const code = Chunk.encodeCoord(b.x, b.y, b.z);
+        instanceIndexMap[code] = i;
       }
 
       meshData.push({ type, count, matrices, aoLow, aoHigh, orientation, instanceIndexMap });
@@ -483,23 +501,23 @@ export function extendChunk(Chunk) {
 
     if (visibleKeys) {
       this.visibleKeys.clear();
-      for (const key of visibleKeys) {
-        this.visibleKeys.add(key);
+      for (const code of visibleKeys) {
+        this.visibleKeys.add(code);
       }
-      for (const key of this.dynamicMeshes.keys()) {
-        this.visibleKeys.add(key);
+      for (const code of this.dynamicMeshes.keys()) {
+        this.visibleKeys.add(code);
       }
     }
 
     if (solidBlocks) {
       this.solidBlocks.clear();
-      for (const key of solidBlocks) {
-        this.solidBlocks.add(key);
+      for (const code of solidBlocks) {
+        this.solidBlocks.add(code);
       }
-      for (const [key, mesh] of this.dynamicMeshes.entries()) {
+      for (const [code, mesh] of this.dynamicMeshes.entries()) {
         const type = mesh.userData.type;
-        if (this.blockData[key] && getBlockProps(type).isSolid) {
-          this.solidBlocks.add(key);
+        if (this.blockData.get(code) && getBlockProps(type).isSolid) {
+          this.solidBlocks.add(code);
         }
       }
       if (this.entityCollisionIndex?.size > 0) {
