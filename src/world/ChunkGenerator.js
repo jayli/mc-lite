@@ -192,12 +192,9 @@ export function extendChunk(Chunk) {
     }
 
     // 存储索引映射（用于后续交互），Worker 返回的 Object key 为字符串，转回数字编码
-    // 跳过树木类型，因为树木的 instanceIndexMap 已经在 createInstancedTreesForChunk 中设置
-    if (type !== 'realistic_trunk' && type !== 'realistic_leaves') {
-      this.instanceIndexMap[type] = new Map(
-        Object.entries(instanceIndexMap).map(([k, v]) => [Number(k), v])
-      );
-    }
+    this.instanceIndexMap[type] = new Map(
+      Object.entries(instanceIndexMap).map(([k, v]) => [Number(k), v])
+    );
 
     // 宝箱特殊处理：初始化每个箱子的状态
     if (type === 'chest') {
