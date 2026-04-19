@@ -4,7 +4,7 @@
 
 import { calculateAOForBlock } from '../utils/AOUtils.js';
 import { getBlockProperties, isFullCubeOccluder } from '../constants/BlockData.js';
-import { encodeCoord } from '../utils/CoordEncoding.js';
+import { encodeCoord, decodeCoord } from '../utils/CoordEncoding.js';
 
 /**
  * 判断方块类型是否适用于 AO 计算
@@ -183,21 +183,9 @@ function getEntryFromCache(chunkKey, code) {
   if (data[code] !== undefined) return data[code];
 
   // 回退：字符串 key 格式（旧档兼容）
-  const { x, y, z } = decodeCoordFromCode(code);
+  const { x, y, z } = decodeCoord(code);
   const strKey = `${x},${y},${z}`;
   return data[strKey] !== undefined ? data[strKey] : null;
-}
-
-/**
- * 将编码后的 code 解码为 {x, y, z}
- * 与 CoordEncoding.js 中的 decodeCoord 一致
- */
-function decodeCoordFromCode(code) {
-  const z = (code % 2000001) - 1000000;
-  const t = Math.floor(code / 2000001);
-  const y = (t % 2049) - 512;
-  const x = Math.floor(t / 2049) - 1000000;
-  return { x, y, z };
 }
 
 /**

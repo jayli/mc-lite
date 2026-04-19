@@ -48,6 +48,28 @@ export function blockDataToStringKeys(blockData) {
 }
 
 /**
+ * 将 blocks 对象统一为数字编码格式
+ * 兼容字符串 key "x,y,z" 格式（旧档/Worker 返回）
+ * @param {Object} blocks - blocks 对象
+ * @returns {Object} 数字编码格式的 blocks 对象
+ */
+export function normalizeBlocksToNumberKeys(blocks) {
+  if (!blocks || typeof blocks !== 'object') return blocks;
+  const result = {};
+  for (const key in blocks) {
+    if (key.includes(',')) {
+      // 字符串 key "x,y,z" → 数字编码
+      const [x, y, z] = key.split(',').map(Number);
+      result[encodeCoord(x, y, z)] = blocks[key];
+    } else {
+      // 已经是数字编码
+      result[Number(key)] = blocks[key];
+    }
+  }
+  return result;
+}
+
+/**
  * 将 Map<number, entry> 格式的 blockData 转换为数字编码的 plain object
  * Worker 可直接使用此格式，无需字符串转换
  * @param {Map<number, *>} blockData - 数字编码键的方块数据

@@ -1782,9 +1782,10 @@ onmessage = async function(e) {
         }
 
         // 兼容两种 key 格式：数字编码 和 字符串 “x,y,z”
+        // 注意：postMessage 序列化后数字 key 会转为字符串，所以统一用字符串判断
         let bx, by, bz;
-        if (typeof key === 'number' || (typeof key === 'string' && !key.includes(','))) {
-          // 数字编码格式（可能是 number 或 string 类型的数字）
+        if (!key.includes(',')) {
+          // 数字编码格式（序列化为字符串数字）
           const decoded = decodeCoord(Number(key));
           bx = decoded.x;
           by = decoded.y;

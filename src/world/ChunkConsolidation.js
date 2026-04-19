@@ -402,18 +402,12 @@ export function extendChunk(Chunk) {
       : [];
 
     // 同步可见性状态与碰撞状态（Worker 返回字符串数组，需编码转换）
-    const encodedVisibleKeys = visibleKeys
-      ? visibleKeys.map(strKey => {
-        const [vx, vy, vz] = strKey.split(',').map(Number);
-        return Chunk.encodeCoord(vx, vy, vz);
-      })
-      : null;
-    const encodedSolidBlocks = solidBlocks
-      ? solidBlocks.map(strKey => {
-        const [sx, sy, sz] = strKey.split(',').map(Number);
-        return Chunk.encodeCoord(sx, sy, sz);
-      })
-      : null;
+    const encodeKeys = (arr) => arr ? arr.map(strKey => {
+      const [x, y, z] = strKey.split(',').map(Number);
+      return Chunk.encodeCoord(x, y, z);
+    }) : null;
+    const encodedVisibleKeys = encodeKeys(visibleKeys);
+    const encodedSolidBlocks = encodeKeys(solidBlocks);
     this._syncVisibilityAndCollision(encodedVisibleKeys, encodedSolidBlocks);
 
     // 保存宝箱状态

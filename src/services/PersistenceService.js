@@ -8,7 +8,7 @@
  */
 import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 import { serializeBlockEntry } from '../utils/OrientationUtils.js';
-import { encodeCoord } from '../utils/CoordEncoding.js';
+import { encodeCoord, normalizeBlocksToNumberKeys } from '../utils/CoordEncoding.js';
 import { WorkerRpcClient } from './WorkerRpcClient.js';
 
 /**
@@ -21,26 +21,6 @@ function isNumberKeyFormat(blocks) {
   const firstKey = Object.keys(blocks)[0];
   if (!firstKey) return true; // 空对象视为新格式
   return typeof firstKey === 'number' || (!firstKey.includes(','));
-}
-
-/**
- * 将字符串 key 格式的 blocks 转换为数字编码格式
- * @param {Object} blocks - blocks 对象
- * @returns {Object} 数字编码格式的 blocks 对象
- */
-function convertStringKeysToNumberKeys(blocks) {
-  const result = {};
-  for (const key in blocks) {
-    if (key.includes(',')) {
-      // 字符串 key "x,y,z" → 数字编码
-      const [x, y, z] = key.split(',').map(Number);
-      result[encodeCoord(x, y, z)] = blocks[key];
-    } else {
-      // 已经是数字编码
-      result[Number(key)] = blocks[key];
-    }
-  }
-  return result;
 }
 
 /**
@@ -57,7 +37,7 @@ function normalizeChunkData(data) {
     // 旧格式：字符串 key → 新格式：数字编码
     return {
       ...data,
-      blocks: convertStringKeysToNumberKeys(data.blocks)
+      blocks: normalizeBlocksToNumberKeys(data.blocks)
     };
   }
   return data;
