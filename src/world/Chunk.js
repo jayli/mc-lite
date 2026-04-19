@@ -61,6 +61,31 @@ export class Chunk {
   }
 
   /**
+   * 将世界坐标编码为数字 key（大整数乘法编码，避免 JS 位运算 32bit 截断）
+   * 支持范围: x,z ∈ [-1_000_000, +1_000_000], y ∈ [-512, +512]
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @returns {number} 编码后的数字 key
+   */
+  static encodeCoord(x, y, z) {
+    return ((Math.floor(x) + 1000000) * 2049 + (Math.floor(y) + 512)) * 2000001 + (Math.floor(z) + 1000000);
+  }
+
+  /**
+   * 将数字 key 解码为世界坐标
+   * @param {number} code - 编码后的数字 key
+   * @returns {{x:number,y:number,z:number}} 世界坐标
+   */
+  static decodeCoord(code) {
+    const z = (code % 2000001) - 1000000;
+    const t = Math.floor(code / 2000001);
+    const y = (t % 2049) - 512;
+    const x = Math.floor(t / 2049) - 1000000;
+    return { x, y, z };
+  }
+
+  /**
    * 创建区块实例
    * @param {number} cx - 区块的 X 坐标（区块空间坐标，世界坐标 / 16）
    * @param {number} cz - 区块的 Z 坐标（区块空间坐标）

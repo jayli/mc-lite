@@ -144,6 +144,47 @@ describe('Chunk 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('encodeCoord/decodeCoord 编码解码正确', () => {
+    // 正数
+    let code = Chunk.encodeCoord(10, 20, 30);
+    let decoded = Chunk.decodeCoord(code);
+    assertEqual(decoded.x, 10, 'encode/decode x positive');
+    assertEqual(decoded.y, 20, 'encode/decode y positive');
+    assertEqual(decoded.z, 30, 'encode/decode z positive');
+
+    // 负数（上次失败的根因场景）
+    code = Chunk.encodeCoord(5, -3, 8);
+    decoded = Chunk.decodeCoord(code);
+    assertEqual(decoded.x, 5, 'encode/decode x with negative y');
+    assertEqual(decoded.y, -3, 'encode/decode negative y');
+    assertEqual(decoded.z, 8, 'encode/decode z with negative y');
+
+    // 边界值
+    code = Chunk.encodeCoord(-1000000, -512, -1000000);
+    decoded = Chunk.decodeCoord(code);
+    assertEqual(decoded.x, -1000000, 'encode/decode min x');
+    assertEqual(decoded.y, -512, 'encode/decode min y');
+    assertEqual(decoded.z, -1000000, 'encode/decode min z');
+
+    code = Chunk.encodeCoord(1000000, 512, 1000000);
+    decoded = Chunk.decodeCoord(code);
+    assertEqual(decoded.x, 1000000, 'encode/decode max x');
+    assertEqual(decoded.y, 512, 'encode/decode max y');
+    assertEqual(decoded.z, 1000000, 'encode/decode max z');
+
+    // 唯一性
+    const set = new Set();
+    for (let x = 0; x < 20; x++) {
+      for (let y = -10; y < 10; y++) {
+        for (let z = 0; z < 20; z++) {
+          const c = Chunk.encodeCoord(x, y, z);
+          assertTrue(!set.has(c), `duplicate code at ${x},${y},${z}`);
+          set.add(c);
+        }
+      }
+    }
+  });
+
   test('Chunk 初始状态正确', () => {
     setupEnvironment();
 
