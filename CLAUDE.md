@@ -4,14 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Always respond in Chinese. 所有解释、说明和对话请使用中文。代码注释也尽量使用中文。
 
-
 ## 代码质量检查
 每次修改 JS 文件后，在任务结束前自动运行 lint 检查：
 
 ```bash
 npm run lint
 ```
-
 **运行时机**:
 - 修改了 `src/**/*.js` 文件后
 - 提交代码前
@@ -22,7 +20,7 @@ npm run lint
 - 不强制要求立即修复所有警告，但应保持新增代码无警告
 
 ## 项目简介
-这是一个基于 Three.js 的纯客户端应用，没有后端，自启动一个 HTTP 静态服务器进行开发。
+这是一个基于 Three.js 的纯客户端体素游戏应用，没有后端，自启动一个 HTTP 静态服务器进行开发。
 
 ## 开发命令
 - **启动开发服务器**: `npm run start` (端口 8080)
@@ -34,12 +32,12 @@ npm run lint
 > 开发服务器会自动提供热加载能力。
 
 ## 调试
-- 游戏实例暴露在 `window.game`，可在浏览器控制台中访问
-- 可通过 `window.game.world`、`window.game.engine` 等访问子系统
+- 入口文件: `index.html` — 通过 `<script type="module">` 加载 `src/core/Game.js` 并启动游戏
 
 ## 代码规范
 - **材质统一管理**: `src/core/MaterialManager.js`
 - **方块属性集中配置**: `src/constants/BlockData.js`
+- **ESLint 配置**: `eslint.config.mjs`
 
 ## 核心架构
 ### 三层架构
@@ -48,8 +46,6 @@ npm run lint
 - 数据层: 持久化与存储 : `src/services/`, `src/constants/`
 
 ### 渲染管线设计机制
-
-> **详细架构文档**: `docs/RENDERING_PIPELINE_ARCHITECTURE.md` — 完整的渲染管线架构图解，Consolidation 合并机制，AO 阴影计算时序等信息参照此文档。
 
 ### 核心分层详解
 | 系统 | 入口文件 | 职责 |
@@ -157,12 +153,7 @@ npm run lint
 - **详细文档**: `src/world/entity-system/README_ENTITY_SYSTEM.js`
 
 ### 世界实体
-位于 `src/world/entities/`：
-- `Tree.js` — 基础树生成
-- `RealisticTree.js` — 真实感树木生成
-- `Cloud.js` — 云朵生成
-- `Chest.js` — 宝箱实体
-- `Island.js` — 岛屿辅助结构
+位于 `src/world/entities/`：`Tree.js` — 基础树生成，`Cloud.js` — 云朵生成，`Chest.js` — 宝箱实体，`Island.js` — 岛屿辅助结构
 
 ### 其他系统
 - **音频**: `src/core/AudioManager.js` — 音频加载与播放（导出单例 `audioManager`）
@@ -195,10 +186,5 @@ npm run lint
 3. **添加结构数据**: 在 `src/world/structures/` 添加 JSON 文件 → 在 `StructureLoader.js` 中注册
 4. **添加新地图**: 新地图加在 `src/workers/maps/` 中，参照 `Pyramid.js` 实现，在 `WorldWorker.js` 中被调用
 
-## 测试
-- **测试入口**: `src/tests/index.html`
-- **运行方式**: 启动服务器后访问 http://localhost:8080/src/tests/index.html，点击"运行所有测试"
-
 ## 代码提交
 任何修改都不能自动提交代码，必须等待明确的指令才能提交。
-
