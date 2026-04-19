@@ -36,6 +36,12 @@ export function extendChunk(Chunk) {
    */
   Chunk.prototype.dispose = function() {
     this.disposed = true;
+
+    // 通知 AO Worker 清理 chunk 副本缓存
+    import('../core/AOBridge.js').then(({ aoBridge }) => {
+      aoBridge.unloadChunk(`${this.cx},${this.cz}`);
+    });
+
     // 注销该区块的所有光源
     this._unregisterLightSources();
 

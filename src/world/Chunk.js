@@ -4,7 +4,8 @@
  * 使用 InstancedMesh 优化渲染性能，管理区块内的所有方块和实体
  */
 import * as THREE from 'three';
-import { encodeCoord, decodeCoord, blockDataToNumberKeys } from '../utils/CoordEncoding.js';
+import { encodeCoord, decodeCoord } from '../utils/CoordEncoding.js';
+import { aoBridge } from '../core/AOBridge.js';
 import { materials } from '../core/MaterialManager.js';
 import { persistenceService } from '../services/PersistenceService.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
@@ -381,9 +382,13 @@ export class Chunk {
     if (type === 'air') {
       this.blockData.delete(code);
       this.visibleKeys.delete(code);
+      // 同步到 AO Worker 副本
+      aoBridge.enqueueDelete(`${this.cx},${this.cz}`, code);
     } else {
       this.blockData.set(code, entry);
       this.visibleKeys.add(code);
+      // 同步到 AO Worker 副本
+      aoBridge.enqueueSet(`${this.cx},${this.cz}`, code, entry);
     }
 
     // 更新碰撞体集合
@@ -768,6 +773,10 @@ export class Chunk {
     if (options.fullRefresh) {
       this._markAllBlocksDirtyAO();
     }
+
+    // 全量同步 AO Worker 副本（chunk 首次稳定 / consolidation 后）
+    aoBridge.fullSync(`${this.cx},${this.cz}`, this.blockData);
+
     if (this.aoRefreshTimer) {
       clearTimeout(this.aoRefreshTimer);
       this.aoRefreshTimer = null;
@@ -874,15 +883,18 @@ export class Chunk {
     // 收集脏位置
     const positions = [...sentCodes].map(code => Chunk.decodeCoord(code));
 
-    // 收集邻居 chunk 快照（跨 chunk AO 计算需要）
-    // AO 计算需要 26 邻居（3x3x3），因此需要包含 8 个方向的邻居（正交+对角线）
+    // flush 所有积压的 delta，确保 Worker 副本是最新的
+    // aoBridge 是全局单例，一次 flush 即发送所有 chunk 的待处理变更
+    aoBridge.flush();
+
+    // 收集邻居 chunk 标识（Worker 侧用 cacheKey 合并缓存数据）
+    // 不再传全量 blockData，Worker 从缓存副本读取
     const neighborChunks = [];
     const dirs = [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]];
     for (const [dx, dz] of dirs) {
       const nc = this.world?.chunks?.get(`${this.cx + dx},${this.cz + dz}`);
       if (nc && nc.isReady) {
         neighborChunks.push({
-          blockData: blockDataToNumberKeys(nc.blockData),
           cx: nc.cx,
           cz: nc.cz
         });
@@ -901,12 +913,11 @@ export class Chunk {
         this._applyAOResults(data.results, sentCodes);
       });
 
-      // 发送给 Worker
+      // 发送给 Worker — 不再传全量 blockData
       aoWorker.postMessage({
         requestId,
         chunkKey: `${this.cx},${this.cz}`,
         positions,
-        blockData: blockDataToNumberKeys(this.blockData),
         neighborChunks
       });
     });
@@ -1838,6 +1849,8 @@ export class Chunk {
     const neighborsToUpdate = new Set();
 
     // 1. 更新逻辑数据和物理数据，并收集需要更新的邻居
+    const chunkKey = `${this.cx},${this.cz}`;
+    const aoDeltas = [];
     positions.forEach(p => {
       const px = Math.floor(p.x);
       const py = Math.floor(p.y);
@@ -1854,6 +1867,9 @@ export class Chunk {
         this.solidBlocks.delete(code);
         getPersistenceService().recordChangeForChunk(this.cx, this.cz, px, py, pz, 'air');
 
+        // 记录 AO Worker 副本同步 delta
+        aoDeltas.push({ chunkKey, code, op: 'delete', entry: null });
+
         // 只收集正交邻居（6方向），对角线邻居不共享面，不需要即时 reveal/refresh
         Chunk.getAOImpactedNeighborKeys(px, py, pz).forEach(({ code: neighborCode, isOrthogonal }) => {
           if (isOrthogonal) {
@@ -1862,6 +1878,11 @@ export class Chunk {
         });
       }
     });
+
+    // 批量同步 AO Worker 副本
+    if (aoDeltas.length > 0) {
+      aoBridge.enqueueBatch(aoDeltas);
+    }
 
     // 2. 移除当前待删除方块的渲染网格
     for (let i = this.group.children.length - 1; i >= 0; i--) {

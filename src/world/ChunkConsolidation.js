@@ -284,6 +284,11 @@ export function extendChunk(Chunk) {
     }
   };
 
+  // 初始化 AO Bridge — 绑定 Worker 引用，启用 delta 同步机制
+  import('../core/AOBridge.js').then(({ aoBridge }) => {
+    aoBridge.init(aoWorker);
+  });
+
   aoWorker.onerror = (e) => {
     console.error('AOWorker Error:', e.message, 'at', e.filename, ':', e.lineno);
   };
