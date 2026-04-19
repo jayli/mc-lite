@@ -4,7 +4,7 @@
  * 使用 InstancedMesh 优化渲染性能，管理区块内的所有方块和实体
  */
 import * as THREE from 'three';
-import { encodeCoord, decodeCoord, blockDataToStringKeys } from '../utils/CoordEncoding.js';
+import { encodeCoord, decodeCoord, blockDataToStringKeys, blockDataToNumberKeys } from '../utils/CoordEncoding.js';
 import { materials } from '../core/MaterialManager.js';
 import { persistenceService } from '../services/PersistenceService.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
@@ -20,7 +20,6 @@ import { extendChunk as extendWithRenderUtils } from './ChunkRenderUtils.js';
 import { FACE_MASK_ALL } from '../constants/GameConfig.js';
 import { StaticModelInstancedRenderer } from './entities/StaticModelInstancedRenderer.js';
 import { carModel, gunManModel } from '../core/Engine.js';
-import { RealisticTree } from './entities/RealisticTree.js';
 
 // 阴影投射白名单规则：所有“实心且可渲染”的方块都允许投射阴影
 const isSolidShadowCaster = (props) => props.isSolid && props.isRendered !== false;
@@ -122,7 +121,7 @@ export class Chunk {
      * 存储该 Chunk 中所有动态方块（放置、挖掘、特殊结构产生的方块）。
      * 格式: Map<number, entry>，key 为 encodeCoord(x,y,z) 编码，value 为字符串类型或 { type, orientation } 对象。
      * 读写者: World.setBlockDataState, World.removeBlock, Worker 结果接收, 持久化加载
-     * 包含: 所有被修改过的方块（地形生成后放置的方块、RealisticTree 树干占位等）。
+     * 包含: 所有被修改过的方块（地形生成后放置的方块、特殊实体占位等）。
      * 不包含: 原始地形生成的方块（这些走 blockDataArray 路径）。
      * 同步关系: 是 blockDataArray + solidBlockIds + solidBlocks 的权威来源。
      *           当 blockData 变更时，需要同步更新上述派生结构。
@@ -137,7 +136,7 @@ export class Chunk {
      *          acceptWorkerResult / buildMeshesForRegion（Worker 回传直接填充）、
      *          FaceCullingWorker（面剔除结果回传）、_markBoundaryDirtyAO（AO 脏位遍历时间接读取）。
      * 包含: blockData 中所有 isSolid=true 的方块。
-     * 不包含: 特殊实体占位（modGunMan、rover、RealisticTree）— 这些走 entityCollisionIndex。
+     * 不包含: 特殊实体占位（modGunMan、rover 等）— 这些走 entityCollisionIndex。
      * 同步关系: 应保持为 blockData 中实心方块的子集，与 blockData 同步。
      *           注意: Worker 回传路径中可能先于 blockData 填充，需确保最终一致。
      */
@@ -199,9 +198,9 @@ export class Chunk {
 
     /**
      * entities — 特殊实体实例列表
-     * 存储 modGunMan、rover、realisticTrees 等实体的实例数据。
+     * 存储 modGunMan、rover 等实体的实例数据。
      */
-    this.entities = { realisticTrees: [], modGunMan: [], rovers: [] };
+    this.entities = { modGunMan: [], rovers: [] };
 
     /**
      * structureCenters — 结构中心位置列表
@@ -565,41 +564,6 @@ export class Chunk {
   }
 
   /**
-   * 处理 RealisticTree 实例化树木移除逻辑
-   * @param {number} x - 世界坐标 X
-   * @param {number} y - 世界坐标 Y
-   * @param {number} z - 世界坐标 Z
-   * @param {string} oldType - 旧方块类型
-   */
-  _handleRealisticTreeRemoval(x, y, z, oldType) {
-    if (oldType !== 'realistic_trunk_collider') return;
-
-    const code = Chunk.encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
-    const dummy = new THREE.Matrix4();
-    dummy.makeScale(0, 0, 0);
-
-    // 隐藏树干实例
-    const trunkMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'realistic_trunk');
-    if (trunkMesh && this.instanceIndexMap['realistic_trunk']) {
-      const idx = this.instanceIndexMap['realistic_trunk'].get(code);
-      if (idx !== undefined) {
-        trunkMesh.setMatrixAt(idx, dummy);
-        trunkMesh.instanceMatrix.needsUpdate = true;
-      }
-    }
-
-    // 隐藏树叶实例
-    const leavesMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'realistic_leaves');
-    if (leavesMesh && this.instanceIndexMap['realistic_leaves']) {
-      const idx = this.instanceIndexMap['realistic_leaves'].get(code);
-      if (idx !== undefined) {
-        leavesMesh.setMatrixAt(idx, dummy);
-        leavesMesh.instanceMatrix.needsUpdate = true;
-      }
-    }
-  }
-
-  /**
    * 移除指定位置的动态网格
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y
@@ -918,7 +882,7 @@ export class Chunk {
       const nc = this.world?.chunks?.get(`${this.cx + dx},${this.cz + dz}`);
       if (nc && nc.isReady) {
         neighborChunks.push({
-          blockData: blockDataToStringKeys(nc.blockData),
+          blockData: blockDataToNumberKeys(nc.blockData),
           cx: nc.cx,
           cz: nc.cz
         });
@@ -942,7 +906,7 @@ export class Chunk {
         requestId,
         chunkKey: `${this.cx},${this.cz}`,
         positions,
-        blockData: blockDataToStringKeys(this.blockData),
+        blockData: blockDataToNumberKeys(this.blockData),
         neighborChunks
       });
     });
@@ -1336,7 +1300,6 @@ export class Chunk {
     const {
       scatteredBlocks,
       solidBlocks,
-      realisticTrees,
       modGunMan,
       rovers,
       visibleKeys,
@@ -1368,13 +1331,9 @@ export class Chunk {
       .filter(c => c.type === 'static_tree')
       .map(c => ({ x: c.x, y: c.y, z: c.z }));
 
-    // 特殊实体
-    this.entities.realisticTrees = realisticTrees || [];
-
     // 保存 snapshot 和特殊实体数据（供后续阶段使用）
     this.pendingSnapshot = snapshot || null;
     this.pendingSpecialEntityData = {
-      realisticTrees: realisticTrees || [],
       modGunMan: modGunMan || [],
       rovers: rovers || []
     };
@@ -1457,12 +1416,6 @@ export class Chunk {
    */
   assembleEntityPhase() {
     if (this.loadState !== 'terrain-built') return this.loadState === 'entities-built' || this.loadState === 'finalized';
-
-    const realisticTrees = this.pendingSpecialEntityData?.realisticTrees || [];
-    realisticTrees.forEach(pos => {
-      RealisticTree.generate(pos.x, pos.y, pos.z, this, null, true);
-    });
-    RealisticTree.createInstancedForChunk(this);
 
     const gunman = this.pendingSpecialEntityData?.modGunMan || [];
     const rovers = this.pendingSpecialEntityData?.rovers || [];
@@ -1697,7 +1650,6 @@ export class Chunk {
     // 7. 移除旧的渲染网格
     this._removeInstancedMeshBlock(code, x, y, z, oldType);
     this._handleEntityRemoval(x, y, z, oldType);
-    this._handleRealisticTreeRemoval(x, y, z, oldType);
     this._removeDynamicMesh(x, y, z, code);
 
     // 8. 如果是移除方块，唤醒邻居并移除光源
