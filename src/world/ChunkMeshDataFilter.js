@@ -1,4 +1,4 @@
-import { Chunk } from './Chunk.js';
+import { encodeCoord, getFromBlockDataMap } from '../utils/CoordEncoding.js';
 
 function getEntryType(entry) {
   if (entry == null) return null;
@@ -25,25 +25,27 @@ function copyInstanceMatrices(matrices, keepIndices) {
   return result;
 }
 
-function getBlockDataEntry(blockData, key) {
-  if (blockData instanceof Map) {
-    return blockData.get(Number(key));
+/**
+ * 从 Map 格式的 blockData 中获取条目（Worker 结果 key 可能是字符串）
+ * @param {Map} blockData - 方块数据 Map
+ * @param {string|number} key - Worker 返回的 key（可能为字符串 "x,y,z" 或数字编码）
+ * @returns {*} 方块数据条目
+ */
+function getBlockDataEntryFromKey(blockData, key) {
+  // Worker 返回的 visibleKeys/solidBlocks 使用字符串 key
+  if (typeof key === 'string') {
+    const [x, y, z] = key.split(',').map(Number);
+    return getFromBlockDataMap(blockData, x, y, z);
   }
-  return blockData[key];
+  return blockData.get(key);
 }
 
-function hasBlockDataEntry(blockData, key) {
-  if (blockData instanceof Map) {
-    return blockData.has(Number(key));
+function hasBlockDataEntryFromKey(blockData, key) {
+  if (typeof key === 'string') {
+    const [x, y, z] = key.split(',').map(Number);
+    return blockData.has(encodeCoord(x, y, z));
   }
-  return blockData[key] !== undefined;
-}
-
-function getBlockEntryAt(blockData, x, y, z) {
-  if (blockData instanceof Map) {
-    return blockData.get(Chunk.encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z)));
-  }
-  return blockData[`${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`];
+  return blockData.has(key);
 }
 
 function filterLegacyRenderData(d, blockData) {
@@ -55,7 +57,7 @@ function filterLegacyRenderData(d, blockData) {
     if (type.endsWith('_collider')) continue;
 
     filtered[type] = d[type].filter(pos => {
-      return getEntryType(getBlockEntryAt(blockData, pos.x, pos.y, pos.z)) === type;
+      return getEntryType(getFromBlockDataMap(blockData, pos.x, pos.y, pos.z)) === type;
     });
   }
   return filtered;
@@ -73,7 +75,7 @@ function filterMeshData(meshData, blockData) {
       .map(([key, index]) => ({ key, index }))
       .sort((a, b) => a.index - b.index);
 
-    const keepEntries = entries.filter(({ key }) => getEntryType(getBlockDataEntry(blockData, key)) === item.type);
+    const keepEntries = entries.filter(({ key }) => getEntryType(getBlockDataEntryFromKey(blockData, key)) === item.type);
     if (keepEntries.length === 0) continue;
 
     const keepIndices = keepEntries.map(entry => entry.index);
@@ -100,11 +102,11 @@ export function filterWorkerResultAgainstBlockData(data, blockData) {
   let { d, meshData, visibleKeys, solidBlocks } = data;
 
   if (visibleKeys) {
-    visibleKeys = visibleKeys.filter(key => hasBlockDataEntry(blockData, key));
+    visibleKeys = visibleKeys.filter(key => hasBlockDataEntryFromKey(blockData, key));
   }
 
   if (solidBlocks) {
-    solidBlocks = solidBlocks.filter(key => hasBlockDataEntry(blockData, key));
+    solidBlocks = solidBlocks.filter(key => hasBlockDataEntryFromKey(blockData, key));
   }
 
   return {

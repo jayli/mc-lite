@@ -60,3 +60,35 @@ export function blockDataToNumberKeys(blockData) {
   }
   return result;
 }
+
+/**
+ * 从 Map<number, entry> 格式的 blockData 中获取方块类型
+ * 主线程专用：blockData 始终是 Map，直接编码 + Map.get
+ * @param {Map} blockData - 方块数据 Map
+ * @param {number} x - X 坐标
+ * @param {number} y - Y 坐标
+ * @param {number} z - Z 坐标
+ * @returns {*} 方块数据条目（字符串类型或对象）
+ */
+export function getFromBlockDataMap(blockData, x, y, z) {
+  const code = encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
+  return blockData.get(code);
+}
+
+/**
+ * 从数字编码的 plain object 格式 blockData 中获取方块类型
+ * Worker 专用：blockData 是 { code: entry } 格式的纯对象
+ * 兼容 Worker 返回的旧档数据（字符串 key 回退）
+ * @param {Object} blockData - 方块数据对象
+ * @param {number} x - X 坐标
+ * @param {number} y - Y 坐标
+ * @param {number} z - Z 坐标
+ * @returns {*} 方块数据条目
+ */
+export function getFromBlockDataObj(blockData, x, y, z) {
+  const code = encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
+  if (blockData[code] !== undefined) return blockData[code];
+  // 回退：字符串 key 格式（旧档兼容）
+  const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+  return blockData[key];
+}

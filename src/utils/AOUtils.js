@@ -3,17 +3,7 @@
 
 import { getBlockProperties, isFullCubeOccluder } from '../constants/BlockData.js';
 import { AO_VERTICES_COUNT } from '../constants/GameConfig.js';
-import { encodeCoord } from './CoordEncoding.js';
-
-function getBlockDataEntry(blockData, x, y, z) {
-  if (blockData instanceof Map) {
-    return blockData.get(encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z)));
-  }
-  // 支持数字编码 key（优先）和字符串 key（回退）
-  const code = encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
-  if (blockData[code] !== undefined) return blockData[code];
-  return blockData[`${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`];
-}
+import { getFromBlockDataMap, getFromBlockDataObj } from './CoordEncoding.js';
 
 /**
  * 预计算的邻居偏移量（按面和角索引）
@@ -337,7 +327,7 @@ export function createOcclusionChecker(world, CHUNK_SIZE, getBlockPropsFn) {
     // 导致补面 AO 与可交互世界视图不一致，出现黑面或方向错乱。
     if (!isCurrentChunk && !chunk.isReady) return false;
 
-    const entry = getBlockDataEntry(chunk.blockData, ox, oy, oz);
+    const entry = getFromBlockDataMap(chunk.blockData, ox, oy, oz);
 
     if (entry) {
       const type = typeof entry === 'string' ? entry : entry.type;
@@ -377,7 +367,7 @@ export function createBlockDataOcclusionChecker(blockData, getBlockPropsFn, opti
   const { requireSolid = false } = options;
 
   return function isOccluding(x, y, z) {
-    const type = getBlockDataEntry(blockData, x, y, z);
+    const type = getFromBlockDataObj(blockData, x, y, z);
     if (!type) return false;
 
     const props = getBlockPropsFn(type);
@@ -424,7 +414,7 @@ export function computeIncrementalAO(position, operation, blockType, blockData, 
         const nx = x + dx;
         const ny = y + dy;
         const nz = z + dz;
-        const type = getBlockDataEntry(blockData, nx, ny, nz);
+        const type = getFromBlockDataObj(blockData, nx, ny, nz);
 
         if (type && isAOApplicable(type)) {
           affected.add(`${nx},${ny},${nz}`);
@@ -436,7 +426,7 @@ export function computeIncrementalAO(position, operation, blockType, blockData, 
   // 计算 AO
   for (const key of affected) {
     const [bx, by, bz] = key.split(',').map(Number);
-    const type = getBlockDataEntry(blockData, bx, by, bz);
+    const type = getFromBlockDataObj(blockData, bx, by, bz);
 
     if (type && isAOApplicable(type)) {
       const { aoLow, aoHigh } = calculateAOForBlock(bx, by, bz, isOccluding);

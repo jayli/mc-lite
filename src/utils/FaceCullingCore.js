@@ -68,22 +68,21 @@ export function computeFaceVisibilityMask(blockType, getNeighborType, isTranspar
   return mask;
 }
 
-import { encodeCoord } from './CoordEncoding.js';
+import { getFromBlockDataObj } from './CoordEncoding.js';
 
 /**
- * 从 blockData 中提取方块类型（兼容数字编码和字符串 key 两种格式）
- * @param {Object} blockData - 方块数据（{"x,y,z": type} 或 {code: type}）
+ * 从 plain object 格式的 blockData 中提取方块类型
+ * Worker 专用：blockData 是 { code: entry } 格式
+ * 兼容字符串 key 回退（旧档数据）
+ * @param {Object} blockData - 方块数据对象
  * @param {number} x - X 坐标
  * @param {number} y - Y 坐标
  * @param {number} z - Z 坐标
  * @returns {string|null} 方块类型
  */
 function getTypeFromBlockData(blockData, x, y, z) {
-  const code = encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
-  if (blockData[code] !== undefined) return blockData[code];
-  // 回退：字符串 key 格式
-  const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-  return blockData[key] || null;
+  const entry = getFromBlockDataObj(blockData, x, y, z);
+  return entry ? (typeof entry === 'string' ? entry : entry.type) : null;
 }
 
 /**

@@ -36,14 +36,7 @@ import {
   createNeighborsObjectQuery
 } from '../utils/FaceCullingCore.js';
 import { getBlockProperties, getTransparentTypes } from '../constants/BlockData.js';
-import { Chunk } from '../world/Chunk.js';
-
-function getBlockDataEntry(blockData, x, y, z) {
-  if (blockData instanceof Map) {
-    return blockData.get(Chunk.encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z)));
-  }
-  return blockData[`${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`];
-}
+import { getFromBlockDataMap } from '../utils/CoordEncoding.js';
 
 /**
  * 隐藏面剔除系统类
@@ -281,7 +274,7 @@ export class FaceCullingSystem {
    * @returns {Object|null} 方块对象或null
    */
   getBlockFromData(x, y, z, blockData) {
-    const type = getBlockDataEntry(blockData, x, y, z);
+    const type = getFromBlockDataMap(blockData, x, y, z);
     return type ? { type } : null;
   }
 
