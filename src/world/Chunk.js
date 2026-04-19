@@ -577,14 +577,14 @@ export class Chunk {
   _handleRealisticTreeRemoval(x, y, z, oldType) {
     if (oldType !== 'realistic_trunk_collider') return;
 
-    const posKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const code = Chunk.encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
     const dummy = new THREE.Matrix4();
     dummy.makeScale(0, 0, 0);
 
     // 隐藏树干实例
     const trunkMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'realistic_trunk');
     if (trunkMesh && this.instanceIndexMap['realistic_trunk']) {
-      const idx = this.instanceIndexMap['realistic_trunk'].get(posKey);
+      const idx = this.instanceIndexMap['realistic_trunk'].get(code);
       if (idx !== undefined) {
         trunkMesh.setMatrixAt(idx, dummy);
         trunkMesh.instanceMatrix.needsUpdate = true;
@@ -594,7 +594,7 @@ export class Chunk {
     // 隐藏树叶实例
     const leavesMesh = this.group.children.find(c => c.isInstancedMesh && c.userData.type === 'realistic_leaves');
     if (leavesMesh && this.instanceIndexMap['realistic_leaves']) {
-      const idx = this.instanceIndexMap['realistic_leaves'].get(posKey);
+      const idx = this.instanceIndexMap['realistic_leaves'].get(code);
       if (idx !== undefined) {
         leavesMesh.setMatrixAt(idx, dummy);
         leavesMesh.instanceMatrix.needsUpdate = true;
@@ -639,27 +639,27 @@ export class Chunk {
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y
    * @param {number} z - 世界坐标 Z
-   * @param {string} key - 方块键
+   * @param {number} code - 方块编码
    * @param {string|object} entryOrType - 方块条目或类型
    */
-  _refreshBlockRenderMesh(x, y, z, key, entryOrType) {
+  _refreshBlockRenderMesh(x, y, z, code, entryOrType) {
     const parsed = parseBlockEntry(entryOrType);
     const type = parsed.type;
     if (!type || type === 'air' || type === 'collider') return;
 
     // 先移除该位置已有网格（实例网格或动态网格）
-    this._removeInstancedMeshBlock(key, x, y, z, type);
-    this._removeDynamicMesh(x, y, z, key);
+    this._removeInstancedMeshBlock(code, x, y, z, type);
+    this._removeDynamicMesh(x, y, z, code);
 
     // 立即创建动态网格，保证暴露面立刻可见
-    const mesh = this._createDynamicBlockMesh(x, y, z, key, type, parsed.orientation || 0, { applyAO: false });
+    const mesh = this._createDynamicBlockMesh(x, y, z, code, type, parsed.orientation || 0, { applyAO: false });
     if (!mesh) return;
 
     this.group.add(mesh);
-    this.dynamicMeshes.set(key, mesh);
+    this.dynamicMeshes.set(code, mesh);
     mesh.updateMatrix();
     mesh.updateMatrixWorld();
-    this.visibleKeys.add(key);
+    this.visibleKeys.add(code);
     // 标记 AO 脏位置（放置方块：自身+邻居）
     this._markDirtyAO(x, y, z, true);
   }
@@ -670,10 +670,10 @@ export class Chunk {
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y
    * @param {number} z - 世界坐标 Z
-   * @param {string} key - 方块键
+   * @param {number} code - 方块编码
    * @param {string|object} entryOrType - 方块条目或类型
    */
-  _refreshBlockRenderLightweight(x, y, z, key, entryOrType) {
+  _refreshBlockRenderLightweight(x, y, z, code, entryOrType) {
     const parsed = parseBlockEntry(entryOrType);
     const type = parsed.type;
     if (!type || type === 'air' || type === 'collider') return;
@@ -684,12 +684,12 @@ export class Chunk {
     // 原本已经可见的 InstancedMesh 方块不需要重建。
     // 方块几何本来就是完整立方体，邻块移除后新暴露的面会自然可见。
     // 若在这里删旧建新，反而容易引入临时 dynamic mesh、黑闪和共面重叠。
-    if (this.visibleKeys.has(key) && !this.dynamicMeshes.has(key)) {
+    if (this.visibleKeys.has(code) && !this.dynamicMeshes.has(code)) {
       return;
     }
 
     // 兜底：异常场景回退到重建，确保视觉正确性
-    this._refreshBlockRenderMesh(x, y, z, key, entryOrType);
+    this._refreshBlockRenderMesh(x, y, z, code, entryOrType);
   }
 
   /**
@@ -714,17 +714,15 @@ export class Chunk {
       const nCz = Math.floor(nz / CHUNK_SIZE);
 
       if (nCx === this.cx && nCz === this.cz) {
-        const nKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-        // 只使用 blockData（权威存储），不使用 _getBlockEntryByKey
-        // blockData 始终包含所有方块（acceptWorkerResult 和 _updateBlockState 都写入 blockData）
-        const entry = this.blockData[nKey];
+        const nCode = Chunk.encodeCoord(nx, ny, nz);
+        const entry = this.blockData.get(nCode);
         if (entry) {
           const parsed = parseBlockEntry(entry);
           const props = getBlockProps(parsed.type);
-          if (!this.visibleKeys.has(nKey) && props.isRendered !== false) {
-            this._refreshBlockRenderMesh(nx, ny, nz, nKey, entry);
-          } else if (this.visibleKeys.has(nKey)) {
-            this._refreshBlockRenderLightweight(nx, ny, nz, nKey, entry);
+          if (!this.visibleKeys.has(nCode) && props.isRendered !== false) {
+            this._refreshBlockRenderMesh(nx, ny, nz, nCode, entry);
+          } else if (this.visibleKeys.has(nCode)) {
+            this._refreshBlockRenderLightweight(nx, ny, nz, nCode, entry);
           }
         }
       } else {
@@ -821,11 +819,11 @@ export class Chunk {
    * 用于 chunk 首次加载后全量刷新（WorldWorker 生成的 AO 可能因缺少邻居数据而不准确）
    */
   _markAllBlocksDirtyAO() {
-    for (const [key, entry] of Object.entries(this.blockData)) {
+    for (const [code, entry] of this.blockData) {
       if (!entry) continue;
       const type = typeof entry === 'string' ? entry : entry.type;
       if (type && getBlockProps(type).isSolid && !getBlockProps(type).isTransparent) {
-        this.dirtyAOPositions.add(key);
+        this.dirtyAOPositions.add(code);
       }
     }
   }
@@ -856,13 +854,13 @@ export class Chunk {
       const x = this.cx * CHUNK_SIZE + lx;
       const y = this.worldY + ly;
       const z = this.cz * CHUNK_SIZE + lz;
-      const key = `${x},${y},${z}`;
+      const code = Chunk.encodeCoord(x, y, z);
 
       // 只标记边界列上的方块（±1 范围覆盖对角线）
       const matchX = boundaryX !== null && Math.abs(x - boundaryX) <= 1;
       const matchZ = boundaryZ !== null && Math.abs(z - boundaryZ) <= 1;
       if (matchX || matchZ) {
-        this.dirtyAOPositions.add(key);
+        this.dirtyAOPositions.add(code);
       }
     }
   }
@@ -910,13 +908,10 @@ export class Chunk {
     }
 
     // 快照当前脏位置（后续新增的不会被本次请求覆盖）
-    const sentKeys = new Set(this.dirtyAOPositions);
+    const sentCodes = new Set(this.dirtyAOPositions);
 
     // 收集脏位置
-    const positions = [...sentKeys].map(key => {
-      const [x, y, z] = key.split(',').map(Number);
-      return { x, y, z };
-    });
+    const positions = [...sentCodes].map(code => Chunk.decodeCoord(code));
 
     // 收集邻居 chunk 快照（跨 chunk AO 计算需要）
     // AO 计算需要 26 邻居（3x3x3），因此需要包含 8 个方向的邻居（正交+对角线）
@@ -926,7 +921,7 @@ export class Chunk {
       const nc = this.world?.chunks?.get(`${this.cx + dx},${this.cz + dz}`);
       if (nc && nc.isReady) {
         neighborChunks.push({
-          blockData: nc.blockData,
+          blockData: Object.fromEntries(nc.blockData),
           cx: nc.cx,
           cz: nc.cz
         });
@@ -942,7 +937,7 @@ export class Chunk {
       // 注册回调
       aoCallbacks.set(requestId, (data) => {
         if (!this.isReady || this.isConsolidating || this._aoSourceVersion !== aoSourceVersion) return;
-        this._applyAOResults(data.results, sentKeys);
+        this._applyAOResults(data.results, sentCodes);
       });
 
       // 发送给 Worker
@@ -950,7 +945,7 @@ export class Chunk {
         requestId,
         chunkKey: `${this.cx},${this.cz}`,
         positions,
-        blockData: { ...this.blockData },
+        blockData: Object.fromEntries(this.blockData),
         neighborChunks
       });
     });
@@ -1619,14 +1614,13 @@ export class Chunk {
   _registerLightSources() {
     if (!this.world.lightSourceManager) return;
 
-    for (const key in this.blockData) {
-      const entry = this.blockData[key];
+    for (const [code, entry] of this.blockData) {
       const parsed = parseBlockEntry(entry);
       if (!parsed.type || parsed.type === 'air') continue;
 
       const props = getBlockProps(parsed.type);
       if (props.isLightSource) {
-        const [x, y, z] = key.split(',').map(Number);
+        const { x, y, z } = Chunk.decodeCoord(code);
         this.world.lightSourceManager.addLight(x, y, z, parsed.type);
       }
     }
@@ -1639,14 +1633,13 @@ export class Chunk {
   _unregisterLightSources() {
     if (!this.world.lightSourceManager) return;
 
-    for (const key in this.blockData) {
-      const entry = this.blockData[key];
+    for (const [code, entry] of this.blockData) {
       const parsed = parseBlockEntry(entry);
       if (!parsed.type || parsed.type === 'air') continue;
 
       const props = getBlockProps(parsed.type);
       if (props.isLightSource) {
-        const [x, y, z] = key.split(',').map(Number);
+        const { x, y, z } = Chunk.decodeCoord(code);
         this.world.lightSourceManager.removeLight(x, y, z);
       }
     }
@@ -2321,14 +2314,14 @@ export class Chunk {
     // 按 type 分组
     const groupedByType = {};
 
-    for (const [key, entry] of Object.entries(this.blockData)) {
+    for (const [code, entry] of this.blockData) {
       const parsed = parseBlockEntry(entry);
       const type = parsed.type;
       const orientation = parsed.orientation || 0;
-      const [x, y, z] = key.split(',').map(Number);
+      const { x, y, z } = Chunk.decodeCoord(code);
 
       if (!groupedByType[type]) groupedByType[type] = [];
-      groupedByType[type].push({ key, orientation, x, y, z });
+      groupedByType[type].push({ code, orientation, x, y, z });
     }
 
     // 构建 meshDataArray（兼容现有 buildMeshes 的输入格式）
@@ -2359,7 +2352,7 @@ export class Chunk {
         aoLow[i] = 1;
         aoHigh[i] = 1;
         orientationArr[i] = b.orientation;
-        instanceIndexMap[b.key] = i;
+        instanceIndexMap[b.code] = i;
       }
 
       meshDataArray.push({ type, count, matrices, aoLow, aoHigh, orientation: orientationArr, instanceIndexMap });
