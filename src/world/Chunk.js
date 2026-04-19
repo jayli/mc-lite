@@ -22,9 +22,31 @@ import { FACE_MASK_ALL } from '../constants/GameConfig.js';
 import { StaticModelInstancedRenderer } from './entities/StaticModelInstancedRenderer.js';
 import { carModel, gunManModel } from '../core/Engine.js';
 
-// 阴影投射白名单规则：所有“实心且可渲染”的方块都允许投射阴影
+// 阴影投射白名单规则：所有”实心且可渲染”的方块都允许投射阴影
 const isSolidShadowCaster = (props) => props.isSolid && props.isRendered !== false;
 const isGlassType = (type) => typeof type === 'string' && type.includes('glass');
+
+/**
+ * 将 blocks 对象统一为数字编码格式
+ * 兼容 WorldWorker 返回的字符串 key “x,y,z” 格式
+ * @param {Object} blocks - blocks 对象
+ * @returns {Object} 数字编码格式的 blocks 对象
+ */
+function normalizeBlocksToNumberKeys(blocks) {
+  if (!blocks || typeof blocks !== 'object') return blocks;
+  const result = {};
+  for (const key in blocks) {
+    if (key.includes(',')) {
+      // 字符串 key “x,y,z” → 数字编码
+      const [x, y, z] = key.split(',').map(Number);
+      result[encodeCoord(x, y, z)] = blocks[key];
+    } else {
+      // 已经是数字编码
+      result[Number(key)] = blocks[key];
+    }
+  }
+  return result;
+}
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
@@ -1444,6 +1466,11 @@ export class Chunk {
           ...snapshot.entities,
           turrets: existingData.entities.turrets || snapshot.entities?.turrets || []
         };
+      }
+      // 确保 snapshot.blocks 使用数字编码格式（与 Chunk.blockData 一致）
+      // 兼容 WorldWorker 返回的字符串 key 格式
+      if (snapshot.blocks) {
+        snapshot.blocks = normalizeBlocksToNumberKeys(snapshot.blocks);
       }
       if (persistence?.cache?.set) {
         persistence.cache.set(chunkKey, snapshot);

@@ -2,16 +2,72 @@
 /**
  * PersistenceService - 负责地图增量修改的存储与检索
  * 使用 Worker 线程处理 IndexedDB 操作，避免阻塞主线程
+ *
+ * 内部缓存格式：blocks 使用数字编码 key（与 Chunk.blockData 一致）
+ * 存储/导出格式：blocks 使用数字编码 key（新格式），兼容旧存档的字符串 key
  */
 import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 import { serializeBlockEntry } from '../utils/OrientationUtils.js';
+import { encodeCoord } from '../utils/CoordEncoding.js';
 import { WorkerRpcClient } from './WorkerRpcClient.js';
+
+/**
+ * 判断 blocks 对象的 key 格式
+ * @param {Object} blocks - blocks 对象
+ * @returns {boolean} true 表示数字编码格式，false 表示字符串 key 格式
+ */
+function isNumberKeyFormat(blocks) {
+  if (!blocks || typeof blocks !== 'object') return false;
+  const firstKey = Object.keys(blocks)[0];
+  if (!firstKey) return true; // 空对象视为新格式
+  return typeof firstKey === 'number' || (!firstKey.includes(','));
+}
+
+/**
+ * 将字符串 key 格式的 blocks 转换为数字编码格式
+ * @param {Object} blocks - blocks 对象
+ * @returns {Object} 数字编码格式的 blocks 对象
+ */
+function convertStringKeysToNumberKeys(blocks) {
+  const result = {};
+  for (const key in blocks) {
+    if (key.includes(',')) {
+      // 字符串 key "x,y,z" → 数字编码
+      const [x, y, z] = key.split(',').map(Number);
+      result[encodeCoord(x, y, z)] = blocks[key];
+    } else {
+      // 已经是数字编码
+      result[Number(key)] = blocks[key];
+    }
+  }
+  return result;
+}
+
+/**
+ * 标准化区块数据：确保 blocks 使用数字编码格式
+ * 兼容旧存档的字符串 key 格式，自动转换为数字编码
+ * @param {Object} data - 区块数据 { blocks, entities, meta? }
+ * @returns {Object} 标准化后的数据
+ */
+function normalizeChunkData(data) {
+  if (!data) return data;
+  if (!data.blocks) return data;
+
+  if (!isNumberKeyFormat(data.blocks)) {
+    // 旧格式：字符串 key → 新格式：数字编码
+    return {
+      ...data,
+      blocks: convertStringKeysToNumberKeys(data.blocks)
+    };
+  }
+  return data;
+}
 
 export class PersistenceService {
   constructor() {
     this.rpc = new WorkerRpcClient(new URL('../workers/PersistenceWorker.js', import.meta.url));
     this.worker = this.rpc.worker;
-    this.cache = new Map(); // Key: "cx,cz" -> { blocks: {}, entities: {} }
+    this.cache = new Map(); // Key: "cx,cz" -> { blocks: {number: entry}, entities: {} }
     this.initPromise = this.init();
   }
 
@@ -38,7 +94,7 @@ export class PersistenceService {
    * 获取指定区块的全量快照数据
    * @param {number} cx - 区块X坐标
    * @param {number} cz - 区块Z坐标
-   * @returns {Promise<object|null>} 返回 { blocks, entities } 或 null
+   * @returns {Promise<object|null>} 返回 { blocks, entities } 或 null（blocks 使用数字编码）
    */
   async getChunkData(cx, cz) {
     await this.initPromise;
@@ -50,8 +106,12 @@ export class PersistenceService {
 
     try {
       const data = await this.postMessage('getChunkData', { key });
-      this.cache.set(key, data);
-      return data;
+      // 标准化为数字编码格式（仅缓存有效数据）
+      const normalized = normalizeChunkData(data);
+      if (normalized) {
+        this.cache.set(key, normalized);
+      }
+      return normalized;
     } catch (error) {
       console.error(`Failed to get data for chunk ${key}:`, error);
       return null;
@@ -74,6 +134,7 @@ export class PersistenceService {
 
   /**
    * 记录一个方块的变更到指定归属区块（用于跨 Chunk 结构）
+   * 使用数字编码 key 存储，与 Chunk.blockData 格式一致
    * @param {number} ownerCx - 归属区块X坐标
    * @param {number} ownerCz - 归属区块Z坐标
    * @param {number} x - 世界坐标X
@@ -84,29 +145,29 @@ export class PersistenceService {
    */
   recordChangeForChunk(ownerCx, ownerCz, x, y, z, typeOrEntry, orientation) {
     const chunkKey = `${ownerCx},${ownerCz}`;
-    const blockKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const blockCode = encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
 
     const chunkData = this.cache.get(chunkKey);
-    if (chunkData && chunkData.blocks) {
-      // 解析输入参数
-      let entry;
-      if (typeof typeOrEntry === 'string') {
-        if (typeOrEntry === 'air') {
-          delete chunkData.blocks[blockKey];
-          return;
-        }
-        entry = serializeBlockEntry(typeOrEntry, orientation);
-      } else if (typeof typeOrEntry === 'object' && typeOrEntry !== null) {
-        if (typeOrEntry.type === 'air') {
-          delete chunkData.blocks[blockKey];
-          return;
-        }
-        entry = typeOrEntry;
-      } else {
+    if (!chunkData || !chunkData.blocks) return;
+
+    // 解析输入参数
+    let entry;
+    if (typeof typeOrEntry === 'string') {
+      if (typeOrEntry === 'air') {
+        delete chunkData.blocks[blockCode];
         return;
       }
-      chunkData.blocks[blockKey] = entry;
+      entry = serializeBlockEntry(typeOrEntry, orientation);
+    } else if (typeof typeOrEntry === 'object' && typeOrEntry !== null) {
+      if (typeOrEntry.type === 'air') {
+        delete chunkData.blocks[blockCode];
+        return;
+      }
+      entry = typeOrEntry;
+    } else {
+      return;
     }
+    chunkData.blocks[blockCode] = entry;
   }
 
   /**
@@ -146,13 +207,15 @@ export class PersistenceService {
 
   /**
    * 注入存档数据到缓存中 (供加载存档使用)
+   * 兼容旧格式（字符串 key）和新格式（数字编码）
    * @param {Array} worldDeltas - 存档中的区块增量数组
    */
   injectSaveData(worldDeltas) {
     this.cache.clear();
     for (const chunk of worldDeltas) {
       const { key, ...data } = chunk;
-      this.cache.set(key, data);
+      // 标准化为数字编码格式
+      this.cache.set(key, normalizeChunkData(data));
     }
   }
 }

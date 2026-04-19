@@ -3,6 +3,7 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { setSeed, seededRandom, getBiome as getBaseBiome } from '../utils/MathUtils.js';
 import { parseBlockEntry, getRotationAngle } from '../utils/OrientationUtils.js';
+import { encodeCoord, decodeCoord } from '../utils/CoordEncoding.js';
 import { terrainGen } from '../world/TerrainGen.js';
 import { Tree } from '../world/entities/Tree.js';
 import { Cloud } from '../world/entities/Cloud.js';
@@ -1680,6 +1681,24 @@ onmessage = async function(e) {
     return belongsToCrossChunkStructure(block.x, block.y, block.z, structureCenters);
   };
 
+  /**
+   * 从 snapshot.blocks 中获取指定坐标的方块条目
+   * 兼容数字编码和字符串 key 两种格式
+   * @param {Object} blocks - snapshot.blocks 对象
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @returns {*} 方块条目或 undefined
+   */
+  function getBlockFromSnapshot(blocks, x, y, z) {
+    // 先尝试数字编码格式
+    const code = encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
+    if (blocks[code] !== undefined) return blocks[code];
+    // 回退到字符串 key 格式
+    const strKey = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    return blocks[strKey];
+  }
+
   // 如果有 snapshot，用 snapshot 中的方块覆盖 blockMap（保留玩家修改）
   if (savedSnapshot) {
     const incomingOwnershipVersion = Number(savedSnapshot.meta?.ownershipVersion || 1);
@@ -1736,13 +1755,13 @@ onmessage = async function(e) {
 
     // 用 snapshot 中的方块覆盖 blockMap（保留玩家修改）
     if (savedSnapshot.blocks) {
-      // 在 snapshot 模式下，需要根据 snapshot 清理“当前 Chunk 负责渲染/存储范围”的被删除方块
+      // 在 snapshot 模式下，需要根据 snapshot 清理”当前 Chunk 负责渲染/存储范围”的被删除方块
       // 注意：仅对可跨 Chunk 的小体积结构保留跨 Chunk 责任；大型静态结构按坐标归属
       for (const [key, b] of blockMap) {
         // 只清理当前 Chunk 责任范围内的方块
         if (isBlockOwnedByCurrentChunk(b)) {
           // 如果该坐标不在 snapshot 中，说明玩家已删除该方块（或该坐标原本就是空气）
-          if (!savedSnapshot.blocks[key]) {
+          if (!getBlockFromSnapshot(savedSnapshot.blocks, b.x, b.y, b.z)) {
             blockMap.delete(key);
           }
         }
@@ -1761,10 +1780,23 @@ onmessage = async function(e) {
         ) {
           entry.orientation = rawEntry.direction;
         }
-        const [bx, by, bz] = key.split(',').map(Number);
+
+        // 兼容两种 key 格式：数字编码 和 字符串 “x,y,z”
+        let bx, by, bz;
+        if (typeof key === 'number' || (typeof key === 'string' && !key.includes(','))) {
+          // 数字编码格式（可能是 number 或 string 类型的数字）
+          const decoded = decodeCoord(Number(key));
+          bx = decoded.x;
+          by = decoded.y;
+          bz = decoded.z;
+        } else {
+          // 字符串 key 格式 “x,y,z”
+          [bx, by, bz] = key.split(',').map(Number);
+        }
+
         const snapshotBlock = { x: bx, y: by, z: bz, type: entry.type };
 
-        // 关键修复：snapshot 回写也必须通过当前 Chunk 的“所有权”校验，
+        // 关键修复：snapshot 回写也必须通过当前 Chunk 的”所有权”校验，
         // 否则历史遗留的跨 Chunk 重复键会被再次注入，导致同坐标多方块重叠渲染。
         if (!isBlockOwnedByCurrentChunk(snapshotBlock)) {
           ownershipFilteredSnapshotBlocks++;
@@ -1772,7 +1804,7 @@ onmessage = async function(e) {
         }
 
         const solid = getBlockProperties(entry.type).isSolid;
-        blockMap.set(key, { x: bx, y: by, z: bz, type: entry.type, solid, orientation: entry.orientation });
+        blockMap.set(`${bx},${by},${bz}`, { x: bx, y: by, z: bz, type: entry.type, solid, orientation: entry.orientation });
       }
     }
 
@@ -1817,10 +1849,12 @@ onmessage = async function(e) {
   // structureCenters 已在前面完成去重构建，避免重复追加导致 ownership 判定膨胀
 
   // 仅保存当前 Chunk 负责的数据（地图语义）
+  // 使用数字编码格式，与 Chunk.blockData 一致
   const blocksForSnapshot = {};
   for (const [key, b] of blockMap) {
     if (!isBlockOwnedByCurrentChunk(b)) continue;
-    blocksForSnapshot[key] = { type: b.type, orientation: b.orientation || 0 };
+    const code = encodeCoord(b.x, b.y, b.z);
+    blocksForSnapshot[code] = { type: b.type, orientation: b.orientation || 0 };
   }
 
   for (const [key, block] of blockMap) {

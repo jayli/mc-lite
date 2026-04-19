@@ -533,6 +533,7 @@ export class Game {
     // 序列化 persistenceService 中的所有区块增量
     const worldDeltas = [];
     for (const [key, data] of persistenceService.cache.entries()) {
+      if (!data) continue; // 跳过无效条目
       worldDeltas.push({ key, ...data });
       // 调试：记录包含炮塔的区块
       if (data.entities?.turrets?.length > 0) {

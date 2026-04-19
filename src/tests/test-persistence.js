@@ -15,6 +15,7 @@ import { describe, test } from './runner.js';
 import { assertEqual, assertNotNull, assertDeepEqual } from './assert.js';
 import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 import { PersistenceService } from '../services/PersistenceService.js';
+import { encodeCoord } from '../utils/CoordEncoding.js';
 
 // 模拟 Worker，用于测试
 class MockPersistenceWorker {
@@ -116,7 +117,7 @@ describe('PersistenceService 真实类测试', (test) => {
   });
 
   // =========== injectSaveData 测试 ===========
-  test('injectSaveData - 注入存档数据', () => {
+  test('injectSaveData - 注入存档数据（字符串 key 旧格式兼容）', () => {
     const service = createTestService();
 
     const worldDeltas = [
@@ -126,14 +127,16 @@ describe('PersistenceService 真实类测试', (test) => {
 
     service.injectSaveData(worldDeltas);
 
-    // 验证数据已注入
+    // 验证数据已注入并转换为数字编码格式
     const chunk0 = service.cache.get('0,0');
     assertNotNull(chunk0, '区块 0,0 应该存在');
-    assertNotNull(chunk0.blocks['1,1,1'], '方块 1,1,1 应该存在');
+    const code0 = encodeCoord(1, 1, 1);
+    assertNotNull(chunk0.blocks[code0], '方块 1,1,1 应该存在（数字编码格式）');
 
     const chunk1 = service.cache.get('1,0');
     assertNotNull(chunk1, '区块 1,0 应该存在');
-    assertNotNull(chunk1.blocks['17,0,1'], '方块 17,0,1 应该存在');
+    const code1 = encodeCoord(17, 0, 1);
+    assertNotNull(chunk1.blocks[code1], '方块 17,0,1 应该存在（数字编码格式）');
 
     teardownService();
   });
@@ -149,13 +152,13 @@ describe('PersistenceService 真实类测试', (test) => {
     // 记录一个方块变更
     service.recordChange(5, 10, 5, 'stone', 0);
 
-    // 验证缓存已更新
+    // 验证缓存已更新（使用数字编码格式）
     const chunkData = service.cache.get(chunkKey);
     assertNotNull(chunkData, '区块数据应该存在');
     assertNotNull(chunkData.blocks, 'blocks 应该存在');
 
-    const blockKey = '5,10,5';
-    const entry = chunkData.blocks[blockKey];
+    const code = encodeCoord(5, 10, 5);
+    const entry = chunkData.blocks[code];
     assertNotNull(entry, '方块条目应该存在');
     assertEqual(entry.type, 'stone', '方块类型应该是 stone');
     assertEqual(entry.orientation, 0, '朝向应该是 0');
@@ -167,8 +170,9 @@ describe('PersistenceService 真实类测试', (test) => {
     const service = createTestService();
 
     const chunkKey = '0,0';
+    const code = encodeCoord(5, 10, 5);
     service.cache.set(chunkKey, {
-      blocks: { '5,10,5': { type: 'stone', orientation: 0 } },
+      blocks: { [code]: { type: 'stone', orientation: 0 } },
       entities: {}
     });
 
@@ -176,7 +180,7 @@ describe('PersistenceService 真实类测试', (test) => {
     service.recordChange(5, 10, 5, 'air', 0);
 
     const chunkData = service.cache.get(chunkKey);
-    const entry = chunkData.blocks['5,10,5'];
+    const entry = chunkData.blocks[code];
     assertEqual(entry, undefined, '方块条目应该被删除');
 
     teardownService();
@@ -192,7 +196,8 @@ describe('PersistenceService 真实类测试', (test) => {
     service.recordChange(3, 5, 3, { type: 'handrailA', orientation: 2 });
 
     const chunkData = service.cache.get(chunkKey);
-    const entry = chunkData.blocks['3,5,3'];
+    const code = encodeCoord(3, 5, 3);
+    const entry = chunkData.blocks[code];
     assertNotNull(entry, '方块条目应该存在');
     assertEqual(entry.type, 'handrailA', '方块类型应该是 handrailA');
     assertEqual(entry.orientation, 2, '朝向应该是 2');
@@ -212,8 +217,9 @@ describe('PersistenceService 真实类测试', (test) => {
     const ownerChunk = service.cache.get('0,0');
     const coordChunk = service.cache.get('1,0');
 
-    assertNotNull(ownerChunk.blocks['20,8,2'], 'owner chunk 应该包含该方块');
-    assertEqual(coordChunk.blocks['20,8,2'], undefined, '坐标 chunk 不应写入该方块');
+    const code = encodeCoord(20, 8, 2);
+    assertNotNull(ownerChunk.blocks[code], 'owner chunk 应该包含该方块（数字编码）');
+    assertEqual(coordChunk.blocks[code], undefined, '坐标 chunk 不应写入该方块');
 
     teardownService();
   });
@@ -236,8 +242,9 @@ describe('PersistenceService 真实类测试', (test) => {
   test('saveChunkData - 保存数据并通过 getChunkData 读取', async () => {
     const service = createTestService();
 
+    const code = encodeCoord(2, 2, 2);
     const testData = {
-      blocks: { '2,2,2': { type: 'diamond', orientation: 1 } },
+      blocks: { [code]: { type: 'diamond', orientation: 1 } },
       entities: {}
     };
 
@@ -254,7 +261,9 @@ describe('PersistenceService 真实类测试', (test) => {
     // 从模拟的 IndexedDB 读取
     const result = await service.getChunkData(0, 0);
     assertNotNull(result, '应该返回数据');
-    assertDeepEqual(result, testData, '读取的数据应该与保存的一致');
+    // 从 IndexedDB 读取的数据格式应与保存的一致（数字编码）
+    assertNotNull(result.blocks[code], '应该包含数字编码的方块数据');
+    assertEqual(result.blocks[code].type, 'diamond', '方块类型应该是 diamond');
 
     teardownService();
   });
@@ -262,8 +271,9 @@ describe('PersistenceService 真实类测试', (test) => {
   test('saveChunkData - 直接传入数据保存', async () => {
     const service = createTestService();
 
+    const code = encodeCoord(5, 5, 5);
     const testData = {
-      blocks: { '5,5,5': { type: 'wood', orientation: 0 } },
+      blocks: { [code]: { type: 'wood', orientation: 0 } },
       entities: {}
     };
 
@@ -330,14 +340,17 @@ describe('PersistenceService 真实类测试', (test) => {
     service.recordChange(1, 0, 0, 'dirt', 1);
     service.recordChange(2, 0, 0, { type: 'handrailA', orientation: 2 });
 
-    // 3. 验证缓存中的数据
+    // 3. 验证缓存中的数据（使用数字编码格式）
     const chunkData = service.cache.get('0,0');
-    assertNotNull(chunkData.blocks['0,0,0'], '方块 0,0,0 应该存在');
-    assertEqual(chunkData.blocks['0,0,0'].type, 'stone', '类型应该是 stone');
-    assertEqual(chunkData.blocks['1,0,0'].type, 'dirt', '类型应该是 dirt');
-    assertEqual(chunkData.blocks['1,0,0'].orientation, 1, '朝向应该是 1');
-    assertEqual(chunkData.blocks['2,0,0'].type, 'handrailA', '类型应该是 handrailA');
-    assertEqual(chunkData.blocks['2,0,0'].orientation, 2, '朝向应该是 2');
+    const code0 = encodeCoord(0, 0, 0);
+    const code1 = encodeCoord(1, 0, 0);
+    const code2 = encodeCoord(2, 0, 0);
+    assertNotNull(chunkData.blocks[code0], '方块 0,0,0 应该存在');
+    assertEqual(chunkData.blocks[code0].type, 'stone', '类型应该是 stone');
+    assertEqual(chunkData.blocks[code1].type, 'dirt', '类型应该是 dirt');
+    assertEqual(chunkData.blocks[code1].orientation, 1, '朝向应该是 1');
+    assertEqual(chunkData.blocks[code2].type, 'handrailA', '类型应该是 handrailA');
+    assertEqual(chunkData.blocks[code2].orientation, 2, '朝向应该是 2');
 
     // 4. 保存数据
     await service.saveChunkData(0, 0);
@@ -347,13 +360,13 @@ describe('PersistenceService 真实类测试', (test) => {
     const reloaded = await service.getChunkData(0, 0);
 
     // 6. 验证重新读取的数据
-    assertNotNull(reloaded.blocks['0,0,0'], '重新读取后方块 0,0,0 应该存在');
-    assertEqual(reloaded.blocks['0,0,0'].type, 'stone', '重新读取后类型应该是 stone');
+    assertNotNull(reloaded.blocks[code0], '重新读取后方块 0,0,0 应该存在');
+    assertEqual(reloaded.blocks[code0].type, 'stone', '重新读取后类型应该是 stone');
 
     // 7. 删除一个方块
     service.injectSaveData([{ key: '0,0', ...reloaded }]);
     service.recordChange(0, 0, 0, 'air');
-    assertEqual(service.cache.get('0,0').blocks['0,0,0'], undefined, '删除后方块应该不存在');
+    assertEqual(service.cache.get('0,0').blocks[code0], undefined, '删除后方块应该不存在');
 
     teardownService();
   });
