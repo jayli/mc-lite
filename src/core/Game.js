@@ -7,7 +7,6 @@ import { Engine, VISUAL_STYLE_KEYS } from './Engine.js';
 import { World } from '../world/World.js';
 import { UIManager } from '../ui/UIManager.js';
 import { Player } from '../actors/player/Player.js';
-import { realisticTreeManager } from '../world/entity-system/RealisticTreeManager.js';
 import { faceCullingSystem } from './FaceCullingSystem.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { EnemyManager } from './EnemyManager.js'; // 替换为新的敌人管理器
@@ -168,9 +167,6 @@ export class Game {
         });
       }
     });
-
-    // 初始化树木管理器（用于生成逼真树木）
-    realisticTreeManager.init();
 
     // 初始化玩家背包，添加默认物品
     this.player.inventory.add('stone', DEFAULT_INVENTORY_COUNT);
