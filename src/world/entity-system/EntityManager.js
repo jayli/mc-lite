@@ -6,7 +6,6 @@ import { JsonEntity } from './JsonEntity.js';
 import { Tree } from '../entities/Tree.js';
 import { Cloud } from '../entities/Cloud.js';
 import { Island } from '../entities/Island.js';
-import { RealisticTree } from '../entities/RealisticTree.js';
 import { structureLoaders } from './StructureLoader.js';
 
 /**
@@ -192,7 +191,7 @@ class EntityManagerClass {
     this.register('tree_big', new CodeEntity({
       id: 'tree_big',
       biomes: ['FOREST'],
-      probability: 0.036,  // 综合概率：0.04 * 0.9 * 0.9（去除 realistic tree 和 birch）
+      probability: 0.036,  // 综合概率：0.04 * 0.9 * 0.9（去除 birch）
       generateFn: (x, y, z, chunk, dObj) => {
         const isYellow = Math.random() < 0.1;
         const leafType = isYellow ? 'yellow_leaves' : null;
@@ -215,17 +214,6 @@ class EntityManagerClass {
       categories: ['tree', 'forest']
     }));
 
-    // 真实树木（RealisticTree，使用 instanced rendering）
-    this.register('tree_realistic', new CodeEntity({
-      id: 'tree_realistic',
-      biomes: ['FOREST'],
-      probability: 0.006,  // 0.04 * 0.15
-      generateFn: (x, y, z, chunk, dObj) => {
-        RealisticTree.generate(x, y, z, chunk, null, true);
-      },
-      crossChunkDist: 8,
-      categories: ['tree', 'forest']
-    }));
 
     // 杜鹃花树
     this.register('tree_azalea', new CodeEntity({

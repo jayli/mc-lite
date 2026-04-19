@@ -34,7 +34,7 @@ export const STRUCTURE_RENDER_DIST = {
   smallHouse: 18,     // small_house 约 33x29
   treeHouse: 10,      // tree_house 约 16x15
   woodHouse: 10,      // wood_house 约 17x16
-  tree: 8,            // RealisticTree 树木
+  tree: 8,            // 大树
   static_tree: 8,     // 静态树（白桦树、普通树等）
   house: 5,           // 普通小屋约 5x5
   tank: 20,           // Tank 尺寸约 35x70x40 (X/Z: ±20, Y: 根据实际结构调整)
@@ -97,7 +97,7 @@ export const STRUCTURE_HEIGHT_RANGE = 16;
  * - 其余结构统一采用“方块坐标归属 Chunk”
  */
 export const CROSS_CHUNK_OWNER_TYPES = Object.freeze([
-  'tree',       // RealisticTree
+  'tree',       // 大树
   'static_tree',// 静态树（普通树/白桦树等）
   'house',      // 普通小屋（代码生成）
   'tall_well',  // 高井（JSON 结构）

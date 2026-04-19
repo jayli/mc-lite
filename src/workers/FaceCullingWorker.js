@@ -2,6 +2,7 @@
 // 专门处理隐藏面剔除计算的Worker
 
 import { getBlockProperties } from '../constants/BlockData.js';
+import { encodeCoord, decodeCoord } from '../utils/CoordEncoding.js';
 import {
   computeFaceVisibilityMask,
   createBlockDataNeighborQuery,
@@ -26,7 +27,10 @@ const isTransparent = (type) => {
  */
 function createOccludingChecker(blockData, worldChunks, currentCx, currentCz) {
   return function isOccluding(x, y, z) {
-    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const fx = Math.floor(x);
+    const fy = Math.floor(y);
+    const fz = Math.floor(z);
+    const code = encodeCoord(fx, fy, fz);
 
     // 检查是否在当前区块内
     const xChunk = Math.floor(x / 16);
@@ -34,12 +38,12 @@ function createOccludingChecker(blockData, worldChunks, currentCx, currentCz) {
 
     let type = null;
     if (xChunk === currentCx && zChunk === currentCz) {
-      type = blockData[key];
+      type = blockData[code];
     } else {
       // 从相邻区块查找
       const chunk = worldChunks?.find(c => c.cx === xChunk && c.cz === zChunk);
       if (chunk && chunk.blockData) {
-        type = chunk.blockData[key];
+        type = chunk.blockData[code];
       }
     }
 
@@ -80,12 +84,13 @@ function batchCalculateFaceVisibility(blockUpdates, blockData) {
   };
 
   // 收集所有需要检查的方块（包括更新的方块及其邻居）
-  const allBlocksToCheck = new Set();
+  const allBlocksToCheck = new Map(); // code -> {x, y, z}
 
   for (const update of blockUpdates) {
     // 添加更新的方块
     const key = `${Math.floor(update.x)},${Math.floor(update.y)},${Math.floor(update.z)}`;
-    allBlocksToCheck.add(key);
+    const code = encodeCoord(Math.floor(update.x), Math.floor(update.y), Math.floor(update.z));
+    allBlocksToCheck.set(code, { x: Math.floor(update.x), y: Math.floor(update.y), z: Math.floor(update.z), strKey: key });
 
     // 添加邻居方块
     const { x, y, z } = update;
@@ -94,30 +99,30 @@ function batchCalculateFaceVisibility(blockUpdates, blockData) {
     ];
 
     for (const [nx, ny, nz] of neighbors) {
-      const neighborKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-      allBlocksToCheck.add(neighborKey);
+      const nCode = encodeCoord(Math.floor(nx), Math.floor(ny), Math.floor(nz));
+      const nKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
+      allBlocksToCheck.set(nCode, { x: Math.floor(nx), y: Math.floor(ny), z: Math.floor(nz), strKey: nKey });
     }
   }
 
   // 计算所有相关方块的可见性
-  for (const key of allBlocksToCheck) {
-    const [bx, by, bz] = key.split(',').map(Number);
-    const type = blockData[key];
+  for (const [code, pos] of allBlocksToCheck) {
+    const type = blockData[code];
 
     if (type) { // 如果方块存在
-      const block = { x: bx, y: by, z: bz, type };
+      const block = { x: pos.x, y: pos.y, z: pos.z, type };
       const visibility = calculateFaceVisibility(block, blockData);
 
       // 创建方块对象
       const blockInfo = {
-        x: bx, y: by, z: bz, type, visibility
+        x: pos.x, y: pos.y, z: pos.z, type, visibility
       };
 
       // 如果是更新的方块，添加到updatedBlocks
       const isUpdatedBlock = blockUpdates.some(update =>
-        Math.floor(update.x) === bx &&
-        Math.floor(update.y) === by &&
-        Math.floor(update.z) === bz
+        Math.floor(update.x) === pos.x &&
+        Math.floor(update.y) === pos.y &&
+        Math.floor(update.z) === pos.z
       );
 
       if (isUpdatedBlock) {
@@ -126,9 +131,9 @@ function batchCalculateFaceVisibility(blockUpdates, blockData) {
         results.affectedNeighbors.push(blockInfo);
       }
 
-      // 如果方块可见，添加到visibleKeys
+      // 如果方块可见，添加到visibleKeys（使用字符串 key 保持向后兼容）
       if (visibility > 0) {
-        results.visibleKeys.add(key);
+        results.visibleKeys.add(pos.strKey);
       }
     }
   }
@@ -152,9 +157,10 @@ function calculateChunkFaceVisibility(blockData, cx, cz, worldChunks = null) {
     blocksWithVisibility: {}
   };
 
-  for (const key in blockData) {
-    const [x, y, z] = key.split(',').map(Number);
-    const type = blockData[key];
+  for (const codeStr in blockData) {
+    const code = Number(codeStr);
+    const { x, y, z } = decodeCoord(code);
+    const type = blockData[code];
 
     // 获取完整方块信息
     const block = { x, y, z, type };
@@ -169,7 +175,8 @@ function calculateChunkFaceVisibility(blockData, cx, cz, worldChunks = null) {
       mask = calculateFaceVisibility(block, blockData);
     }
 
-    // 添加到结果
+    // 添加到结果（使用字符串 key 保持向后兼容）
+    const key = `${x},${y},${z}`;
     results.blocksWithVisibility[key] = {
       x, y, z, type, visibility: mask
     };

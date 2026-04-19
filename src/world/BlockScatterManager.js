@@ -64,7 +64,7 @@ export class BlockScatterManager {
   }
 
   /**
-   * 特殊实体分发（RealisticTree、modGunMan、Rover）
+   * 特殊实体分发（modGunMan、Rover）
    */
   scatterEntities(entities, cx, cz) {
     const chunk = this.world.chunks.get(`${cx},${cz}`);

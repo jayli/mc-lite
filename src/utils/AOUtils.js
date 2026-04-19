@@ -9,6 +9,9 @@ function getBlockDataEntry(blockData, x, y, z) {
   if (blockData instanceof Map) {
     return blockData.get(encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z)));
   }
+  // 支持数字编码 key（优先）和字符串 key（回退）
+  const code = encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
+  if (blockData[code] !== undefined) return blockData[code];
   return blockData[`${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`];
 }
 

@@ -139,14 +139,6 @@ describe('BlockData 测试', (test) => {
     assertFalse(props.isRendered, '碰撞体不渲染');
   });
 
-  test('树木碰撞体属性', () => {
-    const props = getBlockProperties('realistic_trunk_collider');
-
-    assertTrue(props.isSolid, '树木碰撞体是实心');
-    assertTrue(props.isTransparent, '树木碰撞体透明');
-    assertFalse(props.isRendered, '树木碰撞体不渲染');
-  });
-
   // =========== 云朵测试 ===========
   test('云朵方块属性', () => {
     const props = getBlockProperties('cloud');

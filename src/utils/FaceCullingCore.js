@@ -68,9 +68,28 @@ export function computeFaceVisibilityMask(blockType, getNeighborType, isTranspar
   return mask;
 }
 
+import { encodeCoord } from './CoordEncoding.js';
+
+/**
+ * 从 blockData 中提取方块类型（兼容数字编码和字符串 key 两种格式）
+ * @param {Object} blockData - 方块数据（{"x,y,z": type} 或 {code: type}）
+ * @param {number} x - X 坐标
+ * @param {number} y - Y 坐标
+ * @param {number} z - Z 坐标
+ * @returns {string|null} 方块类型
+ */
+function getTypeFromBlockData(blockData, x, y, z) {
+  const code = encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
+  if (blockData[code] !== undefined) return blockData[code];
+  // 回退：字符串 key 格式
+  const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+  return blockData[key] || null;
+}
+
 /**
  * 创建基于 blockData 对象的邻居查询函数
- * @param {Object} blockData - {"x,y,z": type} 格式的方块数据
+ * 支持数字编码 key 和字符串 key 两种格式
+ * @param {Object} blockData - 方块数据（{code: type} 或 {"x,y,z": type}）
  * @param {number} x - 当前方块 X 坐标
  * @param {number} y - 当前方块 Y 坐标
  * @param {number} z - 当前方块 Z 坐标
@@ -78,8 +97,7 @@ export function computeFaceVisibilityMask(blockType, getNeighborType, isTranspar
  */
 export function createBlockDataNeighborQuery(blockData, x, y, z) {
   return function getNeighborType(dx, dy, dz) {
-    const key = `${Math.floor(x + dx)},${Math.floor(y + dy)},${Math.floor(z + dz)}`;
-    return blockData[key] || null;
+    return getTypeFromBlockData(blockData, x + dx, y + dy, z + dz);
   };
 }
 
@@ -126,6 +144,7 @@ export function createNeighborsObjectQuery(neighbors) {
 
 /**
  * 创建跨区块邻居查询函数
+ * 支持数字编码 key 和字符串 key 两种格式
  * @param {Object} blockData - 当前区块的方块数据
  * @param {Map} worldChunks - 世界区块映射
  * @param {number} currentCx - 当前区块 X 坐标
@@ -146,8 +165,7 @@ export function createCrossChunkNeighborQuery(blockData, worldChunks, currentCx,
 
     // 如果在当前区块内
     if (nxChunk === currentCx && nzChunk === currentCz) {
-      const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-      return blockData[key] || null;
+      return getTypeFromBlockData(blockData, nx, ny, nz);
     }
 
     // 跨区块查询
@@ -155,8 +173,7 @@ export function createCrossChunkNeighborQuery(blockData, worldChunks, currentCx,
     const neighborChunk = worldChunks.get(chunkKey);
 
     if (neighborChunk && neighborChunk.blockData) {
-      const key = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-      return neighborChunk.blockData[key] || null;
+      return getTypeFromBlockData(neighborChunk.blockData, nx, ny, nz);
     }
 
     return null;

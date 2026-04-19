@@ -597,9 +597,8 @@ export function extendChunk(Chunk) {
       const child = this.group.children[i];
       if (child.isInstancedMesh) {
         const type = child.userData.type;
-        // 保留真实感树木和普通树叶（树叶是静态的，不应在合并时重建）
-        if (type === 'realistic_trunk' || type === 'realistic_leaves' ||
-            type === 'modGunMan' || type === 'rover' ||
+        // 保留特殊实体和树叶（树叶是静态的，不应在合并时重建）
+        if (type === 'modGunMan' || type === 'rover' ||
             type === 'leaves' || type === 'azalea_leaves' || type === 'azalea_flowers' ||
             type === 'sky_leaves' || type === 'yellow_leaves' || type === 'swamp_leaves' ||
             type === 'snow_leaves') {

@@ -352,7 +352,7 @@ export class Physics {
    *   2. World.isSolid() — 四级查询链：
    *      a. solidBlockIds      → Y:0~15 的实心方块快速查询（Set<number>）
    *      b. solidBlocks        → Y:16+ 和动态方块的实心查询（Set<string>）
-   *      c. blockData          → 通过 getBlockProps(type).isSolid 判断（RealisticTree 树干等）
+   *      c. blockData          → 通过 getBlockProps(type).isSolid 判断（其他方块）
    *      d. entityCollisionIndex → 特殊实体占位（modGunMan、rover）
    *   3. getBlock().isSolid   → 未加载 chunk 时的噪声地形回退
    *   4. MinecartManager      → 矿车实体碰撞（独立路径，不走方块体系）

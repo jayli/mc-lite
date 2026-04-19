@@ -79,11 +79,8 @@ const CITY_TALL_WELL_CHANCE = CITY_FLOWER_BED_CHANCE * 3; // 与 pavilion 相同
 // 方块归属机制版本号（用于存档兼容性判断）
 const OWNERSHIP_SCHEMA_VERSION = 2;
 // 不打散的实体类型 — 这些类型不进入 blockMap，单独收集
-const NON_SCATTERED_TYPES = new Set([
-  'realistic_trunk',
-  'realistic_leaves'
-  // modGunMan、Rover 通过其他方式收集，不经过 fakeChunk.add
-]);
+// 当前所有方块都进入 blockMap，modGunMan、Rover 通过其他方式收集
+const NON_SCATTERED_TYPES = new Set([]);
 // 旧档归属迁移调试开关（默认关闭）
 const DEBUG_OWNERSHIP_MIGRATION = false;
 
@@ -1707,7 +1704,7 @@ onmessage = async function(e) {
 
     // 重建结构中心列表（从实体列表）
     // 修复：保留静态结构（如 tank, house, static_tree），只移除动态实体，避免 reload 后静态结构被截断
-    // 动态实体类型：tree (RealisticTree), gunman, rover
+    // 动态实体类型：gunman, rover
     const staticCenters = structureCenters.filter(c =>
       c.type !== 'tree' && c.type !== 'gunman' && c.type !== 'rover'
     );

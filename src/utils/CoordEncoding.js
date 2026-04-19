@@ -46,3 +46,17 @@ export function blockDataToStringKeys(blockData) {
   }
   return result;
 }
+
+/**
+ * 将 Map<number, entry> 格式的 blockData 转换为数字编码的 plain object
+ * Worker 可直接使用此格式，无需字符串转换
+ * @param {Map<number, *>} blockData - 数字编码键的方块数据
+ * @returns {Object} 数字编码键的方块数据对象 { code: entry }
+ */
+export function blockDataToNumberKeys(blockData) {
+  const result = {};
+  for (const [code, entry] of blockData) {
+    result[code] = entry;
+  }
+  return result;
+}

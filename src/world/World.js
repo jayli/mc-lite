@@ -887,7 +887,7 @@ export class World {
       return true;
     }
 
-    // --- blockData 回退（覆盖 RealisticTree 树干等 blockData 条目） ---
+    // --- blockData 回退（覆盖所有 blockData 条目） ---
     const type = chunk.blockData?.get(blockCode);
     if (type) {
       const typeStr = typeof type === 'string' ? type : (type?.type || '');

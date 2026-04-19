@@ -4,7 +4,7 @@
  * 使用 InstancedMesh 优化渲染性能，管理区块内的所有方块和实体
  */
 import * as THREE from 'three';
-import { encodeCoord, decodeCoord, blockDataToStringKeys, blockDataToNumberKeys } from '../utils/CoordEncoding.js';
+import { encodeCoord, decodeCoord, blockDataToNumberKeys } from '../utils/CoordEncoding.js';
 import { materials } from '../core/MaterialManager.js';
 import { persistenceService } from '../services/PersistenceService.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';

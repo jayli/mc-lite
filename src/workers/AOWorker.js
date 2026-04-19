@@ -4,6 +4,7 @@
 
 import { calculateAOForBlock } from '../utils/AOUtils.js';
 import { getBlockProperties, isFullCubeOccluder } from '../constants/BlockData.js';
+import { encodeCoord } from '../utils/CoordEncoding.js';
 
 /**
  * 判断方块类型是否适用于 AO 计算
@@ -28,6 +29,7 @@ function isAOApplicable(blockType) {
  */
 function createOcclusionChecker(blockData, neighborChunks) {
   // 构建合并查找表：当前 chunk 数据 + 邻居 chunk 数据
+  // 支持数字编码 key（优先）和字符串 key（回退）
   const merged = {};
   for (const key in blockData) {
     merged[key] = blockData[key];
@@ -46,8 +48,8 @@ function createOcclusionChecker(blockData, neighborChunks) {
   }
 
   return function isOccluding(x, y, z) {
-    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-    const entry = merged[key];
+    const code = encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
+    const entry = merged[code] !== undefined ? merged[code] : merged[`${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`];
     if (!entry) return false;
     const type = typeof entry === 'string' ? entry : entry.type;
     if (!type) return false;
@@ -89,9 +91,9 @@ function handleComputeAO(data) {
     const iy = Math.floor(pos.y);
     const iz = Math.floor(pos.z);
 
-    // 从当前 chunk（非 merged）获取方块类型
-    const key = `${ix},${iy},${iz}`;
-    const entry = blockData[key];
+    // 从当前 chunk（非 merged）获取方块类型，优先数字编码，回退字符串 key
+    const code = encodeCoord(ix, iy, iz);
+    const entry = blockData[code] !== undefined ? blockData[code] : blockData[`${ix},${iy},${iz}`];
     const type = typeof entry === 'string' ? entry : entry?.type;
 
     // 跳过空气、透明、非实心方块
