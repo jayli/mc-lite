@@ -5,7 +5,7 @@
  */
 
 const transparentTypes = ['glass_block', 'leaves', 'water', 'air'];
-const solidTypes = ['stone', 'dirt', 'wood', 'collider', 'realistic_trunk_collider'];
+const solidTypes = ['stone', 'dirt', 'wood', 'collider'];
 
 export const mockFaceCullingSystem = {
   isEnabled: () => false,

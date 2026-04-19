@@ -74,7 +74,6 @@ class MockWorkerWrapper {
                     cz: msg.cz,
                     d: {},
                     solidBlocks: [],
-                    realisticTrees: [],
                     modGunMan: [],
                     rovers: [],
                     allBlockTypes: {},

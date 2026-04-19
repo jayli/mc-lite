@@ -33,7 +33,6 @@ class MockWorldWorker {
             cz: msg.cz,
             d: {},
             solidBlocks: [],
-            realisticTrees: [],
             modGunMan: [],
             rovers: [],
             allBlockTypes: [],
