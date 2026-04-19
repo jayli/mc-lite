@@ -118,16 +118,16 @@ export class Chunk {
     // =========================================
 
     /**
-     * blockData — 权威数据源（Object）
+     * blockData — 权威数据源（Map）
      * 存储该 Chunk 中所有动态方块（放置、挖掘、特殊结构产生的方块）。
-     * 格式: { "x,y,z": entry }，entry 可以是字符串类型或 { type, orientation } 对象。
+     * 格式: Map<number, entry>，key 为 encodeCoord(x,y,z) 编码，value 为字符串类型或 { type, orientation } 对象。
      * 读写者: World.setBlockDataState, World.removeBlock, Worker 结果接收, 持久化加载
      * 包含: 所有被修改过的方块（地形生成后放置的方块、RealisticTree 树干占位等）。
      * 不包含: 原始地形生成的方块（这些走 blockDataArray 路径）。
      * 同步关系: 是 blockDataArray + solidBlockIds + solidBlocks 的权威来源。
      *           当 blockData 变更时，需要同步更新上述派生结构。
      */
-    this.blockData = {};
+    this.blockData = new Map();
 
     /**
      * solidBlocks — 实心方块世界坐标集合（Set<string>）
@@ -369,29 +369,30 @@ export class Chunk {
 
   /**
    * 更新方块的数据状态（blockData, visibleKeys, solidBlocks）
-   * @param {string} key - 方块键
-   * @param {string} type - 方块类型
-   * @param {Object} entry - 方块条目
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y
    * @param {number} z - 世界坐标 Z
+   * @param {string} type - 方块类型
+   * @param {Object} entry - 方块条目
    */
-  _updateBlockState(key, type, entry, x, y, z) {
-    // === 旧的对象存储（保持兼容） ===
+  _updateBlockState(x, y, z, type, entry) {
+    const code = Chunk.encodeCoord(x, y, z);
+
+    // === blockData（权威存储） ===
     if (type === 'air') {
-      delete this.blockData[key];
-      this.visibleKeys.delete(key);
+      this.blockData.delete(code);
+      this.visibleKeys.delete(code);
     } else {
-      this.blockData[key] = entry;
-      this.visibleKeys.add(key);
+      this.blockData.set(code, entry);
+      this.visibleKeys.add(code);
     }
 
     // 更新碰撞体集合
     const props = getBlockProps(type);
     if (props.isSolid) {
-      this.solidBlocks.add(key);
+      this.solidBlocks.add(code);
     } else {
-      this.solidBlocks.delete(key);
+      this.solidBlocks.delete(code);
     }
 
     // === 新的数组存储（高性能） ===
@@ -500,71 +501,42 @@ export class Chunk {
   }
 
   /**
-   * 获取指定 key 对应方块类型（兼容字符串/对象条目）
-   * 优先使用新的数组存储
-   * @param {string} key - 方块键
-   * @returns {string|null} 方块类型
+   * 获取指定坐标的方块条目（权威查询）
+   * 先查 blockData（Map），再回退到 blockDataArray
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @returns {{type:string,orientation:number}|null}
    */
-  _getBlockTypeByKey(key) {
-    // 优先使用 blockData（权威存储，worldY 未初始化导致 blockDataArray 索引不可靠）
-    const entry = this.blockData[key];
-    if (entry) return parseBlockEntry(entry).type;
+  getBlockEntry(x, y, z) {
+    const code = Chunk.encodeCoord(x, y, z);
+    const entry = this.blockData.get(code);
+    if (entry) return parseBlockEntry(entry);
     // 回退到 blockDataArray
-    const [x, y, z] = key.split(',').map(Number);
     const blockIndex = this._getBlockIndex(x, y, z);
     if (blockIndex >= 0) {
       const blockId = this.blockDataArray[blockIndex];
-      if (blockId) return this._getTypeFromBlockId(blockId);
+      if (blockId) {
+        const arrEntry = this._getEntryFromBlockId(blockId);
+        if (arrEntry) return parseBlockEntry(arrEntry);
+      }
     }
     return null;
   }
 
   /**
-   * 检查指定 key 是否有方块（使用新存储）
-   * @param {string} key - 方块键
+   * 检查指定坐标是否有方块
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
    * @returns {boolean}
    */
-  _hasBlockByKey(key) {
-    const [x, y, z] = key.split(',').map(Number);
+  hasBlockEntry(x, y, z) {
+    const code = Chunk.encodeCoord(x, y, z);
+    if (this.blockData.has(code)) return true;
     const blockIndex = this._getBlockIndex(x, y, z);
     if (blockIndex >= 0) {
       return this.blockDataArray[blockIndex] !== 0;
-    }
-    return key in this.blockData;
-  }
-
-  /**
-   * 获取指定 key 的方块条目（使用新存储）
-   * @param {string} key - 方块键
-   * @returns {string|object|null}
-   */
-  _getBlockEntryByKey(key) {
-    // 优先使用 blockData（权威存储）
-    const entry = this.blockData[key];
-    if (entry) return entry;
-    // 回退到 blockDataArray
-    const [x, y, z] = key.split(',').map(Number);
-    const blockIndex = this._getBlockIndex(x, y, z);
-    if (blockIndex >= 0) {
-      const blockId = this.blockDataArray[blockIndex];
-      if (blockId) return this._getEntryFromBlockId(blockId);
-    }
-    return null;
-  }
-
-  /**
-   * 检查指定 key 是否是可见方块（使用新存储）
-   * @param {string} key - 方块键
-   * @returns {boolean}
-   */
-  _isBlockVisibleByKey(key) {
-    // 优先使用 blockData（权威存储，worldY 未初始化导致 blockDataArray 索引不可靠）
-    const entry = this.blockData[key];
-    if (entry) {
-      const type = typeof entry === 'string' ? entry : entry.type;
-      if (!type) return false;
-      const props = getBlockProps(type);
-      return props.isRendered !== false;
     }
     return false;
   }
@@ -584,10 +556,9 @@ export class Chunk {
       const bx = Math.floor(b.x);
       const by = Math.floor(b.y);
       const bz = Math.floor(b.z);
-      const bKey = `${bx},${by},${bz}`;
 
       // 兼容 blockData 对象格式，避免 "实体已删但碰撞体残留"
-      if (this._getBlockTypeByKey(bKey) === 'collider') {
+      if (this.getBlockEntry(bx, by, bz)?.type === 'collider') {
         this.removeBlock(bx, by, bz);
       }
     });
@@ -802,23 +773,25 @@ export class Chunk {
    * @private
    */
   _addDirtyAOPosition(x, y, z) {
-    const key = `${x},${y},${z}`;
+    const code = Chunk.encodeCoord(x, y, z);
     const ncx = Math.floor(x / CHUNK_SIZE);
     const ncz = Math.floor(z / CHUNK_SIZE);
 
     if (ncx === this.cx && ncz === this.cz) {
       // 当前 chunk 内：只标记实心不透明方块
-      const type = this._getBlockTypeByKey(key);
+      const entry = this.blockData.get(code);
+      const type = entry ? (typeof entry === 'string' ? entry : entry.type) : null;
       if (type && getBlockProps(type).isSolid && !getBlockProps(type).isTransparent) {
-        this.dirtyAOPositions.add(key);
+        this.dirtyAOPositions.add(code);
       }
     } else {
       // 跨 chunk：标记邻居 chunk 的脏集
       const nChunk = this.world?.chunks?.get(`${ncx},${ncz}`);
       if (nChunk && nChunk.isReady) {
-        const nType = nChunk._getBlockTypeByKey?.(key);
+        const nEntry = nChunk.blockData?.get(code);
+        const nType = nEntry ? (typeof nEntry === 'string' ? nEntry : nEntry.type) : null;
         if (nType && getBlockProps(nType).isSolid && !getBlockProps(nType).isTransparent) {
-          nChunk.dirtyAOPositions.add(key);
+          nChunk.dirtyAOPositions.add(code);
         }
       }
     }
@@ -999,11 +972,12 @@ export class Chunk {
     // 按方块类型分组，减少 InstancedMesh 查找
     const resultsByType = new Map();
     for (const r of results) {
-      const key = `${r.x},${r.y},${r.z}`;
-      const type = this._getBlockTypeByKey(key);
+      const code = Chunk.encodeCoord(r.x, r.y, r.z);
+      const entry = this.blockData.get(code);
+      const type = entry ? (typeof entry === 'string' ? entry : entry.type) : null;
       if (!type) continue;
       if (!resultsByType.has(type)) resultsByType.set(type, []);
-      resultsByType.get(type).push({ ...r, key });
+      resultsByType.get(type).push({ ...r, code });
     }
 
     // 按类型批量更新 InstancedMesh
@@ -1022,7 +996,7 @@ export class Chunk {
       if (!aoLowAttr || !aoHighAttr) continue;
 
       for (const r of typeResults) {
-        const idx = typeMap.get(r.key);
+        const idx = typeMap.get(r.code);
         if (idx === undefined || idx < 0 || idx >= aoLowAttr.array.length) continue;
 
         // 直接覆写，无中间态
@@ -1054,9 +1028,11 @@ export class Chunk {
    * @param {number} orientation - 方块朝向
    * @returns {THREE.Mesh|null} 创建的网格或 null
    */
-  _createDynamicBlockMesh(x, y, z, key, type, orientation, options = {}) {
+  _createDynamicBlockMesh(x, y, z, code, type, orientation, options = {}) {
     const props = getBlockProps(type);
-    if (!props.isRendered || !this._isBlockVisibleByKey(key)) {
+    const entry = this.blockData.get(code);
+    const entryType = entry ? (typeof entry === 'string' ? entry : entry.type) : null;
+    if (!props.isRendered || !entryType) {
       return null;
     }
     const applyAO = options.applyAO === true;
@@ -1381,12 +1357,14 @@ export class Chunk {
 
     if (visibleKeys) {
       for (const key of visibleKeys) {
-        this.visibleKeys.add(key);
+        const [x, y, z] = key.split(',').map(Number);
+        this.visibleKeys.add(Chunk.encodeCoord(x, y, z));
       }
     }
     if (solidBlocks) {
       for (const key of solidBlocks) {
-        this.solidBlocks.add(key);
+        const [x, y, z] = key.split(',').map(Number);
+        this.solidBlocks.add(Chunk.encodeCoord(x, y, z));
       }
     }
 
@@ -1425,8 +1403,8 @@ export class Chunk {
     this.nextBlockId = 1;
 
     // 遍历 blockData 填充数组存储
-    for (const [key, entry] of Object.entries(this.blockData)) {
-      const [x, y, z] = key.split(',').map(Number);
+    for (const [code, entry] of this.blockData) {
+      const { x, y, z } = Chunk.decodeCoord(code);
       const parsed = parseBlockEntry(entry);
       const type = parsed.type;
 
@@ -1883,25 +1861,9 @@ export class Chunk {
    * @returns {number} 朝向值 (0-3)，方块不存在时返回 0
    */
   getBlockOrientation(x, y, z) {
-    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-    const entry = this._getBlockEntryByKey(key);
+    const entry = this.getBlockEntry(x, y, z);
     if (!entry) return 0;
-    const parsed = parseBlockEntry(entry);
-    return parsed.orientation || 0;
-  }
-
-  /**
-   * 获取指定位置方块的类型
-   * @param {number} x - 世界坐标 X
-   * @param {number} y - 世界坐标 Y
-   * @param {number} z - 世界坐标 Z
-   * @returns {{ type: string, orientation: number }|null} 方块信息
-   */
-  getBlockEntry(x, y, z) {
-    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-    const entry = this._getBlockEntryByKey(key);
-    if (!entry) return null;
-    return parseBlockEntry(entry);
+    return entry.orientation || 0;
   }
 
   /**
@@ -2129,8 +2091,7 @@ export class Chunk {
    */
   removeBlock(x, y, z) {
     // 检查方块是否为不可破坏类型
-    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
-    const type = this._getBlockTypeByKey(key);
+    const type = this.getBlockEntry(x, y, z)?.type;
     if (type) {
       const props = getBlockProps(type);
       if (props.isIndestructible) {
