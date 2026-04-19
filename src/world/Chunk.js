@@ -47,11 +47,14 @@ export class Chunk {
       for (let dy = -1; dy <= 1; dy++) {
         for (let dz = -1; dz <= 1; dz++) {
           if (dx === 0 && dy === 0 && dz === 0) continue;
+          const nx = Math.floor(x + dx);
+          const ny = Math.floor(y + dy);
+          const nz = Math.floor(z + dz);
           impacted.push({
-            x: x + dx,
-            y: y + dy,
-            z: z + dz,
-            key: `${Math.floor(x + dx)},${Math.floor(y + dy)},${Math.floor(z + dz)}`,
+            x: nx,
+            y: ny,
+            z: nz,
+            code: Chunk.encodeCoord(nx, ny, nz),
             isOrthogonal: Math.abs(dx) + Math.abs(dy) + Math.abs(dz) === 1
           });
         }
@@ -1665,13 +1668,13 @@ export class Chunk {
       : parseBlockEntry(typeOrEntry);
     const { type } = entry;
     const blockOrientation = entry.orientation || 0;
-    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const code = Chunk.encodeCoord(x, y, z);
 
     // 2. 边界检查（跨 Chunk）
     if (!this._isInResponsibility(x, y, z)) return;
 
     // 3. 获取旧方块信息
-    const oldEntry = this.blockData[key];
+    const oldEntry = this.blockData.get(code);
     const oldParsed = parseBlockEntry(oldEntry);
     const oldType = oldParsed.type;
 
@@ -1679,7 +1682,7 @@ export class Chunk {
     getPersistenceService().recordChangeForChunk(this.cx, this.cz, x, y, z, entry);
 
     // 5. 更新数据状态
-    this._updateBlockState(key, type, entry, x, y, z);
+    this._updateBlockState(x, y, z, type, entry);
     this.saveDebounced();
 
     // 6. 计算 Face Culling 掩码
@@ -1697,15 +1700,15 @@ export class Chunk {
       mask = fcSystem.calculateFaceVisibility(block, neighbors);
 
       mask === 0 && !fcSystem.isTransparent(type)
-        ? this.visibleKeys.delete(key)
-        : this.visibleKeys.add(key);
+        ? this.visibleKeys.delete(code)
+        : this.visibleKeys.add(code);
     }
 
     // 7. 移除旧的渲染网格
-    this._removeInstancedMeshBlock(key, x, y, z, oldType);
+    this._removeInstancedMeshBlock(code, x, y, z, oldType);
     this._handleEntityRemoval(x, y, z, oldType);
     this._handleRealisticTreeRemoval(x, y, z, oldType);
-    this._removeDynamicMesh(x, y, z, key);
+    this._removeDynamicMesh(x, y, z, code);
 
     // 8. 如果是移除方块，唤醒邻居并移除光源
     if (type === 'air') {
@@ -1725,10 +1728,10 @@ export class Chunk {
     }
 
     // 9. 创建新的动态网格
-    const mesh = this._createDynamicBlockMesh(x, y, z, key, type, blockOrientation, { applyAO: false });
+    const mesh = this._createDynamicBlockMesh(x, y, z, code, type, blockOrientation, { applyAO: false });
     if (mesh) {
       this.group.add(mesh);
-      this.dynamicMeshes.set(key, mesh);
+      this.dynamicMeshes.set(code, mesh);
       this.dirtyBlocks++;
       this.scheduleConsolidation();
       mesh.updateMatrix();
@@ -1781,14 +1784,14 @@ export class Chunk {
       const x = Math.floor(block.x);
       const y = Math.floor(block.y);
       const z = Math.floor(block.z);
-      const key = `${x},${y},${z}`;
+      const code = Chunk.encodeCoord(x, y, z);
 
       if (!this._isInResponsibility(x, y, z)) {
         skipped++;
         continue;
       }
 
-      const oldEntry = this.blockData[key];
+      const oldEntry = this.blockData.get(code);
       const oldType = oldEntry ? parseBlockEntry(oldEntry).type : null;
       const nextType = typeof block.type === 'string' ? block.type : 'air';
 
@@ -1810,7 +1813,7 @@ export class Chunk {
       const entry = { type: nextType, orientation };
 
       getPersistenceService().recordChangeForChunk(this.cx, this.cz, x, y, z, entry);
-      this._updateBlockState(key, nextType, entry, x, y, z);
+      this._updateBlockState(x, y, z, nextType, entry);
       this.dirtyBlocks++;
       hasChanges = true;
       placed++;
@@ -1897,22 +1900,22 @@ export class Chunk {
       const px = Math.floor(p.x);
       const py = Math.floor(p.y);
       const pz = Math.floor(p.z);
-      const key = `${px},${py},${pz}`;
-      const oldEntry = this.blockData[key];
+      const code = Chunk.encodeCoord(px, py, pz);
+      const oldEntry = this.blockData.get(code);
 
       if (oldEntry) {
         // 解析方块类型，兼容新旧格式
         const oldParsed = typeof oldEntry === 'string' ? { type: oldEntry, orientation: 0 } : parseBlockEntry(oldEntry);
         affectedTypes.add(oldParsed.type);
-        delete this.blockData[key];
-        this.visibleKeys.delete(key);
-        this.solidBlocks.delete(key);
+        this.blockData.delete(code);
+        this.visibleKeys.delete(code);
+        this.solidBlocks.delete(code);
         getPersistenceService().recordChangeForChunk(this.cx, this.cz, px, py, pz, 'air');
 
         // 只收集正交邻居（6方向），对角线邻居不共享面，不需要即时 reveal/refresh
-        Chunk.getAOImpactedNeighborKeys(px, py, pz).forEach(({ key: neighborKey, isOrthogonal }) => {
+        Chunk.getAOImpactedNeighborKeys(px, py, pz).forEach(({ code: neighborCode, isOrthogonal }) => {
           if (isOrthogonal) {
-            neighborsToUpdate.add(neighborKey);
+            neighborsToUpdate.add(neighborCode);
           }
         });
       }
@@ -1931,12 +1934,12 @@ export class Chunk {
           if (typeMap) {
             // 优化：使用 Map 直接查找索引，避免扫描全量实例
             positions.forEach(p => {
-              const key = `${Math.floor(p.x)},${Math.floor(p.y)},${Math.floor(p.z)}`;
-              if (typeMap.has(key)) {
-                const idx = typeMap.get(key);
+              const code = Chunk.encodeCoord(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z));
+              if (typeMap.has(code)) {
+                const idx = typeMap.get(code);
                 dummy.makeScale(0, 0, 0);
                 child.setMatrixAt(idx, dummy);
-                typeMap.delete(key);
+                typeMap.delete(code);
                 updated = true;
               }
             });
@@ -1988,8 +1991,8 @@ export class Chunk {
         );
 
         if (isMatch) {
-          const key = `${cx},${cy},${cz}`;
-          this.dynamicMeshes.delete(key);
+          const code = Chunk.encodeCoord(cx, cy, cz);
+          this.dynamicMeshes.delete(code);
           if (child.geometry) child.geometry.dispose();
           if (child.material) {
             if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
@@ -2003,38 +2006,36 @@ export class Chunk {
     // 3. 核心修复：更新周围邻居的 Face Culling 状态，让原本隐藏的面显示出来
     // 关键优化：在批量删除场景（如 Mag7、TNT）中，将需要更新的邻居收集起来，
     // 等待所有批量操作完成后统一处理，避免 AO 阴影计算丢失
-    neighborsToUpdate.forEach(nKey => {
+    neighborsToUpdate.forEach(nCode => {
       // 如果邻居本身也在本次删除列表中，跳过
-      if (positions.some(p => `${Math.floor(p.x)},${Math.floor(p.y)},${Math.floor(p.z)}` === nKey)) return;
+      if (positions.some(p => Chunk.encodeCoord(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z)) === nCode)) return;
 
-      const [nx, ny, nz] = nKey.split(',').map(Number);
+      const { x: nx, y: ny, z: nz } = Chunk.decodeCoord(nCode);
       const nCx = Math.floor(nx / CHUNK_SIZE);
       const nCz = Math.floor(nz / CHUNK_SIZE);
 
       if (nCx === this.cx && nCz === this.cz) {
         // 邻居在当前区块
-        // 只使用 blockData（权威存储），不使用 _getBlockEntryByKey
-        // blockData 始终包含所有方块（acceptWorkerResult 和 _updateBlockState 都写入 blockData）
-        const nEntry = this.blockData[nKey];
+        const nEntry = this.blockData.get(nCode);
         if (nEntry) {
           // 使用 visibleKeys（面剔除状态）判断可见性
           const nParsed = parseBlockEntry(nEntry);
           const nProps = getBlockProps(nParsed.type);
-          if (!this.visibleKeys.has(nKey) && nProps.isRendered !== false) {
+          if (!this.visibleKeys.has(nCode) && nProps.isRendered !== false) {
             // 隐藏邻居现在有了暴露面，只创建临时渲染网格（不改 blockData/持久化）
-            this._refreshBlockRenderMesh(nx, ny, nz, nKey, nEntry);
-          } else if (this.visibleKeys.has(nKey)) {
+            this._refreshBlockRenderMesh(nx, ny, nz, nCode, nEntry);
+          } else if (this.visibleKeys.has(nCode)) {
             // 如果本来就可见，也要重新触发 Face Culling 更新以显示新的暴露面
             if (isBatch) {
               // 批量模式：收集到待处理队列，不立即更新
-              this.pendingBatchFaceCullingUpdates.add(nKey);
+              this.pendingBatchFaceCullingUpdates.add(nCode);
               // 启动防抖定时器，在最后一批删除完成后统一处理
               this._scheduleBatchFaceCullingUpdate();
               // 标记 AO 脏位置（邻居自身 + 它的 6 个邻居，都要重算）
               this._markDirtyAO(nx, ny, nz, true);
             } else {
               // 非批量模式：立即刷新网格补面
-              this._refreshBlockRenderLightweight(nx, ny, nz, nKey, nEntry);
+              this._refreshBlockRenderLightweight(nx, ny, nz, nCode, nEntry);
             }
           }
         }
@@ -2044,7 +2045,7 @@ export class Chunk {
         if (neighborChunk && neighborChunk.isReady) {
           if (isBatch) {
             // 批量模式：将跨区块的更新也收集起来
-            this.pendingBatchFaceCullingUpdates.add(nKey);
+            this.pendingBatchFaceCullingUpdates.add(nCode);
             this._scheduleBatchFaceCullingUpdate();
             // 标记 AO 脏位置（跨 chunk 邻居自身 + 它的邻居都要重算）
             this._markDirtyAO(nx, ny, nz, true);
@@ -2138,12 +2139,12 @@ export class Chunk {
 
         if (typeMap) {
           positions.forEach(p => {
-            const key = `${Math.floor(p.x)},${Math.floor(p.y)},${Math.floor(p.z)}`;
-            if (typeMap.has(key)) {
-              const idx = typeMap.get(key);
+            const code = Chunk.encodeCoord(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z));
+            if (typeMap.has(code)) {
+              const idx = typeMap.get(code);
               dummy.makeScale(0, 0, 0);
               child.setMatrixAt(idx, dummy);
-              typeMap.delete(key);
+              typeMap.delete(code);
               updated = true;
             }
           });
@@ -2178,8 +2179,8 @@ export class Chunk {
         );
 
         if (isMatch) {
-          const key = `${cx},${cy},${cz}`;
-          this.dynamicMeshes.delete(key);
+          const code = Chunk.encodeCoord(cx, cy, cz);
+          this.dynamicMeshes.delete(code);
           if (child.geometry) child.geometry.dispose();
           if (child.material) {
             if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
@@ -2216,19 +2217,19 @@ export class Chunk {
         continue;
       }
 
-      const key = `${block.x},${block.y},${block.z}`;
+      const code = Chunk.encodeCoord(block.x, block.y, block.z);
 
       // 写入 blockData（唯一真相源）
       if (block.orientation !== 0) {
-        this.blockData[key] = { type: block.type, orientation: block.orientation };
+        this.blockData.set(code, { type: block.type, orientation: block.orientation });
       } else {
-        this.blockData[key] = block.type;
+        this.blockData.set(code, block.type);
       }
 
       // 写入 solidBlocks
       const props = getBlockProps(block.type);
       if (props.isSolid) {
-        this.solidBlocks.add(key);
+        this.solidBlocks.add(code);
       }
     }
 
@@ -2236,7 +2237,8 @@ export class Chunk {
     // 只有面剔除可见的方块才加入 visibleKeys，被遮挡的地下方块不加入
     if (visibleBlockKeys) {
       for (const key of visibleBlockKeys) {
-        this.visibleKeys.add(key);
+        const [x, y, z] = key.split(',').map(Number);
+        this.visibleKeys.add(Chunk.encodeCoord(x, y, z));
       }
     }
 
@@ -2274,22 +2276,22 @@ export class Chunk {
         continue;
       }
 
-      const key = `${block.x},${block.y},${block.z}`;
+      const code = Chunk.encodeCoord(block.x, block.y, block.z);
 
       // 跳过已存在的方块，尊重玩家修改或已有数据
-      if (key in this.blockData) continue;
+      if (this.blockData.has(code)) continue;
 
       // 写入 blockData
       if (block.orientation !== 0) {
-        this.blockData[key] = { type: block.type, orientation: block.orientation };
+        this.blockData.set(code, { type: block.type, orientation: block.orientation });
       } else {
-        this.blockData[key] = block.type;
+        this.blockData.set(code, block.type);
       }
 
       // 写入 solidBlocks
       const props = getBlockProps(block.type);
       if (props.isSolid) {
-        this.solidBlocks.add(key);
+        this.solidBlocks.add(code);
       }
 
       appendedCount++;
@@ -2298,7 +2300,8 @@ export class Chunk {
     // 从 visibleBlockKeys 追加可见标记
     if (visibleBlockKeys) {
       for (const key of visibleBlockKeys) {
-        this.visibleKeys.add(key);
+        const [x, y, z] = key.split(',').map(Number);
+        this.visibleKeys.add(Chunk.encodeCoord(x, y, z));
       }
     }
 
