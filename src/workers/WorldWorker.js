@@ -445,7 +445,6 @@ onmessage = async function(e) {
 
   // 使用 Map 暂存方块，确保同一位置后生成的方块覆盖旧方块
   const blockMap = new Map();
-  let realisticTrees = []; // 记录真实 tree 的位置
   let modGunMan = []; // 记录模型人 (gun_man.glb) 的位置
   let rovers = []; // 记录火星车的位置
   const structureQueue = []; // 结构生成队列，确保结构覆盖地形
@@ -507,12 +506,11 @@ onmessage = async function(e) {
       blocks: snapshot.blocks ? { ...snapshot.blocks } : {},
       meta: snapshot.meta ? { ...snapshot.meta } : {},
       entities: snapshot.entities ? {
-        realisticTrees: snapshot.entities.realisticTrees || [],
         modGunMan: snapshot.entities.modGunMan || [],
         rovers: snapshot.entities.rovers || [],
         zombieNests: snapshot.entities.zombieNests || [],
         staticTrees: snapshot.entities.staticTrees || []
-      } : { realisticTrees: [], modGunMan: [], rovers: [], zombieNests: [], staticTrees: [] }
+      } : { modGunMan: [], rovers: [], zombieNests: [], staticTrees: [] }
     };
   }
 
@@ -1159,7 +1157,11 @@ onmessage = async function(e) {
           const forestRand = seededRandom(wx, wz, seed + 14);
           if (forestRand < 0.04) {
             if (seededRandom(wx, wz, seed + 15) < 0.15) {
-              realisticTrees.push({ x: wx, y: h + 1, z: wz });
+              // 黄叶子大树（替代 RealisticTree）
+              createStructureTask(
+                generateYellowTree.bind(null, wx, h + 1, wz, fakeChunk, dPlaceholder),
+                wx, h + 1, wz, 'static_tree'
+              );
             } else {
               // 10% 概率生成白桦树，90% 概率生成普通大树
               if (seededRandom(wx, wz, seed + 16) < 0.1) {
@@ -1699,7 +1701,6 @@ onmessage = async function(e) {
     let ownershipFilteredSnapshotBlocks = 0;
 
     // 从 snapshot 恢复实体列表
-    realisticTrees = savedSnapshot.entities.realisticTrees || [];
     modGunMan = savedSnapshot.entities.modGunMan || [];
     rovers = savedSnapshot.entities.rovers || [];
     const zombieNests = savedSnapshot.entities.zombieNests || [];
@@ -1713,13 +1714,6 @@ onmessage = async function(e) {
     structureCenters.length = 0; // 清空
     structureCenters.push(...staticCenters);
 
-    if (realisticTrees) {
-      realisticTrees.forEach(pos => {
-        if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
-          pushStructureCenter({ type: 'tree', ...pos });
-        }
-      });
-    }
     if (modGunMan) {
       modGunMan.forEach(pos => {
         if (pos.x >= minX && pos.x < maxX && pos.z >= minZ && pos.z < maxZ) {
@@ -1900,9 +1894,8 @@ onmessage = async function(e) {
     cx, cz, callbackKey,
     scatteredBlocks,
     solidBlocks,
-    realisticTrees, modGunMan, rovers,
+    modGunMan, rovers,
     entities: {
-      realisticTrees,
       modGunMan,
       rovers
     },
@@ -1914,7 +1907,6 @@ onmessage = async function(e) {
       },
       blocks: blocksForSnapshot,
       entities: {
-        realisticTrees,
         modGunMan,
         rovers,
         zombieNests: savedSnapshot?.entities?.zombieNests || []
@@ -1992,6 +1984,19 @@ function generateStructure(type, x, y, z, chunk, dObj, rovers = []) {
  */
 function generateBirchTree(x, y, z, chunk, dObj) {
   birchTree.generate(x, y, z, chunk, dObj, true);
+}
+
+/**
+ * 生成黄叶子大树（替代 RealisticTree）
+ * 使用方块堆叠方式，与 tree_big 一致
+ * @param {number} x - X 坐标
+ * @param {number} y - Y 坐标
+ * @param {number} z - Z 坐标
+ * @param {Object} chunk - 区块对象
+ * @param {Object} dObj - 数据收集对象
+ */
+function generateYellowTree(x, y, z, chunk, dObj) {
+  Tree.generate(x, y, z, chunk, 'big', dObj, null, 'yellow_leaves');
 }
 
 /**
