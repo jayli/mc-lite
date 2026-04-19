@@ -556,9 +556,7 @@ export class PlayerInteraction {
           this.player.spawnParticles(m.position, type);
         }
         if (m.parent) m.parent.remove(m);
-        if (type === 'realistic_trunk') this.player.inventory.add('wood', 1);
-        else if (type === 'realistic_leaves') { if (Math.random() < 0.8) this.player.inventory.add('leaves', 1); }
-        else this.player.inventory.add(type, 1);
+        this.player.inventory.add(type, 1);
       }
     }
   }
