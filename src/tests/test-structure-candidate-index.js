@@ -11,6 +11,7 @@ import { PlainLand } from '../workers/maps/PlainLand.js';
 import { SnowLand } from '../workers/maps/SnowLand.js';
 import { FrozenMountain } from '../workers/maps/FrozenMountain.js';
 import { seededRandom, getBiome } from '../utils/MathUtils.js';
+import { getStructureRenderDist } from '../utils/StructureUtils.js';
 
 export async function testStructureCandidateShape() {
   const c = makeCandidate('tank', 1.8, 2.2, -3.7, 'probabilistic_large_static');
@@ -48,6 +49,20 @@ export async function testCandidateIndexReusesTiles() {
   assertTrue(afterSecond.cacheHits > afterFirst.cacheHits, 'second query should reuse cached tiles');
 }
 
+export async function testStaticTreeChunkQueryUsesConfiguredPadding() {
+  const index = new StructureCandidateIndex({ tileSize: 8 });
+  index.getStaticTreeCandidatesForChunk(0, 0, 12345, terrainGen);
+  const stats = index.getStats();
+  const padding = getStructureRenderDist('static_tree');
+  const expectedTilesPerAxis = Math.ceil((16 + padding * 2) / 8);
+
+  assertEqual(
+    stats.generatedTiles,
+    expectedTilesPerAxis * expectedTilesPerAxis,
+    'static_tree query should use configured render distance'
+  );
+}
+
 /**
  * Reference scanner: 复制旧 WorldWorker 逐格扫描逻辑的核心，用于一致性对比。
  */
@@ -60,7 +75,11 @@ function referenceScanLargeStaticCandidates(rect, seed, terrainGen) {
   const toLocal = (v) => { const m = v % CHUNK_SIZE; return m >= 0 ? m : m + CHUNK_SIZE; };
   const isSafe = (wx, wz) => { const lx = toLocal(wx); const lz = toLocal(wz); return lx >= 3 && lx <= 12 && lz >= 3 && lz <= 12; };
   const surfaceByBiome = (b) => { if (b === 'DESERT' || b === 'CITY') return 'sand'; if (b === 'AZALEA') return 'moss'; if (b === 'SWAMP') return 'swamp_grass'; return 'grass'; };
-  const occupiedNonDesert = (wx, wz) => seededRandom(wx, wz, seed) < 0.0005 || (!seededRandom(wx, wz, seed) < 0.0005 && seededRandom(wx, wz, seed + 1) < 0.005);
+  const occupiedNonDesert = (wx, wz) => {
+    const occupiedByGunman = seededRandom(wx, wz, seed) < 0.0005;
+    const occupiedByTree = !occupiedByGunman && seededRandom(wx, wz, seed + 1) < 0.005;
+    return occupiedByGunman || occupiedByTree;
+  };
   const occupiedDesert = (wx, wz) => seededRandom(wx, wz, seed + 24) < 0.005;
 
   const resolveType = (wx, wz, biome, surface, safe, occupied) => {
@@ -90,19 +109,19 @@ function referenceScanLargeStaticCandidates(rect, seed, terrainGen) {
 
   const cityLayout = CityMap.getCityLayout(seed, terrainGen);
 
-  for (const pm of [cityLayout.placementMap, cityLayout.fillerPlacementMap]) {
-    for (const [keyStr, p] of pm) {
-      const [px, pz] = keyStr.split(',').map(Number);
-      if (px < rect.minX || px >= rect.maxX || pz < rect.minZ || pz >= rect.maxZ) continue;
-      const cy = CityMap.getCitySurfaceY(px, pz, seed, terrainGen);
-      if (cy === null) continue;
-      push(p.type, p.x, cy + 1, p.z);
-    }
-  }
-
   for (let wx = rect.minX; wx < rect.maxX; wx++) {
     for (let wz = rect.minZ; wz < rect.maxZ; wz++) {
-      if (CityMap.isPointInCity(wx, wz, seed, terrainGen)) continue;
+      const cityAnyPlacement = cityLayout.placementMap.get(`${wx},${wz}`) ||
+        cityLayout.fillerPlacementMap.get(`${wx},${wz}`) ||
+        null;
+      if (cityAnyPlacement) {
+        const cityCenterHeight = CityMap.getCitySurfaceY(cityAnyPlacement.x, cityAnyPlacement.z, seed, terrainGen);
+        if (cityCenterHeight !== null) {
+          push(cityAnyPlacement.type, cityAnyPlacement.x, cityCenterHeight + 1, cityAnyPlacement.z);
+        }
+        continue;
+      }
+
       if (Pyramid.getPyramidInfo(wx, wz, seed, terrainGen)) continue;
       const islandInfo = IslandMap.getIslandInfo(wx, wz, seed, terrainGen);
       if (islandInfo) {

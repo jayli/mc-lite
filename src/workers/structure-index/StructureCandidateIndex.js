@@ -73,7 +73,7 @@ export class StructureCandidateIndex {
    * @returns {Array<Object>} 候选数组
    */
   getStaticTreeCandidatesForChunk(cx, cz, seed, terrainGen) {
-    const padding = 16; // STATIC_TREE_SCAN_PADDING
+    const padding = getStructureRenderDist('static_tree');
     const rect = {
       minX: cx * CHUNK_SIZE - padding,
       maxX: (cx + 1) * CHUNK_SIZE + padding,

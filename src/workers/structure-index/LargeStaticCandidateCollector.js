@@ -109,8 +109,11 @@ export function collectLargeStaticCandidatesInRect(rect, seed, terrainGen) {
   // -- 2. 逐格扫描矩形（非城市区域的概率类结构 + 地标中心）--
   for (let wx = rect.minX; wx < rect.maxX; wx++) {
     for (let wz = rect.minZ; wz < rect.maxZ; wz++) {
-      // 跳过 City 内的点（已由 placementMap 覆盖）
-      if (CityMap.isPointInCity(wx, wz, seed, terrainGen)) continue;
+      // 旧 WorldWorker 逻辑只在当前点命中 city placement 时跳过后续扫描。
+      // City 范围内的非 placement 点仍继续走普通大型结构判定。
+      const cityPlacement = cityLayout.placementMap.get(`${wx},${wz}`) || null;
+      const cityFillerPlacement = cityLayout.fillerPlacementMap.get(`${wx},${wz}`) || null;
+      if (cityPlacement || cityFillerPlacement) continue;
 
       // Pyramid 区域：跳过（不放置大型结构）
       const pyInfo = Pyramid.getPyramidInfo(wx, wz, seed, terrainGen);

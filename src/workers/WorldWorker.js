@@ -17,7 +17,6 @@ import { IslandMap } from './maps/IslandMap.js';
 import { PlainLand } from './maps/PlainLand.js';
 import { CityMap } from './maps/CityMap.js';
 import {
-  CROSS_CHUNK_OWNER_BLOCKED_TYPES,
   getStructureRenderDist,
   isCrossChunkOwnerType,
   STRUCTURE_HEIGHT_RANGE,
@@ -95,17 +94,6 @@ const structureCandidateIndex = new StructureCandidateIndex();
 const CHUNK_SIZE = 16;
 const ROOMS_PER_CHUNK = 2;
 const MAX_ROOM_SIZE = 5;
-const STATIC_TREE_SCAN_PADDING = getStructureRenderDist('static_tree');
-// 计算大型静态结构扫描范围，取 CROSS_CHUNK_OWNER_BLOCKED_TYPES 中最大渲染距离
-const LARGE_STATIC_SCAN_PADDING = (() => {
-  let maxDist = 0;
-  for (const type of CROSS_CHUNK_OWNER_BLOCKED_TYPES) {
-    const dist = getStructureRenderDist(type);
-    if (dist > maxDist) maxDist = dist;
-  }
-  // 兜底：至少覆盖一个 chunk，避免配置缺失导致漏扫
-  return Math.max(maxDist, CHUNK_SIZE);
-})();
 const CITY_FLOWER_BED_CHANCE = 0.0005;
 const CITY_PAVILION_CHANCE = CITY_FLOWER_BED_CHANCE * 6;
 const CITY_TALL_WELL_CHANCE = CITY_FLOWER_BED_CHANCE * 3; // 与 pavilion 相同概率
@@ -113,28 +101,6 @@ const CITY_TALL_WELL_CHANCE = CITY_FLOWER_BED_CHANCE * 3; // 与 pavilion 相同
 const OWNERSHIP_SCHEMA_VERSION = 2;
 // 旧档归属迁移调试开关（默认关闭）
 const DEBUG_OWNERSHIP_MIGRATION = false;
-
-/**
- * 将世界坐标转换为 Chunk 内局部坐标（0-15）
- * @param {number} value
- * @returns {number}
- */
-function toLocalCoord(value) {
-  const mod = value % CHUNK_SIZE;
-  return mod >= 0 ? mod : mod + CHUNK_SIZE;
-}
-
-/**
- * 判断指定世界坐标是否满足结构安全生成范围（对应 local 3..12）
- * @param {number} wx
- * @param {number} wz
- * @returns {boolean}
- */
-function isSafeForStructureAt(wx, wz) {
-  const lx = toLocalCoord(wx);
-  const lz = toLocalCoord(wz);
-  return lx >= 3 && lx <= 12 && lz >= 3 && lz <= 12;
-}
 
 /**
  * 根据生物群系推导地表材质类型（与主生成逻辑保持一致）
@@ -147,19 +113,6 @@ function getSurfaceTypeByBiome(biome) {
   if (biome === 'AZALEA') return 'moss';
   if (biome === 'SWAMP') return 'swamp_grass';
   return 'grass';
-}
-
-/**
- * 非沙漠地块中，是否已被"会阻止大型结构生成"的对象占用
- * @param {number} wx
- * @param {number} wz
- * @param {number} seed
- * @returns {boolean}
- */
-function isOccupiedForLargeStaticNonDesert(wx, wz, seed) {
-  const occupiedByGunman = seededRandom(wx, wz, seed) < 0.0005;
-  const occupiedByTree = !occupiedByGunman && seededRandom(wx, wz, seed + 1) < 0.005;
-  return occupiedByGunman || occupiedByTree;
 }
 
 /**
