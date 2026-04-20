@@ -1,6 +1,7 @@
 import { assert, assertEqual } from './assert.js';
 import { makeCandidate, candidateKey } from '../workers/structure-index/StructureCandidateTypes.js';
 import { collectLargeStaticCandidatesInRect } from '../workers/structure-index/LargeStaticCandidateCollector.js';
+import { collectStaticTreeCandidatesInRect } from '../workers/structure-index/StaticTreeCandidateCollector.js';
 import { StructureCandidateIndex } from '../workers/structure-index/StructureCandidateIndex.js';
 import { terrainGen } from '../world/TerrainGen.js';
 import { CityMap } from '../workers/maps/CityMap.js';
@@ -134,4 +135,11 @@ export async function testLargeStaticCollectorMatchesReferenceScanner() {
   const actual = collectLargeStaticCandidatesInRect(rect, 12345, terrainGen).map(candidateKey).sort();
   const expected = referenceScanLargeStaticCandidates(rect, 12345, terrainGen).map(candidateKey).sort();
   assertEqual(JSON.stringify(actual), JSON.stringify(expected));
+}
+
+export async function testStaticTreeCandidatesAreDeterministic() {
+  const rect = { minX: -32, maxX: 96, minZ: -32, maxZ: 96 };
+  const a = collectStaticTreeCandidatesInRect(rect, 12345, terrainGen).map(candidateKey).sort();
+  const b = collectStaticTreeCandidatesInRect(rect, 12345, terrainGen).map(candidateKey).sort();
+  assertEqual(JSON.stringify(a), JSON.stringify(b));
 }

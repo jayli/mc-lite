@@ -1459,12 +1459,12 @@ onmessage = async function(e) {
   const scannedTreeMinZ = minZ - STATIC_TREE_SCAN_PADDING;
   const scannedTreeMaxZ = maxZ + STATIC_TREE_SCAN_PADDING;
   const wLvl = -2;
-  const getChunkBiomeByWorld = (wx, wz) => {
+  const _getChunkBiomeByWorld = (wx, wz) => {
     const ownerCx = Math.floor(wx / CHUNK_SIZE);
     const ownerCz = Math.floor(wz / CHUNK_SIZE);
     return terrainGen.getBiome(ownerCx * CHUNK_SIZE, ownerCz * CHUNK_SIZE);
   };
-  const getActiveBiomeByWorld = (wx, wz) => {
+  const _getActiveBiomeByWorld = (wx, wz) => {
     const ownerCx = Math.floor(wx / CHUNK_SIZE);
     const ownerCz = Math.floor(wz / CHUNK_SIZE);
     const ownerCenterBiome = terrainGen.getBiome(ownerCx * CHUNK_SIZE, ownerCz * CHUNK_SIZE);
@@ -1541,28 +1541,10 @@ onmessage = async function(e) {
     appendLargeStaticTask(candidate.type, candidate.x, candidate.y, candidate.z);
   }
 
-  // static_tree 邻域重建（先覆盖 azalea，避免杜鹃花树跨 Chunk 切割）
-  for (let wx = scannedTreeMinX; wx < scannedTreeMaxX; wx++) {
-    for (let wz = scannedTreeMinZ; wz < scannedTreeMaxZ; wz++) {
-      const pyInfo = Pyramid.getPyramidInfo(wx, wz, seed, terrainGen);
-      if (pyInfo) continue;
-      const islandInfo = IslandMap.getIslandInfo(wx, wz, seed, terrainGen);
-      if (islandInfo) continue;
-      const plainLandInfo = PlainLand.getPlainLandInfo(wx, wz, seed, terrainGen);
-      if (plainLandInfo) continue;
-      const slInfo = SnowLand.getSnowLandInfo(wx, wz, seed, terrainGen);
-      if (slInfo) continue;
-      const fmInfo = FrozenMountain.getFrozenMountainInfo(wx, wz, seed, terrainGen);
-      if (fmInfo) continue;
-
-      const activeBiomeAtPos = getActiveBiomeByWorld(wx, wz);
-      const heightAtPos = terrainGen.generateHeight(wx, wz, activeBiomeAtPos);
-      if (heightAtPos < wLvl) continue;
-
-      if (activeBiomeAtPos === 'AZALEA' && seededRandom(wx, wz, seed + 19) < 0.045) {
-        appendStaticTreeTask(wx, heightAtPos + 1, wz, 'azalea');
-      }
-    }
+  // static_tree 邻域重建（使用候选索引替代逐格扫描）
+  const staticTreeCandidates = structureCandidateIndex.getStaticTreeCandidatesForChunk(cx, cz, seed, terrainGen);
+  for (const candidate of staticTreeCandidates) {
+    appendStaticTreeTask(candidate.x, candidate.y, candidate.z, 'azalea');
   }
 
   structureQueueWithCenters.forEach(({ task, type }) => {

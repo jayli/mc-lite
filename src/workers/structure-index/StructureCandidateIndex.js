@@ -13,6 +13,7 @@
  */
 
 import { collectLargeStaticCandidatesInRect } from './LargeStaticCandidateCollector.js';
+import { collectStaticTreeCandidatesInRect } from './StaticTreeCandidateCollector.js';
 import { candidateKey } from './StructureCandidateTypes.js';
 import { getStructureRenderDist, CROSS_CHUNK_OWNER_BLOCKED_TYPES } from '../../utils/StructureUtils.js';
 
@@ -55,6 +56,48 @@ export class StructureCandidateIndex {
       maxZ: (cz + 1) * CHUNK_SIZE + padding
     };
     return this.getCandidatesInRect(rect, seed, terrainGen);
+  }
+
+  /**
+   * 查询影响指定 chunk 的 static_tree 候选
+   * @param {number} cx - Chunk X
+   * @param {number} cz - Chunk Z
+   * @param {number} seed - 世界种子
+   * @param {Object} terrainGen - 地形生成器
+   * @returns {Array<Object>} 候选数组
+   */
+  getStaticTreeCandidatesForChunk(cx, cz, seed, terrainGen) {
+    const padding = 16; // STATIC_TREE_SCAN_PADDING
+    const rect = {
+      minX: cx * CHUNK_SIZE - padding,
+      maxX: (cx + 1) * CHUNK_SIZE + padding,
+      minZ: cz * CHUNK_SIZE - padding,
+      maxZ: (cz + 1) * CHUNK_SIZE + padding
+    };
+    return this.getStaticTreeCandidatesInRect(rect, seed, terrainGen);
+  }
+
+  /**
+   * 查询指定矩形范围内的 static_tree 候选（带 tile 缓存）
+   * @param {Object} rect - { minX, maxX, minZ, maxZ }
+   * @param {number} seed
+   * @param {Object} terrainGen
+   * @returns {Array<Object>}
+   */
+  getStaticTreeCandidatesInRect(rect, seed, terrainGen) {
+    const candidates = [];
+    const seen = new Set();
+    for (const tile of this._tilesForRect(rect)) {
+      const tileCandidates = this._getStaticTreeTileCandidates(tile.tx, tile.tz, seed, terrainGen);
+      for (const c of tileCandidates) {
+        if (c.x < rect.minX || c.x >= rect.maxX || c.z < rect.minZ || c.z >= rect.maxZ) continue;
+        const key = candidateKey(c);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        candidates.push(c);
+      }
+    }
+    return candidates;
   }
 
   /**
@@ -135,6 +178,35 @@ export class StructureCandidateIndex {
     };
 
     const tileCandidates = collectLargeStaticCandidatesInRect(tileRect, seed, terrainGen);
+    this.tileCache.set(cacheKey, tileCandidates);
+    this.stats.generatedTiles++;
+    return tileCandidates;
+  }
+
+  /**
+   * 获取指定 tile 的 static_tree 候选（独立缓存）
+   * @param {number} tx - Tile X
+   * @param {number} tz - Tile Z
+   * @param {number} seed
+   * @param {Object} terrainGen
+   * @returns {Array<Object>}
+   */
+  _getStaticTreeTileCandidates(tx, tz, seed, terrainGen) {
+    const ts = this.tileSize;
+    const cacheKey = `${seed}:tree:${tx},${tz}`;
+    if (this.tileCache.has(cacheKey)) {
+      this.stats.cacheHits++;
+      return this.tileCache.get(cacheKey);
+    }
+
+    const tileRect = {
+      minX: tx * ts,
+      maxX: (tx + 1) * ts,
+      minZ: tz * ts,
+      maxZ: (tz + 1) * ts
+    };
+
+    const tileCandidates = collectStaticTreeCandidatesInRect(tileRect, seed, terrainGen);
     this.tileCache.set(cacheKey, tileCandidates);
     this.stats.generatedTiles++;
     return tileCandidates;
