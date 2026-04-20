@@ -24,6 +24,7 @@ import {
   STRUCTURE_HEIGHT_RANGE_SPECIAL
 } from '../utils/StructureUtils.js';
 import { calculateAOForBlock } from '../utils/AOUtils.js';
+import { StructureCandidateIndex } from './structure-index/StructureCandidateIndex.js';
 
 console.log('WorldWorker.js loaded');
 
@@ -88,6 +89,9 @@ const structuresPreload = Promise.all([
   desertTempleTube.load()
 ]).catch(err => console.error('Failed to load structure data:', err));
 
+// 结构候选索引（每个 Worker 实例独立缓存）
+const structureCandidateIndex = new StructureCandidateIndex();
+
 const CHUNK_SIZE = 16;
 const ROOMS_PER_CHUNK = 2;
 const MAX_ROOM_SIZE = 5;
@@ -126,7 +130,7 @@ function toLocalCoord(value) {
  * @param {number} wz
  * @returns {boolean}
  */
-function isSafeForStructureAt(wx, wz) {
+function _isSafeForStructureAt(wx, wz) {
   const lx = toLocalCoord(wx);
   const lz = toLocalCoord(wz);
   return lx >= 3 && lx <= 12 && lz >= 3 && lz <= 12;
@@ -153,7 +157,7 @@ function getSurfaceTypeByBiome(biome) {
  * @param {number} seed
  * @returns {boolean}
  */
-function isOccupiedForLargeStaticNonDesert(wx, wz, seed) {
+function _isOccupiedForLargeStaticNonDesert(wx, wz, seed) {
   const occupiedByGunman = seededRandom(wx, wz, seed) < 0.0005;
   const occupiedByTree = !occupiedByGunman && seededRandom(wx, wz, seed + 1) < 0.005;
   return occupiedByGunman || occupiedByTree;
@@ -1531,66 +1535,10 @@ onmessage = async function(e) {
     structureQueueWithCenters.push({ task, centerX, centerY, centerZ, type: 'static_tree' });
   };
 
-  for (let wx = scannedMinX; wx < scannedMaxX; wx++) {
-    for (let wz = scannedMinZ; wz < scannedMaxZ; wz++) {
-      const cityPlacement = cityPlacementMap.get(`${wx},${wz}`) || null;
-      const cityFillerPlacement = cityFillerPlacementMap.get(`${wx},${wz}`) || null;
-      const cityAnyPlacement = cityPlacement || cityFillerPlacement;
-      if (cityAnyPlacement) {
-        const cityCenterHeight = CityMap.getCitySurfaceY(cityAnyPlacement.x, cityAnyPlacement.z, seed, terrainGen);
-        appendLargeStaticTask(cityAnyPlacement.type, cityAnyPlacement.x, cityCenterHeight + 1, cityAnyPlacement.z);
-        continue;
-      }
-
-      const pyInfo = Pyramid.getPyramidInfo(wx, wz, seed, terrainGen);
-      if (pyInfo) continue;
-
-      const islandInfo = IslandMap.getIslandInfo(wx, wz, seed, terrainGen);
-      if (islandInfo) {
-        if (wx === islandInfo.centerX && wz === islandInfo.centerZ) {
-          appendLargeStaticTask('tower', islandInfo.centerX, -1, islandInfo.centerZ);
-        }
-        continue;
-      }
-
-      const plainLandInfo = PlainLand.getPlainLandInfo(wx, wz, seed, terrainGen);
-      if (plainLandInfo) {
-        if (wx === plainLandInfo.centerX && wz === plainLandInfo.centerZ) {
-          appendLargeStaticTask('pyramidIsland', plainLandInfo.centerX, plainLandInfo.baseHeight + 1, plainLandInfo.centerZ);
-        }
-        continue;
-      }
-
-      const slInfo = SnowLand.getSnowLandInfo(wx, wz, seed, terrainGen);
-      if (slInfo) continue;
-
-      const fmInfo = FrozenMountain.getFrozenMountainInfo(wx, wz, seed, terrainGen);
-      if (fmInfo) continue;
-
-      const centerBiomeAtPos = getChunkBiomeByWorld(wx, wz);
-      const heightAtPos = terrainGen.generateHeight(wx, wz, centerBiomeAtPos);
-      if (heightAtPos < wLvl) continue;
-
-      const safeForStructure = isSafeForStructureAt(wx, wz);
-      if (!safeForStructure) continue;
-
-      const surfaceType = getSurfaceTypeByBiome(centerBiomeAtPos);
-      const occupiedForLargeStatic = centerBiomeAtPos === 'DESERT'
-        ? isOccupiedForLargeStaticDesert(wx, wz, seed)
-        : isOccupiedForLargeStaticNonDesert(wx, wz, seed);
-      const largeStaticType = resolveLargeStaticStructureType({
-        wx,
-        wz,
-        seed,
-        biome: centerBiomeAtPos,
-        surfaceType,
-        safeForStructure,
-        occupied: occupiedForLargeStatic
-      });
-      if (largeStaticType) {
-        appendLargeStaticTask(largeStaticType, wx, heightAtPos + 1, wz);
-      }
-    }
+  // 使用结构候选索引查询大型静态结构（替代逐格扫描）
+  const largeCandidates = structureCandidateIndex.getCandidatesForChunk(cx, cz, seed, terrainGen);
+  for (const candidate of largeCandidates) {
+    appendLargeStaticTask(candidate.type, candidate.x, candidate.y, candidate.z);
   }
 
   // static_tree 邻域重建（先覆盖 azalea，避免杜鹃花树跨 Chunk 切割）
