@@ -56,7 +56,7 @@ export class PlaygroundService {
     if (!this.world) return false;
 
     // 遍历世界中的所有区块
-    for (const [chunkKey, chunk] of this.world.chunks.entries()) {
+    for (const [, chunk] of this.world.chunks.entries()) {
       // 检查区块是否有修改过的方块
       if (chunk.blockData) {
         for (const [code, entry] of chunk.blockData) {
@@ -93,33 +93,42 @@ export class PlaygroundService {
     }
 
     // 如果没找到中心方块，尝试通过 persistenceService 的缓存查找
-    // 注意：persistenceService.cache 的键是区块坐标 "cx,cz"，值是 { blocks: {}, entities: {} }
+    // 注意：persistenceService.cache 的键是区块坐标 "cx,cz"，值是 { blocks: {number: entry}, entities: {} }
     if (persistenceService && persistenceService.cache) {
-      for (const [chunkKey, chunkData] of persistenceService.cache.entries()) {
-        if (chunkData && chunkData.blocks) {
-          for (const [blockKey, blockData] of Object.entries(chunkData.blocks)) {
-            if (blockData && blockData.type === 'playground_center_block') {
-              const [x, y, z] = blockKey.split(',').map(Number);
-              this.playgroundOrigin = { x, y, z };
-              this.isPlaygroundActive = true;
-
-              // 重新构建 playgroundBlocks 集合
-              this.playgroundBlocks.clear();
-              const halfSize = this.playgroundSize / 2;
-              const originX = x - halfSize;
-              const originZ = z - halfSize;
-
-              for (let dx = 0; dx < this.playgroundSize; dx++) {
-                for (let dz = 0; dz < this.playgroundSize; dz++) {
-                  const px = Math.floor(originX + dx);
-                  const pz = Math.floor(originZ + dz);
-                  this.playgroundBlocks.add(`${px},${y},${pz}`);
-                }
-              }
-
-              console.log(`[PlaygroundService] 从缓存检测到已存在的创造台 at (${originX}, ${y}, ${originZ})`);
-              return true;
+      for (const [, chunkData] of persistenceService.cache) {
+        if (!chunkData || !chunkData.blocks) continue;
+        for (const [blockKey, blockData] of Object.entries(chunkData.blocks)) {
+          if (!blockData) continue;
+          const entryType = typeof blockData === 'string' ? blockData : blockData?.type;
+          if (entryType === 'playground_center_block') {
+            // 解析坐标：兼容数字编码 key 和旧字符串 "x,y,z" 格式
+            let x, y, z;
+            if (blockKey.includes(',')) {
+              // 旧格式 "x,y,z"
+              [x, y, z] = blockKey.split(',').map(Number);
+            } else {
+              // 新格式：数字编码 key
+              ({ x, y, z } = Chunk.decodeCoord(Number(blockKey)));
             }
+            this.playgroundOrigin = { x, y, z };
+            this.isPlaygroundActive = true;
+
+            // 重新构建 playgroundBlocks 集合
+            this.playgroundBlocks.clear();
+            const halfSize = this.playgroundSize / 2;
+            const originX = x - halfSize;
+            const originZ = z - halfSize;
+
+            for (let dx = 0; dx < this.playgroundSize; dx++) {
+              for (let dz = 0; dz < this.playgroundSize; dz++) {
+                const px = Math.floor(originX + dx);
+                const pz = Math.floor(originZ + dz);
+                this.playgroundBlocks.add(`${px},${y},${pz}`);
+              }
+            }
+
+            console.log(`[PlaygroundService] 从缓存检测到已存在的创造台 at (${originX}, ${y}, ${originZ})`);
+            return true;
           }
         }
       }
@@ -598,8 +607,9 @@ export class PlaygroundService {
     for (const [, chunk] of this.world.chunks) {
       if (!chunk || !chunk.blockData) continue;
 
-      for (const [key, entry] of Object.entries(chunk.blockData)) {
-        const [x, y, z] = key.split(',').map(Number);
+      // chunk.blockData 是 Map<number, entry>，需要遍历 Map
+      for (const [code, entry] of chunk.blockData) {
+        const { x, y, z } = Chunk.decodeCoord(code);
         if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue;
         if (x < minX || x > maxX || z < minZ || z > maxZ || y < minY) continue;
 
@@ -703,7 +713,7 @@ export class PlaygroundService {
           callbackKey,
           seed: WORLD_CONFIG.SEED,
           snapshot: {
-            blocks: { ...chunk.blockData },
+            blocks: (() => { const o = {}; for (const [k, v] of chunk.blockData) o[k] = v; return o; })(),
             entities: { ...chunk.entities }
           },
           structureCenters: chunk.structureCenters,
