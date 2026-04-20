@@ -21,7 +21,7 @@ export class BlockScatterManager {
    * @param {Object} workerResult - Worker 返回的数据
    */
   scatter(workerResult) {
-    const { scatteredBlocks, visibleKeys, cx, cz } = workerResult;
+    const { scatteredBlocks, visibleKeys, cx, cz, structureCenters } = workerResult;
 
     // visibleKeys 从 Worker 传来是数组，先转为 Set 方便查找
     const visibleKeysSet = Array.isArray(visibleKeys) ? new Set(visibleKeys) : null;
@@ -34,7 +34,7 @@ export class BlockScatterManager {
 
       let buffer = this.chunkBuffers.get(chunkKey);
       if (!buffer) {
-        buffer = { blocks: [], ready: false, sourceWorkers: new Set(), visibleBlockKeys: new Set() };
+        buffer = { blocks: [], ready: false, sourceWorkers: new Set(), visibleBlockKeys: new Set(), structureCenters: null };
         this.chunkBuffers.set(chunkKey, buffer);
       }
       buffer.blocks.push(block);
@@ -47,14 +47,22 @@ export class BlockScatterManager {
       }
     }
 
-    // 2. 标记发起 Worker 的 chunk 为"已加载"
+    // 2. 合并结构中心信息到所有 buffer（追加而非覆盖）
+    // 每个 chunk 可能收到来自多个 Worker 的结构中心，需要合并
+    if (structureCenters?.length > 0) {
+      for (const [, buffer] of this.chunkBuffers) {
+        buffer.structureCenters = this._mergeStructureCenters(buffer.structureCenters, structureCenters);
+      }
+    }
+
+    // 3. 标记发起 Worker 的 chunk 为"已加载"
     const ownKey = `${cx},${cz}`;
     const ownBuffer = this.chunkBuffers.get(ownKey);
     if (ownBuffer) {
       ownBuffer.ready = true;
     }
 
-    // 3. 通知就绪的 chunk 进行渲染
+    // 4. 通知就绪的 chunk 进行渲染
     this.flushReadyChunks();
   }
 
@@ -70,16 +78,35 @@ export class BlockScatterManager {
       if (!chunk) continue;
 
       if (!chunk.isReady) {
-        // 首次渲染：完整接受并构建 mesh
-        chunk.acceptScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys);
+        // 首次渲染：完整接受并构建 mesh（传递 structureCenters 供跨 chunk 结构判断）
+        chunk.acceptScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys, buffer.structureCenters);
       } else {
         // 增量追加：只追加新方块并触发 consolidation
-        chunk.appendScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys);
+        chunk.appendScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys, buffer.structureCenters);
         // 清空已处理的方块，释放内存，保留 buffer 结构以接收后续溢出
         buffer.blocks = [];
         buffer.visibleBlockKeys = new Set();
       }
     }
+  }
+
+  /**
+   * 合并结构中心列表，按位置去重
+   */
+  _mergeStructureCenters(existing, incoming) {
+    if (!existing || existing.length === 0) return incoming;
+    if (!incoming || incoming.length === 0) return existing;
+
+    const merged = [...existing];
+    const seen = new Set(existing.map(c => `${c.type},${c.x},${c.y},${c.z}`));
+    for (const c of incoming) {
+      const key = `${c.type},${c.x},${c.y},${c.z}`;
+      if (!seen.has(key)) {
+        merged.push(c);
+        seen.add(key);
+      }
+    }
+    return merged;
   }
 
   /**

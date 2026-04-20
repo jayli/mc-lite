@@ -1304,6 +1304,28 @@ export class Chunk {
   }
 
   /**
+   * 合并结构中心列表，按位置去重
+   * @param {Array} incoming - 新的结构中心列表
+   */
+  _mergeStructureCenters(incoming) {
+    if (!incoming || incoming.length === 0) return;
+    if (!this.structureCenters) this.structureCenters = [];
+    if (this.structureCenters.length === 0) {
+      this.structureCenters = incoming;
+      return;
+    }
+
+    const seen = new Set(this.structureCenters.map(c => `${c.type},${c.x},${c.y},${c.z}`));
+    for (const c of incoming) {
+      const key = `${c.type},${c.x},${c.y},${c.z}`;
+      if (!seen.has(key)) {
+        this.structureCenters.push(c);
+        seen.add(key);
+      }
+    }
+  }
+
+  /**
    * 接收 Worker 生成结果，但暂不立即在主线程完成全部装配
    * @param {object} payload - Worker 回包数据
    */
@@ -2168,8 +2190,9 @@ export class Chunk {
    * 接收 BlockScatterManager 分发来的方块数据
    * @param {Array} scatteredBlocks - 方块列表（含溢出）
    * @param {Set} visibleBlockKeys - 面剔除可见的方块 key 集合
+   * @param {Array} structureCenters - 结构中心列表（供跨 chunk 结构判断）
    */
-  acceptScatteredBlocks(scatteredBlocks, visibleBlockKeys) {
+  acceptScatteredBlocks(scatteredBlocks, visibleBlockKeys, structureCenters) {
     const minX = this.cx * CHUNK_SIZE;
     const minZ = this.cz * CHUNK_SIZE;
 
@@ -2210,11 +2233,16 @@ export class Chunk {
       }
     }
 
+    // 合并 structureCenters（buffer 中可能已包含来自相邻 chunk 的结构中心）
+    if (structureCenters?.length > 0) {
+      this._mergeStructureCenters(structureCenters);
+    }
+
     // 初始化数组存储
     this._initArrayStorageFromBlockData();
 
-    // 从已填充的 blockData 构建渲染 mesh
-    this.buildMeshesFromScatteredData();
+    // 从已填充的 blockData 构建渲染 mesh（传入 structureCenters 供跨 chunk 结构判断）
+    this.buildMeshesFromScatteredData(structureCenters);
 
     // 标记 chunk 为已加载
     this.loadState = 'terrain-built';
@@ -2229,10 +2257,16 @@ export class Chunk {
    * 用于后加载 chunk 的溢出方块追加到已渲染的 chunk 中
    * @param {Array} scatteredBlocks - 方块列表（含溢出）
    * @param {Set} visibleBlockKeys - 面剔除可见的方块 key 集合
+   * @param {Array} structureCenters - 结构中心列表（供跨 chunk 结构判断）
    */
-  appendScatteredBlocks(scatteredBlocks, visibleBlockKeys) {
+  appendScatteredBlocks(scatteredBlocks, visibleBlockKeys, structureCenters) {
     const minX = this.cx * CHUNK_SIZE;
     const minZ = this.cz * CHUNK_SIZE;
+
+    // 合并 structureCenters（增量追加场景可能收到来自不同 chunk 的结构中心）
+    if (structureCenters?.length > 0) {
+      this._mergeStructureCenters(structureCenters);
+    }
 
     let appendedCount = 0;
 
@@ -2284,19 +2318,30 @@ export class Chunk {
   /**
    * 从散装的方块数据构建渲染 mesh
    * 按 type 分组后，自动选择合批模式或 per-chunk 模式
+   * @param {Array} structureCenters - 结构中心列表（供跨 chunk 结构判断，可选）
    */
-  buildMeshesFromScatteredData() {
-    // 按 type 分组
+  buildMeshesFromScatteredData(structureCenters) {
+    // 优先使用传入的 structureCenters（来自 scatter buffer），其次使用 chunk 自身缓存
+    const centers = structureCenters || this.structureCenters;
+
+    // 按 type 分组（只渲染 visibleKeys 中的方块，被遮挡的地下方块不渲染）
     const groupedByType = {};
 
     for (const [code, entry] of this.blockData) {
+      // 面剔除可见性过滤：只有 visibleKeys 已计算且非空时，才过滤隐藏方块
+      // 但跨 chunk 结构（花坛、静态树等）的方块不受面剔除影响，应始终渲染
+      if (this.visibleKeys.size > 0 && !this.visibleKeys.has(code)) {
+        const { x, y, z } = Chunk.decodeCoord(code);
+        if (!centers?.length || !belongsToCrossChunkStructure(x, y, z, centers)) continue;
+      }
+
       const parsed = parseBlockEntry(entry);
       const type = parsed.type;
       const orientation = parsed.orientation || 0;
-      const { x, y, z } = Chunk.decodeCoord(code);
+      const pos = Chunk.decodeCoord(code);
 
       if (!groupedByType[type]) groupedByType[type] = [];
-      groupedByType[type].push({ code, orientation, x, y, z });
+      groupedByType[type].push({ code, orientation, x: pos.x, y: pos.y, z: pos.z });
     }
 
     // 构建 meshDataArray（兼容现有 buildMeshes 的输入格式）

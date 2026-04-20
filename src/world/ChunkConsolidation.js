@@ -8,6 +8,7 @@ import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { getBlockProperties as getBlockProps } from '../constants/BlockData.js';
 import { blockDataToStringKeys } from '../utils/CoordEncoding.js';
 import { filterWorkerResultAgainstBlockData } from './ChunkMeshDataFilter.js';
+import { belongsToCrossChunkStructure } from '../utils/StructureUtils.js';
 
 // 区块大小常量
 export const CHUNK_SIZE = 16;
@@ -390,8 +391,14 @@ export function extendChunk(Chunk) {
       }
     }
 
-    // 将过滤后的 scatteredBlocks 转换为 meshData 格式
-    const meshData = this._convertScatteredBlocksToMeshData(filteredBlocks);
+    // 将过滤后的 scatteredBlocks 转换为 meshData 格式（按 visibleKeys 过滤可见方块）
+    const encodeKeys = (arr) => arr ? arr.map(strKey => {
+      const [x, y, z] = strKey.split(',').map(Number);
+      return Chunk.encodeCoord(x, y, z);
+    }) : null;
+    const encodedVisibleKeys = encodeKeys(visibleKeys);
+    const encodedVisibleKeysSet = encodedVisibleKeys ? new Set(encodedVisibleKeys) : null;
+    const meshData = this._convertScatteredBlocksToMeshData(filteredBlocks, encodedVisibleKeysSet, newStructureCenters);
 
     // 保存原始 solidBlocks 用于跨 Chunk 碰撞体（Worker 返回字符串数组，需编码转换）
     this._tempOriginalSolidBlocks = solidBlocks
@@ -402,11 +409,6 @@ export function extendChunk(Chunk) {
       : [];
 
     // 同步可见性状态与碰撞状态（Worker 返回字符串数组，需编码转换）
-    const encodeKeys = (arr) => arr ? arr.map(strKey => {
-      const [x, y, z] = strKey.split(',').map(Number);
-      return Chunk.encodeCoord(x, y, z);
-    }) : null;
-    const encodedVisibleKeys = encodeKeys(visibleKeys);
     const encodedSolidBlocks = encodeKeys(solidBlocks);
     this._syncVisibilityAndCollision(encodedVisibleKeys, encodedSolidBlocks);
 
@@ -443,13 +445,20 @@ export function extendChunk(Chunk) {
 
   /**
    * 将 scatteredBlocks 转换为 meshData 格式（按 type 分组）
+   * @param {Array} scatteredBlocks - 过滤后的方块列表
+   * @param {Set} visibleKeys - 面剔除可见的方块编码集合（可选，用于过滤隐藏方块）
+   * @param {Array} structureCenters - 结构中心列表（供跨 chunk 结构判断）
    */
-  Chunk.prototype._convertScatteredBlocksToMeshData = function(scatteredBlocks) {
+  Chunk.prototype._convertScatteredBlocksToMeshData = function(scatteredBlocks, visibleKeys, structureCenters) {
     if (!scatteredBlocks || scatteredBlocks.length === 0) return [];
 
-    // 按 type 分组
+    // 按 type 分组（只渲染 visibleKeys 中的方块，跨 chunk 结构方块除外）
     const groupedByType = {};
     for (const block of scatteredBlocks) {
+      const code = Chunk.encodeCoord(block.x, block.y, block.z);
+      if (visibleKeys && visibleKeys.size > 0 && !visibleKeys.has(code)) {
+        if (!structureCenters?.length || !belongsToCrossChunkStructure(block.x, block.y, block.z, structureCenters)) continue;
+      }
       if (!groupedByType[block.type]) groupedByType[block.type] = [];
       groupedByType[block.type].push(block);
     }
