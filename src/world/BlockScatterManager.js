@@ -21,7 +21,7 @@ export class BlockScatterManager {
    * @param {Object} workerResult - Worker 返回的数据
    */
   scatter(workerResult) {
-    const { scatteredBlocks, visibleKeys, cx, cz, entities } = workerResult;
+    const { scatteredBlocks, visibleKeys, cx, cz } = workerResult;
 
     // visibleKeys 从 Worker 传来是数组，先转为 Set 方便查找
     const visibleKeysSet = Array.isArray(visibleKeys) ? new Set(visibleKeys) : null;
@@ -54,29 +54,8 @@ export class BlockScatterManager {
       ownBuffer.ready = true;
     }
 
-    // 3. 特殊实体直接分发给对应 chunk
-    if (entities) {
-      this.scatterEntities(entities, cx, cz);
-    }
-
-    // 4. 通知就绪的 chunk 进行渲染
+    // 3. 通知就绪的 chunk 进行渲染
     this.flushReadyChunks();
-  }
-
-  /**
-   * 特殊实体分发（modGunMan、Rover）
-   */
-  scatterEntities(entities, cx, cz) {
-    const chunk = this.world.chunks.get(`${cx},${cz}`);
-    if (!chunk) return;
-
-
-    if (entities.modGunMan?.length) {
-      chunk.entities.modGunMan = entities.modGunMan;
-    }
-    if (entities.rovers?.length) {
-      chunk.entities.rovers = entities.rovers;
-    }
   }
 
   /**

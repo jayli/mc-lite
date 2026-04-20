@@ -225,6 +225,9 @@ export class World {
    * @param {Object} workerResult - Worker 返回的数据
    */
   _onChunkGenResult(chunk, workerResult) {
+    // 先装配 Worker 回包元数据（snapshot、structureCenters、solidBlocks、
+    // pendingSpecialEntityData、visibleKeys 等），再分发方块
+    chunk.acceptWorkerResult(workerResult);
     this.scatterManager.scatter(workerResult);
   }
 
