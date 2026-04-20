@@ -1,4 +1,4 @@
-import { assert, assertEqual } from './assert.js';
+import { assertTrue, assertEqual } from './assert.js';
 import { makeCandidate, candidateKey } from '../workers/structure-index/StructureCandidateTypes.js';
 import { collectLargeStaticCandidatesInRect } from '../workers/structure-index/LargeStaticCandidateCollector.js';
 import { collectStaticTreeCandidatesInRect } from '../workers/structure-index/StaticTreeCandidateCollector.js';
@@ -27,7 +27,7 @@ export async function testCandidateKeyUniqueness() {
   const c = makeCandidate('tower', 10, 20, 30, 'probabilistic_large_static');
 
   assertEqual(candidateKey(a), candidateKey(b));
-  assert(candidateKey(a) !== candidateKey(c), 'different type should produce different key');
+  assertTrue(candidateKey(a) !== candidateKey(c), 'different type should produce different key');
 }
 
 export async function testLargeStaticCandidatesAreDeterministic() {
@@ -44,8 +44,8 @@ export async function testCandidateIndexReusesTiles() {
   index.getCandidatesForChunk(1, 0, 12345, terrainGen);
   const afterSecond = index.getStats();
 
-  assert(afterFirst.generatedTiles > 0, 'first query should generate tiles');
-  assert(afterSecond.cacheHits > afterFirst.cacheHits, 'second query should reuse cached tiles');
+  assertTrue(afterFirst.generatedTiles > 0, 'first query should generate tiles');
+  assertTrue(afterSecond.cacheHits > afterFirst.cacheHits, 'second query should reuse cached tiles');
 }
 
 /**
