@@ -62,9 +62,8 @@ class MockWorkerWrapper {
       if (shouldMockWorkers) {
         // 只响应 Chunk 生成请求（有 seed 参数且不是 consolidate）
         if (msg.seed !== undefined && !msg.isOptimization) {
-          // 直接调用 workerCallbacks 中注册的回调，绕过真实 Worker handler
-          // 真实 handler 会在地形生成后 postMessage，产生真实数据干扰测试
-          const callbackKey = `${msg.cx},${msg.cz}`;
+          // 使用消息中的 taskId 查找回调（Worker 池化后使用 taskId 路由）
+          const callbackKey = msg.taskId || `${msg.cx},${msg.cz}`;
           setTimeout(() => {
             // 优先使用直接回调方式（绕过真实 Worker）
             if (globalThis.workerCallbacks?.has?.(callbackKey)) {

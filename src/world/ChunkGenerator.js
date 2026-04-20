@@ -45,19 +45,19 @@ export function extendChunk(Chunk) {
     }
 
     return new Promise((resolve) => {
-      const callbackKey = `${this.cx},${this.cz}`;
+      const taskId = `gen:${this.cx},${this.cz}:${performance.now()}:${Math.random().toString(36).slice(2, 8)}`;
 
-      // 注册 Worker 回调
-      workerCallbacks.set(callbackKey, (data) => {
-        // 新链路：通过 World.scatterManager 分发
+      // 注册 Worker 池回调
+      workerCallbacks.set(taskId, (data) => {
         this.world?._onChunkGenResult?.(this, data);
         resolve();
       });
 
-      // 4. 发送生成请求到 Worker
+      // 4. 发送生成请求到 Worker 池
       worldWorker.postMessage({
         cx: this.cx,
         cz: this.cz,
+        taskId,
         seed: WORLD_CONFIG.SEED,
         snapshot,
         structureCenters: neighborStructureCenters.length > 0 ? neighborStructureCenters : undefined

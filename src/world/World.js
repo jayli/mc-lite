@@ -309,8 +309,8 @@ export class World {
   processAssemblyQueues() {
     const isBootstrap = this.bootstrapState.phase === 'bootstrapping';
     this.chunkAssemblyScheduler.processWithinBudget({
-      budgetMs: isBootstrap ? 12 : 2.5,
-      maxTasks: isBootstrap ? 8 : 2
+      budgetMs: isBootstrap ? 12 : 8,
+      maxTasks: isBootstrap ? 8 : 6
     });
   }
 

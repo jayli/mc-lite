@@ -60,6 +60,34 @@ const {
   desertTempleTube
 } = structureLoaders;
 
+// 模块级预加载：每个 Worker 实例只执行一次，所有 onmessage 共享此 Promise
+const structuresPreload = Promise.all([
+  bigHouse.load(),
+  regularHouse1.load(),
+  boxHouse.load(),
+  doubleTower.load(),
+  treeTower.load(),
+  junglePyramid.load(),
+  pyramidIsland.load(),
+  smallHouse.load(),
+  treeHouse.load(),
+  uglyHouse.load(),
+  whiteTower.load(),
+  woodHouse.load(),
+  desertVillage.load(),
+  desertPyramid.load(),
+  birchTree.load(),
+  birchTreeWithSnow.load(),
+  tank.load(),
+  tower.load(),
+  castle.load(),
+  gate.load(),
+  flowerBed.load(),
+  pavilion.load(),
+  tallWell.load(),
+  desertTempleTube.load()
+]).catch(err => console.error('Failed to load structure data:', err));
+
 const CHUNK_SIZE = 16;
 const ROOMS_PER_CHUNK = 2;
 const MAX_ROOM_SIZE = 5;
@@ -397,6 +425,7 @@ onmessage = async function(e) {
     snapshot,
     structureCenters: incomingStructureCenters,
     callbackKey,
+    taskId,
     isOptimization = false,
     textureGroups = {}  // 新增：纹理分组配置
   } = e.data;
@@ -404,33 +433,8 @@ onmessage = async function(e) {
   // 同步种子
   setSeed(seed);
 
-  // 预加载所有结构数据（等待完成后再生成地形）
-  await Promise.all([
-    bigHouse.load(),
-    regularHouse1.load(),
-    boxHouse.load(),
-    doubleTower.load(),
-    treeTower.load(),
-    junglePyramid.load(),
-    pyramidIsland.load(),
-    smallHouse.load(),
-    treeHouse.load(),
-    uglyHouse.load(),
-    whiteTower.load(),
-    woodHouse.load(),
-    desertVillage.load(),
-    desertPyramid.load(),
-    birchTree.load(),
-    birchTreeWithSnow.load(),
-    tank.load(),
-    tower.load(),
-    castle.load(),
-    gate.load(),
-    flowerBed.load(),
-    pavilion.load(),
-    tallWell.load(),
-    desertTempleTube.load()
-  ]).catch(err => console.error('Failed to load structure data:', err));
+  // 等待结构数据预加载完成（模块级 Promise，首个消息触发，后续消息直接返回）
+  await structuresPreload;
 
   // 计算当前区块的范围 - 提前定义，供 snapshot 模式使用
   const minX = cx * CHUNK_SIZE;
@@ -1911,7 +1915,7 @@ onmessage = async function(e) {
   }
 
   postMessage({
-    cx, cz, callbackKey,
+    cx, cz, callbackKey, taskId,
     scatteredBlocks,
     solidBlocks,
     modGunMan, rovers,

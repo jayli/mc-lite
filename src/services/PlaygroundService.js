@@ -677,7 +677,7 @@ export class PlaygroundService {
       if (!chunk || !chunk.isReady) continue;
 
       tasks.push(new Promise((resolve) => {
-        const callbackKey = `pg-opt:${key}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
+        const taskId = `pg-opt:${key}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`;
         const consolidatedCount = chunk.dirtyBlocks;
         const consolidatedMeshKeys = new Set(chunk.dynamicMeshes.keys());
 
@@ -689,13 +689,13 @@ export class PlaygroundService {
         chunk.isConsolidating = true;
 
         const timeoutId = setTimeout(() => {
-          workerCallbacks.delete(callbackKey);
+          workerCallbacks.delete(taskId);
           chunk.isConsolidating = false;
           console.warn(`[PlaygroundService] Worker 优化超时: ${key}`);
           resolve(false);
         }, timeoutMs);
 
-        workerCallbacks.set(callbackKey, (data) => {
+        workerCallbacks.set(taskId, (data) => {
           clearTimeout(timeoutId);
           try {
             chunk._applyConsolidateResult(data, consolidatedCount, consolidatedMeshKeys);
@@ -710,7 +710,7 @@ export class PlaygroundService {
         worldWorker.postMessage({
           cx: chunk.cx,
           cz: chunk.cz,
-          callbackKey,
+          taskId,
           seed: WORLD_CONFIG.SEED,
           snapshot: {
             blocks: (() => { const o = {}; for (const [k, v] of chunk.blockData) o[k] = v; return o; })(),

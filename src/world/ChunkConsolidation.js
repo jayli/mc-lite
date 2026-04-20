@@ -9,6 +9,8 @@ import { getBlockProperties as getBlockProps } from '../constants/BlockData.js';
 import { blockDataToStringKeys } from '../utils/CoordEncoding.js';
 import { filterWorkerResultAgainstBlockData } from './ChunkMeshDataFilter.js';
 import { belongsToCrossChunkStructure } from '../utils/StructureUtils.js';
+import { worldWorker, workerCallbacks, worldWorkerPool } from '../workers/WorldWorkerPool.js';
+export { worldWorker, workerCallbacks, worldWorkerPool };
 
 // 区块大小常量
 export const CHUNK_SIZE = 16;
@@ -16,10 +18,6 @@ export const CHUNK_SIZE = 16;
 // 合并机制常量
 const DIRTY_THRESHOLD = 50;
 export const CONSOLIDATION_DELAY = 1000;
-
-// Worker 实例与回调映射
-export const worldWorker = new Worker(new URL('../workers/WorldWorker.js', import.meta.url), { type: 'module' });
-export const workerCallbacks = new Map(); // 用于跟踪异步生成请求的回调函数
 
 // 专用 AO Worker — 只做 AO 计算，不复用 FaceCullingWorker
 export const aoWorker = new Worker(new URL('../workers/AOWorker.js', import.meta.url), { type: 'module' });
@@ -251,22 +249,10 @@ export const geomMap = {
 };
 
 export function extendChunk(Chunk) {
-  // 注册 Worker 消息处理器
-  worldWorker.onmessage = (e) => {
-    const {
-      cx, cz, callbackKey,
-      scatteredBlocks,
-      solidBlocks, modGunMan, rovers, entities, visibleKeys, snapshot, structureCenters
-    } = e.data;
-    const key = callbackKey || `${cx},${cz}`;
-    if (workerCallbacks.has(key)) {
-      workerCallbacks.get(key)({ cx, cz, scatteredBlocks, solidBlocks, modGunMan, rovers, entities, visibleKeys, snapshot, structureCenters });
-      workerCallbacks.delete(key);
-    }
-  };
-
-  worldWorker.onerror = (e) => {
-    console.error('WorldWorker Error:', e);
+  // WorldWorkerPool 内部已处理消息路由，不再需要全局 onmessage 注册
+  // 仅保留 onerror 用于日志
+  worldWorkerPool.onerror = (e) => {
+    console.error('WorldWorkerPool Error:', e);
     console.error('Error details:', {
       message: e.message,
       filename: e.filename,
@@ -340,16 +326,16 @@ export function extendChunk(Chunk) {
     }
 
     // 阶段 2: 注册 Worker 回调并请求重新计算
-    const callbackKey = `${this.cx},${this.cz}`;
-    workerCallbacks.set(callbackKey, (data) => {
+    const taskId = `consolidate:${this.cx},${this.cz}:${performance.now()}:${Math.random().toString(36).slice(2, 8)}`;
+    workerCallbacks.set(taskId, (data) => {
       this._applyConsolidateResult(data, consolidatedCount, consolidatedMeshKeys);
     });
 
-    // 发送请求到 Worker
+    // 发送请求到 Worker 池
     worldWorker.postMessage({
       cx: this.cx,
       cz: this.cz,
-      callbackKey,
+      taskId,
       seed: WORLD_CONFIG.SEED,
       snapshot: {
         blocks: blockDataToStringKeys(this.blockData),
