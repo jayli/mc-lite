@@ -8,6 +8,12 @@
  *   const index = new StructureCandidateIndex();
  *   const candidates = index.getCandidatesForChunk(cx, cz, seed, terrainGen);
  *
+ * 维护说明：
+ * - 候选索引只负责"发现结构中心"，不负责生成方块。
+ * - 方块生成仍由 WorldWorker.js 的现有 generate 函数执行。
+ * - 新增大型结构时必须更新 LargeStaticCandidateCollector.js 的候选发现逻辑。
+ * - 新增 static_tree 类型时必须更新 StaticTreeCandidateCollector.js。
+ *
  * 缓存 key：`${seed}:${tileX},${tileZ}`
  * 每个 WorldWorker 实例拥有独立的 index 和缓存。
  */
