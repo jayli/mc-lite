@@ -1,6 +1,7 @@
 import { assert, assertEqual } from './assert.js';
 import { makeCandidate, candidateKey } from '../workers/structure-index/StructureCandidateTypes.js';
 import { collectLargeStaticCandidatesInRect } from '../workers/structure-index/LargeStaticCandidateCollector.js';
+import { StructureCandidateIndex } from '../workers/structure-index/StructureCandidateIndex.js';
 import { terrainGen } from '../world/TerrainGen.js';
 
 export async function testStructureCandidateShape() {
@@ -26,4 +27,15 @@ export async function testLargeStaticCandidatesAreDeterministic() {
   const a = collectLargeStaticCandidatesInRect(rect, 12345, terrainGen).map(candidateKey).sort();
   const b = collectLargeStaticCandidatesInRect(rect, 12345, terrainGen).map(candidateKey).sort();
   assertEqual(JSON.stringify(a), JSON.stringify(b));
+}
+
+export async function testCandidateIndexReusesTiles() {
+  const index = new StructureCandidateIndex({ tileSize: 64 });
+  index.getCandidatesForChunk(0, 0, 12345, terrainGen);
+  const afterFirst = index.getStats();
+  index.getCandidatesForChunk(1, 0, 12345, terrainGen);
+  const afterSecond = index.getStats();
+
+  assert(afterFirst.generatedTiles > 0, 'first query should generate tiles');
+  assert(afterSecond.cacheHits > afterFirst.cacheHits, 'second query should reuse cached tiles');
 }
