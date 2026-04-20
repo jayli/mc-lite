@@ -130,7 +130,7 @@ function toLocalCoord(value) {
  * @param {number} wz
  * @returns {boolean}
  */
-function _isSafeForStructureAt(wx, wz) {
+function isSafeForStructureAt(wx, wz) {
   const lx = toLocalCoord(wx);
   const lz = toLocalCoord(wz);
   return lx >= 3 && lx <= 12 && lz >= 3 && lz <= 12;
@@ -150,14 +150,13 @@ function getSurfaceTypeByBiome(biome) {
 }
 
 /**
- * 非沙漠地块中，是否已被“会阻止大型结构生成”的对象占用
- * 与主流程 else 分支保持一致：先 gunman，再 tree
+ * 非沙漠地块中，是否已被"会阻止大型结构生成"的对象占用
  * @param {number} wx
  * @param {number} wz
  * @param {number} seed
  * @returns {boolean}
  */
-function _isOccupiedForLargeStaticNonDesert(wx, wz, seed) {
+function isOccupiedForLargeStaticNonDesert(wx, wz, seed) {
   const occupiedByGunman = seededRandom(wx, wz, seed) < 0.0005;
   const occupiedByTree = !occupiedByGunman && seededRandom(wx, wz, seed + 1) < 0.005;
   return occupiedByGunman || occupiedByTree;
@@ -165,7 +164,6 @@ function _isOccupiedForLargeStaticNonDesert(wx, wz, seed) {
 
 /**
  * 沙漠地块中，是否已被 dead_bush 占位（会阻止大型结构）
- * 与主流程 DESERT 分支保持一致
  * @param {number} wx
  * @param {number} wz
  * @param {number} seed
@@ -186,14 +184,13 @@ function isOccupiedForLargeStaticDesert(wx, wz, seed) {
  * @param {string} params.surfaceType
  * @param {boolean} params.safeForStructure
  * @param {boolean} params.occupied
- * @returns {'desertPyramid'|'desertVillage'|'uglyHouse'|'whiteTower'|'gate'|'tank'|null}
+ * @returns {'desertPyramid'|'desertVillage'|'uglyHouse'|'tank'|null}
  */
 function resolveLargeStaticStructureType(params) {
   const { wx, wz, seed, biome, surfaceType, safeForStructure, occupied } = params;
   if (!safeForStructure || occupied) return null;
 
   if (biome === 'DESERT') {
-    // gate 和 whiteTower 已从沙漠中移除
     if (seededRandom(wx, wz, seed + 25) < 0.00016) return 'desertPyramid';
     if (seededRandom(wx, wz, seed + 26) < 0.00016) return 'desertVillage';
     if (seededRandom(wx, wz, seed + 23) < 0.00008) return 'uglyHouse';
@@ -1450,29 +1447,6 @@ onmessage = async function(e) {
 
   // 大型静态结构邻域重建：
   // 让每个 Chunk 都能拿到“落在自己坐标内”的结构分片，避免中心 Chunk 卸载导致整栋闪灭/切割
-  const scannedMinX = minX - LARGE_STATIC_SCAN_PADDING;
-  const scannedMaxX = maxX + LARGE_STATIC_SCAN_PADDING;
-  const scannedMinZ = minZ - LARGE_STATIC_SCAN_PADDING;
-  const scannedMaxZ = maxZ + LARGE_STATIC_SCAN_PADDING;
-  const scannedTreeMinX = minX - STATIC_TREE_SCAN_PADDING;
-  const scannedTreeMaxX = maxX + STATIC_TREE_SCAN_PADDING;
-  const scannedTreeMinZ = minZ - STATIC_TREE_SCAN_PADDING;
-  const scannedTreeMaxZ = maxZ + STATIC_TREE_SCAN_PADDING;
-  const wLvl = -2;
-  const _getChunkBiomeByWorld = (wx, wz) => {
-    const ownerCx = Math.floor(wx / CHUNK_SIZE);
-    const ownerCz = Math.floor(wz / CHUNK_SIZE);
-    return terrainGen.getBiome(ownerCx * CHUNK_SIZE, ownerCz * CHUNK_SIZE);
-  };
-  const _getActiveBiomeByWorld = (wx, wz) => {
-    const ownerCx = Math.floor(wx / CHUNK_SIZE);
-    const ownerCz = Math.floor(wz / CHUNK_SIZE);
-    const ownerCenterBiome = terrainGen.getBiome(ownerCx * CHUNK_SIZE, ownerCz * CHUNK_SIZE);
-    const cityInfo = CityMap.getCityInfo(wx, wz, seed, terrainGen);
-    const inCity = cityInfo !== null;
-    const baseBiome = getBaseBiome(wx, wz);
-    return (ownerCenterBiome === 'CITY' && !inCity) ? baseBiome : ownerCenterBiome;
-  };
   const largeStructureTaskKeySet = new Set(
     structureQueueWithCenters
       .filter(item => item.type)
