@@ -12,7 +12,7 @@
  * - Worker 端 deltaQueue 优先于 computeQueue 处理（双重保险）
  */
 
-import { blockDataToStringKeys } from '../utils/CoordEncoding.js';
+import { blockDataToNumberKeys } from '../utils/CoordEncoding.js';
 
 class AOBridge {
   constructor() {
@@ -75,7 +75,7 @@ class AOBridge {
     // 先 flush 积压的 delta，避免 fullSync 后残留旧 delta
     this._flush();
 
-    const blockDataObj = blockDataToStringKeys(blockDataMap);
+    const blockDataObj = blockDataToNumberKeys(blockDataMap);
     this._worker.postMessage({
       type: 'fullSync',
       chunkKey,

@@ -9,6 +9,7 @@ import { assertEqual, assertFalse, assertTrue } from './assert.js';
 import { calculateAOForBlock, createOcclusionChecker, unpackAOValue } from '../utils/AOUtils.js';
 import { getBlockProperties } from '../constants/BlockData.js';
 import { Chunk } from '../world/Chunk.js';
+import { aoBridge } from '../core/AOBridge.js';
 
 /**
  * 将方块数据从普通对象转换为 Map（符合 Chunk.blockData 的实际数据结构）
@@ -146,5 +147,44 @@ describe('AO 遮挡判定一致性测试', (test) => {
       assertEqual(unpackAOValue(aoLow, aoHigh, vertexIdx), 3, '+X 隐藏面 AO 应为中性值');
     }
     assertEqual(unpackAOValue(aoLow, aoHigh, 8), 0, '+Y 可见面仍应计算墙角 AO');
+  });
+
+  test('AOBridge fullSync 应发送数字编码 blocks，避免逗号坐标 key 序列化', () => {
+    const messages = [];
+    const mockWorker = {
+      postMessage(message) {
+        messages.push(message);
+      }
+    };
+    const originalWorker = aoBridge._worker;
+    const originalIsWorkerReady = aoBridge._isWorkerReady;
+    const originalPendingDeltas = [...aoBridge._pendingDeltas];
+    const originalFlushTimer = aoBridge._flushTimer;
+
+    aoBridge.init(mockWorker);
+
+    try {
+      const blockData = new Map();
+      const code = Chunk.encodeCoord(1, 2, 3);
+      blockData.set(code, { type: 'stone', orientation: 0 });
+
+      aoBridge.fullSync('0,0', blockData);
+
+      const syncMessage = messages.find(message => message.type === 'fullSync');
+      assertTrue(!!syncMessage, 'fullSync 应发送 fullSync 消息');
+
+      const keys = Object.keys(syncMessage.blockData);
+      assertEqual(keys.length, 1, 'fullSync 应发送一个方块记录');
+      assertEqual(keys[0], String(code), 'fullSync blockData key 应该是数字编码字符串');
+      assertFalse(keys[0].includes(','), 'fullSync blockData key 不应该是 x,y,z 逗号坐标');
+    } finally {
+      if (aoBridge._flushTimer && aoBridge._flushTimer !== originalFlushTimer) {
+        clearTimeout(aoBridge._flushTimer);
+      }
+      aoBridge._worker = originalWorker;
+      aoBridge._isWorkerReady = originalIsWorkerReady;
+      aoBridge._pendingDeltas = originalPendingDeltas;
+      aoBridge._flushTimer = originalFlushTimer;
+    }
   });
 });
