@@ -14,8 +14,26 @@ export class BlockScatterManager {
     this.world = world;
     // chunkKey → { blocks: [], loading: true/false, sourceWorkers: Set }
     this.chunkBuffers = new Map();
+    // chunkKey → 延迟跨 chunk 补刷数据。首帧不消费，runtime idle 时分批补刷。
+    this.pendingCrossChunkPatchBuffers = new Map();
     // 跨 chunk 方块渲染开关，关闭时跨 chunk 的方块会被直接丢弃
     this.skipCrossChunk = false;
+  }
+
+  _getOrCreateBuffer(map, chunkKey) {
+    let buffer = map.get(chunkKey);
+    if (!buffer) {
+      buffer = {
+        blocks: [],
+        ready: false,
+        sourceWorkers: new Set(),
+        visibleBlockKeys: new Set(),
+        structureCenters: null,
+        lastUpdatedAt: 0
+      };
+      map.set(chunkKey, buffer);
+    }
+    return buffer;
   }
 
   /**
@@ -43,13 +61,12 @@ export class BlockScatterManager {
         continue;
       }
 
-      let buffer = this.chunkBuffers.get(chunkKey);
-      if (!buffer) {
-        buffer = { blocks: [], ready: false, sourceWorkers: new Set(), visibleBlockKeys: new Set(), structureCenters: null };
-        this.chunkBuffers.set(chunkKey, buffer);
-      }
+      const isOwnChunk = chunkCx === cx && chunkCz === cz;
+      const targetMap = isOwnChunk ? this.chunkBuffers : this.pendingCrossChunkPatchBuffers;
+      const buffer = this._getOrCreateBuffer(targetMap, chunkKey);
       buffer.blocks.push(block);
       buffer.sourceWorkers.add(`${cx},${cz}`);
+      buffer.lastUpdatedAt = globalThis.performance?.now?.() ?? Date.now();
       touchedBuffers.add(buffer);
 
       // 提取 visibleKeys，标记哪些方块是面剔除可见的
@@ -61,11 +78,7 @@ export class BlockScatterManager {
 
     // 确保发起 Worker 的 chunk 即使没有方块，也有 buffer 承载 ready 状态和结构中心。
     const ownKey = `${cx},${cz}`;
-    let ownBuffer = this.chunkBuffers.get(ownKey);
-    if (!ownBuffer) {
-      ownBuffer = { blocks: [], ready: false, sourceWorkers: new Set(), visibleBlockKeys: new Set(), structureCenters: null };
-      this.chunkBuffers.set(ownKey, ownBuffer);
-    }
+    const ownBuffer = this._getOrCreateBuffer(this.chunkBuffers, ownKey);
     touchedBuffers.add(ownBuffer);
 
     // 2. 合并结构中心信息到本次触达的 buffer（追加而非覆盖）
@@ -110,6 +123,76 @@ export class BlockScatterManager {
     }
   }
 
+  _getPendingPatchKeysByDistance(playerCx, playerCz) {
+    return [...this.pendingCrossChunkPatchBuffers.keys()].sort((a, b) => {
+      const [ax, az] = a.split(',').map(Number);
+      const [bx, bz] = b.split(',').map(Number);
+      const da = Math.abs(ax - playerCx) + Math.abs(az - playerCz);
+      const db = Math.abs(bx - playerCx) + Math.abs(bz - playerCz);
+      if (da !== db) return da - db;
+      return a.localeCompare(b);
+    });
+  }
+
+  /**
+   * runtime idle 阶段按玩家距离分批补刷跨 chunk 方块。
+   * @returns {{processedChunks:number, processedBlocks:number}}
+   */
+  flushDeferredCrossChunkPatchesAround(playerCx, playerCz, options = {}) {
+    const maxChunks = Number.isFinite(options.maxChunks) ? options.maxChunks : 1;
+    const maxBlocks = Number.isFinite(options.maxBlocks) ? options.maxBlocks : 400;
+    let processedChunks = 0;
+    let processedBlocks = 0;
+
+    for (const key of this._getPendingPatchKeysByDistance(playerCx, playerCz)) {
+      if (processedChunks >= maxChunks || processedBlocks >= maxBlocks) break;
+
+      const chunk = this.world.chunks.get(key);
+      const buffer = this.pendingCrossChunkPatchBuffers.get(key);
+      if (!buffer) continue;
+
+      if (!chunk || chunk.disposed) {
+        continue;
+      }
+      if (!chunk.isReady || chunk.isConsolidating) continue;
+      if (buffer.blocks.length === 0) {
+        this.pendingCrossChunkPatchBuffers.delete(key);
+        continue;
+      }
+
+      const remainingBudget = maxBlocks - processedBlocks;
+      const blocks = buffer.blocks.length > remainingBudget
+        ? buffer.blocks.splice(0, remainingBudget)
+        : buffer.blocks.splice(0, buffer.blocks.length);
+
+      const appended = chunk.appendDeferredCrossChunkPatch?.(
+        blocks,
+        buffer.visibleBlockKeys,
+        buffer.structureCenters
+      ) ?? 0;
+
+      processedBlocks += Number.isFinite(appended) ? appended : blocks.length;
+      processedChunks++;
+
+      if (buffer.blocks.length === 0) {
+        this.pendingCrossChunkPatchBuffers.delete(key);
+      }
+    }
+
+    return { processedChunks, processedBlocks };
+  }
+
+  getPendingCrossChunkPatchStats() {
+    let blocks = 0;
+    for (const buffer of this.pendingCrossChunkPatchBuffers.values()) {
+      blocks += buffer.blocks.length;
+    }
+    return {
+      chunks: this.pendingCrossChunkPatchBuffers.size,
+      blocks
+    };
+  }
+
   /**
    * 合并结构中心列表，按位置去重
    */
@@ -134,5 +217,6 @@ export class BlockScatterManager {
    */
   unloadChunk(chunkKey) {
     this.chunkBuffers.delete(chunkKey);
+    this.pendingCrossChunkPatchBuffers.delete(chunkKey);
   }
 }

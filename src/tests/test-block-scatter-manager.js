@@ -40,6 +40,7 @@ describe('BlockScatterManager 数据契约', (test) => {
 
   test('纯流式跨 chunk 追加不应立即调度 consolidation', () => {
     let scheduled = 0;
+    let appended = 0;
     const chunk = {
       isReady: true,
       appendScatteredBlocks(blocks, visibleKeys, structureCenters, options = {}) {
@@ -51,6 +52,7 @@ describe('BlockScatterManager 数据契约', (test) => {
         this.blocks = blocks;
         this.visibleKeys = visibleKeys;
         this.structureCenters = structureCenters;
+        appended += blocks.length;
       }
     };
     const world = {
@@ -72,6 +74,48 @@ describe('BlockScatterManager 数据契约', (test) => {
     });
 
     assertEqual(scheduled, 0, '跨 chunk 流式追加不应同步调度 consolidation');
-    assertTrue(chunk.deferred, '应通过 deferConsolidation 选项延迟后续合并');
+    assertEqual(appended, 0, '跨 chunk 方块不应在 scatter 阶段立即追加到 ready chunk');
+    assertEqual(scatter.getPendingCrossChunkPatchStats().blocks, 1, '跨 chunk 方块应进入延迟补刷 buffer');
+  });
+
+  test('空闲补刷按玩家距离处理最近 ready chunk', () => {
+    const appendedKeys = [];
+    const makeChunk = (key) => ({
+      isReady: true,
+      isConsolidating: false,
+      appendDeferredCrossChunkPatch(blocks, visibleKeys) {
+        appendedKeys.push(key);
+        this.blocks = blocks;
+        this.visibleKeys = visibleKeys;
+        return blocks.length;
+      }
+    });
+    const world = {
+      chunks: new Map([
+        ['2,0', makeChunk('2,0')],
+        ['1,0', makeChunk('1,0')]
+      ])
+    };
+    const scatter = new BlockScatterManager(world);
+
+    scatter.scatter({
+      cx: 0,
+      cz: 0,
+      blockDataBlocks: [
+        { x: 33, y: 1, z: 1, type: 'stone' },
+        { x: 17, y: 1, z: 1, type: 'dirt' }
+      ],
+      visibleKeys: ['33,1,1', '17,1,1'],
+      structureCenters: []
+    });
+
+    const result = scatter.flushDeferredCrossChunkPatchesAround(0, 0, {
+      maxChunks: 1,
+      maxBlocks: 10
+    });
+
+    assertEqual(result.processedChunks, 1, '每次只应处理预算允许的 chunk 数');
+    assertEqual(appendedKeys[0], '1,0', '应优先补刷离玩家最近的 chunk');
+    assertEqual(scatter.getPendingCrossChunkPatchStats().chunks, 1, '远处 chunk 应保留在 pending buffer');
   });
 });

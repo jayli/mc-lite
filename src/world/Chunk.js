@@ -2307,7 +2307,7 @@ export class Chunk {
       }
     }
 
-    if (appendedCount === 0) return;
+    if (appendedCount === 0) return 0;
 
     // 同步数组存储；跨 chunk 流式补片不立即抢占 WorldWorker 合并队列
     this.dirtyBlocks += appendedCount;
@@ -2315,9 +2315,20 @@ export class Chunk {
     if (options.deferConsolidation) {
       this.hasDeferredFinalizeWork = true;
       this.world?.queueDeferredConsolidation?.(this);
-      return;
+      return appendedCount;
     }
     this.scheduleConsolidation();
+    return appendedCount;
+  }
+
+  /**
+   * runtime idle 阶段补刷跨 chunk 方块。
+   * 只写入数据并排入 deferred consolidation，不立即抢占 WorldWorker 合并队列。
+   */
+  appendDeferredCrossChunkPatch(scatteredBlocks, visibleBlockKeys, structureCenters) {
+    return this.appendScatteredBlocks(scatteredBlocks, visibleBlockKeys, structureCenters, {
+      deferConsolidation: true
+    });
   }
 
   /**

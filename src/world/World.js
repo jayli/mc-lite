@@ -11,6 +11,7 @@ import { ParticleSystem } from './effects/ParticleSystem.js';
 import { parseBlockEntry } from '../utils/OrientationUtils.js';
 import { getBlockProps } from '../constants/BlockData.js';
 import { ChunkAssemblyScheduler } from './ChunkAssemblyScheduler.js';
+import { RuntimeIdleScheduler } from './RuntimeIdleScheduler.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
@@ -26,6 +27,10 @@ const MIN_RENDER_DIST = 2;
 const MAX_RENDER_DIST = 3;
 const RUNTIME_DEFERRED_FINALIZE_IDLE_GRACE_MS = 800;
 const RUNTIME_DEFERRED_FINALIZE_MAX_CHUNKS = 1;
+const RUNTIME_IDLE_GRACE_MS = 1000;
+const RUNTIME_IDLE_FRAME_BUDGET_MS = 2;
+const CROSS_CHUNK_PATCH_MAX_CHUNKS_PER_FRAME = 1;
+const CROSS_CHUNK_PATCH_MAX_BLOCKS_PER_FRAME = 400;
 /**
  * 世界管理器类
  * 管理游戏世界中的所有区块、粒子效果和方块操作，是世界数据的中央访问点
@@ -105,6 +110,10 @@ export class World {
       finalizedChunkKeys: new Set()
     };
     this.chunkAssemblyScheduler = new ChunkAssemblyScheduler(this);
+    this.runtimeIdleScheduler = new RuntimeIdleScheduler({
+      idleGraceMs: RUNTIME_IDLE_GRACE_MS,
+      frameBudgetMs: RUNTIME_IDLE_FRAME_BUDGET_MS
+    });
     this._staticTreeTerrainBoostChunkKeys = new Set();
     this._lastStreamingActivityAt = 0;
     this._pendingDeferredFinalizeChunkKeys = new Set();
@@ -112,6 +121,7 @@ export class World {
 
     // 方块分发管理器
     this.scatterManager = new BlockScatterManager(this);
+    this._registerRuntimeIdleTasks();
   }
 
   /**
@@ -167,6 +177,14 @@ export class World {
 
   getRenderDistance() {
     return this.renderDistance;
+  }
+
+  getDeferredCrossChunkPatchStats() {
+    return this.scatterManager?.getPendingCrossChunkPatchStats?.() || { chunks: 0, blocks: 0 };
+  }
+
+  getRuntimeIdleStats() {
+    return this.runtimeIdleScheduler?.getStats?.() || null;
   }
 
   setRenderDistance(distance) {
@@ -226,10 +244,44 @@ export class World {
    * @param {Object} workerResult - Worker 返回的数据
    */
   _onChunkGenResult(chunk, workerResult) {
+    this.runtimeIdleScheduler?.markBusy('chunk-worker-result');
     // 先装配 Worker 回包元数据（snapshot、structureCenters、solidBlocks、
     // pendingSpecialEntityData、visibleKeys 等），再分发方块
     chunk.acceptWorkerResult(workerResult);
     this.scatterManager.scatter(workerResult);
+  }
+
+  _registerRuntimeIdleTasks() {
+    this.runtimeIdleScheduler.registerTask({
+      id: 'cross-chunk-patch',
+      priority: 100,
+      minIdleMs: RUNTIME_IDLE_GRACE_MS,
+      run: () => {
+        const processed = this._processDeferredCrossChunkPatchQueue();
+        return { didWork: processed > 0 };
+      }
+    });
+
+    this.runtimeIdleScheduler.registerTask({
+      id: 'deferred-consolidation',
+      priority: 50,
+      minIdleMs: RUNTIME_IDLE_GRACE_MS,
+      run: () => {
+        const processed = this._processDeferredConsolidationQueue();
+        return { didWork: processed > 0 };
+      }
+    });
+  }
+
+  _processDeferredCrossChunkPatchQueue() {
+    const playerCx = Math.floor(this._lastPlayerPos.x / CHUNK_SIZE);
+    const playerCz = Math.floor(this._lastPlayerPos.z / CHUNK_SIZE);
+    const result = this.scatterManager?.flushDeferredCrossChunkPatchesAround?.(playerCx, playerCz, {
+      maxChunks: CROSS_CHUNK_PATCH_MAX_CHUNKS_PER_FRAME,
+      maxBlocks: CROSS_CHUNK_PATCH_MAX_BLOCKS_PER_FRAME
+    });
+
+    return result?.processedChunks || 0;
   }
 
   onChunkWorkerReady(chunk) {
@@ -308,6 +360,9 @@ export class World {
   }
 
   processAssemblyQueues() {
+    if (this.chunkAssemblyScheduler.hasWork()) {
+      this.runtimeIdleScheduler?.markBusy('chunk-assembly');
+    }
     const isBootstrap = this.bootstrapState.phase === 'bootstrapping';
     this.chunkAssemblyScheduler.processWithinBudget({
       budgetMs: isBootstrap ? 12 : 8,
@@ -447,6 +502,7 @@ export class World {
     }
 
     if (chunkTopologyChanged) {
+      this.runtimeIdleScheduler?.markBusy('chunk-topology-changed');
       this.clearBlockLookupCaches();
       this.requestShadowMapUpdate('chunk-topology-changed');
     }
@@ -489,7 +545,11 @@ export class World {
     this.processAssemblyQueues();
     if (this.bootstrapState.phase === 'runtime-streaming') {
       this._processDeferredFinalizeQueue();
-      this._processDeferredConsolidationQueue();
+      this.runtimeIdleScheduler.process({
+        phase: this.bootstrapState.phase,
+        hasAssemblyWork: this.chunkAssemblyScheduler.hasWork(),
+        playerPosition: this._lastPlayerPos
+      });
     }
     if (this.pendingShadowUpdate && this.bootstrapState.phase === 'runtime-streaming') {
       const now = globalThis.performance?.now?.() ?? Date.now();
