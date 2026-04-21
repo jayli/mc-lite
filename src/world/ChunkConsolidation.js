@@ -492,8 +492,8 @@ export function extendChunk(Chunk) {
           dummy.updateMatrix();
           matrices.set(dummy.matrix.elements, i * 16);
         }
-        aoLow[i] = b.aoLow;
-        aoHigh[i] = b.aoHigh;
+        aoLow[i] = b.aoLow ?? 1;
+        aoHigh[i] = b.aoHigh ?? 1;
         orientation[i] = b.orientation;
         const code = Chunk.encodeCoord(b.x, b.y, b.z);
         instanceIndexMap[code] = i;

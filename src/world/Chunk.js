@@ -2224,12 +2224,14 @@ export class Chunk {
       }
     }
 
-    // 从 Worker 传来的 visibleBlockKeys 初始化 visibleKeys
-    // 只有面剔除可见的方块才加入 visibleKeys，被遮挡的地下方块不加入
+    // 构建可见方块编码集合，供 mesh 构建时过滤隐藏方块
+    const encodedVisibleKeys = new Set();
     if (visibleBlockKeys) {
       for (const key of visibleBlockKeys) {
         const [x, y, z] = key.split(',').map(Number);
-        this.visibleKeys.add(Chunk.encodeCoord(x, y, z));
+        const code = Chunk.encodeCoord(x, y, z);
+        encodedVisibleKeys.add(code);
+        this.visibleKeys.add(code);
       }
     }
 
@@ -2241,8 +2243,10 @@ export class Chunk {
     // 初始化数组存储
     this._initArrayStorageFromBlockData();
 
-    // 从已填充的 blockData 构建渲染 mesh（传入 structureCenters 供跨 chunk 结构判断）
-    this.buildMeshesFromScatteredData(structureCenters);
+    // 直接从 scatteredBlocks 构建 meshData，跳过 buildMeshesFromScatteredData 的重复遍历。
+    // buffer.blocks 包含所有方块（含隐藏），_convertScatteredBlocksToMeshData 会按 visibleKeys 过滤。
+    const meshData = this._convertScatteredBlocksToMeshData(scatteredBlocks, encodedVisibleKeys, structureCenters);
+    this.buildMeshes(meshData);
 
     // 标记 chunk 为已加载
     this.loadState = 'terrain-built';
@@ -2332,73 +2336,6 @@ export class Chunk {
     return this.appendScatteredBlocks(scatteredBlocks, visibleBlockKeys, structureCenters, {
       deferConsolidation: true
     });
-  }
-
-  /**
-   * 从散装的方块数据构建渲染 mesh
-   * 按 type 分组后，自动选择合批模式或 per-chunk 模式
-   * @param {Array} structureCenters - 结构中心列表（供跨 chunk 结构判断，可选）
-   */
-  buildMeshesFromScatteredData(structureCenters) {
-    // 优先使用传入的 structureCenters（来自 scatter buffer），其次使用 chunk 自身缓存
-    const centers = structureCenters || this.structureCenters;
-
-    // 按 type 分组（只渲染 visibleKeys 中的方块，被遮挡的地下方块不渲染）
-    const groupedByType = {};
-
-    for (const [code, entry] of this.blockData) {
-      // 面剔除可见性过滤：只有 visibleKeys 已计算且非空时，才过滤隐藏方块
-      // 但跨 chunk 结构（花坛、静态树等）的方块不受面剔除影响，应始终渲染
-      if (this.visibleKeys.size > 0 && !this.visibleKeys.has(code)) {
-        const { x, y, z } = Chunk.decodeCoord(code);
-        if (!centers?.length || !belongsToCrossChunkStructure(x, y, z, centers)) continue;
-      }
-
-      const parsed = parseBlockEntry(entry);
-      const type = parsed.type;
-      const orientation = parsed.orientation || 0;
-      const pos = Chunk.decodeCoord(code);
-
-      if (!groupedByType[type]) groupedByType[type] = [];
-      groupedByType[type].push({ code, orientation, x: pos.x, y: pos.y, z: pos.z });
-    }
-
-    // 构建 meshDataArray（兼容现有 buildMeshes 的输入格式）
-    const meshDataArray = [];
-    const dummy = new THREE.Object3D();
-
-    for (const [type, blocks] of Object.entries(groupedByType)) {
-      const props = getBlockProps(type);
-      if (!props.isRendered) continue;
-
-      const count = blocks.length;
-      if (count === 0) continue;
-
-      const matrices = new Float32Array(count * 16);
-      const aoLow = new Float32Array(count);
-      const aoHigh = new Float32Array(count);
-      const orientationArr = new Float32Array(count);
-      const instanceIndexMap = {};
-
-      for (let i = 0; i < count; i++) {
-        const b = blocks[i];
-        dummy.position.set(b.x + 0.5, b.y + 0.5, b.z + 0.5);
-        dummy.rotation.set(0, getRotationAngle(b.orientation), 0);
-        dummy.scale.set(1, 1, 1);
-        dummy.updateMatrix();
-        matrices.set(dummy.matrix.elements, i * 16);
-        // AO 在 consolidation 时重新计算
-        aoLow[i] = 1;
-        aoHigh[i] = 1;
-        orientationArr[i] = b.orientation;
-        instanceIndexMap[b.code] = i;
-      }
-
-      meshDataArray.push({ type, count, matrices, aoLow, aoHigh, orientation: orientationArr, instanceIndexMap });
-    }
-
-    // 复用现有 buildMeshes 方法（自动处理合批/非合批模式）
-    this.buildMeshes(meshDataArray);
   }
 }
 
