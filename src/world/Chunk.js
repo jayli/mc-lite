@@ -2318,12 +2318,6 @@ export class Chunk {
     if (options.deferConsolidation) {
       this.hasDeferredFinalizeWork = true;
       // 不再在这里 queue，改由 World 层 idle 任务统一触发
-      const elapsed = (globalThis.performance?.now?.() ?? Date.now()) - t0;
-      if (elapsed > 0.5) {
-        console.log(
-          `[Chunk] appendScatteredBlocks chunk=${this.cx},${this.cz} count=${appendedCount} total=${elapsed.toFixed(2)}ms write=${(t1-t0).toFixed(2)}ms arrayStorage=${(t2-t1).toFixed(2)}ms`
-        );
-      }
       return appendedCount;
     }
     this.scheduleConsolidation();

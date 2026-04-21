@@ -413,8 +413,6 @@ export class World {
       return 0;
     }
 
-    const pendingCount = this._pendingDeferredConsolidationChunkKeys.size;
-    console.log(`[DeferredConsolidation] processing queue: pending=${pendingCount} maxChunks=${maxChunks}`);
 
     let processed = 0;
     for (const key of [...this._pendingDeferredConsolidationChunkKeys]) {
@@ -426,7 +424,6 @@ export class World {
       }
       if (!chunk.isReady || chunk.isConsolidating || chunk.dirtyBlocks <= 0) continue;
       this._pendingDeferredConsolidationChunkKeys.delete(key);
-      console.log(`[DeferredConsolidation] → chunk=${key} dirtyBlocks=${chunk.dirtyBlocks}`);
       chunk.scheduleConsolidation?.();
       processed++;
     }

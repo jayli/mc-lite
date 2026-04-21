@@ -337,16 +337,6 @@ export function extendChunk(Chunk) {
         ? callbackReceivedAt - workerTiming.workerFinishedAt
         : 0;
 
-      if (isCrossChunkPatch) {
-        const totalRoundTrip = callbackReceivedAt - (this._consolidationStartedAt || callbackReceivedAt);
-        console.log(
-          `[Consolidation] chunk=${this.cx},${this.cz} total=${totalRoundTrip.toFixed(1)}ms ` +
-          `queue=${workerTiming.transitToWorkerMs?.toFixed(1) || '?'}ms ` +
-          `workerCompute=${workerTiming.workerComputeMs?.toFixed(1) || '?'}ms ` +
-          `returnTransit=${transitFromWorkerMs.toFixed(1)}ms ` +
-          `dirtyBlocks=${consolidatedCount} source=crossChunkPatch`
-        );
-      }
       this._applyConsolidateResult(data, consolidatedCount, consolidatedMeshKeys);
     });
 
@@ -453,16 +443,6 @@ export function extendChunk(Chunk) {
     if (this.loadState === 'waiting-consolidation') {
       this.loadState = 'entities-built';
       this.world?.onChunkConsolidationComplete?.(this);
-    }
-
-    const applyTotal = performance.now() - t0;
-    if (applyTotal > 3) {
-      console.log(
-        `[Consolidation] chunk=${this.cx},${this.cz} applyResult=${applyTotal.toFixed(1)}ms ` +
-        `filter=${(t2-t1).toFixed(1)} convertMesh=${(t3-t2).toFixed(1)} ` +
-        `syncVisCol=${(t4-t3).toFixed(1)} cleanup=${(t5-t4).toFixed(1)} ` +
-        `buildMeshes=${(t6-t5).toFixed(1)} lightsInit=${(t7-t6).toFixed(1)}`
-      );
     }
 
     if (this.dirtyBlocks > 0) this.scheduleConsolidation();

@@ -227,20 +227,11 @@ export class BlockScatterManager {
         ? buffer.blocks.splice(0, remainingBudget)
         : buffer.blocks.splice(0, buffer.blocks.length);
 
-      const patchStart = globalThis.performance?.now?.() ?? Date.now();
       const appended = chunk.appendDeferredCrossChunkPatch?.(
         blocks,
         buffer.visibleBlockKeys,
         buffer.structureCenters
       ) ?? 0;
-      const patchElapsed = (globalThis.performance?.now?.() ?? Date.now()) - patchStart;
-
-      if (patchElapsed > 1) {
-        const bufferAge = patchStart - (buffer.lastUpdatedAt || patchStart);
-        console.log(
-          `[CrossChunkPatch] ✓ chunk=${key} blocks=${blocks.length} appended=${appended} elapsed=${patchElapsed.toFixed(2)}ms bufferAge=${bufferAge.toFixed(0)}ms pendingChunks=${this.pendingCrossChunkPatchBuffers.size}`
-        );
-      }
 
       if (appended > 0) {
         processedBlocks += appended;
@@ -256,26 +247,14 @@ export class BlockScatterManager {
     }
 
     // 本轮补刷完成后，对受影响的 chunks 统一触发 consolidation
-    let batchConsolidationCount = 0;
     for (const key of touchedChunkKeys) {
       const chunk = this.world.chunks.get(key);
       if (chunk?.isReady && !chunk.isConsolidating && chunk.dirtyBlocks > 0) {
         this.world.queueDeferredConsolidation(chunk);
-        batchConsolidationCount++;
       }
-    }
-    if (batchConsolidationCount > 0) {
-      console.log(
-        `[CrossChunkPatch] ✓ batch-consolidation queued=${batchConsolidationCount} chunks=[${[...touchedChunkKeys].join(', ')}]`
-      );
     }
 
     const elapsedMs = (globalThis.performance?.now?.() ?? Date.now()) - t0;
-    if (processedChunks > 0 || (elapsedMs > 1 && this.pendingCrossChunkPatchBuffers.size > 0)) {
-      console.log(
-        `[CrossChunkPatch] frame: ${processedChunks} chunks, ${processedBlocks} blocks, skippedBusy=${skippedBusy}, pending=${this.pendingCrossChunkPatchBuffers.size}, total=${elapsedMs.toFixed(2)}ms`
-      );
-    }
     return { processedChunks, processedBlocks, elapsedMs, skippedBusy, ...pruneStats };
   }
 
