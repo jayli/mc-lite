@@ -118,4 +118,41 @@ describe('BlockScatterManager 数据契约', (test) => {
     assertEqual(appendedKeys[0], '1,0', '应优先补刷离玩家最近的 chunk');
     assertEqual(scatter.getPendingCrossChunkPatchStats().chunks, 1, '远处 chunk 应保留在 pending buffer');
   });
+
+  test('空闲补刷会丢弃目标和源都超出活跃范围的 pending patch', () => {
+    const world = {
+      chunks: new Map()
+    };
+    const scatter = new BlockScatterManager(world);
+
+    scatter.scatter({
+      cx: 0,
+      cz: 0,
+      blockDataBlocks: [
+        { x: 80, y: 1, z: 1, type: 'stone' }
+      ],
+      visibleKeys: ['80,1,1'],
+      structureCenters: []
+    });
+    scatter.scatter({
+      cx: 6,
+      cz: 0,
+      blockDataBlocks: [
+        { x: 160, y: 1, z: 1, type: 'dirt' }
+      ],
+      visibleKeys: ['160,1,1'],
+      structureCenters: []
+    });
+
+    const result = scatter.flushDeferredCrossChunkPatchesAround(0, 0, {
+      maxChunks: 4,
+      maxBlocks: 10,
+      activeRange: 3
+    });
+
+    assertEqual(result.prunedChunks, 1, '超出活跃范围的未加载 patch 应被丢弃');
+    assertEqual(scatter.getPendingCrossChunkPatchStats().chunks, 1, '活跃范围内的未加载 patch 应保留');
+    assertTrue(scatter.pendingCrossChunkPatchBuffers.has('5,0'), '源仍在活跃范围内的 pending patch 应继续等待目标 chunk 加载');
+    assertEqual(scatter.pendingCrossChunkPatchBuffers.has('10,0'), false, '远处 pending patch 应被清理');
+  });
 });

@@ -134,13 +134,53 @@ export class BlockScatterManager {
     });
   }
 
+  _getActivePatchRange(options = {}) {
+    if (Number.isFinite(options.activeRange)) return options.activeRange;
+    const renderDistance = this.world?.getRenderDistance?.() ?? this.world?.renderDistance ?? 2;
+    return renderDistance + 1;
+  }
+
+  _pruneInactivePendingPatches(playerCx, playerCz, activeRange) {
+    let prunedChunks = 0;
+    let prunedBlocks = 0;
+
+    for (const [key, buffer] of this.pendingCrossChunkPatchBuffers) {
+      const targetOutsideActiveRange = this._isChunkKeyOutsideActiveRange(key, playerCx, playerCz, activeRange);
+      if (!targetOutsideActiveRange) continue;
+
+      // 只有目标 chunk 和所有 source worker 都离开活跃范围，才可以安全丢弃。
+      // 如果源 chunk 仍活跃，保留 patch，避免源不重新生成导致跨 chunk 方块缺补刷。
+      let allSourcesOutsideActiveRange = true;
+      for (const sourceKey of buffer.sourceWorkers || []) {
+        if (!this._isChunkKeyOutsideActiveRange(sourceKey, playerCx, playerCz, activeRange)) {
+          allSourcesOutsideActiveRange = false;
+          break;
+        }
+      }
+      if (!allSourcesOutsideActiveRange) continue;
+
+      prunedBlocks += buffer.blocks.length;
+      prunedChunks++;
+      this.pendingCrossChunkPatchBuffers.delete(key);
+    }
+
+    return { prunedChunks, prunedBlocks };
+  }
+
+  _isChunkKeyOutsideActiveRange(chunkKey, playerCx, playerCz, activeRange) {
+    const [cx, cz] = chunkKey.split(',').map(Number);
+    return Math.abs(cx - playerCx) > activeRange || Math.abs(cz - playerCz) > activeRange;
+  }
+
   /**
    * runtime idle 阶段按玩家距离分批补刷跨 chunk 方块。
-   * @returns {{processedChunks:number, processedBlocks:number}}
+   * @returns {{processedChunks:number, processedBlocks:number, prunedChunks:number, prunedBlocks:number}}
    */
   flushDeferredCrossChunkPatchesAround(playerCx, playerCz, options = {}) {
     const maxChunks = Number.isFinite(options.maxChunks) ? options.maxChunks : 1;
     const maxBlocks = Number.isFinite(options.maxBlocks) ? options.maxBlocks : 400;
+    const activeRange = this._getActivePatchRange(options);
+    const pruneStats = this._pruneInactivePendingPatches(playerCx, playerCz, activeRange);
     let processedChunks = 0;
     let processedBlocks = 0;
 
@@ -179,7 +219,7 @@ export class BlockScatterManager {
       }
     }
 
-    return { processedChunks, processedBlocks };
+    return { processedChunks, processedBlocks, ...pruneStats };
   }
 
   getPendingCrossChunkPatchStats() {
