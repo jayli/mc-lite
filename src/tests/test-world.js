@@ -345,7 +345,7 @@ describe('World 真实类测试', (test) => {
     world = new World(scene);
 
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    const enteredRuntime = await waitForWorldPhase(world, 'runtime-streaming');
+    const enteredRuntime = await waitForWorldPhase(world, 'runtime-streaming', 300);
 
     const chunk = world.chunks.get('0,0');
     assertNotNull(chunk, '区块 0,0 应该存在');

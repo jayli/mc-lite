@@ -21,13 +21,17 @@ export class BlockScatterManager {
    * @param {Object} workerResult - Worker 返回的数据
    */
   scatter(workerResult) {
-    const { scatteredBlocks, visibleKeys, cx, cz, structureCenters } = workerResult;
+    const { scatteredBlocks = [], visibleKeys, cx, cz, structureCenters } = workerResult;
+    const blockDataBlocks = Array.isArray(workerResult.blockDataBlocks)
+      ? workerResult.blockDataBlocks
+      : scatteredBlocks;
 
     // visibleKeys 从 Worker 传来是数组，先转为 Set 方便查找
     const visibleKeysSet = Array.isArray(visibleKeys) ? new Set(visibleKeys) : null;
+    const touchedBuffers = new Set();
 
-    // 1. 遍历所有方块，按坐标分发
-    for (const block of scatteredBlocks) {
+    // 1. 遍历所有逻辑方块，按坐标分发
+    for (const block of blockDataBlocks) {
       const chunkCx = Math.floor(block.x / CHUNK_SIZE);
       const chunkCz = Math.floor(block.z / CHUNK_SIZE);
       const chunkKey = `${chunkCx},${chunkCz}`;
@@ -39,6 +43,7 @@ export class BlockScatterManager {
       }
       buffer.blocks.push(block);
       buffer.sourceWorkers.add(`${cx},${cz}`);
+      touchedBuffers.add(buffer);
 
       // 提取 visibleKeys，标记哪些方块是面剔除可见的
       const blockKey = `${block.x},${block.y},${block.z}`;
@@ -47,20 +52,25 @@ export class BlockScatterManager {
       }
     }
 
-    // 2. 合并结构中心信息到所有 buffer（追加而非覆盖）
-    // 每个 chunk 可能收到来自多个 Worker 的结构中心，需要合并
+    // 确保发起 Worker 的 chunk 即使没有方块，也有 buffer 承载 ready 状态和结构中心。
+    const ownKey = `${cx},${cz}`;
+    let ownBuffer = this.chunkBuffers.get(ownKey);
+    if (!ownBuffer) {
+      ownBuffer = { blocks: [], ready: false, sourceWorkers: new Set(), visibleBlockKeys: new Set(), structureCenters: null };
+      this.chunkBuffers.set(ownKey, ownBuffer);
+    }
+    touchedBuffers.add(ownBuffer);
+
+    // 2. 合并结构中心信息到本次触达的 buffer（追加而非覆盖）
+    // 避免把每个 Worker 的 structureCenters 灌入所有历史 buffer，放大后续归属判定成本。
     if (structureCenters?.length > 0) {
-      for (const [, buffer] of this.chunkBuffers) {
+      for (const buffer of touchedBuffers) {
         buffer.structureCenters = this._mergeStructureCenters(buffer.structureCenters, structureCenters);
       }
     }
 
     // 3. 标记发起 Worker 的 chunk 为"已加载"
-    const ownKey = `${cx},${cz}`;
-    const ownBuffer = this.chunkBuffers.get(ownKey);
-    if (ownBuffer) {
-      ownBuffer.ready = true;
-    }
+    ownBuffer.ready = true;
 
     // 4. 通知就绪的 chunk 进行渲染
     this.flushReadyChunks();
@@ -72,17 +82,20 @@ export class BlockScatterManager {
    */
   flushReadyChunks() {
     for (const [key, buffer] of this.chunkBuffers) {
-      if (!buffer.ready) continue;
-
       const chunk = this.world.chunks.get(key);
       if (!chunk) continue;
+      if (!buffer.ready && !chunk.isReady) continue;
 
       if (!chunk.isReady) {
         // 首次渲染：完整接受并构建 mesh（传递 structureCenters 供跨 chunk 结构判断）
         chunk.acceptScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys, buffer.structureCenters);
+        buffer.blocks = [];
+        buffer.visibleBlockKeys = new Set();
       } else {
-        // 增量追加：只追加新方块并触发 consolidation
-        chunk.appendScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys, buffer.structureCenters);
+        // 增量追加：跨 chunk 流式补片不抢 WorldWorker consolidation 队列
+        chunk.appendScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys, buffer.structureCenters, {
+          deferConsolidation: !buffer.ready
+        });
         // 清空已处理的方块，释放内存，保留 buffer 结构以接收后续溢出
         buffer.blocks = [];
         buffer.visibleBlockKeys = new Set();

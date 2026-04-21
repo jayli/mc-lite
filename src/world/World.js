@@ -108,6 +108,7 @@ export class World {
     this._staticTreeTerrainBoostChunkKeys = new Set();
     this._lastStreamingActivityAt = 0;
     this._pendingDeferredFinalizeChunkKeys = new Set();
+    this._pendingDeferredConsolidationChunkKeys = new Set();
 
     // 方块分发管理器
     this.scatterManager = new BlockScatterManager(this);
@@ -342,6 +343,37 @@ export class World {
     return processed;
   }
 
+  queueDeferredConsolidation(chunk) {
+    if (!chunk || chunk.disposed) return;
+    this._pendingDeferredConsolidationChunkKeys.add(`${chunk.cx},${chunk.cz}`);
+  }
+
+  _processDeferredConsolidationQueue(options = {}) {
+    if (this._pendingDeferredConsolidationChunkKeys.size === 0) return 0;
+    const maxChunks = Number.isFinite(options.maxChunks) ? options.maxChunks : RUNTIME_DEFERRED_FINALIZE_MAX_CHUNKS;
+    if (maxChunks <= 0) return 0;
+
+    const currentTime = globalThis.performance?.now?.() ?? Date.now();
+    if (currentTime - this._lastStreamingActivityAt < RUNTIME_DEFERRED_FINALIZE_IDLE_GRACE_MS) {
+      return 0;
+    }
+
+    let processed = 0;
+    for (const key of [...this._pendingDeferredConsolidationChunkKeys]) {
+      if (processed >= maxChunks) break;
+      const chunk = this.chunks.get(key);
+      if (!chunk || chunk.disposed) {
+        this._pendingDeferredConsolidationChunkKeys.delete(key);
+        continue;
+      }
+      if (!chunk.isReady || chunk.isConsolidating || chunk.dirtyBlocks <= 0) continue;
+      this._pendingDeferredConsolidationChunkKeys.delete(key);
+      chunk.scheduleConsolidation?.();
+      processed++;
+    }
+    return processed;
+  }
+
   async drainAssemblyQueues(options = {}) {
     await this.chunkAssemblyScheduler.drainAll(options);
 
@@ -457,6 +489,7 @@ export class World {
     this.processAssemblyQueues();
     if (this.bootstrapState.phase === 'runtime-streaming') {
       this._processDeferredFinalizeQueue();
+      this._processDeferredConsolidationQueue();
     }
     if (this.pendingShadowUpdate && this.bootstrapState.phase === 'runtime-streaming') {
       const now = globalThis.performance?.now?.() ?? Date.now();

@@ -211,9 +211,28 @@ function buildMeshData(fakeChunk, d, cx, cz) {
 }
 
 /**
- * 构建打散方块列表 — 替代 buildMeshData
- * 返回所有可渲染方块的扁平数组（包括被面剔除的隐藏方块）
- * 每个方块独立存储坐标、类型、方向、AO、矩阵
+ * 构建逻辑方块列表。
+ * 这条数据用于主线程恢复 blockData，不携带矩阵和 AO，避免把隐藏方块也做成重渲染载荷。
+ * @param {Map} blockMap - 所有方块的 Map (key -> {x, y, z, type, solid, orientation})
+ * @returns {Array} blockDataBlocks 数组
+ */
+function buildBlockDataBlocks(blockMap) {
+  const blocks = [];
+  for (const [, block] of blockMap) {
+    const { x, y, z, type, orientation } = block;
+    if (type === 'air') continue;
+    blocks.push({
+      x, y, z,
+      type,
+      orientation: orientation || 0
+    });
+  }
+  return blocks;
+}
+
+/**
+ * 构建可见打散方块列表 — 替代 buildMeshData
+ * 只返回首帧/合并渲染需要的可见方块，不再为每个方块创建 matrix buffer。
  * @param {Map} blockMap - 所有方块的 Map (key -> {x, y, z, type, solid, orientation})
  * @param {Set} visibleKeysSet - 可见方块 keys Set（用于渲染路径）
  * @param {Map} aoMap - AO 数据 Map (key -> {aoLow, aoHigh})
@@ -221,13 +240,13 @@ function buildMeshData(fakeChunk, d, cx, cz) {
  */
 function buildScatteredBlocks(blockMap, visibleKeysSet, aoMap) {
   const blocks = [];
-  const dummy = new THREE.Object3D();
 
   for (const [key, block] of blockMap) {
     const { x, y, z, type, orientation } = block;
 
     // 跳过空气方块
     if (type === 'air') continue;
+    if (visibleKeysSet?.size > 0 && !visibleKeysSet.has(key)) continue;
 
     // 跳过不可渲染的方块（如 collider）
     const props = getBlockProperties(type);
@@ -235,21 +254,12 @@ function buildScatteredBlocks(blockMap, visibleKeysSet, aoMap) {
 
     const ao = aoMap.get(key) || { aoLow: 1, aoHigh: 1 };
 
-    // 计算变换矩阵
-    dummy.position.set(x + 0.5, y + 0.5, z + 0.5);
-    dummy.rotation.set(0, getRotationAngle(orientation || 0), 0);
-    dummy.updateMatrix();
-
-    const matrix = new Float32Array(16);
-    matrix.set(dummy.matrix.elements);
-
     blocks.push({
       x, y, z,
       type,
       orientation: orientation || 0,
       aoLow: ao.aoLow,
-      aoHigh: ao.aoHigh,
-      matrix
+      aoHigh: ao.aoHigh
     });
   }
 
@@ -1762,17 +1772,14 @@ onmessage = async function(e) {
     }
   }
 
-  // 构建打散方块列表（替代 meshData）
+  // 构建轻量逻辑方块列表和可见渲染方块列表。
+  // blockDataBlocks 保留完整逻辑数据；scatteredBlocks 只走渲染路径，避免隐藏块扩大回包。
+  const blockDataBlocks = buildBlockDataBlocks(blockMap);
   const scatteredBlocks = buildScatteredBlocks(blockMap, visibleKeysSet, aoMap);
-
-  // 收集可传输的 buffer（每个方块的 matrix buffer）
-  const transferables = [];
-  for (const block of scatteredBlocks) {
-    transferables.push(block.matrix.buffer);
-  }
 
   postMessage({
     cx, cz, callbackKey, taskId,
+    blockDataBlocks,
     scatteredBlocks,
     solidBlocks,
     modGunMan, rovers,
@@ -1793,7 +1800,7 @@ onmessage = async function(e) {
         zombieNests: savedSnapshot?.entities?.zombieNests || []
       }
     }
-  }, transferables);
+  });
 };
 
 // 复制结构生成逻辑

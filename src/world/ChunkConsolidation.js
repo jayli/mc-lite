@@ -7,6 +7,7 @@ import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { getBlockProperties as getBlockProps } from '../constants/BlockData.js';
 import { blockDataToStringKeys } from '../utils/CoordEncoding.js';
+import { getRotationAngle } from '../utils/OrientationUtils.js';
 import { filterWorkerResultAgainstBlockData } from './ChunkMeshDataFilter.js';
 import { belongsToCrossChunkStructure } from '../utils/StructureUtils.js';
 import { worldWorker, workerCallbacks, worldWorkerPool } from '../workers/WorldWorkerPool.js';
@@ -451,6 +452,7 @@ export function extendChunk(Chunk) {
 
     // 转换为 meshData 格式
     const meshData = [];
+    const dummy = new THREE.Object3D();
     for (const [type, blocks] of Object.entries(groupedByType)) {
       const count = blocks.length;
       if (count === 0) continue;
@@ -463,7 +465,15 @@ export function extendChunk(Chunk) {
 
       for (let i = 0; i < count; i++) {
         const b = blocks[i];
-        matrices.set(b.matrix, i * 16);
+        if (b.matrix) {
+          matrices.set(b.matrix, i * 16);
+        } else {
+          dummy.position.set(b.x + 0.5, b.y + 0.5, b.z + 0.5);
+          dummy.rotation.set(0, getRotationAngle(b.orientation || 0), 0);
+          dummy.scale.set(1, 1, 1);
+          dummy.updateMatrix();
+          matrices.set(dummy.matrix.elements, i * 16);
+        }
         aoLow[i] = b.aoLow;
         aoHigh[i] = b.aoHigh;
         orientation[i] = b.orientation;

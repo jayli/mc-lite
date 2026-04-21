@@ -2259,7 +2259,7 @@ export class Chunk {
    * @param {Set} visibleBlockKeys - 面剔除可见的方块 key 集合
    * @param {Array} structureCenters - 结构中心列表（供跨 chunk 结构判断）
    */
-  appendScatteredBlocks(scatteredBlocks, visibleBlockKeys, structureCenters) {
+  appendScatteredBlocks(scatteredBlocks, visibleBlockKeys, structureCenters, options = {}) {
     const minX = this.cx * CHUNK_SIZE;
     const minZ = this.cz * CHUNK_SIZE;
 
@@ -2309,9 +2309,14 @@ export class Chunk {
 
     if (appendedCount === 0) return;
 
-    // 同步数组存储并触发合并重建
+    // 同步数组存储；跨 chunk 流式补片不立即抢占 WorldWorker 合并队列
     this.dirtyBlocks += appendedCount;
     this._initArrayStorageFromBlockData();
+    if (options.deferConsolidation) {
+      this.hasDeferredFinalizeWork = true;
+      this.world?.queueDeferredConsolidation?.(this);
+      return;
+    }
     this.scheduleConsolidation();
   }
 
