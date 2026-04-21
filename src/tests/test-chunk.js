@@ -15,6 +15,7 @@ import { describe, test } from './runner.js';
 import { assertEqual, assertTrue, assertFalse, assertNotNull } from './assert.js';
 import * as THREE from 'three';
 import { Chunk } from '../world/Chunk.js';
+import { worldWorker } from '../world/ChunkConsolidation.js';
 import { mockFaceCullingSystem, mockMaterials, mockBlockData } from './test-mocks.js';
 
 // 模拟 WorldWorker
@@ -181,6 +182,42 @@ describe('Chunk 真实类测试', (test) => {
           set.add(c);
         }
       }
+    }
+  });
+
+  test('consolidate 发送数字编码 blocks，避免逗号坐标 key 序列化', () => {
+    setupEnvironment();
+
+    const originalPostMessage = worldWorker.postMessage;
+    let capturedMessage = null;
+    worldWorker.postMessage = (message) => {
+      capturedMessage = message;
+    };
+
+    try {
+      const world = createMockWorld();
+      world.engine = {
+        materials: {
+          getTextureGroups: () => ({})
+        }
+      };
+
+      const chunk = new Chunk(0, 0, world);
+      chunk.isReady = true;
+
+      const code = Chunk.encodeCoord(1, 2, 3);
+      chunk.blockData.set(code, 'stone');
+
+      chunk.consolidate();
+
+      assertNotNull(capturedMessage, 'consolidate 应该向 WorldWorker 发送消息');
+      const keys = Object.keys(capturedMessage.snapshot.blocks);
+      assertEqual(keys.length, 1, '应该只发送一个方块记录');
+      assertEqual(keys[0], String(code), 'blocks key 应该是数字编码字符串');
+      assertFalse(keys[0].includes(','), 'blocks key 不应该是 x,y,z 逗号坐标');
+    } finally {
+      worldWorker.postMessage = originalPostMessage;
+      teardownEnvironment();
     }
   });
 

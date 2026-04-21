@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { getBlockProperties as getBlockProps } from '../constants/BlockData.js';
-import { blockDataToStringKeys } from '../utils/CoordEncoding.js';
+import { blockDataToNumberKeys } from '../utils/CoordEncoding.js';
 import { getRotationAngle } from '../utils/OrientationUtils.js';
 import { filterWorkerResultAgainstBlockData } from './ChunkMeshDataFilter.js';
 import { belongsToCrossChunkStructure } from '../utils/StructureUtils.js';
@@ -349,7 +349,7 @@ export function extendChunk(Chunk) {
       seed: WORLD_CONFIG.SEED,
       _consolidationRequestSentAt: sendTimestamp,
       snapshot: {
-        blocks: blockDataToStringKeys(this.blockData),
+        blocks: blockDataToNumberKeys(this.blockData),
         entities: {
           ...this.entities,
           staticTrees: this.entities.staticTrees || []
