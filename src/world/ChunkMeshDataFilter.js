@@ -1,4 +1,4 @@
-import { encodeCoord, getFromBlockDataMap } from '../utils/CoordEncoding.js';
+import { coordKeyToCode, getFromBlockDataMap } from '../utils/CoordEncoding.js';
 
 function getEntryType(entry) {
   if (entry == null) return null;
@@ -32,20 +32,11 @@ function copyInstanceMatrices(matrices, keepIndices) {
  * @returns {*} 方块数据条目
  */
 function getBlockDataEntryFromKey(blockData, key) {
-  // Worker 返回的 visibleKeys/solidBlocks 使用字符串 key
-  if (typeof key === 'string') {
-    const [x, y, z] = key.split(',').map(Number);
-    return getFromBlockDataMap(blockData, x, y, z);
-  }
-  return blockData.get(key);
+  return blockData.get(coordKeyToCode(key));
 }
 
 function hasBlockDataEntryFromKey(blockData, key) {
-  if (typeof key === 'string') {
-    const [x, y, z] = key.split(',').map(Number);
-    return blockData.has(encodeCoord(x, y, z));
-  }
-  return blockData.has(key);
+  return blockData.has(coordKeyToCode(key));
 }
 
 function filterLegacyRenderData(d, blockData) {

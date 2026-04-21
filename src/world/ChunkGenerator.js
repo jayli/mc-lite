@@ -77,7 +77,7 @@ export function extendChunk(Chunk) {
     */
   Chunk.prototype.add = function(x, y, z, type, dObj = null, solid = true, orientation = 0) {
     // 生成方块的唯一键（用于碰撞检测和持久化覆盖检查）
-    const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+    const key = Chunk.encodeCoord(x, y, z);
 
     // 如果提供了数据收集对象，将方块位置按类型分类存储
     if (dObj) {

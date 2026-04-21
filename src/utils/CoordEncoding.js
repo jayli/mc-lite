@@ -34,20 +34,6 @@ export function decodeCoord(code) {
 }
 
 /**
- * 将 Map<number, entry> 格式的 blockData 转换为 Worker 兼容的 {"x,y,z": entry} 格式
- * @param {Map<number, *>} blockData - 数字编码键的方块数据
- * @returns {Object} 字符串键的方块数据对象
- */
-export function blockDataToStringKeys(blockData) {
-  const result = {};
-  for (const [code, entry] of blockData) {
-    const { x, y, z } = decodeCoord(code);
-    result[`${x},${y},${z}`] = entry;
-  }
-  return result;
-}
-
-/**
  * 将 blocks 对象统一为数字编码格式
  * 兼容字符串 key "x,y,z" 格式（旧档/Worker 返回）
  * @param {Object} blocks - blocks 对象
@@ -67,6 +53,34 @@ export function normalizeBlocksToNumberKeys(blocks) {
     }
   }
   return result;
+}
+
+/**
+ * 将数字编码或旧格式 "x,y,z" 坐标 key 统一转换为数字编码
+ * @param {number|string} key - 数字编码、数字字符串或旧格式坐标字符串
+ * @returns {number} 数字编码
+ */
+export function coordKeyToCode(key) {
+  if (typeof key === 'number') return key;
+  const normalizedKey = String(key);
+  if (normalizedKey.includes(',')) {
+    const [x, y, z] = normalizedKey.split(',').map(Number);
+    return encodeCoord(x, y, z);
+  }
+  return Number(normalizedKey);
+}
+
+/**
+ * 将数字编码或旧格式 "x,y,z" 坐标 key 解码为三维坐标
+ * @param {number|string} key - 数字编码、数字字符串或旧格式坐标字符串
+ * @returns {{x:number,y:number,z:number}} 三维坐标
+ */
+export function coordKeyToPosition(key) {
+  if (typeof key === 'string' && key.includes(',')) {
+    const [x, y, z] = key.split(',').map(Number);
+    return { x, y, z };
+  }
+  return decodeCoord(Number(key));
 }
 
 /**

@@ -196,8 +196,8 @@ function buildMeshData(fakeChunk, d, cx, cz) {
       aoHigh[i] = pos.aoHigh || 0;
       orientation[i] = pos.orientation || 0;
 
-      // 索引映射
-      const posKey = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
+      // 索引映射使用数字编码，避免在 Worker 回包中携带 "x,y,z" key。
+      const posKey = encodeCoord(pos.x, pos.y, pos.z);
       instanceIndexMap[posKey] = i;
     }
 
@@ -330,7 +330,7 @@ function buildBatchedMeshData(fakeChunk, d, textureGroups) {
       orientation[i] = pos.orientation || 0;
       textureIndexAttr[i] = pos.textureIndex;
 
-      const posKey = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
+      const posKey = encodeCoord(pos.x, pos.y, pos.z);
       instanceIndexMap[posKey] = { index: i, type: pos.type };
     }
 
@@ -368,7 +368,7 @@ function buildBatchedMeshData(fakeChunk, d, textureGroups) {
       aoLow[i] = pos.aoLow || 0;
       aoHigh[i] = pos.aoHigh || 0;
       orientation[i] = pos.orientation || 0;
-      const posKey = `${Math.floor(pos.x)},${Math.floor(pos.y)},${Math.floor(pos.z)}`;
+      const posKey = encodeCoord(pos.x, pos.y, pos.z);
       instanceIndexMap[posKey] = i;
     }
 
@@ -408,7 +408,7 @@ onmessage = async function(e) {
   const minZ = cz * CHUNK_SIZE;
   const maxZ = (cz + 1) * CHUNK_SIZE;
 
-  // 使用 Map 暂存方块，确保同一位置后生成的方块覆盖旧方块
+  // 使用数字编码 Map 暂存方块，确保同一位置后生成的方块覆盖旧方块
   const blockMap = new Map();
   let modGunMan = []; // 记录模型人 (gun_man.glb) 的位置
   let rovers = []; // 记录火星车的位置
@@ -433,7 +433,7 @@ onmessage = async function(e) {
   // 模拟 Chunk 类的 add 方法 - 改为写入 blockMap
   const fakeChunk = {
     add: (x, y, z, type, dObj, solid = true, orientation = 0) => {
-      const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+      const key = encodeCoord(x, y, z);
 
       // 关键修复：严格检查该位置是否已有方块
       // 规则：只要该位置已有任何非空气方块，就不允许再放置任何方块
@@ -450,7 +450,7 @@ onmessage = async function(e) {
       }
     },
     getBlockType: (x, y, z) => {
-      const key = `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+      const key = encodeCoord(x, y, z);
       return blockMap.get(key)?.type || null;
     }
   };
@@ -1544,7 +1544,7 @@ onmessage = async function(e) {
     if (inCurrentChunk) return true;
 
     // 检查是否属于允许跨 Chunk 的小型实体
-    const sourceType = blockSourceTypeMap.get(`${Math.floor(block.x)},${Math.floor(block.y)},${Math.floor(block.z)}`);
+    const sourceType = blockSourceTypeMap.get(encodeCoord(block.x, block.y, block.z));
     if (sourceType && isCrossChunkOwnerType(sourceType)) {
       return belongsToCrossChunkStructure(block.x, block.y, block.z, structureCenters);
     }
@@ -1678,7 +1678,7 @@ onmessage = async function(e) {
         }
 
         const solid = getBlockProperties(entry.type).isSolid;
-        blockMap.set(`${bx},${by},${bz}`, { x: bx, y: by, z: bz, type: entry.type, solid, orientation: entry.orientation });
+        blockMap.set(encodeCoord(bx, by, bz), { x: bx, y: by, z: bz, type: entry.type, solid, orientation: entry.orientation });
       }
     }
 
@@ -1697,7 +1697,7 @@ onmessage = async function(e) {
   // 辅助函数：判断指定位置的方块是否遮挡视线
   // 与主线程 AO 规则保持一致：仅“实心且非透明”方块才遮挡
   const isOccluding = (x, y, z) => {
-    const k = `${x},${y},${z}`;
+    const k = encodeCoord(x, y, z);
     const b = blockMap.get(k);
     if (!b) return false;
     // consolidate 优化场景：只信任当前 Chunk 归属方块作为遮挡体，
@@ -1725,7 +1725,7 @@ onmessage = async function(e) {
   // 仅保存当前 Chunk 负责的数据（地图语义）
   // 使用数字编码格式，与 Chunk.blockData 一致
   const blocksForSnapshot = {};
-  for (const [key, b] of blockMap) {
+  for (const [, b] of blockMap) {
     if (!isBlockOwnedByCurrentChunk(b)) continue;
     const code = encodeCoord(b.x, b.y, b.z);
     blocksForSnapshot[code] = { type: b.type, orientation: b.orientation || 0 };

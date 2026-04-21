@@ -88,9 +88,8 @@ function batchCalculateFaceVisibility(blockUpdates, blockData) {
 
   for (const update of blockUpdates) {
     // 添加更新的方块
-    const key = `${Math.floor(update.x)},${Math.floor(update.y)},${Math.floor(update.z)}`;
     const code = encodeCoord(Math.floor(update.x), Math.floor(update.y), Math.floor(update.z));
-    allBlocksToCheck.set(code, { x: Math.floor(update.x), y: Math.floor(update.y), z: Math.floor(update.z), strKey: key });
+    allBlocksToCheck.set(code, { x: Math.floor(update.x), y: Math.floor(update.y), z: Math.floor(update.z) });
 
     // 添加邻居方块
     const { x, y, z } = update;
@@ -100,8 +99,7 @@ function batchCalculateFaceVisibility(blockUpdates, blockData) {
 
     for (const [nx, ny, nz] of neighbors) {
       const nCode = encodeCoord(Math.floor(nx), Math.floor(ny), Math.floor(nz));
-      const nKey = `${Math.floor(nx)},${Math.floor(ny)},${Math.floor(nz)}`;
-      allBlocksToCheck.set(nCode, { x: Math.floor(nx), y: Math.floor(ny), z: Math.floor(nz), strKey: nKey });
+      allBlocksToCheck.set(nCode, { x: Math.floor(nx), y: Math.floor(ny), z: Math.floor(nz) });
     }
   }
 
@@ -131,9 +129,9 @@ function batchCalculateFaceVisibility(blockUpdates, blockData) {
         results.affectedNeighbors.push(blockInfo);
       }
 
-      // 如果方块可见，添加到visibleKeys（使用字符串 key 保持向后兼容）
+      // 如果方块可见，添加到 visibleKeys（数字编码）
       if (visibility > 0) {
-        results.visibleKeys.add(pos.strKey);
+        results.visibleKeys.add(code);
       }
     }
   }
@@ -175,21 +173,20 @@ function calculateChunkFaceVisibility(blockData, cx, cz, worldChunks = null) {
       mask = calculateFaceVisibility(block, blockData);
     }
 
-    // 添加到结果（使用字符串 key 保持向后兼容）
-    const key = `${x},${y},${z}`;
-    results.blocksWithVisibility[key] = {
+    // 添加到结果（数字编码 key）
+    results.blocksWithVisibility[code] = {
       x, y, z, type, visibility: mask
     };
 
     // 如果方块可见，则添加到visibleKeys
     if (mask > 0) {
-      results.visibleKeys.push(key);
+      results.visibleKeys.push(code);
     }
 
     // 如果是固体方块，添加到solidBlocks
     const props = getBlockProperties(type);
     if (props.isSolid) {
-      results.solidBlocks.push(key);
+      results.solidBlocks.push(code);
     }
   }
 

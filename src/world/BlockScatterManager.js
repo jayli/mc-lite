@@ -8,6 +8,7 @@
  * 4. 通知就绪的 chunk 进行渲染
  */
 import { CHUNK_SIZE } from './ChunkConsolidation.js';
+import { coordKeyToCode, encodeCoord } from '../utils/CoordEncoding.js';
 
 export class BlockScatterManager {
   constructor(world) {
@@ -47,8 +48,10 @@ export class BlockScatterManager {
       ? workerResult.blockDataBlocks
       : scatteredBlocks;
 
-    // visibleKeys 从 Worker 传来是数组，先转为 Set 方便查找
-    const visibleKeysSet = Array.isArray(visibleKeys) ? new Set(visibleKeys) : null;
+    // visibleKeys 从 Worker 传来是数字编码数组，旧字符串格式在边界处归一化兼容。
+    const visibleKeysSet = Array.isArray(visibleKeys)
+      ? new Set(visibleKeys.map(coordKeyToCode))
+      : null;
     const touchedBuffers = new Set();
 
     // 1. 遍历所有逻辑方块，按坐标分发
@@ -80,7 +83,7 @@ export class BlockScatterManager {
       touchedBuffers.add(buffer);
 
       // 提取 visibleKeys，标记哪些方块是面剔除可见的
-      const blockKey = `${block.x},${block.y},${block.z}`;
+      const blockKey = encodeCoord(block.x, block.y, block.z);
       if (visibleKeysSet?.has(blockKey)) {
         buffer.visibleBlockKeys.add(blockKey);
       }

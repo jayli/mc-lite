@@ -68,7 +68,7 @@ export function computeFaceVisibilityMask(blockType, getNeighborType, isTranspar
   return mask;
 }
 
-import { getFromBlockDataObj } from './CoordEncoding.js';
+import { encodeCoord, getFromBlockDataObj } from './CoordEncoding.js';
 
 /**
  * 从 plain object 格式的 blockData 中提取方块类型
@@ -102,7 +102,7 @@ export function createBlockDataNeighborQuery(blockData, x, y, z) {
 
 /**
  * 创建基于 Map 的邻居查询函数
- * @param {Map} blockMap - Map<"x,y,z", {type: string}> 格式的方块数据
+ * @param {Map} blockMap - Map<number, {type: string}> 格式的方块数据，兼容旧 "x,y,z" key
  * @param {number} x - 当前方块 X 坐标
  * @param {number} y - 当前方块 Y 坐标
  * @param {number} z - 当前方块 Z 坐标
@@ -110,8 +110,11 @@ export function createBlockDataNeighborQuery(blockData, x, y, z) {
  */
 export function createBlockMapNeighborQuery(blockMap, x, y, z) {
   return function getNeighborType(dx, dy, dz) {
-    const key = `${Math.floor(x + dx)},${Math.floor(y + dy)},${Math.floor(z + dz)}`;
-    const block = blockMap.get(key);
+    const bx = Math.floor(x + dx);
+    const by = Math.floor(y + dy);
+    const bz = Math.floor(z + dz);
+    const code = encodeCoord(bx, by, bz);
+    const block = blockMap.get(code) || blockMap.get(`${bx},${by},${bz}`);
     return block ? block.type : null;
   };
 }

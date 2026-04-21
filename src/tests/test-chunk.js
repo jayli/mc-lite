@@ -221,6 +221,44 @@ describe('Chunk 真实类测试', (test) => {
     }
   });
 
+  test('_applyConsolidateResult 接受数字编码 visibleKeys 和 solidBlocks', () => {
+    setupEnvironment();
+
+    try {
+      const world = createMockWorld();
+      world.onChunkAOSourceStable = () => {};
+      const chunk = new Chunk(0, 0, world);
+      chunk.isReady = true;
+
+      const code = Chunk.encodeCoord(1, 2, 3);
+      chunk.blockData.set(code, 'stone');
+      chunk.dirtyBlocks = 1;
+      chunk.dynamicMeshes = new Map();
+      chunk._convertScatteredBlocksToMeshData = () => [];
+      chunk._saveChestStates = () => new Map();
+      chunk._cleanupOldMeshes = () => {};
+      chunk.buildMeshes = () => {};
+      chunk._restoreChestStates = () => {};
+      chunk._unregisterLightSources = () => {};
+      chunk._registerLightSources = () => {};
+      chunk._initArrayStorageFromBlockData = () => {};
+      chunk.regenerateCrossChunkColliders = () => {};
+
+      chunk._applyConsolidateResult({
+        scatteredBlocks: [{ x: 1, y: 2, z: 3, type: 'stone' }],
+        visibleKeys: [code],
+        solidBlocks: [code],
+        structureCenters: []
+      }, 1, new Set());
+
+      assertTrue(chunk.visibleKeys.has(code), 'visibleKeys 应保存数字编码');
+      assertTrue(chunk.solidBlocks.has(code), 'solidBlocks 应保存数字编码');
+      assertEqual(chunk._tempOriginalSolidBlocks[0], code, '原始 solidBlocks 临时缓存也应保存数字编码');
+    } finally {
+      teardownEnvironment();
+    }
+  });
+
   test('Chunk 初始状态正确', () => {
     setupEnvironment();
 

@@ -8,8 +8,8 @@ const input = {
     [Chunk.encodeCoord(4, 5, 6), { type: 'glass_block', orientation: 0 }]
   ]),
   workerResult: {
-    visibleKeys: ['1,2,3', '4,5,6', '7,8,9'],
-    solidBlocks: ['1,2,3', '7,8,9'],
+    visibleKeys: [Chunk.encodeCoord(1, 2, 3), Chunk.encodeCoord(4, 5, 6), Chunk.encodeCoord(7, 8, 9)],
+    solidBlocks: [Chunk.encodeCoord(1, 2, 3), Chunk.encodeCoord(7, 8, 9)],
     d: {
       stone: [
         { x: 1, y: 2, z: 3 },
@@ -49,8 +49,8 @@ const input = {
 
 const result = filterWorkerResultAgainstBlockData(input.workerResult, input.blockData);
 
-assertDeepEqual(result.visibleKeys, ['1,2,3', '4,5,6'], 'visibleKeys 应过滤掉已不存在的方块');
-assertDeepEqual(result.solidBlocks, ['1,2,3'], 'solidBlocks 应过滤掉已不存在的方块');
+assertDeepEqual(result.visibleKeys, [Chunk.encodeCoord(1, 2, 3), Chunk.encodeCoord(4, 5, 6)], 'visibleKeys 应过滤掉已不存在的方块');
+assertDeepEqual(result.solidBlocks, [Chunk.encodeCoord(1, 2, 3)], 'solidBlocks 应过滤掉已不存在的方块');
 assertEqual(result.d.stone.length, 1, '旧格式 d.stone 应只保留一个实例');
 assertEqual(result.meshData.length, 2, '应保留两个类型分组');
 assertEqual(result.meshData[0].count, 1, 'stone meshData 应只保留一个实例');

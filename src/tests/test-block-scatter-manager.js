@@ -1,10 +1,13 @@
 import { describe } from './runner.js';
 import { assertEqual, assertTrue } from './assert.js';
 import { BlockScatterManager } from '../world/BlockScatterManager.js';
+import { encodeCoord } from '../utils/CoordEncoding.js';
 
 describe('BlockScatterManager 数据契约', (test) => {
   test('优先使用 blockDataBlocks 写入逻辑数据，scatteredBlocks 只承载可见渲染数据', () => {
     let accepted = null;
+    const visibleCode = encodeCoord(1, 1, 1);
+    const hiddenCode = encodeCoord(2, 1, 1);
     const world = {
       chunks: new Map([
         ['0,0', {
@@ -28,14 +31,47 @@ describe('BlockScatterManager 数据契约', (test) => {
       scatteredBlocks: [
         { x: 1, y: 1, z: 1, type: 'stone' }
       ],
-      visibleKeys: ['1,1,1'],
+      visibleKeys: [visibleCode],
       structureCenters: [{ type: 'static_tree', x: 1, y: 2, z: 1 }]
     });
 
     assertTrue(accepted !== null, 'ready chunk 应收到分发数据');
     assertEqual(accepted.blocks.length, 2, '隐藏逻辑方块也应进入 chunk blockData');
-    assertTrue(accepted.visibleKeys.has('1,1,1'), '可见 key 应保留');
-    assertEqual(accepted.visibleKeys.has('2,1,1'), false, '隐藏方块不应被标记为可见');
+    assertTrue(accepted.visibleKeys.has(visibleCode), '可见 key 应保留');
+    assertEqual(accepted.visibleKeys.has(hiddenCode), false, '隐藏方块不应被标记为可见');
+  });
+
+  test('应使用数字编码 visibleKeys 分发可见方块', () => {
+    let accepted = null;
+    const visibleCode = encodeCoord(1, 1, 1);
+    const hiddenCode = encodeCoord(2, 1, 1);
+    const world = {
+      chunks: new Map([
+        ['0,0', {
+          isReady: false,
+          acceptScatteredBlocks(blocks, visibleKeys, structureCenters) {
+            accepted = { blocks, visibleKeys, structureCenters };
+            this.isReady = true;
+          }
+        }]
+      ])
+    };
+    const scatter = new BlockScatterManager(world);
+
+    scatter.scatter({
+      cx: 0,
+      cz: 0,
+      blockDataBlocks: [
+        { x: 1, y: 1, z: 1, type: 'stone' },
+        { x: 2, y: 1, z: 1, type: 'dirt' }
+      ],
+      visibleKeys: [visibleCode],
+      structureCenters: []
+    });
+
+    assertTrue(accepted !== null, 'ready chunk 应收到分发数据');
+    assertTrue(accepted.visibleKeys.has(visibleCode), '可见 key 应保留为数字编码');
+    assertEqual(accepted.visibleKeys.has(hiddenCode), false, '隐藏方块不应被标记为可见');
   });
 
   test('纯流式跨 chunk 追加不应立即调度 consolidation', () => {
@@ -69,7 +105,7 @@ describe('BlockScatterManager 数据契约', (test) => {
       scatteredBlocks: [
         { x: 17, y: 1, z: 1, type: 'stone' }
       ],
-      visibleKeys: ['17,1,1'],
+      visibleKeys: [encodeCoord(17, 1, 1)],
       structureCenters: []
     });
 
@@ -105,7 +141,7 @@ describe('BlockScatterManager 数据契约', (test) => {
         { x: 33, y: 1, z: 1, type: 'stone' },
         { x: 17, y: 1, z: 1, type: 'dirt' }
       ],
-      visibleKeys: ['33,1,1', '17,1,1'],
+      visibleKeys: [encodeCoord(33, 1, 1), encodeCoord(17, 1, 1)],
       structureCenters: []
     });
 
@@ -131,7 +167,7 @@ describe('BlockScatterManager 数据契约', (test) => {
       blockDataBlocks: [
         { x: 80, y: 1, z: 1, type: 'stone' }
       ],
-      visibleKeys: ['80,1,1'],
+      visibleKeys: [encodeCoord(80, 1, 1)],
       structureCenters: []
     });
     scatter.scatter({
@@ -140,7 +176,7 @@ describe('BlockScatterManager 数据契约', (test) => {
       blockDataBlocks: [
         { x: 160, y: 1, z: 1, type: 'dirt' }
       ],
-      visibleKeys: ['160,1,1'],
+      visibleKeys: [encodeCoord(160, 1, 1)],
       structureCenters: []
     });
 

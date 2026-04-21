@@ -4,7 +4,7 @@
  * 使用 InstancedMesh 优化渲染性能，管理区块内的所有方块和实体
  */
 import * as THREE from 'three';
-import { encodeCoord, decodeCoord, normalizeBlocksToNumberKeys } from '../utils/CoordEncoding.js';
+import { encodeCoord, decodeCoord, normalizeBlocksToNumberKeys, coordKeyToCode } from '../utils/CoordEncoding.js';
 import { aoBridge } from '../core/AOBridge.js';
 import { materials } from '../core/MaterialManager.js';
 import { persistenceService } from '../services/PersistenceService.js';
@@ -130,8 +130,8 @@ export class Chunk {
     this.blockData = new Map();
 
     /**
-     * solidBlocks — 实心方块世界坐标集合（Set<string>）
-     * 存储该 Chunk 中所有 isSolid=true 的方块的世界坐标字符串 "x,y,z"。
+     * solidBlocks — 实心方块世界坐标集合（Set<number>）
+     * 存储该 Chunk 中所有 isSolid=true 的方块的世界坐标数字编码。
      * 覆盖范围: Y:0~31（包含所有高度，不限于 blockDataArray 的 Y:0~15 范围）。
      * 读写者: setBlockDataState（跟随 blockData 同步）、
      *          acceptWorkerResult / buildMeshesForRegion（Worker 回传直接填充）、
@@ -1361,14 +1361,12 @@ export class Chunk {
 
     if (visibleKeys) {
       for (const key of visibleKeys) {
-        const [x, y, z] = key.split(',').map(Number);
-        this.visibleKeys.add(Chunk.encodeCoord(x, y, z));
+        this.visibleKeys.add(coordKeyToCode(key));
       }
     }
     if (solidBlocks) {
       for (const key of solidBlocks) {
-        const [x, y, z] = key.split(',').map(Number);
-        this.solidBlocks.add(Chunk.encodeCoord(x, y, z));
+        this.solidBlocks.add(coordKeyToCode(key));
       }
     }
 
@@ -1481,7 +1479,7 @@ export class Chunk {
         };
       }
       // 确保 snapshot.blocks 使用数字编码格式（与 Chunk.blockData 一致）
-      // 兼容 WorldWorker 返回的字符串 key 格式
+      // 兼容旧存档 / 旧 Worker 回包中的字符串 key 格式
       if (snapshot.blocks) {
         snapshot.blocks = normalizeBlocksToNumberKeys(snapshot.blocks);
       }
@@ -2241,8 +2239,7 @@ export class Chunk {
     const encodedVisibleKeys = new Set();
     if (visibleBlockKeys) {
       for (const key of visibleBlockKeys) {
-        const [x, y, z] = key.split(',').map(Number);
-        const code = Chunk.encodeCoord(x, y, z);
+        const code = coordKeyToCode(key);
         encodedVisibleKeys.add(code);
         this.visibleKeys.add(code);
       }
@@ -2320,8 +2317,7 @@ export class Chunk {
     // 从 visibleBlockKeys 追加可见标记
     if (visibleBlockKeys) {
       for (const key of visibleBlockKeys) {
-        const [x, y, z] = key.split(',').map(Number);
-        this.visibleKeys.add(Chunk.encodeCoord(x, y, z));
+        this.visibleKeys.add(coordKeyToCode(key));
       }
     }
 

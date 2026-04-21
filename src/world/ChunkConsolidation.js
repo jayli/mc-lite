@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { getBlockProperties as getBlockProps } from '../constants/BlockData.js';
-import { blockDataToNumberKeys } from '../utils/CoordEncoding.js';
+import { blockDataToNumberKeys, coordKeyToCode } from '../utils/CoordEncoding.js';
 import { getRotationAngle } from '../utils/OrientationUtils.js';
 import { filterWorkerResultAgainstBlockData } from './ChunkMeshDataFilter.js';
 import { belongsToCrossChunkStructure } from '../utils/StructureUtils.js';
@@ -392,24 +392,16 @@ export function extendChunk(Chunk) {
     const t2 = performance.now();
 
     // 将过滤后的 scatteredBlocks 转换为 meshData 格式（按 visibleKeys 过滤可见方块）
-    const encodeKeys = (arr) => arr ? arr.map(strKey => {
-      const [x, y, z] = strKey.split(',').map(Number);
-      return Chunk.encodeCoord(x, y, z);
-    }) : null;
+    const encodeKeys = (arr) => arr ? arr.map(coordKeyToCode) : null;
     const encodedVisibleKeys = encodeKeys(visibleKeys);
     const encodedVisibleKeysSet = encodedVisibleKeys ? new Set(encodedVisibleKeys) : null;
     const meshData = this._convertScatteredBlocksToMeshData(filteredBlocks, encodedVisibleKeysSet, newStructureCenters);
     const t3 = performance.now();
 
-    // 保存原始 solidBlocks 用于跨 Chunk 碰撞体（Worker 返回字符串数组，需编码转换）
-    this._tempOriginalSolidBlocks = solidBlocks
-      ? solidBlocks.map(strKey => {
-        const [sx, sy, sz] = strKey.split(',').map(Number);
-        return Chunk.encodeCoord(sx, sy, sz);
-      })
-      : [];
+    // 保存原始 solidBlocks 用于跨 Chunk 碰撞体（Worker 返回数字编码，旧字符串格式在边界兼容）
+    this._tempOriginalSolidBlocks = solidBlocks ? solidBlocks.map(coordKeyToCode) : [];
 
-    // 同步可见性状态与碰撞状态（Worker 返回字符串数组，需编码转换）
+    // 同步可见性状态与碰撞状态（统一为数字编码）
     const encodedSolidBlocks = encodeKeys(solidBlocks);
     this._syncVisibilityAndCollision(encodedVisibleKeys, encodedSolidBlocks);
     const t4 = performance.now();
