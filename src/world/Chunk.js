@@ -2260,6 +2260,7 @@ export class Chunk {
    * @param {Array} structureCenters - 结构中心列表（供跨 chunk 结构判断）
    */
   appendScatteredBlocks(scatteredBlocks, visibleBlockKeys, structureCenters, options = {}) {
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
     const minX = this.cx * CHUNK_SIZE;
     const minZ = this.cz * CHUNK_SIZE;
 
@@ -2311,10 +2312,18 @@ export class Chunk {
 
     // 同步数组存储；跨 chunk 流式补片不立即抢占 WorldWorker 合并队列
     this.dirtyBlocks += appendedCount;
+    const t1 = globalThis.performance?.now?.() ?? Date.now();
     this._initArrayStorageFromBlockData();
+    const t2 = globalThis.performance?.now?.() ?? Date.now();
     if (options.deferConsolidation) {
       this.hasDeferredFinalizeWork = true;
-      this.world?.queueDeferredConsolidation?.(this);
+      // 不再在这里 queue，改由 World 层 idle 任务统一触发
+      const elapsed = (globalThis.performance?.now?.() ?? Date.now()) - t0;
+      if (elapsed > 0.5) {
+        console.log(
+          `[Chunk] appendScatteredBlocks chunk=${this.cx},${this.cz} count=${appendedCount} total=${elapsed.toFixed(2)}ms write=${(t1-t0).toFixed(2)}ms arrayStorage=${(t2-t1).toFixed(2)}ms`
+        );
+      }
       return appendedCount;
     }
     this.scheduleConsolidation();

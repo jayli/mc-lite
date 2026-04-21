@@ -382,6 +382,7 @@ function buildBatchedMeshData(fakeChunk, d, textureGroups) {
 }
 
 onmessage = async function(e) {
+  const workerReceivedAt = performance.now();
   const {
     cx,
     cz,
@@ -391,6 +392,7 @@ onmessage = async function(e) {
     callbackKey,
     taskId,
     isOptimization = false,
+    _consolidationRequestSentAt = 0,  // 主线程发送时间戳
     textureGroups = {}  // 新增：纹理分组配置
   } = e.data;
 
@@ -1777,6 +1779,12 @@ onmessage = async function(e) {
   const blockDataBlocks = buildBlockDataBlocks(blockMap);
   const scatteredBlocks = buildScatteredBlocks(blockMap, visibleKeysSet, aoMap);
 
+  const workerFinishedAt = performance.now();
+  const workerComputeMs = workerFinishedAt - workerReceivedAt;
+  const transitToWorkerMs = _consolidationRequestSentAt
+    ? workerReceivedAt - _consolidationRequestSentAt
+    : 0;
+
   postMessage({
     cx, cz, callbackKey, taskId,
     blockDataBlocks,
@@ -1799,7 +1807,13 @@ onmessage = async function(e) {
         rovers,
         zombieNests: savedSnapshot?.entities?.zombieNests || []
       }
-    }
+    },
+    _workerTiming: {
+      workerComputeMs,
+      transitToWorkerMs,
+      workerFinishedAt
+    },
+    isOptimization
   });
 };
 

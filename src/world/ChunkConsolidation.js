@@ -315,6 +315,7 @@ export function extendChunk(Chunk) {
     if (this.isConsolidating || !this.isReady) return;
     this.isConsolidating = true;
     this._aoSourceVersion++;
+    this._consolidationStartedAt = performance.now();
 
     // 阶段 1: 准备合并数据
     const consolidatedCount = this.dirtyBlocks;
@@ -328,16 +329,35 @@ export function extendChunk(Chunk) {
 
     // 阶段 2: 注册 Worker 回调并请求重新计算
     const taskId = `consolidate:${this.cx},${this.cz}:${performance.now()}:${Math.random().toString(36).slice(2, 8)}`;
+    const isCrossChunkPatch = this.hasDeferredFinalizeWork === true;
     workerCallbacks.set(taskId, (data) => {
+      const callbackReceivedAt = performance.now();
+      const workerTiming = data._workerTiming || {};
+      const transitFromWorkerMs = workerTiming.workerFinishedAt
+        ? callbackReceivedAt - workerTiming.workerFinishedAt
+        : 0;
+
+      if (isCrossChunkPatch) {
+        const totalRoundTrip = callbackReceivedAt - (this._consolidationStartedAt || callbackReceivedAt);
+        console.log(
+          `[Consolidation] chunk=${this.cx},${this.cz} total=${totalRoundTrip.toFixed(1)}ms ` +
+          `queue=${workerTiming.transitToWorkerMs?.toFixed(1) || '?'}ms ` +
+          `workerCompute=${workerTiming.workerComputeMs?.toFixed(1) || '?'}ms ` +
+          `returnTransit=${transitFromWorkerMs.toFixed(1)}ms ` +
+          `dirtyBlocks=${consolidatedCount} source=crossChunkPatch`
+        );
+      }
       this._applyConsolidateResult(data, consolidatedCount, consolidatedMeshKeys);
     });
 
     // 发送请求到 Worker 池
+    const sendTimestamp = performance.now();
     worldWorker.postMessage({
       cx: this.cx,
       cz: this.cz,
       taskId,
       seed: WORLD_CONFIG.SEED,
+      _consolidationRequestSentAt: sendTimestamp,
       snapshot: {
         blocks: blockDataToStringKeys(this.blockData),
         entities: {
@@ -358,6 +378,7 @@ export function extendChunk(Chunk) {
    * @param {Set} consolidatedMeshKeys - 合并前的动态 Mesh 键集合
    */
   Chunk.prototype._applyConsolidateResult = function(data, consolidatedCount, consolidatedMeshKeys) {
+    const t0 = performance.now();
     let { scatteredBlocks, visibleKeys, solidBlocks, structureCenters: newStructureCenters } = data;
 
     // 更新结构中心列表
@@ -366,6 +387,7 @@ export function extendChunk(Chunk) {
     }
 
     // 过滤 scatteredBlocks：只保留 blockData 中存在的方块
+    const t1 = performance.now();
     const filteredBlocks = [];
     if (scatteredBlocks && Array.isArray(scatteredBlocks)) {
       for (const block of scatteredBlocks) {
@@ -377,6 +399,7 @@ export function extendChunk(Chunk) {
         filteredBlocks.push(block);
       }
     }
+    const t2 = performance.now();
 
     // 将过滤后的 scatteredBlocks 转换为 meshData 格式（按 visibleKeys 过滤可见方块）
     const encodeKeys = (arr) => arr ? arr.map(strKey => {
@@ -386,6 +409,7 @@ export function extendChunk(Chunk) {
     const encodedVisibleKeys = encodeKeys(visibleKeys);
     const encodedVisibleKeysSet = encodedVisibleKeys ? new Set(encodedVisibleKeys) : null;
     const meshData = this._convertScatteredBlocksToMeshData(filteredBlocks, encodedVisibleKeysSet, newStructureCenters);
+    const t3 = performance.now();
 
     // 保存原始 solidBlocks 用于跨 Chunk 碰撞体（Worker 返回字符串数组，需编码转换）
     this._tempOriginalSolidBlocks = solidBlocks
@@ -398,15 +422,18 @@ export function extendChunk(Chunk) {
     // 同步可见性状态与碰撞状态（Worker 返回字符串数组，需编码转换）
     const encodedSolidBlocks = encodeKeys(solidBlocks);
     this._syncVisibilityAndCollision(encodedVisibleKeys, encodedSolidBlocks);
+    const t4 = performance.now();
 
     // 保存宝箱状态
     const savedChestStates = this._saveChestStates();
 
     // 清理旧网格
     this._cleanupOldMeshes(consolidatedMeshKeys);
+    const t5 = performance.now();
 
     // 构建新的渲染网格
     this.buildMeshes(meshData || []);
+    const t6 = performance.now();
 
     // 恢复宝箱状态
     this._restoreChestStates(savedChestStates);
@@ -417,6 +444,7 @@ export function extendChunk(Chunk) {
 
     // 重建数组存储，确保 blockDataArray 与 blockData 权威源同步
     this._initArrayStorageFromBlockData();
+    const t7 = performance.now();
 
     // 重置状态
     this.dirtyBlocks = Math.max(0, this.dirtyBlocks - consolidatedCount);
@@ -425,6 +453,16 @@ export function extendChunk(Chunk) {
     if (this.loadState === 'waiting-consolidation') {
       this.loadState = 'entities-built';
       this.world?.onChunkConsolidationComplete?.(this);
+    }
+
+    const applyTotal = performance.now() - t0;
+    if (applyTotal > 3) {
+      console.log(
+        `[Consolidation] chunk=${this.cx},${this.cz} applyResult=${applyTotal.toFixed(1)}ms ` +
+        `filter=${(t2-t1).toFixed(1)} convertMesh=${(t3-t2).toFixed(1)} ` +
+        `syncVisCol=${(t4-t3).toFixed(1)} cleanup=${(t5-t4).toFixed(1)} ` +
+        `buildMeshes=${(t6-t5).toFixed(1)} lightsInit=${(t7-t6).toFixed(1)}`
+      );
     }
 
     if (this.dirtyBlocks > 0) this.scheduleConsolidation();

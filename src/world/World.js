@@ -26,8 +26,9 @@ const DEFAULT_RENDER_DIST = 2;
 const MIN_RENDER_DIST = 2;
 const MAX_RENDER_DIST = 3;
 const RUNTIME_DEFERRED_FINALIZE_IDLE_GRACE_MS = 800;
-const RUNTIME_DEFERRED_FINALIZE_MAX_CHUNKS = 1;
+const RUNTIME_DEFERRED_FINALIZE_MAX_CHUNKS = 2;
 const RUNTIME_IDLE_GRACE_MS = 1000;
+const RUNTIME_DEFERRED_CONSOLIDATION_IDLE_GRACE_MS = 3000;
 const RUNTIME_IDLE_FRAME_BUDGET_MS = 2;
 const CROSS_CHUNK_PATCH_MAX_CHUNKS_PER_FRAME = 1;
 const CROSS_CHUNK_PATCH_MAX_BLOCKS_PER_FRAME = 400;
@@ -265,7 +266,7 @@ export class World {
     this.runtimeIdleScheduler.registerTask({
       id: 'deferred-consolidation',
       priority: 50,
-      minIdleMs: RUNTIME_IDLE_GRACE_MS,
+      minIdleMs: RUNTIME_DEFERRED_CONSOLIDATION_IDLE_GRACE_MS,
       run: () => {
         const processed = this._processDeferredConsolidationQueue();
         return { didWork: processed > 0 };
@@ -280,7 +281,6 @@ export class World {
       maxChunks: CROSS_CHUNK_PATCH_MAX_CHUNKS_PER_FRAME,
       maxBlocks: CROSS_CHUNK_PATCH_MAX_BLOCKS_PER_FRAME
     });
-
     return result?.processedChunks || 0;
   }
 
@@ -413,6 +413,9 @@ export class World {
       return 0;
     }
 
+    const pendingCount = this._pendingDeferredConsolidationChunkKeys.size;
+    console.log(`[DeferredConsolidation] processing queue: pending=${pendingCount} maxChunks=${maxChunks}`);
+
     let processed = 0;
     for (const key of [...this._pendingDeferredConsolidationChunkKeys]) {
       if (processed >= maxChunks) break;
@@ -423,6 +426,7 @@ export class World {
       }
       if (!chunk.isReady || chunk.isConsolidating || chunk.dirtyBlocks <= 0) continue;
       this._pendingDeferredConsolidationChunkKeys.delete(key);
+      console.log(`[DeferredConsolidation] → chunk=${key} dirtyBlocks=${chunk.dirtyBlocks}`);
       chunk.scheduleConsolidation?.();
       processed++;
     }

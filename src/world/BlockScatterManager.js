@@ -29,7 +29,8 @@ export class BlockScatterManager {
         sourceWorkers: new Set(),
         visibleBlockKeys: new Set(),
         structureCenters: null,
-        lastUpdatedAt: 0
+        lastUpdatedAt: 0,
+        retryCount: 0
       };
       map.set(chunkKey, buffer);
     }
@@ -62,6 +63,15 @@ export class BlockScatterManager {
       }
 
       const isOwnChunk = chunkCx === cx && chunkCz === cz;
+
+      // 跨 chunk 场景：如果目标 chunk 已存在且已有该方块，跳过，避免创建冗余 buffer
+      if (!isOwnChunk) {
+        const existingChunk = this.world.chunks.get(chunkKey);
+        if (existingChunk?.isReady && existingChunk.hasBlockEntry?.(block.x, block.y, block.z)) {
+          continue;
+        }
+      }
+
       const targetMap = isOwnChunk ? this.chunkBuffers : this.pendingCrossChunkPatchBuffers;
       const buffer = this._getOrCreateBuffer(targetMap, chunkKey);
       buffer.blocks.push(block);
@@ -174,15 +184,19 @@ export class BlockScatterManager {
 
   /**
    * runtime idle 阶段按玩家距离分批补刷跨 chunk 方块。
-   * @returns {{processedChunks:number, processedBlocks:number, prunedChunks:number, prunedBlocks:number}}
+   * @returns {{processedChunks:number, processedBlocks:number, prunedChunks:number, prunedBlocks:number, elapsedMs:number, skippedBusy:number}}
    */
   flushDeferredCrossChunkPatchesAround(playerCx, playerCz, options = {}) {
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
     const maxChunks = Number.isFinite(options.maxChunks) ? options.maxChunks : 1;
     const maxBlocks = Number.isFinite(options.maxBlocks) ? options.maxBlocks : 400;
     const activeRange = this._getActivePatchRange(options);
     const pruneStats = this._pruneInactivePendingPatches(playerCx, playerCz, activeRange);
     let processedChunks = 0;
     let processedBlocks = 0;
+    let skippedBusy = 0;
+    // 记录本轮补刷涉及的 chunk keys，用于后续批量触发 consolidation
+    const touchedChunkKeys = new Set();
 
     for (const key of this._getPendingPatchKeysByDistance(playerCx, playerCz)) {
       if (processedChunks >= maxChunks || processedBlocks >= maxBlocks) break;
@@ -192,11 +206,19 @@ export class BlockScatterManager {
       if (!buffer) continue;
 
       if (!chunk || chunk.disposed) {
+        this.pendingCrossChunkPatchBuffers.delete(key);
         continue;
       }
-      if (!chunk.isReady || chunk.isConsolidating) continue;
+      if (!chunk.isReady || chunk.isConsolidating) {
+        skippedBusy++;
+        continue;
+      }
       if (buffer.blocks.length === 0) {
-        this.pendingCrossChunkPatchBuffers.delete(key);
+        // 空 buffer：检查重试次数，超过上限则丢弃
+        buffer.retryCount = (buffer.retryCount || 0) + 1;
+        if (buffer.retryCount > 10) {
+          this.pendingCrossChunkPatchBuffers.delete(key);
+        }
         continue;
       }
 
@@ -205,21 +227,56 @@ export class BlockScatterManager {
         ? buffer.blocks.splice(0, remainingBudget)
         : buffer.blocks.splice(0, buffer.blocks.length);
 
+      const patchStart = globalThis.performance?.now?.() ?? Date.now();
       const appended = chunk.appendDeferredCrossChunkPatch?.(
         blocks,
         buffer.visibleBlockKeys,
         buffer.structureCenters
       ) ?? 0;
+      const patchElapsed = (globalThis.performance?.now?.() ?? Date.now()) - patchStart;
 
-      processedBlocks += Number.isFinite(appended) ? appended : blocks.length;
-      processedChunks++;
+      if (patchElapsed > 1) {
+        const bufferAge = patchStart - (buffer.lastUpdatedAt || patchStart);
+        console.log(
+          `[CrossChunkPatch] ✓ chunk=${key} blocks=${blocks.length} appended=${appended} elapsed=${patchElapsed.toFixed(2)}ms bufferAge=${bufferAge.toFixed(0)}ms pendingChunks=${this.pendingCrossChunkPatchBuffers.size}`
+        );
+      }
+
+      if (appended > 0) {
+        processedBlocks += appended;
+        processedChunks++;
+        touchedChunkKeys.add(key);
+      }
+      // appended === 0 说明所有方块都已存在于 chunk，buffer 数据冗余。
+      // splice 已移出，buffer 为空时删除；不为空时留给下一帧。
 
       if (buffer.blocks.length === 0) {
         this.pendingCrossChunkPatchBuffers.delete(key);
       }
     }
 
-    return { processedChunks, processedBlocks, ...pruneStats };
+    // 本轮补刷完成后，对受影响的 chunks 统一触发 consolidation
+    let batchConsolidationCount = 0;
+    for (const key of touchedChunkKeys) {
+      const chunk = this.world.chunks.get(key);
+      if (chunk?.isReady && !chunk.isConsolidating && chunk.dirtyBlocks > 0) {
+        this.world.queueDeferredConsolidation(chunk);
+        batchConsolidationCount++;
+      }
+    }
+    if (batchConsolidationCount > 0) {
+      console.log(
+        `[CrossChunkPatch] ✓ batch-consolidation queued=${batchConsolidationCount} chunks=[${[...touchedChunkKeys].join(', ')}]`
+      );
+    }
+
+    const elapsedMs = (globalThis.performance?.now?.() ?? Date.now()) - t0;
+    if (processedChunks > 0 || (elapsedMs > 1 && this.pendingCrossChunkPatchBuffers.size > 0)) {
+      console.log(
+        `[CrossChunkPatch] frame: ${processedChunks} chunks, ${processedBlocks} blocks, skippedBusy=${skippedBusy}, pending=${this.pendingCrossChunkPatchBuffers.size}, total=${elapsedMs.toFixed(2)}ms`
+      );
+    }
+    return { processedChunks, processedBlocks, elapsedMs, skippedBusy, ...pruneStats };
   }
 
   getPendingCrossChunkPatchStats() {
