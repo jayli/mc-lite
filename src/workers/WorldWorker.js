@@ -470,15 +470,18 @@ onmessage = async function(e) {
     };
   }
 
-  // 无论是否有 snapshot，都执行完整的地形和结构生成
-  // 这样可以确保跨 Chunk 的结构方块被正确生成
-  const rooms = [];
-  const roomSeed = Math.abs((cx * 73856093) ^ (cz * 19349663) ^ seed);
-  let rRand = roomSeed;
-  const nextRand = () => {
-    rRand = (rRand * 1103515245 + 12345) & 0x7fffffff;
-    return rRand / 0x7fffffff;
-  };
+  // P0 优化：consolidation 场景跳过地形重生成，直接用 snapshot.blocks 构建 blockMap。
+  // 主线程的 blockData 是权威数据源，包含完整方块集，无需重新跑地形管线。
+  let structureQueueWithCenters = []; // 在 if 块外声明，供后续代码引用
+  if (!isOptimization) {
+    // 地形生成：房间、CityMap、FrozenMountain、Pyramid 等所有结构放置
+    const rooms = [];
+    const roomSeed = Math.abs((cx * 73856093) ^ (cz * 19349663) ^ seed);
+    let rRand = roomSeed;
+    const nextRand = () => {
+      rRand = (rRand * 1103515245 + 12345) & 0x7fffffff;
+      return rRand / 0x7fffffff;
+    };
 
   for (let i = 0; i < ROOMS_PER_CHUNK; i++) {
     const rx = Math.floor(nextRand() * CHUNK_SIZE);
@@ -1405,7 +1408,7 @@ onmessage = async function(e) {
 
   // 执行结构生成队列，并记录大型结构的中心点
   // structureCenters 需要在生成结构时同步更新
-  const structureQueueWithCenters = structureQueue.map(task => {
+  structureQueueWithCenters = structureQueue.map(task => {
     // 尝试从任务中提取中心点（通过预存储的方式）
     return { task, centerX: task.centerX, centerY: task.centerY, centerZ: task.centerZ, type: task.type };
   });
@@ -1492,6 +1495,7 @@ onmessage = async function(e) {
     activeStructureType = null;
   });
   activeStructureType = null;
+  } // end if (!isOptimization) — consolidation 跳过地形重生成
 
   // 结构中心统一去重，避免后续多阶段追加造成重复中心放大判定范围
   const structureCenterKeySet = new Set();
