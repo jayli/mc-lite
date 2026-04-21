@@ -205,7 +205,11 @@ export class BlockScatterManager {
       const buffer = this.pendingCrossChunkPatchBuffers.get(key);
       if (!buffer) continue;
 
-      if (!chunk || chunk.disposed) {
+      if (!chunk) {
+        // 目标 chunk 尚未加载，保留 pending buffer 等待加载
+        continue;
+      }
+      if (chunk.disposed) {
         this.pendingCrossChunkPatchBuffers.delete(key);
         continue;
       }

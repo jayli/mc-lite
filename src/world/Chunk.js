@@ -1180,6 +1180,19 @@ export class Chunk {
         y: record.y,
         z: record.z
       });
+
+      // 从 blockDataArray 中清除对应坐标，确保 resolveBlockOwner 不会命中地形方块
+      const lx = x & 15;
+      const ly = y - this.worldY;
+      const lz = z & 15;
+      if (ly >= 0 && ly < 16) {
+        const blockIndex = (ly << 8) | (lz << 4) | lx;
+        const oldBlockId = this.blockDataArray[blockIndex];
+        if (oldBlockId !== 0) {
+          this.blockDataArray[blockIndex] = 0;
+          this.solidBlockIds.delete(oldBlockId);
+        }
+      }
     });
   }
 
