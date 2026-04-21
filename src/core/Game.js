@@ -99,14 +99,22 @@ export class Game {
     // 监听键盘事件
     window.addEventListener('keydown', (e) => {
       if (e.code === 'KeyP') {
-        this.showDebugInfo = !this.showDebugInfo;
-        if (!this.showDebugInfo) {
-          console.log('[Debug] 性能监控已关闭');
+        // 切换跨 chunk 方块渲染开关（测试 chunk 生成性能影响）
+        if (this.world?.scatterManager) {
+          this.world.scatterManager.skipCrossChunk = !this.world.scatterManager.skipCrossChunk;
+          const state = this.world.scatterManager.skipCrossChunk ? '已关闭（丢弃）' : '已开启（正常渲染）';
+          console.log(`[Chunk] 跨 chunk 方块渲染 ${state}`);
           if (this.ui && this.ui.hud && this.ui.hud.msgEl) {
-            this.ui.hud.msgEl.style.opacity = 0;
+            const label = this.world.scatterManager.skipCrossChunk ? '⚠ 跨chunk渲染: 关闭' : '跨chunk渲染: 开启';
+            this.ui.hud.msgEl.textContent = label;
+            this.ui.hud.msgEl.style.opacity = 1;
+            // 3 秒后自动隐藏
+            setTimeout(() => {
+              if (this.ui?.hud?.msgEl) {
+                this.ui.hud.msgEl.style.opacity = 0;
+              }
+            }, 3000);
           }
-        } else {
-          console.log('[Debug] 性能监控已开启');
         }
       }
 

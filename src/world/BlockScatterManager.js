@@ -14,6 +14,8 @@ export class BlockScatterManager {
     this.world = world;
     // chunkKey → { blocks: [], loading: true/false, sourceWorkers: Set }
     this.chunkBuffers = new Map();
+    // 跨 chunk 方块渲染开关，关闭时跨 chunk 的方块会被直接丢弃
+    this.skipCrossChunk = false;
   }
 
   /**
@@ -35,6 +37,11 @@ export class BlockScatterManager {
       const chunkCx = Math.floor(block.x / CHUNK_SIZE);
       const chunkCz = Math.floor(block.z / CHUNK_SIZE);
       const chunkKey = `${chunkCx},${chunkCz}`;
+
+      // 跨 chunk 方块过滤（测试用）
+      if (this.skipCrossChunk && (chunkCx !== cx || chunkCz !== cz)) {
+        continue;
+      }
 
       let buffer = this.chunkBuffers.get(chunkKey);
       if (!buffer) {
