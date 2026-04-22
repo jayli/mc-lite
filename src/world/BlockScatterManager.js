@@ -9,6 +9,7 @@
  */
 import { CHUNK_SIZE } from './ChunkConsolidation.js';
 import { coordKeyToCode, encodeCoord } from '../utils/CoordEncoding.js';
+import { recordChunkPerf } from '../utils/ChunkPerfMonitor.js';
 
 export class BlockScatterManager {
   constructor(world) {
@@ -43,6 +44,7 @@ export class BlockScatterManager {
    * @param {Object} workerResult - Worker 返回的数据
    */
   scatter(workerResult) {
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
     const { scatteredBlocks = [], visibleKeys, cx, cz, structureCenters } = workerResult;
     const blockDataBlocks = Array.isArray(workerResult.blockDataBlocks)
       ? workerResult.blockDataBlocks
@@ -88,6 +90,7 @@ export class BlockScatterManager {
         buffer.visibleBlockKeys.add(blockKey);
       }
     }
+    const t1 = globalThis.performance?.now?.() ?? Date.now();
 
     // 确保发起 Worker 的 chunk 即使没有方块，也有 buffer 承载 ready 状态和结构中心。
     const ownKey = `${cx},${cz}`;
@@ -107,6 +110,17 @@ export class BlockScatterManager {
 
     // 4. 通知就绪的 chunk 进行渲染
     this.flushReadyChunks();
+    const t2 = globalThis.performance?.now?.() ?? Date.now();
+    recordChunkPerf('block-scatter.scatter', t2 - t0, {
+      sourceChunkKey: `${cx},${cz}`,
+      distributeMs: t1 - t0,
+      flushReadyChunksMs: t2 - t1,
+      blockDataBlocks: blockDataBlocks.length,
+      scatteredBlocks: scatteredBlocks.length,
+      touchedBuffers: touchedBuffers.size,
+      chunkBuffers: this.chunkBuffers.size,
+      pendingPatchBuffers: this.pendingCrossChunkPatchBuffers.size
+    });
   }
 
   /**
@@ -114,6 +128,11 @@ export class BlockScatterManager {
    * 支持首次渲染和已 ready chunk 的增量追加
    */
   flushReadyChunks() {
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
+    let acceptedChunks = 0;
+    let appendedChunks = 0;
+    let acceptedBlocks = 0;
+    let appendedBlocks = 0;
     for (const [key, buffer] of this.chunkBuffers) {
       const chunk = this.world.chunks.get(key);
       if (!chunk) continue;
@@ -121,11 +140,15 @@ export class BlockScatterManager {
 
       if (!chunk.isReady) {
         // 首次渲染：完整接受并构建 mesh（传递 structureCenters 供跨 chunk 结构判断）
+        acceptedChunks++;
+        acceptedBlocks += buffer.blocks.length;
         chunk.acceptScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys, buffer.structureCenters);
         buffer.blocks = [];
         buffer.visibleBlockKeys = new Set();
       } else {
         // 增量追加：跨 chunk 流式补片不抢 WorldWorker consolidation 队列
+        appendedChunks++;
+        appendedBlocks += buffer.blocks.length;
         chunk.appendScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys, buffer.structureCenters, {
           deferConsolidation: !buffer.ready
         });
@@ -134,6 +157,12 @@ export class BlockScatterManager {
         buffer.visibleBlockKeys = new Set();
       }
     }
+    recordChunkPerf('block-scatter.flush-ready', (globalThis.performance?.now?.() ?? Date.now()) - t0, {
+      acceptedChunks,
+      appendedChunks,
+      acceptedBlocks,
+      appendedBlocks
+    });
   }
 
   _getPendingPatchKeysByDistance(playerCx, playerCz) {

@@ -21,6 +21,7 @@ import { extendChunk as extendWithRenderUtils } from './ChunkRenderUtils.js';
 import { FACE_MASK_ALL } from '../constants/GameConfig.js';
 import { StaticModelInstancedRenderer } from './entities/StaticModelInstancedRenderer.js';
 import { carModel, gunManModel } from '../core/Engine.js';
+import { recordChunkPerf } from '../utils/ChunkPerfMonitor.js';
 
 // 阴影投射白名单规则：所有”实心且可渲染”的方块都允许投射阴影
 const isSolidShadowCaster = (props) => props.isSolid && props.isRendered !== false;
@@ -1343,6 +1344,7 @@ export class Chunk {
    * @param {object} payload - Worker 回包数据
    */
   acceptWorkerResult(payload = {}) {
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
     const {
       scatteredBlocks,
       solidBlocks,
@@ -1386,6 +1388,15 @@ export class Chunk {
     // 由 BlockScatterManager.scatter() → acceptScatteredBlocks() 处理
 
     this.loadState = 'worker-ready';
+    recordChunkPerf('chunk.accept-worker-result', (globalThis.performance?.now?.() ?? Date.now()) - t0, {
+      chunkKey: `${this.cx},${this.cz}`,
+      visibleKeys: visibleKeys?.length || 0,
+      solidBlocks: solidBlocks?.length || 0,
+      scatteredBlocks: scatteredBlocks?.length || 0,
+      structureCenters: structureCenters?.length || 0,
+      modGunMan: modGunMan?.length || 0,
+      rovers: rovers?.length || 0
+    });
   }
 
   /**
@@ -2204,6 +2215,7 @@ export class Chunk {
    * @param {Array} structureCenters - 结构中心列表（供跨 chunk 结构判断）
    */
   acceptScatteredBlocks(scatteredBlocks, visibleBlockKeys, structureCenters) {
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
     const minX = this.cx * CHUNK_SIZE;
     const minZ = this.cz * CHUNK_SIZE;
 
@@ -2234,6 +2246,7 @@ export class Chunk {
         this.solidBlocks.add(code);
       }
     }
+    const t1 = globalThis.performance?.now?.() ?? Date.now();
 
     // 构建可见方块编码集合，供 mesh 构建时过滤隐藏方块
     const encodedVisibleKeys = new Set();
@@ -2244,19 +2257,24 @@ export class Chunk {
         this.visibleKeys.add(code);
       }
     }
+    const t2 = globalThis.performance?.now?.() ?? Date.now();
 
     // 合并 structureCenters（buffer 中可能已包含来自相邻 chunk 的结构中心）
     if (structureCenters?.length > 0) {
       this._mergeStructureCenters(structureCenters);
     }
+    const t3 = globalThis.performance?.now?.() ?? Date.now();
 
     // 初始化数组存储
     this._initArrayStorageFromBlockData();
+    const t4 = globalThis.performance?.now?.() ?? Date.now();
 
     // 直接从 scatteredBlocks 构建 meshData，跳过 buildMeshesFromScatteredData 的重复遍历。
     // buffer.blocks 包含所有方块（含隐藏），_convertScatteredBlocksToMeshData 会按 visibleKeys 过滤。
     const meshData = this._convertScatteredBlocksToMeshData(scatteredBlocks, encodedVisibleKeys, structureCenters);
+    const t5 = globalThis.performance?.now?.() ?? Date.now();
     this.buildMeshes(meshData);
+    const t6 = globalThis.performance?.now?.() ?? Date.now();
 
     // 标记 chunk 为已加载
     this.loadState = 'terrain-built';
@@ -2264,6 +2282,21 @@ export class Chunk {
 
     // 通知 World 继续后续装配流程（entities → finalize）
     this.world?.onChunkWorkerReady?.(this);
+    const t7 = globalThis.performance?.now?.() ?? Date.now();
+    recordChunkPerf('chunk.accept-scattered-blocks', t7 - t0, {
+      chunkKey: `${this.cx},${this.cz}`,
+      inputBlocks: scatteredBlocks?.length || 0,
+      visibleBlockKeys: visibleBlockKeys?.size || 0,
+      blockDataSize: this.blockData.size,
+      meshGroups: meshData?.length || 0,
+      writeBlockDataMs: t1 - t0,
+      visibleKeysMs: t2 - t1,
+      mergeStructureCentersMs: t3 - t2,
+      initArrayStorageMs: t4 - t3,
+      convertMeshDataMs: t5 - t4,
+      buildMeshesMs: t6 - t5,
+      notifyWorldMs: t7 - t6
+    });
   }
 
   /**
@@ -2322,12 +2355,22 @@ export class Chunk {
     }
 
     if (appendedCount === 0) return 0;
+    const t1 = globalThis.performance?.now?.() ?? Date.now();
 
     // 同步数组存储；跨 chunk 流式补片不立即抢占 WorldWorker 合并队列
     this.dirtyBlocks += appendedCount;
-    const t1 = globalThis.performance?.now?.() ?? Date.now();
     this._initArrayStorageFromBlockData();
     const t2 = globalThis.performance?.now?.() ?? Date.now();
+    recordChunkPerf('chunk.append-scattered-blocks', t2 - t0, {
+      chunkKey: `${this.cx},${this.cz}`,
+      inputBlocks: scatteredBlocks?.length || 0,
+      appendedCount,
+      visibleBlockKeys: visibleBlockKeys?.size || 0,
+      deferConsolidation: options.deferConsolidation === true,
+      writeBlockDataMs: t1 - t0,
+      initArrayStorageMs: t2 - t1,
+      dirtyBlocks: this.dirtyBlocks
+    });
     if (options.deferConsolidation) {
       this.hasDeferredFinalizeWork = true;
       // 不再在这里 queue，改由 World 层 idle 任务统一触发

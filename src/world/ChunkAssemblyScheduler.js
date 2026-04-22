@@ -1,5 +1,6 @@
 // src/world/ChunkAssemblyScheduler.js
 // Chunk 主线程装配调度器
+import { recordChunkPerf } from '../utils/ChunkPerfMonitor.js';
 
 const now = () => (globalThis.performance?.now?.() ?? Date.now());
 
@@ -45,6 +46,7 @@ export class ChunkAssemblyScheduler {
     const budgetMs = Number.isFinite(options.budgetMs) ? options.budgetMs : 4;
     const maxTasks = Number.isFinite(options.maxTasks) ? options.maxTasks : 2;
     const start = now();
+    const initialQueueLength = this.queue.length;
     let processed = 0;
 
     while (this.queue.length > 0 && processed < maxTasks && (now() - start) <= budgetMs) {
@@ -54,6 +56,15 @@ export class ChunkAssemblyScheduler {
       this._runTask(task);
     }
 
+    if (processed > 0 || initialQueueLength > 0 || this.queue.length > 0) {
+      recordChunkPerf('chunk-assembly.process', now() - start, {
+        budgetMs,
+        maxTasks,
+        processed,
+        initialQueueLength,
+        remainingQueueLength: this.queue.length
+      });
+    }
     return processed;
   }
 
@@ -90,6 +101,7 @@ export class ChunkAssemblyScheduler {
 
   _runTask(task) {
     const { chunk, stage } = task;
+    const start = now();
     chunk.queuedAssemblyStages?.delete(stage);
     if (!chunk || chunk.disposed) return;
 
@@ -115,5 +127,12 @@ export class ChunkAssemblyScheduler {
       default:
         break;
     }
+    recordChunkPerf('chunk-assembly.task', now() - start, {
+      chunkKey: `${chunk.cx},${chunk.cz}`,
+      stage,
+      priority: task.priority,
+      loadState: chunk.loadState,
+      isReady: chunk.isReady
+    });
   }
 }

@@ -11,6 +11,7 @@ import { getRotationAngle } from '../utils/OrientationUtils.js';
 import { filterWorkerResultAgainstBlockData } from './ChunkMeshDataFilter.js';
 import { belongsToCrossChunkStructure } from '../utils/StructureUtils.js';
 import { worldWorker, workerCallbacks, worldWorkerPool } from '../workers/WorldWorkerPool.js';
+import { recordChunkPerf } from '../utils/ChunkPerfMonitor.js';
 export { worldWorker, workerCallbacks, worldWorkerPool };
 
 // 区块大小常量
@@ -338,6 +339,12 @@ export function extendChunk(Chunk) {
         : 0;
 
       this._applyConsolidateResult(data, consolidatedCount, consolidatedMeshKeys);
+      recordChunkPerf('chunk.consolidate-worker-callback', performance.now() - callbackReceivedAt, {
+        chunkKey: `${this.cx},${this.cz}`,
+        isCrossChunkPatch,
+        workerComputeMs: workerTiming.workerComputeMs,
+        transitFromWorkerMs
+      });
     });
 
     // 发送请求到 Worker 池
@@ -438,6 +445,20 @@ export function extendChunk(Chunk) {
     }
 
     if (this.dirtyBlocks > 0) this.scheduleConsolidation();
+    recordChunkPerf('chunk.apply-consolidate-result', t7 - t0, {
+      chunkKey: `${this.cx},${this.cz}`,
+      scatteredBlocks: scatteredBlocks?.length || 0,
+      filteredBlocks: filteredBlocks.length,
+      meshGroups: meshData?.length || 0,
+      filterMs: t2 - t1,
+      convertMeshDataMs: t3 - t2,
+      syncVisibilityMs: t4 - t3,
+      cleanupOldMeshesMs: t5 - t4,
+      buildMeshesMs: t6 - t5,
+      restoreAndReindexMs: t7 - t6,
+      workerComputeMs: data?._workerTiming?.workerComputeMs,
+      dirtyBlocks: this.dirtyBlocks
+    });
   };
 
   /**

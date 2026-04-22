@@ -9,6 +9,7 @@ import { UIManager } from '../ui/UIManager.js';
 import { Player } from '../actors/player/Player.js';
 import { faceCullingSystem } from './FaceCullingSystem.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
+import { getRecentChunkPerfEvents, isChunkPerfDebugEnabled, toggleChunkPerfDebug } from '../utils/ChunkPerfMonitor.js';
 import { EnemyManager } from './EnemyManager.js'; // 替换为新的敌人管理器
 import { TurretManager } from '../actors/turret/TurretManager.js';
 import { ZombieNestManager } from '../actors/zombie-nest/ZombieNestManager.js';
@@ -98,6 +99,13 @@ export class Game {
 
     // 监听键盘事件
     window.addEventListener('keydown', (e) => {
+      if (e.code === 'KeyL' && !e.repeat && !this._isTextInputEvent(e)) {
+        const enabled = toggleChunkPerfDebug(globalThis);
+        const state = enabled ? '开启' : '关闭';
+        console.log(`[ChunkPerf] CHUNK_PERF_DEBUG 已${state}`);
+        this._showTransientHudMessage(`ChunkPerf: ${state}`);
+      }
+
       if (e.code === 'KeyP') {
         // 切换跨 chunk 方块渲染开关（测试 chunk 生成性能影响）
         if (this.world?.scatterManager) {
@@ -314,6 +322,27 @@ export class Game {
     }, 5000);
   }
 
+  _isTextInputEvent(event) {
+    const target = event?.target;
+    if (!target) return false;
+    const tagName = target.tagName;
+    return target.isContentEditable ||
+      tagName === 'INPUT' ||
+      tagName === 'TEXTAREA' ||
+      tagName === 'SELECT';
+  }
+
+  _showTransientHudMessage(text) {
+    if (!this.ui?.hud?.msgEl) return;
+    this.ui.hud.msgEl.textContent = text;
+    this.ui.hud.msgEl.style.opacity = 1;
+    setTimeout(() => {
+      if (this.ui?.hud?.msgEl?.textContent === text) {
+        this.ui.hud.msgEl.style.opacity = 0;
+      }
+    }, 2000);
+  }
+
   /**
   * 启动游戏循环
   */
@@ -396,6 +425,20 @@ export class Game {
         'Render (WebGL)': `${this.perfStats.render.toFixed(2)}ms`,
         'Other (Overhead)': `${overHead}ms`
       });
+      if (isChunkPerfDebugEnabled()) {
+        const recentChunkPerfEvents = getRecentChunkPerfEvents(1200);
+        if (recentChunkPerfEvents.length > 0) {
+          console.table(recentChunkPerfEvents.map((event) => ({
+            label: event.label,
+            durationMs: event.durationMs.toFixed(2),
+            chunkKey: event.details?.chunkKey || event.details?.sourceChunkKey || '',
+            blocks: event.details?.inputBlocks ?? event.details?.blockDataBlocks ?? event.details?.scatteredBlocks ?? '',
+            buildMeshesMs: event.details?.buildMeshesMs?.toFixed?.(2) || '',
+            convertMeshDataMs: event.details?.convertMeshDataMs?.toFixed?.(2) || '',
+            scatterMs: event.details?.scatterMs?.toFixed?.(2) || ''
+          })));
+        }
+      }
     }
   }
 

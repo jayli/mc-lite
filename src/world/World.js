@@ -12,6 +12,7 @@ import { parseBlockEntry } from '../utils/OrientationUtils.js';
 import { getBlockProps } from '../constants/BlockData.js';
 import { ChunkAssemblyScheduler } from './ChunkAssemblyScheduler.js';
 import { RuntimeIdleScheduler } from './RuntimeIdleScheduler.js';
+import { recordChunkPerf } from '../utils/ChunkPerfMonitor.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
@@ -23,14 +24,23 @@ const getParticleSystem = () => globalThis._ParticleSystem || ParticleSystem;
 const CHUNK_SIZE = 16;
 /** 默认渲染距离（以区块为单位） */
 const DEFAULT_RENDER_DIST = 2;
+/** 最小渲染距离 */
 const MIN_RENDER_DIST = 2;
+/** 最大渲染距离 */
 const MAX_RENDER_DIST = 3;
+/** runtime 阶段延迟 finalize 的空闲等待时间（ms），超时后才开始执行 */
 const RUNTIME_DEFERRED_FINALIZE_IDLE_GRACE_MS = 800;
+/** runtime 阶段每帧最多 finalize 的区块数量 */
 const RUNTIME_DEFERRED_FINALIZE_MAX_CHUNKS = 2;
-const RUNTIME_IDLE_GRACE_MS = 1000;
+/** runtime 阶段进入 idle 状态前的空闲等待时间（ms），超时后才触发 idle 任务 */
+const RUNTIME_IDLE_GRACE_MS = 100;
+/** runtime 阶段延迟合并的空闲等待时间（ms） */
 const RUNTIME_DEFERRED_CONSOLIDATION_IDLE_GRACE_MS = 3000;
+/** idle 任务每帧预算时间（ms），防止低优先级任务阻塞渲染 */
 const RUNTIME_IDLE_FRAME_BUDGET_MS = 2;
+/** 跨区块补丁每帧最多处理的区块数 */
 const CROSS_CHUNK_PATCH_MAX_CHUNKS_PER_FRAME = 1;
+/** 跨区块补丁每帧最多处理的方块数 */
 const CROSS_CHUNK_PATCH_MAX_BLOCKS_PER_FRAME = 400;
 /**
  * 世界管理器类
@@ -245,11 +255,25 @@ export class World {
    * @param {Object} workerResult - Worker 返回的数据
    */
   _onChunkGenResult(chunk, workerResult) {
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
     this.runtimeIdleScheduler?.markBusy('chunk-worker-result');
     // 先装配 Worker 回包元数据（snapshot、structureCenters、solidBlocks、
     // pendingSpecialEntityData、visibleKeys 等），再分发方块
     chunk.acceptWorkerResult(workerResult);
+    const t1 = globalThis.performance?.now?.() ?? Date.now();
     this.scatterManager.scatter(workerResult);
+    const t2 = globalThis.performance?.now?.() ?? Date.now();
+    recordChunkPerf('world.chunk-worker-result', t2 - t0, {
+      chunkKey: `${chunk.cx},${chunk.cz}`,
+      acceptWorkerResultMs: t1 - t0,
+      scatterMs: t2 - t1,
+      workerComputeMs: workerResult?._workerTiming?.workerComputeMs,
+      blockDataBlocks: workerResult?.blockDataBlocks?.length || 0,
+      scatteredBlocks: workerResult?.scatteredBlocks?.length || 0,
+      visibleKeys: workerResult?.visibleKeys?.length || 0,
+      solidBlocks: workerResult?.solidBlocks?.length || 0,
+      isOptimization: workerResult?.isOptimization === true
+    });
   }
 
   _registerRuntimeIdleTasks() {

@@ -9,6 +9,7 @@ import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { persistenceService } from '../services/PersistenceService.js';
 import { materials } from '../core/MaterialManager.js';
 import { geomMap, worldWorker, workerCallbacks } from './ChunkConsolidation.js';
+import { recordChunkPerf } from '../utils/ChunkPerfMonitor.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
@@ -96,6 +97,7 @@ export function extendChunk(Chunk) {
    * @param {Array} meshDataArray - Worker 返回的预计算 mesh 数据
    */
   Chunk.prototype.buildMeshes = function(meshDataArray) {
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
     // 防御性检查：确保数据格式正确
     if (!Array.isArray(meshDataArray)) {
       console.warn('buildMeshes received legacy data format, expected array');
@@ -111,6 +113,11 @@ export function extendChunk(Chunk) {
         this._buildSingleTypeMesh(data);
       }
     }
+    recordChunkPerf('chunk.build-meshes', (globalThis.performance?.now?.() ?? Date.now()) - t0, {
+      chunkKey: `${this.cx},${this.cz}`,
+      meshGroups: meshDataArray.length,
+      instanceCount: meshDataArray.reduce((sum, data) => sum + (data.count || 0), 0)
+    });
   }
 
   /**
@@ -118,6 +125,7 @@ export function extendChunk(Chunk) {
    * @param {Object} data - Worker 返回的合批 mesh 数据
    */
   Chunk.prototype._buildBatchedMesh = function(data) {
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
     const { type: textureUrl, count, matrices, aoLow, aoHigh, orientation, textureIndex, instanceIndexMap, blockTypes } = data;
 
     // 创建使用共享材质的 InstancedMesh
@@ -144,6 +152,12 @@ export function extendChunk(Chunk) {
     );
 
     this.group.add(mesh);
+    recordChunkPerf('chunk.build-batched-mesh', (globalThis.performance?.now?.() ?? Date.now()) - t0, {
+      chunkKey: `${this.cx},${this.cz}`,
+      textureUrl,
+      count,
+      blockTypes: blockTypes?.length || 0
+    }, { thresholdMs: 1 });
   };
 
   /**
@@ -151,6 +165,7 @@ export function extendChunk(Chunk) {
    * @param {Object} data - Worker 返回的 mesh 数据
    */
   Chunk.prototype._buildSingleTypeMesh = function(data) {
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
     const { type, count, matrices, aoLow, aoHigh, orientation, instanceIndexMap } = data;
 
     const props = getBlockProps(type);
@@ -216,5 +231,12 @@ export function extendChunk(Chunk) {
 
     // 将实例化网格添加到区块的分组中
     this.group.add(mesh);
+    recordChunkPerf('chunk.build-single-type-mesh', (globalThis.performance?.now?.() ?? Date.now()) - t0, {
+      chunkKey: `${this.cx},${this.cz}`,
+      type,
+      count,
+      clonedGeometry: props.isSolid && !props.isTransparent,
+      instanceIndexMapSize: Object.keys(instanceIndexMap || {}).length
+    }, { thresholdMs: 1 });
   };
 }
