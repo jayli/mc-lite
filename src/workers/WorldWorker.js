@@ -1632,14 +1632,14 @@ onmessage = async function(e) {
 
     // 用 snapshot 中的方块覆盖 blockMap（保留玩家修改）
     if (savedSnapshot.blocks) {
-      // 在 snapshot 模式下，需要根据 snapshot 清理”当前 Chunk 负责渲染/存储范围”的被删除方块
-      // 注意：仅对可跨 Chunk 的小体积结构保留跨 Chunk 责任；大型静态结构按坐标归属
-      for (const [key, b] of blockMap) {
-        // 只清理当前 Chunk 责任范围内的方块
-        if (isBlockOwnedByCurrentChunk(b)) {
-          // 如果该坐标不在 snapshot 中，说明玩家已删除该方块（或该坐标原本就是空气）
-          if (!getBlockFromSnapshot(savedSnapshot.blocks, b.x, b.y, b.z)) {
-            blockMap.delete(key);
+      // 非 consolidation 路径：需要根据 snapshot 清理当前 Chunk 责任范围内的被删除方块
+      // consolidation 路径中 blockMap 为空（地形生成已跳过），无需清理
+      if (!isOptimization) {
+        for (const [key, b] of blockMap) {
+          if (isBlockOwnedByCurrentChunk(b)) {
+            if (!getBlockFromSnapshot(savedSnapshot.blocks, b.x, b.y, b.z)) {
+              blockMap.delete(key);
+            }
           }
         }
       }
@@ -1674,9 +1674,9 @@ onmessage = async function(e) {
 
         const snapshotBlock = { x: bx, y: by, z: bz, type: entry.type };
 
-        // 关键修复：snapshot 回写也必须通过当前 Chunk 的”所有权”校验，
-        // 否则历史遗留的跨 Chunk 重复键会被再次注入，导致同坐标多方块重叠渲染。
-        if (!isBlockOwnedByCurrentChunk(snapshotBlock)) {
+        // consolidation 路径：snapshot 中的方块全部在当前 chunk 范围内，跳过 ownership 检查
+        // 非 consolidation 路径：防止历史遗留的跨 Chunk 重复键被再次注入
+        if (!isOptimization && !isBlockOwnedByCurrentChunk(snapshotBlock)) {
           ownershipFilteredSnapshotBlocks++;
           continue;
         }
@@ -1698,15 +1698,74 @@ onmessage = async function(e) {
   const d = {};
   const solidBlocks = [];
 
-  // 辅助函数：判断指定位置的方块是否遮挡视线
-  // 与主线程 AO 规则保持一致：仅“实心且非透明”方块才遮挡
+  // consolidation 路径专用：Uint8Array 遮挡网格，替代 Map 查找
+  // x/z 方向各扩展 1 格边界（邻居查询需要），y 动态计算范围
+  const GRID_PAD = 1;
+  const GRID_SIZE_XZ = CHUNK_SIZE + GRID_PAD * 2; // 18
+  let occlusionGrid = null;
+  let gridMinY = 0;
+  let gridHeight = 0;
+  const isFastOcclusion = isOptimization && savedSnapshot && savedSnapshot.blocks;
+
+  if (isFastOcclusion) {
+    // 从 snapshot 中提取 y 范围
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (const key in savedSnapshot.blocks) {
+      let y;
+      if (!key.includes(',')) {
+        const decoded = decodeCoord(Number(key));
+        y = decoded.y;
+      } else {
+        y = key.split(',')[1] | 0;
+      }
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    if (minY !== Infinity) {
+      gridMinY = minY;
+      gridHeight = maxY - minY + 1;
+      occlusionGrid = new Uint8Array(GRID_SIZE_XZ * gridHeight * GRID_SIZE_XZ);
+
+      // 填充遮挡网格 — consolidation 路径中 blockMap 的方块全部在当前 chunk 范围内
+      for (const [, b] of blockMap) {
+        if (isFullCubeOccluder(b.type)) {
+          const localX = b.x - minX + GRID_PAD;
+          const localZ = b.z - minZ + GRID_PAD;
+          const localY = b.y - gridMinY;
+          if (localX >= 0 && localX < GRID_SIZE_XZ && localZ >= 0 && localZ < GRID_SIZE_XZ && localY >= 0 && localY < gridHeight) {
+            occlusionGrid[localX * gridHeight * GRID_SIZE_XZ + localY * GRID_SIZE_XZ + localZ] = 1;
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * 快速遮挡查询 — consolidation 路径用 Uint8Array，非 consolidation 路径回退到 blockMap
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @returns {boolean} 该位置是否有遮挡方块
+   */
   const isOccluding = (x, y, z) => {
+    // consolidation 路径：优先使用 Uint8Array 快速查询
+    if (occlusionGrid) {
+      const localX = x - minX + GRID_PAD;
+      const localZ = z - minZ + GRID_PAD;
+      const localY = y - gridMinY;
+      if (localX < 0 || localX >= GRID_SIZE_XZ || localZ < 0 || localZ >= GRID_SIZE_XZ || localY < 0 || localY >= gridHeight) {
+        return false;
+      }
+      return occlusionGrid[localX * gridHeight * GRID_SIZE_XZ + localY * GRID_SIZE_XZ + localZ] === 1;
+    }
+
+    // 非 consolidation 路径 / 无 snapshot 回退：blockMap 查找
     const k = encodeCoord(x, y, z);
     const b = blockMap.get(k);
     if (!b) return false;
-    // consolidate 优化场景：只信任当前 Chunk 归属方块作为遮挡体，
-    // 防止跨 Chunk 历史残留方块在 1s 后回包中误参与遮挡，导致“延迟出洞”。
-    if (isOptimization && savedSnapshot && !isBlockOwnedByCurrentChunk(b)) return false;
+    // 非 consolidation 路径：防止跨 Chunk 历史残留方块误参与遮挡
+    if (!isOptimization && savedSnapshot && !isBlockOwnedByCurrentChunk(b)) return false;
     return isFullCubeOccluder(b.type);
   };
 
@@ -1728,15 +1787,17 @@ onmessage = async function(e) {
 
   // 仅保存当前 Chunk 负责的数据（地图语义）
   // 使用数字编码格式，与 Chunk.blockData 一致
+  // consolidation 路径中所有方块都在 chunk 范围内，无需 ownership 过滤
   const blocksForSnapshot = {};
   for (const [, b] of blockMap) {
-    if (!isBlockOwnedByCurrentChunk(b)) continue;
+    if (!isOptimization && !isBlockOwnedByCurrentChunk(b)) continue;
     const code = encodeCoord(b.x, b.y, b.z);
     blocksForSnapshot[code] = { type: b.type, orientation: b.orientation || 0 };
   }
 
   for (const [key, block] of blockMap) {
-    const shouldOwnBlock = isBlockOwnedByCurrentChunk(block);
+    // consolidation 路径中所有方块都在 chunk 范围内，shouldOwnBlock 永远为 true
+    const shouldOwnBlock = isOptimization || isBlockOwnedByCurrentChunk(block);
 
     // 固体方块：只要在 Chunk 内或者是跨区结构方块，都添加到 solidBlocks
     if (block.solid && shouldOwnBlock) solidBlocks.push(key);
@@ -1767,7 +1828,6 @@ onmessage = async function(e) {
       let aoLow = 0;
       let aoHigh = 0;
       // 简化AO逻辑：非透明且实心的方块自动启用AO
-      const props = getBlockProperties(block.type);
       const isAOEnabled = !props.isTransparent && props.isSolid;
       if (isAOEnabled) {
         ({ aoLow, aoHigh } = calculateAOForBlock(block.x, block.y, block.z, isOccluding));
