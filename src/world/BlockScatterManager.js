@@ -39,6 +39,43 @@ export class BlockScatterManager {
     return buffer;
   }
 
+  _removeBlockFromBuffer(buffer, code) {
+    if (!buffer) return 0;
+    const before = buffer.blocks.length;
+    if (before === 0) {
+      buffer.visibleBlockKeys?.delete?.(code);
+      return 0;
+    }
+
+    buffer.blocks = buffer.blocks.filter((block) => encodeCoord(block.x, block.y, block.z) !== code);
+    buffer.visibleBlockKeys?.delete?.(code);
+    return before - buffer.blocks.length;
+  }
+
+  invalidatePendingBlock(x, y, z) {
+    const code = encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
+    const chunkCx = Math.floor(x / CHUNK_SIZE);
+    const chunkCz = Math.floor(z / CHUNK_SIZE);
+    const chunkKey = `${chunkCx},${chunkCz}`;
+
+    let removed = 0;
+
+    const chunkBuffer = this.chunkBuffers.get(chunkKey);
+    if (chunkBuffer) {
+      removed += this._removeBlockFromBuffer(chunkBuffer, code);
+    }
+
+    const pendingBuffer = this.pendingCrossChunkPatchBuffers.get(chunkKey);
+    if (pendingBuffer) {
+      removed += this._removeBlockFromBuffer(pendingBuffer, code);
+      if (pendingBuffer.blocks.length === 0) {
+        this.pendingCrossChunkPatchBuffers.delete(chunkKey);
+      }
+    }
+
+    return removed;
+  }
+
   /**
    * 入口：接收 Worker 返回的完整结果
    * @param {Object} workerResult - Worker 返回的数据

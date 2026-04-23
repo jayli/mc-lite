@@ -43,6 +43,16 @@ const RUNTIME_IDLE_FRAME_BUDGET_MS = 2;
 const GLOBAL_INSTANCE_FLUSH_FRAME_BUDGET_MS = 2;
 /** 全局实例每帧最多写入数量 */
 const GLOBAL_INSTANCE_FLUSH_MAX_BLOCKS_PER_FRAME = 600;
+/** 全局实例写入最低预算，避免队列长期饥饿 */
+const GLOBAL_INSTANCE_FLUSH_MIN_BLOCKS_PER_FRAME = 120;
+/** 全局实例写入峰值预算上限，仅在高 FPS 且积压较多时放宽 */
+const GLOBAL_INSTANCE_FLUSH_MAX_BLOCKS_PER_FRAME_CAP = 1400;
+/** 全局实例写入最低时间预算 */
+const GLOBAL_INSTANCE_FLUSH_MIN_FRAME_BUDGET_MS = 0.75;
+/** 全局实例写入峰值时间预算上限 */
+const GLOBAL_INSTANCE_FLUSH_MAX_FRAME_BUDGET_MS = 3;
+/** 全局实例 flush 帧时长平滑系数，避免预算抖动 */
+const GLOBAL_INSTANCE_FLUSH_FRAME_EMA_ALPHA = 0.2;
 /** 跨区块补丁每帧最多处理的区块数 */
 const CROSS_CHUNK_PATCH_MAX_CHUNKS_PER_FRAME = 1;
 /** 跨区块补丁每帧最多处理的方块数 */
@@ -131,6 +141,7 @@ export class World {
       idleGraceMs: RUNTIME_IDLE_GRACE_MS,
       frameBudgetMs: RUNTIME_IDLE_FRAME_BUDGET_MS
     });
+    this._globalInstanceFlushFrameMsEma = 16.7;
     this._staticTreeTerrainBoostChunkKeys = new Set();
     this._lastStreamingActivityAt = 0;
     this._pendingDeferredFinalizeChunkKeys = new Set();
@@ -202,6 +213,63 @@ export class World {
 
   getRuntimeIdleStats() {
     return this.runtimeIdleScheduler?.getStats?.() || null;
+  }
+
+  _computeGlobalInstanceFlushBudget(dt = 0) {
+    const frameMsRaw = Number.isFinite(dt) && dt > 0 ? dt * 1000 : 16.7;
+    const frameMs = Math.min(100, Math.max(1, frameMsRaw));
+    this._globalInstanceFlushFrameMsEma =
+      (this._globalInstanceFlushFrameMsEma * (1 - GLOBAL_INSTANCE_FLUSH_FRAME_EMA_ALPHA)) +
+      (frameMs * GLOBAL_INSTANCE_FLUSH_FRAME_EMA_ALPHA);
+
+    const stats = this.globalInstancedMeshManager?.getStats?.() || {};
+    const queuedBlocks = Number.isFinite(stats.queuedBlocks) ? stats.queuedBlocks : 0;
+
+    let ops = GLOBAL_INSTANCE_FLUSH_MAX_BLOCKS_PER_FRAME;
+    let maxMs = GLOBAL_INSTANCE_FLUSH_FRAME_BUDGET_MS;
+
+    if (this._globalInstanceFlushFrameMsEma <= 12) {
+      ops = 1000;
+      maxMs = 3;
+    } else if (this._globalInstanceFlushFrameMsEma <= 16.7) {
+      ops = GLOBAL_INSTANCE_FLUSH_MAX_BLOCKS_PER_FRAME;
+      maxMs = GLOBAL_INSTANCE_FLUSH_FRAME_BUDGET_MS;
+    } else if (this._globalInstanceFlushFrameMsEma <= 22) {
+      ops = 320;
+      maxMs = 1.25;
+    } else {
+      ops = GLOBAL_INSTANCE_FLUSH_MIN_BLOCKS_PER_FRAME;
+      maxMs = GLOBAL_INSTANCE_FLUSH_MIN_FRAME_BUDGET_MS;
+    }
+
+    // 启动阶段优先把首屏 chunk 尽快推上屏；运行期则更强调平滑。
+    if (this.bootstrapState.phase !== 'runtime-streaming') {
+      ops = Math.max(ops, 900);
+      maxMs = Math.max(maxMs, 2.5);
+    }
+
+    // 有明显积压时适度拉高吞吐，但仍受帧时长和全局上限约束。
+    if (queuedBlocks >= 4000) {
+      ops += 300;
+      maxMs += 0.5;
+    } else if (queuedBlocks >= 1500) {
+      ops += 150;
+      maxMs += 0.25;
+    }
+
+    ops = Math.max(
+      GLOBAL_INSTANCE_FLUSH_MIN_BLOCKS_PER_FRAME,
+      Math.min(GLOBAL_INSTANCE_FLUSH_MAX_BLOCKS_PER_FRAME_CAP, Math.round(ops))
+    );
+    maxMs = Math.max(
+      GLOBAL_INSTANCE_FLUSH_MIN_FRAME_BUDGET_MS,
+      Math.min(GLOBAL_INSTANCE_FLUSH_MAX_FRAME_BUDGET_MS, maxMs)
+    );
+
+    return {
+      maxOps: ops,
+      maxMs
+    };
   }
 
   setRenderDistance(distance) {
@@ -574,10 +642,7 @@ export class World {
     }
 
     this.processAssemblyQueues();
-    this.globalInstancedMeshManager?.flushMutationQueue?.({
-      maxOps: GLOBAL_INSTANCE_FLUSH_MAX_BLOCKS_PER_FRAME,
-      maxMs: GLOBAL_INSTANCE_FLUSH_FRAME_BUDGET_MS
-    });
+    this.globalInstancedMeshManager?.flushMutationQueue?.(this._computeGlobalInstanceFlushBudget(dt));
     if (this.bootstrapState.phase === 'runtime-streaming') {
       this._processDeferredFinalizeQueue();
       this.runtimeIdleScheduler.process({

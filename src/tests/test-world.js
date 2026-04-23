@@ -337,6 +337,44 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('_computeGlobalInstanceFlushBudget - 低帧率时应主动降预算', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+    world.bootstrapState.phase = 'runtime-streaming';
+    world.globalInstancedMeshManager = {
+      getStats: () => ({ queuedBlocks: 800 })
+    };
+    world._globalInstanceFlushFrameMsEma = 16.7;
+
+    const budget = world._computeGlobalInstanceFlushBudget(0.04);
+
+    assertEqual(budget.maxOps, 320, '40ms 帧时长下应降到保守 blocks 预算');
+    assertEqual(budget.maxMs, 1.25, '40ms 帧时长下应缩小时间预算');
+
+    teardownEnvironment();
+  });
+
+  test('_computeGlobalInstanceFlushBudget - 高帧率且积压高时应放宽预算', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+    world.bootstrapState.phase = 'runtime-streaming';
+    world.globalInstancedMeshManager = {
+      getStats: () => ({ queuedBlocks: 5000 })
+    };
+    world._globalInstanceFlushFrameMsEma = 10;
+
+    const budget = world._computeGlobalInstanceFlushBudget(0.01);
+
+    assertEqual(budget.maxOps, 1300, '高 FPS 且高积压时应提升吞吐预算');
+    assertEqual(budget.maxMs, 3, '高 FPS 时应放宽到更高时间预算上限');
+
+    teardownEnvironment();
+  });
+
 
   test('bootstrap - 完成装配队列后应允许进入游戏', async () => {
     setupEnvironment();

@@ -19,6 +19,16 @@ function copyMatrixArray(source, sourceIndex, target, targetIndex) {
   );
 }
 
+function copyChestState(sourceStates, fromIndex, targetStates, toIndex) {
+  if (!sourceStates || !targetStates) return;
+  const state = sourceStates[fromIndex];
+  if (state) {
+    targetStates[toIndex] = { ...state };
+  } else {
+    delete targetStates[toIndex];
+  }
+}
+
 class TypeBuffer {
   constructor(manager, renderKey, type, initialCapacity) {
     this.manager = manager;
@@ -87,6 +97,7 @@ class TypeBuffer {
     const oldAoLow = oldGeometry.getAttribute('aAoLow')?.array || null;
     const oldAoHigh = oldGeometry.getAttribute('aAoHigh')?.array || null;
     const oldOrientation = oldGeometry.getAttribute('aOrientation')?.array || null;
+    const oldChestStates = oldMesh.userData?.chests || null;
 
     this.capacity = nextCapacity;
     this.indexToCoord.length = nextCapacity;
@@ -100,6 +111,11 @@ class TypeBuffer {
     if (oldAoLow && nextAoLow) nextAoLow.array.set(oldAoLow.subarray(0, this.count));
     if (oldAoHigh && nextAoHigh) nextAoHigh.array.set(oldAoHigh.subarray(0, this.count));
     if (oldOrientation && nextOrientation) nextOrientation.array.set(oldOrientation.subarray(0, this.count));
+    if (oldChestStates && this.mesh.userData?.chests) {
+      for (let i = 0; i < this.count; i++) {
+        copyChestState(oldChestStates, i, this.mesh.userData.chests, i);
+      }
+    }
 
     this.mesh.count = this.count;
     this.mesh.instanceMatrix.needsUpdate = true;
@@ -181,6 +197,7 @@ class TypeBuffer {
     if (aoLow) aoLow.array[toIndex] = aoLow.array[fromIndex];
     if (aoHigh) aoHigh.array[toIndex] = aoHigh.array[fromIndex];
     if (orientation) orientation.array[toIndex] = orientation.array[fromIndex];
+    copyChestState(this.mesh.userData?.chests, fromIndex, this.mesh.userData?.chests, toIndex);
   }
 
   updateAO(index, aoLowValue, aoHighValue, options = {}) {
@@ -263,6 +280,10 @@ export class GlobalInstancedMeshManager {
     if (!this.chunkToCoords.has(chunkKey)) this.chunkToCoords.set(chunkKey, new Set());
     this.chunkToCoords.get(chunkKey).add(coord);
 
+    if (type === 'chest' && buffer.mesh.userData?.chests) {
+      buffer.mesh.userData.chests[index] = { open: false };
+    }
+
     buffer.writeInstance(index, renderData, options);
     const pendingAO = this.pendingAO.get(coord);
     if (pendingAO) {
@@ -306,6 +327,10 @@ export class GlobalInstancedMeshManager {
       buffer.coordToIndex.set(movedCoord, index);
       const movedRef = this.coordToRef.get(movedCoord);
       if (movedRef) movedRef.index = index;
+    }
+
+    if (buffer.mesh.userData?.chests) {
+      delete buffer.mesh.userData.chests[last];
     }
 
     buffer.coordToIndex.delete(coord);

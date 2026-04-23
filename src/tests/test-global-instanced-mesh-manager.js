@@ -284,4 +284,34 @@ describe('GlobalInstancedMeshManager', (test) => {
 
     assertEqual(updateRangeCalls, 1, '同一 buffer 的 patch 更新应聚合为一次 update range');
   });
+
+  test('chest 全局实例应维护 instanceId 对应的开启状态', () => {
+    const { manager } = createManager(2);
+    const a = encodeCoord(1, 2, 3);
+    const b = encodeCoord(4, 5, 6);
+
+    manager.addVisibleBlock(a, { type: 'chest', orientation: 0 }, '0,0', {
+      matrix: makeMatrix(1, 2, 3),
+      aoLow: 1,
+      aoHigh: 1,
+      orientation: 0
+    });
+    manager.addVisibleBlock(b, { type: 'chest', orientation: 0 }, '0,0', {
+      matrix: makeMatrix(4, 5, 6),
+      aoLow: 1,
+      aoHigh: 1,
+      orientation: 0
+    });
+
+    const buffer = manager.buffers.get('chest');
+    assertEqual(buffer.mesh.userData.chests[0]?.open, false, '新增 chest 实例应初始化为未开启');
+    assertEqual(buffer.mesh.userData.chests[1]?.open, false, '第二个 chest 实例也应初始化为未开启');
+
+    buffer.mesh.userData.chests[1].open = true;
+    manager.removeVisibleBlock(a);
+
+    assertEqual(buffer.count, 1, '删除一个 chest 后应只剩一个实例');
+    assertEqual(buffer.mesh.userData.chests[0]?.open, true, 'swap-remove 后应保留被移动 chest 的开启状态');
+    assertEqual(buffer.mesh.userData.chests[1], undefined, '尾部旧 chest 状态应被清理');
+  });
 });

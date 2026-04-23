@@ -103,6 +103,7 @@ export class Chunk {
     this.loadState = 'created';
     this.spawnReason = world?.bootstrapState?.phase === 'runtime-streaming' ? 'runtime-streaming' : 'bootstrap';
     this.hasPlayerMutations = false;
+    this.deletedBlockTombstones = new Set();
     this.queuedAssemblyStages = new Set();
     this.pendingTerrainData = null;
     this.pendingSnapshot = null;
@@ -378,14 +379,17 @@ export class Chunk {
    */
   _updateBlockState(x, y, z, type, entry) {
     const code = Chunk.encodeCoord(x, y, z);
+    this.world?.scatterManager?.invalidatePendingBlock?.(x, y, z);
 
     // === blockData（权威存储） ===
     if (type === 'air') {
+      this.deletedBlockTombstones.add(code);
       this.blockData.delete(code);
       this.visibleKeys.delete(code);
       // 同步到 AO Worker 副本
       aoBridge.enqueueDelete(`${this.cx},${this.cz}`, code);
     } else {
+      this.deletedBlockTombstones.delete(code);
       this.blockData.set(code, entry);
       this.visibleKeys.add(code);
       // 同步到 AO Worker 副本
@@ -1967,6 +1971,8 @@ export class Chunk {
         // 解析方块类型，兼容新旧格式
         const oldParsed = typeof oldEntry === 'string' ? { type: oldEntry, orientation: 0 } : parseBlockEntry(oldEntry);
         affectedTypes.add(oldParsed.type);
+        this.world?.scatterManager?.invalidatePendingBlock?.(px, py, pz);
+        this.deletedBlockTombstones.add(code);
         this.blockData.delete(code);
         this.visibleKeys.delete(code);
         this.solidBlocks.delete(code);
@@ -2302,6 +2308,7 @@ export class Chunk {
       }
 
       const code = Chunk.encodeCoord(block.x, block.y, block.z);
+      if (this.deletedBlockTombstones.has(code)) continue;
 
       // 写入 blockData（唯一真相源）
       if (block.orientation !== 0) {
@@ -2323,6 +2330,7 @@ export class Chunk {
     if (visibleBlockKeys) {
       for (const key of visibleBlockKeys) {
         const code = coordKeyToCode(key);
+        if (this.deletedBlockTombstones.has(code)) continue;
         encodedVisibleKeys.add(code);
         this.visibleKeys.add(code);
       }
@@ -2397,6 +2405,7 @@ export class Chunk {
       }
 
       const code = Chunk.encodeCoord(block.x, block.y, block.z);
+      if (this.deletedBlockTombstones.has(code)) continue;
 
       // 跳过已存在的方块，尊重玩家修改或已有数据
       if (this.blockData.has(code)) continue;
@@ -2420,7 +2429,9 @@ export class Chunk {
     // 从 visibleBlockKeys 追加可见标记
     if (visibleBlockKeys) {
       for (const key of visibleBlockKeys) {
-        this.visibleKeys.add(coordKeyToCode(key));
+        const code = coordKeyToCode(key);
+        if (this.deletedBlockTombstones.has(code)) continue;
+        this.visibleKeys.add(code);
       }
     }
 

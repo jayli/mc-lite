@@ -1110,6 +1110,57 @@ describe('Chunk 真实类测试', (test) => {
     assertEqual(chunk.blockData.get(Chunk.encodeCoord(5, 10, 5)), undefined, 'blockData 应该删除方块');
     assertFalse(chunk.visibleKeys.has(Chunk.encodeCoord(5, 10, 5)), 'visibleKeys 应该移除方块');
     assertFalse(chunk.solidBlocks.has(Chunk.encodeCoord(5, 10, 5)), 'solidBlocks 应该移除方块');
+    assertTrue(chunk.deletedBlockTombstones.has(Chunk.encodeCoord(5, 10, 5)), '显式删除的坐标应写入 tombstone');
+
+    teardownEnvironment();
+  });
+
+  test('acceptScatteredBlocks - 应跳过 tombstone 坐标，避免晚到旧结构结果回灌', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    world.onChunkWorkerReady = () => {};
+    const chunk = new Chunk(0, 0, world);
+    const code = Chunk.encodeCoord(5, 1, 5);
+    chunk.deletedBlockTombstones.add(code);
+    chunk._convertScatteredBlocksToMeshData = (blocks, visibleKeys) => {
+      assertEqual(blocks.length, 1, '输入 blocks 不变，过滤发生在 blockData/visibleKeys 写入阶段');
+      assertEqual(visibleKeys.has(code), false, 'tombstone 坐标不应进入可见集合');
+      return [];
+    };
+    chunk.buildMeshes = () => {};
+    chunk._initArrayStorageFromBlockData = () => {};
+
+    chunk.acceptScatteredBlocks(
+      [{ x: 5, y: 1, z: 5, type: 'sand', orientation: 0 }],
+      new Set([code]),
+      []
+    );
+
+    assertEqual(chunk.blockData.has(code), false, '晚到的旧结构方块不应写回 blockData');
+    assertEqual(chunk.visibleKeys.has(code), false, '晚到的旧结构方块不应恢复为可见');
+
+    teardownEnvironment();
+  });
+
+  test('appendScatteredBlocks - 应跳过 tombstone 坐标，避免跨 chunk patch 复现已删除方块', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const chunk = new Chunk(0, 0, world);
+    const code = Chunk.encodeCoord(5, 1, 5);
+    chunk.deletedBlockTombstones.add(code);
+
+    const appended = chunk.appendScatteredBlocks(
+      [{ x: 5, y: 1, z: 5, type: 'sand', orientation: 0 }],
+      new Set([code]),
+      [],
+      { deferConsolidation: true }
+    );
+
+    assertEqual(appended, 0, 'tombstone 坐标不应被增量追加');
+    assertEqual(chunk.blockData.has(code), false, 'tombstone 坐标不应写回 blockData');
+    assertEqual(chunk.visibleKeys.has(code), false, 'tombstone 坐标不应重新变为可见');
 
     teardownEnvironment();
   });

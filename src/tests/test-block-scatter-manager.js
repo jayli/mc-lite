@@ -191,4 +191,44 @@ describe('BlockScatterManager 数据契约', (test) => {
     assertTrue(scatter.pendingCrossChunkPatchBuffers.has('5,0'), '源仍在活跃范围内的 pending patch 应继续等待目标 chunk 加载');
     assertEqual(scatter.pendingCrossChunkPatchBuffers.has('10,0'), false, '远处 pending patch 应被清理');
   });
+
+  test('invalidatePendingBlock 应移除延迟跨 chunk 补刷中的旧方块，避免删除后复现', () => {
+    let appended = 0;
+    const world = {
+      chunks: new Map([
+        ['1,0', {
+          isReady: true,
+          isConsolidating: false,
+          appendDeferredCrossChunkPatch(blocks) {
+            appended += blocks.length;
+            return blocks.length;
+          }
+        }]
+      ])
+    };
+    const scatter = new BlockScatterManager(world);
+    const code = encodeCoord(17, 1, 1);
+
+    scatter.scatter({
+      cx: 0,
+      cz: 0,
+      blockDataBlocks: [
+        { x: 17, y: 1, z: 1, type: 'sand' }
+      ],
+      visibleKeys: [code],
+      structureCenters: []
+    });
+
+    assertEqual(scatter.getPendingCrossChunkPatchStats().blocks, 1, '删除前应存在一个待补刷方块');
+    assertEqual(scatter.invalidatePendingBlock(17, 1, 1), 1, '应剔除目标坐标的旧 pending patch');
+    assertEqual(scatter.getPendingCrossChunkPatchStats().blocks, 0, '剔除后不应再有待补刷方块');
+
+    const result = scatter.flushDeferredCrossChunkPatchesAround(0, 0, {
+      maxChunks: 1,
+      maxBlocks: 10
+    });
+
+    assertEqual(appended, 0, '旧 patch 不应再被 append 回 chunk');
+    assertEqual(result.processedBlocks, 0, 'flush 后不应处理已剔除的方块');
+  });
 });
