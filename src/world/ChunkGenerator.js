@@ -104,6 +104,17 @@ export function extendChunk(Chunk) {
       return;
     }
 
+    if (this.world?.globalInstancedMeshManager) {
+      const chunkKey = `${this.cx},${this.cz}`;
+      const instanceCount = this.world.globalInstancedMeshManager.replaceChunkVisibleBlocks(chunkKey, meshDataArray);
+      recordChunkPerf('chunk.build-meshes-global', (globalThis.performance?.now?.() ?? Date.now()) - t0, {
+        chunkKey,
+        meshGroups: meshDataArray.length,
+        instanceCount
+      });
+      return;
+    }
+
     // 遍历每种方块类型的 mesh 数据
     for (const data of meshDataArray) {
       // 判断是否为合批数据（包含 blockTypes 数组）

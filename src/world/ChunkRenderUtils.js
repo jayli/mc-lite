@@ -36,6 +36,7 @@ export function extendChunk(Chunk) {
    */
   Chunk.prototype.dispose = function() {
     this.disposed = true;
+    this.world?.globalInstancedMeshManager?.removeChunk?.(`${this.cx},${this.cz}`);
 
     // 通知 AO Worker 清理 chunk 副本缓存
     import('../core/AOBridge.js').then(({ aoBridge }) => {

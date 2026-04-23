@@ -51,6 +51,9 @@ export class PlayerInteraction {
     };
 
     for (const chunk of this.player.world.chunks.values()) pushTarget(chunk.group);
+    for (const mesh of this.player.world.globalInstancedMeshManager?.getRaycastTargets?.() || []) {
+      pushTarget(mesh);
+    }
 
     // 添加丧尸作为交互目标（如果游戏有敌人管理器）
     if (this.player.game && this.player.game.enemyManager) {
@@ -461,6 +464,29 @@ export class PlayerInteraction {
 
     // 检查是否为不可破坏方块
     if (type === 'end_stone' || type === 'playground_block' || type === 'playground_center_block') return;
+
+    if (m.isInstancedMesh && m.userData?.globalInstancedMesh) {
+      const resolvedHit = this.player.world.globalInstancedMeshManager?.resolveHit?.(hit);
+      if (!resolvedHit) return;
+      const entry = this.player.world.getBlockEntry(resolvedHit.x, resolvedHit.y, resolvedHit.z);
+      if (!entry) return;
+      if (entry.type === 'end_stone' || entry.type === 'playground_block' || entry.type === 'playground_center_block') return;
+
+      this.player._tempVector.set(resolvedHit.x + 0.5, resolvedHit.y + 0.5, resolvedHit.z + 0.5);
+      this.recordRemovedBlock(resolvedHit.x, resolvedHit.y, resolvedHit.z, entry.type, entry.orientation);
+
+      if (isHandBreak) {
+        this.player.world.spawnBlockCrashParticles(this.player._tempVector);
+      } else {
+        this.player.spawnParticles(this.player._tempVector, entry.type);
+      }
+      this.player.world.removeBlock(resolvedHit.x, resolvedHit.y, resolvedHit.z);
+      audioManager.playSound('delete_get', 0.3);
+      if (entry.type !== 'water' && entry.type !== 'cloud') {
+        this.player.inventory.add(entry.type === 'grass' ? 'dirt' : entry.type, 1);
+      }
+      return;
+    }
 
     if (m.isInstancedMesh) {
       let matrixPosition = null;
@@ -1074,11 +1100,18 @@ export class PlayerInteraction {
     let bz;
 
     if (obj.isInstancedMesh && hit.instanceId !== undefined) {
-      obj.getMatrixAt(hit.instanceId, this.player._dummyMatrix);
-      this.player._dummyMatrix.decompose(this.player._tempVector, this.player._dummyQuaternion, this.player._dummyScale);
-      bx = Math.floor(this.player._tempVector.x);
-      by = Math.floor(this.player._tempVector.y);
-      bz = Math.floor(this.player._tempVector.z);
+      const globalHit = this.player.world.globalInstancedMeshManager?.resolveHit?.(hit);
+      if (globalHit) {
+        bx = globalHit.x;
+        by = globalHit.y;
+        bz = globalHit.z;
+      } else {
+        obj.getMatrixAt(hit.instanceId, this.player._dummyMatrix);
+        this.player._dummyMatrix.decompose(this.player._tempVector, this.player._dummyQuaternion, this.player._dummyScale);
+        bx = Math.floor(this.player._tempVector.x);
+        by = Math.floor(this.player._tempVector.y);
+        bz = Math.floor(this.player._tempVector.z);
+      }
     } else if (obj.position) {
       bx = Math.floor(obj.position.x);
       by = Math.floor(obj.position.y);

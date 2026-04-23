@@ -441,6 +441,9 @@ export class Chunk {
    */
   _removeInstancedMeshBlock(key, x, y, z, oldType) {
     if (!oldType) return false;
+    if (this.world?.globalInstancedMeshManager?.removeVisibleBlock?.(key)) {
+      return true;
+    }
 
     for (let i = this.group.children.length - 1; i >= 0; i--) {
       const child = this.group.children[i];
@@ -977,6 +980,13 @@ export class Chunk {
 
       aoLowAttr.needsUpdate = true;
       aoHighAttr.needsUpdate = true;
+    }
+
+    if (this.world?.globalInstancedMeshManager) {
+      for (const r of results) {
+        const code = Chunk.encodeCoord(r.x, r.y, r.z);
+        this.world.globalInstancedMeshManager.updateAO(code, r.aoLow, r.aoHigh);
+      }
     }
 
     // 只清除本次已发送的脏标记，保留后续新增的
@@ -1934,6 +1944,13 @@ export class Chunk {
     }
 
     // 2. 移除当前待删除方块的渲染网格
+    if (this.world?.globalInstancedMeshManager) {
+      positions.forEach(p => {
+        const code = Chunk.encodeCoord(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z));
+        this.world.globalInstancedMeshManager.removeVisibleBlock(code);
+      });
+    }
+
     for (let i = this.group.children.length - 1; i >= 0; i--) {
       const child = this.group.children[i];
 
@@ -2141,6 +2158,13 @@ export class Chunk {
     const pos = new THREE.Vector3();
 
     // 移除渲染网格（隐藏方块）
+    if (this.world?.globalInstancedMeshManager) {
+      positions.forEach(p => {
+        const code = Chunk.encodeCoord(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z));
+        this.world.globalInstancedMeshManager.removeVisibleBlock(code);
+      });
+    }
+
     for (let i = this.group.children.length - 1; i >= 0; i--) {
       const child = this.group.children[i];
 

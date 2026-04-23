@@ -13,6 +13,7 @@ import { getBlockProps } from '../constants/BlockData.js';
 import { ChunkAssemblyScheduler } from './ChunkAssemblyScheduler.js';
 import { RuntimeIdleScheduler } from './RuntimeIdleScheduler.js';
 import { recordChunkPerf } from '../utils/ChunkPerfMonitor.js';
+import { GlobalInstancedMeshManager } from '../core/GlobalInstancedMeshManager.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
@@ -55,6 +56,7 @@ export class World {
     this.renderDistance = DEFAULT_RENDER_DIST;
     /** 存储当前加载的所有区块，Key 为 "cx,cz" 字符串 */
     this.chunks = new Map();
+    this.globalInstancedMeshManager = new GlobalInstancedMeshManager(this.scene);
 
     // 初始化粒子系统，处理挖掘和爆炸的视觉效果
     const ParticleSystemClass = getParticleSystem();
