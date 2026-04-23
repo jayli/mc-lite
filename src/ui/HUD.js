@@ -49,6 +49,11 @@ export class HUD {
       renderStreamingPerf: 0
     };
 
+    this._streamingPerfLogEnabled = false;
+    if (this.perfEl) {
+      this.perfEl.innerHTML = '';
+    }
+
     // 渲染节流控制 - 使用布尔标志位 + 目标时间戳避免每帧创建定时器
     this._lastHotbarRenderTime = 0;
     this._throttledRenderQueued = false;  // 是否有待执行的渲染请求
@@ -81,8 +86,9 @@ export class HUD {
     const snapshot = this.game?.world?.consumeStreamingPerfSnapshot?.(now);
     if (!snapshot) return;
 
-    this.perfEl.innerHTML = this.formatStreamingPerf(snapshot);
-    console.log('[StreamingPerf]', snapshot);
+    if (this._streamingPerfLogEnabled) {
+      console.log('[StreamingPerf]', snapshot);
+    }
   }
 
   formatStreamingPerf(snapshot) {

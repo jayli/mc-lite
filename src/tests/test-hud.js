@@ -13,7 +13,7 @@ function createSlot(item = null, count = 0) {
 }
 
 describe('HUD', (test) => {
-  test('流式性能面板只在每秒快照到达时刷新并输出日志', () => {
+  test('StreamingPerf 日志默认开启且可通过标志位关闭', () => {
     const originalBody = document.body.innerHTML;
     const originalConsoleLog = console.log;
     const logs = [];
@@ -31,26 +31,23 @@ describe('HUD', (test) => {
     };
 
     try {
-      const snapshots = [
-        null,
-        {
-          phase: 'runtime-streaming',
-          assemblyQueue: 4,
-          mutationQueueBlocks: 120,
-          mutationQueueTasks: 3,
-          flushBlocksPerSec: 480,
-          flushMaxMs: 1.8,
-          flushLastProcessedBlocks: 240,
-          flushBudgetOps: 600,
-          flushBudgetMs: 2,
-          deferredPatchChunks: 2,
-          deferredPatchBlocks: 40,
-          consolidatingChunks: 1,
-          loadingChunks: 3,
-          readyChunks: 10,
-          totalChunks: 14
-        }
-      ];
+      const snapshot = {
+        phase: 'runtime-streaming',
+        assemblyQueue: 4,
+        mutationQueueBlocks: 120,
+        mutationQueueTasks: 3,
+        flushBlocksPerSec: 480,
+        flushMaxMs: 1.8,
+        flushLastProcessedBlocks: 240,
+        flushBudgetOps: 600,
+        flushBudgetMs: 2,
+        deferredPatchChunks: 2,
+        deferredPatchBlocks: 40,
+        consolidatingChunks: 1,
+        loadingChunks: 3,
+        readyChunks: 10,
+        totalChunks: 14
+      };
       const game = {
         player: {
           inventory: {
@@ -60,7 +57,7 @@ describe('HUD', (test) => {
         },
         world: {
           consumeStreamingPerfSnapshot() {
-            return snapshots.shift() ?? null;
+            return snapshot;
           }
         }
       };
@@ -68,17 +65,19 @@ describe('HUD', (test) => {
       const hud = new HUD(game);
       hud.renderHotbar = () => {};
 
-      hud.update(0);
-      assertEqual(document.getElementById('perf').textContent, '', '无快照时不应刷新性能面板');
-      assertEqual(logs.length, 0, '无快照时不应输出日志');
-
       hud.update(1000);
-      const perfText = document.getElementById('perf').textContent;
-      assertTrue(perfText.includes('装配队列 4'), '应显示装配队列长度');
-      assertTrue(perfText.includes('实例队列 120/3'), '应显示全局实例队列积压');
-      assertTrue(perfText.includes('flush 480/s'), '应显示每秒 flush 吞吐');
-      assertTrue(perfText.includes('补丁 2/40'), '应显示 deferred patch 积压');
-      assertEqual(logs.length, 1, '有快照时应输出一次日志');
+      assertEqual(document.getElementById('perf').textContent, '', '面板不应再显示装配数据');
+      assertEqual(logs.length, 0, '默认状态下不应输出日志');
+
+      hud._streamingPerfLogEnabled = true;
+      hud.update(2000);
+      assertEqual(logs.length, 1, '开启标志后应输出一次日志');
+      assertTrue(logs[0][0] === '[StreamingPerf]', '日志前缀应为 [StreamingPerf]');
+
+      hud._streamingPerfLogEnabled = false;
+      logs.length = 0;
+      hud.update(3000);
+      assertEqual(logs.length, 0, '关闭标志后不应输出日志');
     } finally {
       console.log = originalConsoleLog;
       document.body.innerHTML = originalBody;

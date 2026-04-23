@@ -192,31 +192,6 @@ export class MaterialManager {
   }
 
   /**
-   * 输出纹理分组报告 — 用于调试和性能分析
-   */
-  reportTextureGroups() {
-    const groups = this.getTextureGroups();
-    const totalTypes = Object.values(groups).reduce((sum, types) => sum + types.length, 0);
-    const groupCount = Object.keys(groups).length;
-
-    console.group('材质合批报告');
-    console.log(`纹理组数量：${groupCount}`);
-    console.log(`可合批方块类型总数：${totalTypes}`);
-    console.log(`预期 Draw Call 减少：从 ${totalTypes} 减少到 ${groupCount} (减少 ${Math.round((1 - groupCount / totalTypes) * 100)}%)`);
-
-    // 按组合大小排序输出
-    const sortedGroups = Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
-
-    for (const [texture, types] of sortedGroups) {
-      const displayName = texture.startsWith('color:')
-        ? `纯色 ${texture.replace('color:', '#')}`
-        : texture.split('/').pop();
-      console.log(`  ${displayName}: ${types.length} 个方块 (${types.join(', ')})`);
-    }
-    console.groupEnd();
-  }
-
-  /**
    * 获取合批材质 — 支持多个方块类型共享
    * @param {string} textureUrl - 主纹理 URL
    * @param {Array} blockTypes - 该组包含的方块类型

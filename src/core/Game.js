@@ -106,6 +106,16 @@ export class Game {
         this._showTransientHudMessage(`ChunkPerf: ${state}`);
       }
 
+      if (e.code === 'KeyN' && !e.repeat) {
+        const hud = this.hud || this.ui?.hud;
+        if (hud) {
+          hud._streamingPerfLogEnabled = !hud._streamingPerfLogEnabled;
+          const state = hud._streamingPerfLogEnabled ? '开启' : '关闭';
+          console.log(`[StreamingPerf] 日志已${state}`);
+          this._showTransientHudMessage(`StreamingPerf: ${state}`);
+        }
+      }
+
       if (e.code === 'KeyP') {
         // 切换跨 chunk 方块渲染开关（测试 chunk 生成性能影响）
         if (this.world?.scatterManager) {
@@ -308,8 +318,6 @@ export class Game {
     preloadAllStructures().then(() => {
       console.log('[Game] All JSON structures preloaded');
 
-      // 材质合批报告（调试用）
-      materials.reportTextureGroups();
     }).catch(err => {
       console.warn('[Game] Failed to preload structures:', err);
     });
