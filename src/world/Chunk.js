@@ -604,6 +604,41 @@ export class Chunk {
   }
 
   /**
+   * 将交互期可见方块直接写入全局 InstancedMesh。
+   * 仅作为即时视觉层，AO 后续由 AOWorker/consolidation 收敛。
+   */
+  _upsertGlobalBlockRender(x, y, z, code, type, orientation = 0) {
+    const manager = this.world?.globalInstancedMeshManager;
+    if (!manager) return false;
+
+    const props = getBlockProps(type);
+    const entry = this.blockData.get(code);
+    const entryType = entry ? (typeof entry === 'string' ? entry : entry.type) : null;
+    if (!props.isRendered || !entryType || type === 'air' || type === 'collider') {
+      return false;
+    }
+
+    if (!this._globalRenderDummy) {
+      this._globalRenderDummy = new THREE.Object3D();
+    }
+
+    this._globalRenderDummy.position.set(Math.floor(x) + 0.5, Math.floor(y) + 0.5, Math.floor(z) + 0.5);
+    this._globalRenderDummy.rotation.set(0, getRotationAngle(orientation), 0);
+    this._globalRenderDummy.scale.set(1, 1, 1);
+    this._globalRenderDummy.updateMatrix();
+
+    const { aoLow, aoHigh } = packAOData(new Uint8Array(24).fill(3));
+    manager.addVisibleBlock(code, { type, orientation }, `${this.cx},${this.cz}`, {
+      matrix: new Float32Array(this._globalRenderDummy.matrix.elements),
+      aoLow,
+      aoHigh,
+      orientation
+    });
+    this.visibleKeys.add(code);
+    return true;
+  }
+
+  /**
    * 刷新已存在方块的渲染网格（仅刷新渲染，不改逻辑数据/持久化）
    * 用于方块被挖掉后，邻居方块立即补面，避免等待 consolidation。
    * @param {number} x - 世界坐标 X
@@ -618,8 +653,12 @@ export class Chunk {
     if (!type || type === 'air' || type === 'collider') return;
 
     // 先移除该位置已有网格（实例网格或动态网格）
-    this._removeInstancedMeshBlock(code, x, y, z, type);
     this._removeDynamicMesh(x, y, z, code);
+    if (this._upsertGlobalBlockRender(x, y, z, code, type, parsed.orientation || 0)) {
+      this._markDirtyAO(x, y, z, true);
+      return;
+    }
+    this._removeInstancedMeshBlock(code, x, y, z, type);
 
     // 立即创建动态网格，保证暴露面立刻可见
     const mesh = this._createDynamicBlockMesh(x, y, z, code, type, parsed.orientation || 0, { applyAO: false });
@@ -1739,15 +1778,22 @@ export class Chunk {
       return;
     }
 
-    // 9. 创建新的动态网格
-    const mesh = this._createDynamicBlockMesh(x, y, z, code, type, blockOrientation, { applyAO: false });
-    if (mesh) {
-      this.group.add(mesh);
-      this.dynamicMeshes.set(code, mesh);
+    // 9. 写入即时渲染。优先走全局 InstancedMesh，保留旧动态 Mesh 作为降级路径。
+    const renderedGlobally = this.visibleKeys.has(code) &&
+      this._upsertGlobalBlockRender(x, y, z, code, type, blockOrientation);
+    if (renderedGlobally) {
       this.dirtyBlocks++;
       this.scheduleConsolidation();
-      mesh.updateMatrix();
-      mesh.updateMatrixWorld();
+    } else {
+      const mesh = this._createDynamicBlockMesh(x, y, z, code, type, blockOrientation, { applyAO: false });
+      if (mesh) {
+        this.group.add(mesh);
+        this.dynamicMeshes.set(code, mesh);
+        this.dirtyBlocks++;
+        this.scheduleConsolidation();
+        mesh.updateMatrix();
+        mesh.updateMatrixWorld();
+      }
     }
 
     // 9.5 标记 AO 脏位置（放置方块：自身+邻居）
