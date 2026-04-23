@@ -41,6 +41,13 @@ export class HUD {
     this.hotbarEl = document.getElementById('hotbar');  // 快捷栏 DOM 元素，用于显示和选择物品
     this.msgEl = document.getElementById('msg');        // 消息显示 DOM 元素，用于显示系统提示信息
     this.hudEl = document.getElementById('hud');        // HUD 容器 DOM 元素，用于承载所有界面元素
+    this.perfEl = document.getElementById('perf');      // 性能面板 DOM 元素
+
+    this.perfStats = {
+      updateFPS: 0,
+      renderHotbar: 0,
+      renderStreamingPerf: 0
+    };
 
     // 渲染节流控制 - 使用布尔标志位 + 目标时间戳避免每帧创建定时器
     this._lastHotbarRenderTime = 0;
@@ -56,9 +63,44 @@ export class HUD {
    * 更新 HUD 显示
    * 在游戏主循环中调用，更新所有 HUD 元素
    */
-  update() {
+  update(now = performance.now()) {
     if (!this.game.player) return; // 确保玩家对象存在
+    const t0 = performance.now();
     this.renderHotbar();           // 渲染快捷栏
+    const t1 = performance.now();
+    this.renderStreamingPerf(now);
+    const t2 = performance.now();
+    this.perfStats.renderHotbar = t1 - t0;
+    this.perfStats.renderStreamingPerf = t2 - t1;
+    this.perfStats.updateFPS = t2 - t0;
+  }
+
+  renderStreamingPerf(now = performance.now()) {
+    if (!this.perfEl) return;
+
+    const snapshot = this.game?.world?.consumeStreamingPerfSnapshot?.(now);
+    if (!snapshot) return;
+
+    this.perfEl.innerHTML = this.formatStreamingPerf(snapshot);
+    console.log('[StreamingPerf]', snapshot);
+  }
+
+  formatStreamingPerf(snapshot) {
+    const sampleMs = Number.isFinite(snapshot.sampleMs) ? snapshot.sampleMs : 1000;
+    const flushRate = Number.isFinite(snapshot.flushBlocksPerSec)
+      ? Math.round(snapshot.flushBlocksPerSec * (1000 / Math.max(1, sampleMs)))
+      : 0;
+    const flushMaxMs = Number.isFinite(snapshot.flushMaxMs) ? snapshot.flushMaxMs.toFixed(2) : '0.00';
+    const flushLastMs = Number.isFinite(snapshot.flushLastMs) ? snapshot.flushLastMs.toFixed(2) : '0.00';
+    const flushBudgetMs = Number.isFinite(snapshot.flushBudgetMs) ? snapshot.flushBudgetMs.toFixed(2) : '0.00';
+    const idleForMs = Number.isFinite(snapshot.idleForMs) ? Math.round(snapshot.idleForMs) : 0;
+
+    return [
+      `阶段 ${snapshot.phase} | ready ${snapshot.readyChunks}/${snapshot.totalChunks} | loading ${snapshot.loadingChunks} | consolidation ${snapshot.consolidatingChunks}`,
+      `装配队列 ${snapshot.assemblyQueue} | 实例队列 ${snapshot.mutationQueueBlocks}/${snapshot.mutationQueueTasks} | AO ${snapshot.pendingAO}`,
+      `flush ${flushRate}/s | max ${flushMaxMs}ms | last ${snapshot.flushLastProcessedBlocks}/${flushLastMs}ms | budget ${snapshot.flushBudgetOps}/${flushBudgetMs}ms`,
+      `补丁 ${snapshot.deferredPatchChunks}/${snapshot.deferredPatchBlocks} | idle ${idleForMs}ms/${snapshot.idleTaskCount}t`
+    ].join('<br>');
   }
 
   /**

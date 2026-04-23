@@ -210,6 +210,22 @@ function buildMeshData(fakeChunk, d, cx, cz) {
   return meshDataArray;
 }
 
+function buildMeshDataForChunk(fakeChunk, d, targetCx, targetCz) {
+  const filtered = {};
+  for (const type in d) {
+    const positions = d[type];
+    if (!Array.isArray(positions) || positions.length === 0) continue;
+
+    const ownPositions = positions.filter((pos) =>
+      Math.floor(pos.x / CHUNK_SIZE) === targetCx && Math.floor(pos.z / CHUNK_SIZE) === targetCz
+    );
+    if (ownPositions.length > 0) {
+      filtered[type] = ownPositions;
+    }
+  }
+  return buildMeshData(fakeChunk, filtered, targetCx, targetCz);
+}
+
 /**
  * 构建逻辑方块列表。
  * 这条数据用于主线程恢复 blockData，不携带矩阵和 AO，避免把隐藏方块也做成重渲染载荷。
@@ -1842,6 +1858,7 @@ onmessage = async function(e) {
   // blockDataBlocks 保留完整逻辑数据；scatteredBlocks 只走渲染路径，避免隐藏块扩大回包。
   const blockDataBlocks = buildBlockDataBlocks(blockMap);
   const scatteredBlocks = buildScatteredBlocks(blockMap, visibleKeysSet, aoMap);
+  const meshData = buildMeshDataForChunk(fakeChunk, d, cx, cz);
 
   const workerFinishedAt = performance.now();
   const workerComputeMs = workerFinishedAt - workerReceivedAt;
@@ -1853,6 +1870,7 @@ onmessage = async function(e) {
     cx, cz, callbackKey, taskId,
     blockDataBlocks,
     scatteredBlocks,
+    meshData,
     solidBlocks,
     modGunMan, rovers,
     entities: {

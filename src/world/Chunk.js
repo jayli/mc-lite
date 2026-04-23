@@ -2290,7 +2290,7 @@ export class Chunk {
    * @param {Set} visibleBlockKeys - 面剔除可见的方块 key 集合
    * @param {Array} structureCenters - 结构中心列表（供跨 chunk 结构判断）
    */
-  acceptScatteredBlocks(scatteredBlocks, visibleBlockKeys, structureCenters) {
+  acceptScatteredBlocks(scatteredBlocks, visibleBlockKeys, structureCenters, workerMeshData = null) {
     const t0 = globalThis.performance?.now?.() ?? Date.now();
     const minX = this.cx * CHUNK_SIZE;
     const minZ = this.cz * CHUNK_SIZE;
@@ -2347,9 +2347,10 @@ export class Chunk {
     this._initArrayStorageFromBlockData();
     const t4 = globalThis.performance?.now?.() ?? Date.now();
 
-    // 直接从 scatteredBlocks 构建 meshData，跳过 buildMeshesFromScatteredData 的重复遍历。
-    // buffer.blocks 包含所有方块（含隐藏），_convertScatteredBlocksToMeshData 会按 visibleKeys 过滤。
-    const meshData = this._convertScatteredBlocksToMeshData(scatteredBlocks, encodedVisibleKeys, structureCenters);
+    // 优先消费 Worker 预构建的 meshData，主线程仅保留回退转换路径。
+    const meshData = Array.isArray(workerMeshData)
+      ? workerMeshData
+      : this._convertScatteredBlocksToMeshData(scatteredBlocks, encodedVisibleKeys, structureCenters);
     const t5 = globalThis.performance?.now?.() ?? Date.now();
     this.buildMeshes(meshData);
     const t6 = globalThis.performance?.now?.() ?? Date.now();

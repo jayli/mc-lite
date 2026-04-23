@@ -57,6 +57,8 @@ const GLOBAL_INSTANCE_FLUSH_FRAME_EMA_ALPHA = 0.2;
 const CROSS_CHUNK_PATCH_MAX_CHUNKS_PER_FRAME = 1;
 /** 跨区块补丁每帧最多处理的方块数 */
 const CROSS_CHUNK_PATCH_MAX_BLOCKS_PER_FRAME = 400;
+/** HUD/控制台流式性能快照刷新间隔 */
+const STREAMING_PERF_SNAPSHOT_INTERVAL_MS = 1000;
 /**
  * 世界管理器类
  * 管理游戏世界中的所有区块、粒子效果和方块操作，是世界数据的中央访问点
@@ -142,6 +144,14 @@ export class World {
       frameBudgetMs: RUNTIME_IDLE_FRAME_BUDGET_MS
     });
     this._globalInstanceFlushFrameMsEma = 16.7;
+    this._streamingPerfTelemetry = {
+      windowStartedAt: globalThis.performance?.now?.() ?? Date.now(),
+      flushBlocks: 0,
+      flushCalls: 0,
+      flushMaxMs: 0,
+      lastBudgetOps: 0,
+      lastBudgetMs: 0
+    };
     this._staticTreeTerrainBoostChunkKeys = new Set();
     this._lastStreamingActivityAt = 0;
     this._pendingDeferredFinalizeChunkKeys = new Set();
@@ -213,6 +223,84 @@ export class World {
 
   getRuntimeIdleStats() {
     return this.runtimeIdleScheduler?.getStats?.() || null;
+  }
+
+  _recordStreamingPerfFlush(result = {}, budget = {}) {
+    if (!this._streamingPerfTelemetry) {
+      this._streamingPerfTelemetry = {
+        windowStartedAt: globalThis.performance?.now?.() ?? Date.now(),
+        flushBlocks: 0,
+        flushCalls: 0,
+        flushMaxMs: 0,
+        lastBudgetOps: 0,
+        lastBudgetMs: 0
+      };
+    }
+
+    this._streamingPerfTelemetry.lastBudgetOps = Number.isFinite(budget.maxOps) ? budget.maxOps : 0;
+    this._streamingPerfTelemetry.lastBudgetMs = Number.isFinite(budget.maxMs) ? budget.maxMs : 0;
+
+    const processedBlocks = Number.isFinite(result.processedBlocks) ? result.processedBlocks : 0;
+    const elapsedMs = Number.isFinite(result.elapsedMs) ? result.elapsedMs : 0;
+    this._streamingPerfTelemetry.flushBlocks += processedBlocks;
+    if (processedBlocks > 0) {
+      this._streamingPerfTelemetry.flushCalls += 1;
+    }
+    this._streamingPerfTelemetry.flushMaxMs = Math.max(this._streamingPerfTelemetry.flushMaxMs, elapsedMs);
+  }
+
+  consumeStreamingPerfSnapshot(now = globalThis.performance?.now?.() ?? Date.now()) {
+    if (!this._streamingPerfTelemetry) return null;
+
+    const elapsedMs = now - this._streamingPerfTelemetry.windowStartedAt;
+    if (elapsedMs < STREAMING_PERF_SNAPSHOT_INTERVAL_MS) return null;
+
+    const globalStats = this.globalInstancedMeshManager?.getStats?.() || {};
+    const deferredPatchStats = this.getDeferredCrossChunkPatchStats();
+    const idleStats = this.getRuntimeIdleStats() || {};
+    const assemblyQueue = this.chunkAssemblyScheduler?.getPendingCount?.() || 0;
+
+    let totalChunks = 0;
+    let readyChunks = 0;
+    let loadingChunks = 0;
+    let consolidatingChunks = 0;
+    for (const chunk of this.chunks?.values?.() || []) {
+      totalChunks++;
+      if (chunk?.isReady) readyChunks++;
+      if (chunk?.loadState !== 'finalized') loadingChunks++;
+      if (chunk?.isConsolidating) consolidatingChunks++;
+    }
+
+    const snapshot = {
+      phase: this.bootstrapState?.phase || 'unknown',
+      sampleMs: elapsedMs,
+      assemblyQueue,
+      mutationQueueBlocks: Number.isFinite(globalStats.queuedBlocks) ? globalStats.queuedBlocks : 0,
+      mutationQueueTasks: Number.isFinite(globalStats.queueTasks) ? globalStats.queueTasks : 0,
+      pendingAO: Number.isFinite(globalStats.pendingAO) ? globalStats.pendingAO : 0,
+      renderedBlocks: Number.isFinite(globalStats.renderedBlocks) ? globalStats.renderedBlocks : 0,
+      flushBlocksPerSec: this._streamingPerfTelemetry.flushBlocks,
+      flushCalls: this._streamingPerfTelemetry.flushCalls,
+      flushMaxMs: this._streamingPerfTelemetry.flushMaxMs,
+      flushLastProcessedBlocks: Number.isFinite(globalStats.lastProcessedBlocks) ? globalStats.lastProcessedBlocks : 0,
+      flushLastMs: Number.isFinite(globalStats.lastFlushMs) ? globalStats.lastFlushMs : 0,
+      flushBudgetOps: this._streamingPerfTelemetry.lastBudgetOps,
+      flushBudgetMs: this._streamingPerfTelemetry.lastBudgetMs,
+      deferredPatchChunks: Number.isFinite(deferredPatchStats.chunks) ? deferredPatchStats.chunks : 0,
+      deferredPatchBlocks: Number.isFinite(deferredPatchStats.blocks) ? deferredPatchStats.blocks : 0,
+      consolidatingChunks,
+      loadingChunks,
+      readyChunks,
+      totalChunks,
+      idleForMs: Number.isFinite(idleStats.idleForMs) ? idleStats.idleForMs : 0,
+      idleTaskCount: Number.isFinite(idleStats.taskCount) ? idleStats.taskCount : 0
+    };
+
+    this._streamingPerfTelemetry.windowStartedAt = now;
+    this._streamingPerfTelemetry.flushBlocks = 0;
+    this._streamingPerfTelemetry.flushCalls = 0;
+    this._streamingPerfTelemetry.flushMaxMs = 0;
+    return snapshot;
   }
 
   _computeGlobalInstanceFlushBudget(dt = 0) {
@@ -642,11 +730,13 @@ export class World {
     }
 
     this.processAssemblyQueues();
-    this.globalInstancedMeshManager?.flushMutationQueue?.({
-      ...this._computeGlobalInstanceFlushBudget(dt),
+    const flushBudget = this._computeGlobalInstanceFlushBudget(dt);
+    const flushResult = this.globalInstancedMeshManager?.flushMutationQueue?.({
+      ...flushBudget,
       playerCx: cx,
       playerCz: cz
-    });
+    }) || { processedBlocks: 0, elapsedMs: 0 };
+    this._recordStreamingPerfFlush(flushResult, flushBudget);
     if (this.bootstrapState.phase === 'runtime-streaming') {
       this._processDeferredFinalizeQueue();
       this.runtimeIdleScheduler.process({

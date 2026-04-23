@@ -1165,6 +1165,80 @@ describe('Chunk 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('acceptScatteredBlocks - 有 Worker meshData 时应直接使用，不再本地转换', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    world.onChunkWorkerReady = () => {};
+    const chunk = new Chunk(0, 0, world);
+    const code = Chunk.encodeCoord(5, 1, 5);
+    const workerMeshData = [{ type: 'sand', count: 1, matrices: new Float32Array(16), aoLow: new Float32Array([1]), aoHigh: new Float32Array([1]), orientation: new Float32Array([0]), instanceIndexMap: { [code]: 0 } }];
+
+    chunk._convertScatteredBlocksToMeshData = () => {
+      throw new Error('不应调用主线程 _convertScatteredBlocksToMeshData');
+    };
+
+    let builtMeshData = null;
+    chunk.buildMeshes = (meshData) => {
+      builtMeshData = meshData;
+    };
+    chunk._initArrayStorageFromBlockData = () => {};
+
+    chunk.acceptScatteredBlocks(
+      [{ x: 5, y: 1, z: 5, type: 'sand', orientation: 0 }],
+      new Set([code]),
+      [],
+      workerMeshData
+    );
+
+    assertEqual(builtMeshData, workerMeshData, '应直接消费 Worker 预构建的 meshData');
+
+    teardownEnvironment();
+  });
+
+  test('_applyConsolidateResult - 有 Worker meshData 时应直接使用，不再本地转换', () => {
+    setupEnvironment();
+
+    try {
+      const world = createMockWorld();
+      world.onChunkAOSourceStable = () => {};
+      const chunk = new Chunk(0, 0, world);
+      chunk.isReady = true;
+
+      const code = Chunk.encodeCoord(1, 2, 3);
+      const workerMeshData = [{ type: 'stone', count: 1, matrices: new Float32Array(16), aoLow: new Float32Array([1]), aoHigh: new Float32Array([1]), orientation: new Float32Array([0]), instanceIndexMap: { [code]: 0 } }];
+      chunk.blockData.set(code, 'stone');
+      chunk.dirtyBlocks = 1;
+      chunk.dynamicMeshes = new Map();
+      chunk._convertScatteredBlocksToMeshData = () => {
+        throw new Error('不应调用主线程 _convertScatteredBlocksToMeshData');
+      };
+      chunk._saveChestStates = () => new Map();
+      chunk._cleanupOldMeshes = () => {};
+      let builtMeshData = null;
+      chunk.buildMeshes = (meshData) => {
+        builtMeshData = meshData;
+      };
+      chunk._restoreChestStates = () => {};
+      chunk._unregisterLightSources = () => {};
+      chunk._registerLightSources = () => {};
+      chunk._initArrayStorageFromBlockData = () => {};
+      chunk.regenerateCrossChunkColliders = () => {};
+
+      chunk._applyConsolidateResult({
+        scatteredBlocks: [{ x: 1, y: 2, z: 3, type: 'stone' }],
+        meshData: workerMeshData,
+        visibleKeys: [code],
+        solidBlocks: [code],
+        structureCenters: []
+      }, 1, new Set());
+
+      assertEqual(builtMeshData, workerMeshData, 'consolidation 应直接消费 Worker 预构建的 meshData');
+    } finally {
+      teardownEnvironment();
+    }
+  });
+
   test('_updateBlockState - 非固体方块', () => {
     setupEnvironment();
 

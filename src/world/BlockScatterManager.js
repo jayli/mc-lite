@@ -27,6 +27,7 @@ export class BlockScatterManager {
     if (!buffer) {
       buffer = {
         blocks: [],
+        meshData: null,
         ready: false,
         sourceWorkers: new Set(),
         visibleBlockKeys: new Set(),
@@ -82,7 +83,7 @@ export class BlockScatterManager {
    */
   scatter(workerResult) {
     const t0 = globalThis.performance?.now?.() ?? Date.now();
-    const { scatteredBlocks = [], visibleKeys, cx, cz, structureCenters } = workerResult;
+    const { scatteredBlocks = [], visibleKeys, cx, cz, structureCenters, meshData = null } = workerResult;
     const blockDataBlocks = Array.isArray(workerResult.blockDataBlocks)
       ? workerResult.blockDataBlocks
       : scatteredBlocks;
@@ -132,6 +133,7 @@ export class BlockScatterManager {
     // 确保发起 Worker 的 chunk 即使没有方块，也有 buffer 承载 ready 状态和结构中心。
     const ownKey = `${cx},${cz}`;
     const ownBuffer = this._getOrCreateBuffer(this.chunkBuffers, ownKey);
+    ownBuffer.meshData = Array.isArray(meshData) ? meshData : null;
     touchedBuffers.add(ownBuffer);
 
     // 2. 合并结构中心信息到本次触达的 buffer（追加而非覆盖）
@@ -179,8 +181,9 @@ export class BlockScatterManager {
         // 首次渲染：完整接受并构建 mesh（传递 structureCenters 供跨 chunk 结构判断）
         acceptedChunks++;
         acceptedBlocks += buffer.blocks.length;
-        chunk.acceptScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys, buffer.structureCenters);
+        chunk.acceptScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys, buffer.structureCenters, buffer.meshData);
         buffer.blocks = [];
+        buffer.meshData = null;
         buffer.visibleBlockKeys = new Set();
       } else {
         // 增量追加：跨 chunk 流式补片不抢 WorldWorker consolidation 队列
@@ -191,6 +194,7 @@ export class BlockScatterManager {
         });
         // 清空已处理的方块，释放内存，保留 buffer 结构以接收后续溢出
         buffer.blocks = [];
+        buffer.meshData = null;
         buffer.visibleBlockKeys = new Set();
       }
     }

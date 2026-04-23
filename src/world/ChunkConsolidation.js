@@ -376,7 +376,7 @@ export function extendChunk(Chunk) {
    */
   Chunk.prototype._applyConsolidateResult = function(data, consolidatedCount, consolidatedMeshKeys) {
     const t0 = performance.now();
-    let { scatteredBlocks, visibleKeys, solidBlocks, structureCenters: newStructureCenters } = data;
+    let { scatteredBlocks, meshData: workerMeshData, visibleKeys, solidBlocks, structureCenters: newStructureCenters } = data;
 
     // 更新结构中心列表
     if (newStructureCenters && newStructureCenters.length > 0) {
@@ -402,7 +402,9 @@ export function extendChunk(Chunk) {
     const encodeKeys = (arr) => arr ? arr.map(coordKeyToCode) : null;
     const encodedVisibleKeys = encodeKeys(visibleKeys);
     const encodedVisibleKeysSet = encodedVisibleKeys ? new Set(encodedVisibleKeys) : null;
-    const meshData = this._convertScatteredBlocksToMeshData(filteredBlocks, encodedVisibleKeysSet, newStructureCenters);
+    const meshData = Array.isArray(workerMeshData)
+      ? workerMeshData
+      : this._convertScatteredBlocksToMeshData(filteredBlocks, encodedVisibleKeysSet, newStructureCenters);
     const t3 = performance.now();
 
     // 保存原始 solidBlocks 用于跨 Chunk 碰撞体（Worker 返回数字编码，旧字符串格式在边界兼容）

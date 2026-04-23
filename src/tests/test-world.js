@@ -257,6 +257,55 @@ const teardownEnvironment = () => {
 };
 
 describe('World 真实类测试', (test) => {
+  test('consumeStreamingPerfSnapshot 每秒聚合一次流式加载统计', () => {
+    const world = Object.create(World.prototype);
+    world.bootstrapState = { phase: 'runtime-streaming' };
+    world.chunkAssemblyScheduler = { getPendingCount: () => 7 };
+    world.globalInstancedMeshManager = {
+      getStats: () => ({
+        queuedBlocks: 320,
+        queueTasks: 5,
+        pendingAO: 9,
+        renderedBlocks: 4096,
+        lastProcessedBlocks: 180,
+        lastFlushMs: 1.5
+      })
+    };
+    world.getDeferredCrossChunkPatchStats = () => ({ chunks: 3, blocks: 45 });
+    world.getRuntimeIdleStats = () => ({ idleForMs: 160, taskCount: 2 });
+    world.chunks = new Map([
+      ['0,0', { isReady: true, isConsolidating: false, loadState: 'finalized' }],
+      ['1,0', { isReady: false, isConsolidating: true, loadState: 'terrain-built' }],
+      ['2,0', { isReady: false, isConsolidating: false, loadState: 'worker-ready' }]
+    ]);
+    world._streamingPerfTelemetry = {
+      windowStartedAt: 0,
+      flushBlocks: 540,
+      flushCalls: 3,
+      flushMaxMs: 2.25,
+      lastBudgetOps: 600,
+      lastBudgetMs: 2
+    };
+
+    assertEqual(world.consumeStreamingPerfSnapshot(999), null, '未满 1 秒时不应产出快照');
+
+    const snapshot = world.consumeStreamingPerfSnapshot(1000);
+    assertEqual(snapshot.phase, 'runtime-streaming', '应返回当前世界阶段');
+    assertEqual(snapshot.assemblyQueue, 7, '应返回装配队列长度');
+    assertEqual(snapshot.mutationQueueBlocks, 320, '应返回全局实例积压方块数');
+    assertEqual(snapshot.mutationQueueTasks, 5, '应返回全局实例积压任务数');
+    assertEqual(snapshot.flushBlocksPerSec, 540, '应聚合一秒内 flush 方块数');
+    assertEqual(snapshot.flushCalls, 3, '应聚合一秒内 flush 次数');
+    assertEqual(snapshot.flushMaxMs, 2.25, '应记录窗口内最大 flush 耗时');
+    assertEqual(snapshot.deferredPatchChunks, 3, '应返回 deferred patch chunk 数');
+    assertEqual(snapshot.deferredPatchBlocks, 45, '应返回 deferred patch block 数');
+    assertEqual(snapshot.consolidatingChunks, 1, '应统计正在 consolidation 的 chunk 数');
+    assertEqual(snapshot.loadingChunks, 2, '应统计未 finalized 的 chunk 数');
+    assertEqual(snapshot.readyChunks, 1, '应统计 ready chunk 数');
+    assertEqual(snapshot.totalChunks, 3, '应统计总 chunk 数');
+    assertEqual(world._streamingPerfTelemetry.flushBlocks, 0, '产出快照后应重置窗口累计 flush blocks');
+    assertEqual(world._streamingPerfTelemetry.flushCalls, 0, '产出快照后应重置窗口累计 flush calls');
+  });
 
   let scene;
   let world;
