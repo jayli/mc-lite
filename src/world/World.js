@@ -642,7 +642,11 @@ export class World {
     }
 
     this.processAssemblyQueues();
-    this.globalInstancedMeshManager?.flushMutationQueue?.(this._computeGlobalInstanceFlushBudget(dt));
+    this.globalInstancedMeshManager?.flushMutationQueue?.({
+      ...this._computeGlobalInstanceFlushBudget(dt),
+      playerCx: cx,
+      playerCz: cz
+    });
     if (this.bootstrapState.phase === 'runtime-streaming') {
       this._processDeferredFinalizeQueue();
       this.runtimeIdleScheduler.process({

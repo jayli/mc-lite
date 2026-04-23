@@ -202,6 +202,30 @@ describe('GlobalInstancedMeshManager', (test) => {
     assertEqual(manager.coordToRef.size, 3, '所有实例最终应写入');
   });
 
+  test('flushMutationQueue 应优先处理离玩家更近的 chunk 队列', () => {
+    const { manager } = createManager(4);
+    const farCoord = encodeCoord(160, 2, 160);
+    const nearCoord = encodeCoord(1, 2, 3);
+
+    manager.replaceChunkVisibleBlocks('10,10', makeMeshData([
+      { x: 160, y: 2, z: 160 }
+    ]));
+    manager.replaceChunkVisibleBlocks('0,0', makeMeshData([
+      { x: 1, y: 2, z: 3 }
+    ]));
+
+    const result = manager.flushMutationQueue({
+      maxOps: 1,
+      maxMs: 100,
+      playerCx: 0,
+      playerCz: 0
+    });
+
+    assertEqual(result.processedBlocks, 1, '应只处理一个实例');
+    assertEqual(manager.coordToRef.has(nearCoord), true, '近处 chunk 应优先 flush');
+    assertEqual(manager.coordToRef.has(farCoord), false, '远处 chunk 应继续留在队列中');
+  });
+
   test('removeChunk 会清理尚未 flush 的队列任务', () => {
     const { manager } = createManager(4);
     const queued = manager.replaceChunkVisibleBlocks('0,0', makeMeshData([

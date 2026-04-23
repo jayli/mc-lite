@@ -484,6 +484,34 @@ export class GlobalInstancedMeshManager {
     return queued;
   }
 
+  _getChunkDistance(chunkKey, playerCx, playerCz) {
+    if (!Number.isFinite(playerCx) || !Number.isFinite(playerCz) || typeof chunkKey !== 'string') {
+      return Infinity;
+    }
+    const [cxText, czText] = chunkKey.split(',');
+    const cx = Number(cxText);
+    const cz = Number(czText);
+    if (!Number.isFinite(cx) || !Number.isFinite(cz)) return Infinity;
+    return Math.abs(cx - playerCx) + Math.abs(cz - playerCz);
+  }
+
+  _selectNextMutationTaskIndex(playerCx, playerCz) {
+    if (!Number.isFinite(playerCx) || !Number.isFinite(playerCz) || this.mutationQueue.length <= 1) {
+      return 0;
+    }
+
+    let bestIndex = 0;
+    let bestDistance = this._getChunkDistance(this.mutationQueue[0]?.chunkKey, playerCx, playerCz);
+    for (let i = 1; i < this.mutationQueue.length; i++) {
+      const distance = this._getChunkDistance(this.mutationQueue[i]?.chunkKey, playerCx, playerCz);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestIndex = i;
+      }
+    }
+    return bestIndex;
+  }
+
   flushMutationQueue(options = {}) {
     if (this.mutationQueue.length === 0) {
       this.mutationStats.lastProcessedBlocks = 0;
@@ -493,6 +521,8 @@ export class GlobalInstancedMeshManager {
 
     const maxOps = Number.isFinite(options.maxOps) ? options.maxOps : DEFAULT_MUTATION_MAX_OPS;
     const maxMs = Number.isFinite(options.maxMs) ? options.maxMs : DEFAULT_MUTATION_MAX_MS;
+    const playerCx = Number.isFinite(options.playerCx) ? options.playerCx : null;
+    const playerCz = Number.isFinite(options.playerCz) ? options.playerCz : null;
     const now = () => globalThis.performance?.now?.() ?? Date.now();
     const start = now();
     let processedBlocks = 0;
@@ -500,7 +530,8 @@ export class GlobalInstancedMeshManager {
     while (this.mutationQueue.length > 0 && processedBlocks < maxOps) {
       if (processedBlocks > 0 && now() - start >= maxMs) break;
 
-      const task = this.mutationQueue[0];
+      const taskIndex = this._selectNextMutationTaskIndex(playerCx, playerCz);
+      const task = this.mutationQueue[taskIndex];
       const { data, entries, chunkKey } = task;
       const { type, matrices, aoLow, aoHigh, orientation } = data;
       const [coordText, sourceIndex] = entries[task.cursor];
@@ -519,7 +550,7 @@ export class GlobalInstancedMeshManager {
       processedBlocks++;
       this.mutationStats.queuedBlocks = Math.max(0, this.mutationStats.queuedBlocks - 1);
       if (task.cursor >= entries.length) {
-        this.mutationQueue.shift();
+        this.mutationQueue.splice(taskIndex, 1);
       }
     }
 
