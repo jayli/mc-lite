@@ -260,4 +260,28 @@ describe('GlobalInstancedMeshManager', (test) => {
     manager.flushMutationQueue({ maxOps: 10, maxMs: 100 });
     assertEqual(manager.coordToRef.has(add), true, '新增坐标 flush 后应出现');
   });
+
+  test('patch 批量更新同一 buffer 时只提交一次矩阵 update range', () => {
+    const { manager } = createManager(4);
+    manager.replaceChunkVisibleBlocks('0,0', makeMeshData([
+      { x: 1, y: 2, z: 3 },
+      { x: 2, y: 2, z: 3 }
+    ]));
+    manager.flushMutationQueue({ maxOps: 10, maxMs: 100 });
+
+    const buffer = manager.buffers.get('stone');
+    let updateRangeCalls = 0;
+    const originalAddUpdateRange = buffer.mesh.instanceMatrix.addUpdateRange.bind(buffer.mesh.instanceMatrix);
+    buffer.mesh.instanceMatrix.addUpdateRange = (...args) => {
+      updateRangeCalls++;
+      return originalAddUpdateRange(...args);
+    };
+
+    manager.patchChunkVisibleBlocks('0,0', makeMeshData([
+      { x: 1, y: 2, z: 3, aoLow: 5 },
+      { x: 2, y: 2, z: 3, aoLow: 6 }
+    ]));
+
+    assertEqual(updateRangeCalls, 1, '同一 buffer 的 patch 更新应聚合为一次 update range');
+  });
 });

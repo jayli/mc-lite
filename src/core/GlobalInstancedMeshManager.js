@@ -28,6 +28,11 @@ class TypeBuffer {
     this.count = 0;
     this.coordToIndex = new Map();
     this.indexToCoord = new Array(this.capacity).fill(0);
+    this.dirtyStart = Infinity;
+    this.dirtyEnd = -1;
+    this.dirtyMatrix = false;
+    this.dirtyAO = false;
+    this.dirtyBounds = false;
     this.mesh = this._createMesh(this.capacity);
   }
 
@@ -109,25 +114,54 @@ class TypeBuffer {
     this.manager.scene.add(this.mesh);
   }
 
-  markDirty(index) {
-    if (typeof this.mesh.instanceMatrix.addUpdateRange === 'function') {
-      this.mesh.instanceMatrix.addUpdateRange(index * MATRIX_STRIDE, MATRIX_STRIDE);
-    } else {
-      this.mesh.instanceMatrix.updateRange.offset = index * MATRIX_STRIDE;
-      this.mesh.instanceMatrix.updateRange.count = MATRIX_STRIDE;
+  markDirty(index, options = {}) {
+    const matrix = options.matrix !== false;
+    const ao = options.ao !== false;
+    const bounds = options.bounds !== false;
+    this.dirtyStart = Math.min(this.dirtyStart, index);
+    this.dirtyEnd = Math.max(this.dirtyEnd, index);
+    this.dirtyMatrix = this.dirtyMatrix || matrix;
+    this.dirtyAO = this.dirtyAO || ao;
+    this.dirtyBounds = this.dirtyBounds || bounds;
+  }
+
+  commitDirty() {
+    if (this.dirtyEnd < this.dirtyStart) return false;
+
+    if (this.dirtyMatrix) {
+      const offset = this.dirtyStart * MATRIX_STRIDE;
+      const count = (this.dirtyEnd - this.dirtyStart + 1) * MATRIX_STRIDE;
+      if (typeof this.mesh.instanceMatrix.addUpdateRange === 'function') {
+        this.mesh.instanceMatrix.addUpdateRange(offset, count);
+      } else {
+        this.mesh.instanceMatrix.updateRange.offset = offset;
+        this.mesh.instanceMatrix.updateRange.count = count;
+      }
+      this.mesh.instanceMatrix.needsUpdate = true;
     }
-    this.mesh.instanceMatrix.needsUpdate = true;
+
     const aoLow = this.mesh.geometry.getAttribute('aAoLow');
     const aoHigh = this.mesh.geometry.getAttribute('aAoHigh');
     const orientation = this.mesh.geometry.getAttribute('aOrientation');
-    if (aoLow) aoLow.needsUpdate = true;
-    if (aoHigh) aoHigh.needsUpdate = true;
-    if (orientation) orientation.needsUpdate = true;
-    this.mesh.boundingSphere = null;
-    this.mesh.boundingBox = null;
+    if (this.dirtyAO) {
+      if (aoLow) aoLow.needsUpdate = true;
+      if (aoHigh) aoHigh.needsUpdate = true;
+      if (orientation) orientation.needsUpdate = true;
+    }
+    if (this.dirtyBounds) {
+      this.mesh.boundingSphere = null;
+      this.mesh.boundingBox = null;
+    }
+
+    this.dirtyStart = Infinity;
+    this.dirtyEnd = -1;
+    this.dirtyMatrix = false;
+    this.dirtyAO = false;
+    this.dirtyBounds = false;
+    return true;
   }
 
-  writeInstance(index, data) {
+  writeInstance(index, data, options = {}) {
     this.mesh.instanceMatrix.array.set(data.matrix, index * MATRIX_STRIDE);
     const aoLow = this.mesh.geometry.getAttribute('aAoLow');
     const aoHigh = this.mesh.geometry.getAttribute('aAoHigh');
@@ -136,6 +170,7 @@ class TypeBuffer {
     if (aoHigh) aoHigh.array[index] = data.aoHigh ?? 1;
     if (orientation) orientation.array[index] = data.orientation ?? 0;
     this.markDirty(index);
+    if (options.commit !== false) this.commitDirty();
   }
 
   copyInstance(fromIndex, toIndex) {
@@ -148,14 +183,14 @@ class TypeBuffer {
     if (orientation) orientation.array[toIndex] = orientation.array[fromIndex];
   }
 
-  updateAO(index, aoLowValue, aoHighValue) {
+  updateAO(index, aoLowValue, aoHighValue, options = {}) {
     const aoLow = this.mesh.geometry.getAttribute('aAoLow');
     const aoHigh = this.mesh.geometry.getAttribute('aAoHigh');
     if (!aoLow || !aoHigh) return false;
     aoLow.array[index] = aoLowValue;
     aoHigh.array[index] = aoHighValue;
-    aoLow.needsUpdate = true;
-    aoHigh.needsUpdate = true;
+    this.markDirty(index, { matrix: false, ao: true, bounds: false });
+    if (options.commit !== false) this.commitDirty();
     return true;
   }
 
@@ -202,7 +237,7 @@ export class GlobalInstancedMeshManager {
     return buffer;
   }
 
-  addVisibleBlock(coord, entry, chunkKey, renderData) {
+  addVisibleBlock(coord, entry, chunkKey, renderData, options = {}) {
     const type = typeof entry === 'string' ? entry : entry?.type;
     if (!type || type === 'air' || type === 'collider') return null;
     const props = getBlockProperties(type);
@@ -210,7 +245,7 @@ export class GlobalInstancedMeshManager {
 
     const existing = this.coordToRef.get(coord);
     if (existing) {
-      this.updateVisibleBlock(coord, entry, renderData);
+      this.updateVisibleBlock(coord, entry, renderData, options);
       return existing;
     }
 
@@ -228,33 +263,33 @@ export class GlobalInstancedMeshManager {
     if (!this.chunkToCoords.has(chunkKey)) this.chunkToCoords.set(chunkKey, new Set());
     this.chunkToCoords.get(chunkKey).add(coord);
 
-    buffer.writeInstance(index, renderData);
+    buffer.writeInstance(index, renderData, options);
     const pendingAO = this.pendingAO.get(coord);
     if (pendingAO) {
-      buffer.updateAO(index, pendingAO.aoLow, pendingAO.aoHigh);
+      buffer.updateAO(index, pendingAO.aoLow, pendingAO.aoHigh, options);
       this.pendingAO.delete(coord);
     }
     return ref;
   }
 
-  updateVisibleBlock(coord, entry, renderData) {
+  updateVisibleBlock(coord, entry, renderData, options = {}) {
     const ref = this.coordToRef.get(coord);
     if (!ref) return false;
     const type = typeof entry === 'string' ? entry : entry?.type;
     const renderKey = this.getRenderKey(type);
     if (renderKey !== ref.renderKey) {
       const oldChunkKey = ref.chunkKey;
-      this.removeVisibleBlock(coord);
-      this.addVisibleBlock(coord, entry, oldChunkKey, renderData);
+      this.removeVisibleBlock(coord, options);
+      this.addVisibleBlock(coord, entry, oldChunkKey, renderData, options);
       return true;
     }
     const buffer = this.buffers.get(ref.renderKey);
     if (!buffer) return false;
-    buffer.writeInstance(ref.index, renderData);
+    buffer.writeInstance(ref.index, renderData, options);
     return true;
   }
 
-  removeVisibleBlock(coord) {
+  removeVisibleBlock(coord, options = {}) {
     const ref = this.coordToRef.get(coord);
     if (!ref) return false;
 
@@ -292,6 +327,7 @@ export class GlobalInstancedMeshManager {
       buffer.mesh.boundingSphere = null;
       buffer.mesh.boundingBox = null;
     }
+    if (options.commit !== false) buffer.commitDirty();
     return true;
   }
 
@@ -302,9 +338,10 @@ export class GlobalInstancedMeshManager {
     const list = Array.from(coords);
     let removed = 0;
     for (const coord of list) {
-      if (this.removeVisibleBlock(coord)) removed++;
+      if (this.removeVisibleBlock(coord, { commit: false })) removed++;
     }
     this.chunkToCoords.delete(chunkKey);
+    this.commitDirtyBuffers();
     return removed;
   }
 
@@ -341,7 +378,7 @@ export class GlobalInstancedMeshManager {
 
         const ref = this.coordToRef.get(coord);
         if (ref) {
-          this.updateVisibleBlock(coord, { type, orientation: renderData.orientation }, renderData);
+          this.updateVisibleBlock(coord, { type, orientation: renderData.orientation }, renderData, { commit: false });
           updated++;
         } else {
           missingEntries.push([coordText, sourceIndex]);
@@ -367,11 +404,12 @@ export class GlobalInstancedMeshManager {
     if (existingCoords) {
       for (const coord of Array.from(existingCoords)) {
         if (nextCoords.has(coord)) continue;
-        if (this.removeVisibleBlock(coord)) removed++;
+        if (this.removeVisibleBlock(coord, { commit: false })) removed++;
       }
     }
 
     this.mutationStats.queuedBlocks += queued;
+    this.commitDirtyBuffers();
     return { updated, queued, removed };
   }
 
@@ -449,7 +487,7 @@ export class GlobalInstancedMeshManager {
         aoLow: aoLow?.[sourceIndex] ?? 1,
         aoHigh: aoHigh?.[sourceIndex] ?? 1,
         orientation: orientation?.[sourceIndex] ?? 0
-      });
+      }, { commit: false });
       this.queuedCoordToChunk.delete(coord);
 
       task.cursor++;
@@ -460,6 +498,7 @@ export class GlobalInstancedMeshManager {
       }
     }
 
+    this.commitDirtyBuffers();
     const elapsedMs = now() - start;
     this.mutationStats.lastProcessedBlocks = processedBlocks;
     this.mutationStats.lastFlushMs = elapsedMs;
@@ -496,7 +535,7 @@ export class GlobalInstancedMeshManager {
     return added;
   }
 
-  updateAO(coord, aoLow, aoHigh) {
+  updateAO(coord, aoLow, aoHigh, options = {}) {
     const ref = this.coordToRef.get(coord);
     if (!ref) {
       if (this.queuedCoordToChunk.has(coord)) {
@@ -506,7 +545,7 @@ export class GlobalInstancedMeshManager {
     }
     const buffer = this.buffers.get(ref.renderKey);
     if (!buffer) return false;
-    return buffer.updateAO(ref.index, aoLow, aoHigh);
+    return buffer.updateAO(ref.index, aoLow, aoHigh, options);
   }
 
   resolveHit(hit) {
@@ -521,6 +560,14 @@ export class GlobalInstancedMeshManager {
     return Array.from(this.buffers.values())
       .filter(buffer => buffer.count > 0)
       .map(buffer => buffer.mesh);
+  }
+
+  commitDirtyBuffers() {
+    let committed = 0;
+    for (const buffer of this.buffers.values()) {
+      if (buffer.commitDirty()) committed++;
+    }
+    return committed;
   }
 
   dispose() {
