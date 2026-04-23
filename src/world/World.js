@@ -39,6 +39,10 @@ const RUNTIME_IDLE_GRACE_MS = 100;
 const RUNTIME_DEFERRED_CONSOLIDATION_IDLE_GRACE_MS = 3000;
 /** idle 任务每帧预算时间（ms），防止低优先级任务阻塞渲染 */
 const RUNTIME_IDLE_FRAME_BUDGET_MS = 2;
+/** 全局实例写入每帧预算，防止 chunk 可见方块一次性注册造成奔跑卡顿 */
+const GLOBAL_INSTANCE_FLUSH_FRAME_BUDGET_MS = 2;
+/** 全局实例每帧最多写入数量 */
+const GLOBAL_INSTANCE_FLUSH_MAX_BLOCKS_PER_FRAME = 600;
 /** 跨区块补丁每帧最多处理的区块数 */
 const CROSS_CHUNK_PATCH_MAX_CHUNKS_PER_FRAME = 1;
 /** 跨区块补丁每帧最多处理的方块数 */
@@ -570,6 +574,10 @@ export class World {
     }
 
     this.processAssemblyQueues();
+    this.globalInstancedMeshManager?.flushMutationQueue?.({
+      maxOps: GLOBAL_INSTANCE_FLUSH_MAX_BLOCKS_PER_FRAME,
+      maxMs: GLOBAL_INSTANCE_FLUSH_FRAME_BUDGET_MS
+    });
     if (this.bootstrapState.phase === 'runtime-streaming') {
       this._processDeferredFinalizeQueue();
       this.runtimeIdleScheduler.process({

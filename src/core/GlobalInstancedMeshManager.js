@@ -5,6 +5,8 @@ import { geomMap } from '../world/ChunkConsolidation.js';
 import { decodeCoord } from '../utils/CoordEncoding.js';
 
 const DEFAULT_INITIAL_CAPACITY = 256;
+const DEFAULT_MUTATION_MAX_OPS = 600;
+const DEFAULT_MUTATION_MAX_MS = 2;
 const MATRIX_STRIDE = 16;
 
 const isGlassType = (type) => typeof type === 'string' && type.includes('glass');
@@ -121,6 +123,8 @@ class TypeBuffer {
     if (aoLow) aoLow.needsUpdate = true;
     if (aoHigh) aoHigh.needsUpdate = true;
     if (orientation) orientation.needsUpdate = true;
+    this.mesh.boundingSphere = null;
+    this.mesh.boundingBox = null;
   }
 
   writeInstance(index, data) {
@@ -173,6 +177,14 @@ export class GlobalInstancedMeshManager {
     this.buffers = new Map();
     this.coordToRef = new Map();
     this.chunkToCoords = new Map();
+    this.pendingAO = new Map();
+    this.queuedCoordToChunk = new Map();
+    this.mutationQueue = [];
+    this.mutationStats = {
+      queuedBlocks: 0,
+      lastProcessedBlocks: 0,
+      lastFlushMs: 0
+    };
   }
 
   getRenderKey(type) {
@@ -217,6 +229,11 @@ export class GlobalInstancedMeshManager {
     this.chunkToCoords.get(chunkKey).add(coord);
 
     buffer.writeInstance(index, renderData);
+    const pendingAO = this.pendingAO.get(coord);
+    if (pendingAO) {
+      buffer.updateAO(index, pendingAO.aoLow, pendingAO.aoHigh);
+      this.pendingAO.delete(coord);
+    }
     return ref;
   }
 
@@ -261,6 +278,7 @@ export class GlobalInstancedMeshManager {
     buffer.count--;
     buffer.mesh.count = buffer.count;
     this.coordToRef.delete(coord);
+    this.pendingAO.delete(coord);
     if (ref.chunkKey && this.chunkToCoords.has(ref.chunkKey)) {
       const coords = this.chunkToCoords.get(ref.chunkKey);
       coords.delete(coord);
@@ -271,11 +289,14 @@ export class GlobalInstancedMeshManager {
       buffer.markDirty(Math.min(index, buffer.count - 1));
     } else {
       buffer.mesh.instanceMatrix.needsUpdate = true;
+      buffer.mesh.boundingSphere = null;
+      buffer.mesh.boundingBox = null;
     }
     return true;
   }
 
   removeChunk(chunkKey) {
+    this._purgeQueuedChunk(chunkKey);
     const coords = this.chunkToCoords.get(chunkKey);
     if (!coords) return 0;
     const list = Array.from(coords);
@@ -289,7 +310,165 @@ export class GlobalInstancedMeshManager {
 
   replaceChunkVisibleBlocks(chunkKey, meshDataArray) {
     this.removeChunk(chunkKey);
-    return this.addMeshDataForChunk(chunkKey, meshDataArray);
+    return this.enqueueMeshDataForChunk(chunkKey, meshDataArray);
+  }
+
+  patchChunkVisibleBlocks(chunkKey, meshDataArray) {
+    if (!Array.isArray(meshDataArray)) return { updated: 0, queued: 0, removed: 0 };
+
+    this._purgeQueuedChunk(chunkKey);
+    const nextCoords = new Set();
+    let updated = 0;
+    let queued = 0;
+
+    for (const data of meshDataArray) {
+      if (data.blockTypes) continue;
+      const { type, count, matrices, aoLow, aoHigh, orientation, instanceIndexMap } = data;
+      const props = getBlockProperties(type);
+      if (!props.isRendered || count === 0) continue;
+
+      const missingEntries = [];
+      for (const [coordText, sourceIndex] of Object.entries(instanceIndexMap || {})) {
+        const coord = Number(coordText);
+        nextCoords.add(coord);
+        const matrix = matrices.subarray(sourceIndex * MATRIX_STRIDE, sourceIndex * MATRIX_STRIDE + MATRIX_STRIDE);
+        const renderData = {
+          matrix,
+          aoLow: aoLow?.[sourceIndex] ?? 1,
+          aoHigh: aoHigh?.[sourceIndex] ?? 1,
+          orientation: orientation?.[sourceIndex] ?? 0
+        };
+
+        const ref = this.coordToRef.get(coord);
+        if (ref) {
+          this.updateVisibleBlock(coord, { type, orientation: renderData.orientation }, renderData);
+          updated++;
+        } else {
+          missingEntries.push([coordText, sourceIndex]);
+        }
+      }
+
+      if (missingEntries.length > 0) {
+        this.mutationQueue.push({
+          chunkKey,
+          data,
+          entries: missingEntries,
+          cursor: 0
+        });
+        for (const [coordText] of missingEntries) {
+          this.queuedCoordToChunk.set(Number(coordText), chunkKey);
+        }
+        queued += missingEntries.length;
+      }
+    }
+
+    let removed = 0;
+    const existingCoords = this.chunkToCoords.get(chunkKey);
+    if (existingCoords) {
+      for (const coord of Array.from(existingCoords)) {
+        if (nextCoords.has(coord)) continue;
+        if (this.removeVisibleBlock(coord)) removed++;
+      }
+    }
+
+    this.mutationStats.queuedBlocks += queued;
+    return { updated, queued, removed };
+  }
+
+  _purgeQueuedChunk(chunkKey) {
+    if (this.mutationQueue.length === 0) return 0;
+    let removed = 0;
+    this.mutationQueue = this.mutationQueue.filter(task => {
+      if (task.chunkKey !== chunkKey) return true;
+      for (let i = task.cursor; i < task.entries.length; i++) {
+        const coord = Number(task.entries[i][0]);
+        this.queuedCoordToChunk.delete(coord);
+        this.pendingAO.delete(coord);
+      }
+      removed += task.entries.length - task.cursor;
+      return false;
+    });
+    this.mutationStats.queuedBlocks = Math.max(0, this.mutationStats.queuedBlocks - removed);
+    return removed;
+  }
+
+  enqueueMeshDataForChunk(chunkKey, meshDataArray) {
+    if (!Array.isArray(meshDataArray)) return 0;
+    this._purgeQueuedChunk(chunkKey);
+
+    let queued = 0;
+    for (const data of meshDataArray) {
+      if (data.blockTypes) continue;
+      const { type, count, instanceIndexMap } = data;
+      const props = getBlockProperties(type);
+      if (!props.isRendered || count === 0) continue;
+
+      const entries = Object.entries(instanceIndexMap || {});
+      if (entries.length === 0) continue;
+      this.mutationQueue.push({
+        chunkKey,
+        data,
+        entries,
+        cursor: 0
+      });
+      for (const [coordText] of entries) {
+        this.queuedCoordToChunk.set(Number(coordText), chunkKey);
+      }
+      queued += entries.length;
+    }
+
+    this.mutationStats.queuedBlocks += queued;
+    return queued;
+  }
+
+  flushMutationQueue(options = {}) {
+    if (this.mutationQueue.length === 0) {
+      this.mutationStats.lastProcessedBlocks = 0;
+      this.mutationStats.lastFlushMs = 0;
+      return { didWork: false, processedBlocks: 0, remainingBlocks: 0, elapsedMs: 0 };
+    }
+
+    const maxOps = Number.isFinite(options.maxOps) ? options.maxOps : DEFAULT_MUTATION_MAX_OPS;
+    const maxMs = Number.isFinite(options.maxMs) ? options.maxMs : DEFAULT_MUTATION_MAX_MS;
+    const now = () => globalThis.performance?.now?.() ?? Date.now();
+    const start = now();
+    let processedBlocks = 0;
+
+    while (this.mutationQueue.length > 0 && processedBlocks < maxOps) {
+      if (processedBlocks > 0 && now() - start >= maxMs) break;
+
+      const task = this.mutationQueue[0];
+      const { data, entries, chunkKey } = task;
+      const { type, matrices, aoLow, aoHigh, orientation } = data;
+      const [coordText, sourceIndex] = entries[task.cursor];
+      const coord = Number(coordText);
+      const matrix = matrices.subarray(sourceIndex * MATRIX_STRIDE, sourceIndex * MATRIX_STRIDE + MATRIX_STRIDE);
+
+      this.addVisibleBlock(coord, { type, orientation: orientation?.[sourceIndex] || 0 }, chunkKey, {
+        matrix,
+        aoLow: aoLow?.[sourceIndex] ?? 1,
+        aoHigh: aoHigh?.[sourceIndex] ?? 1,
+        orientation: orientation?.[sourceIndex] ?? 0
+      });
+      this.queuedCoordToChunk.delete(coord);
+
+      task.cursor++;
+      processedBlocks++;
+      this.mutationStats.queuedBlocks = Math.max(0, this.mutationStats.queuedBlocks - 1);
+      if (task.cursor >= entries.length) {
+        this.mutationQueue.shift();
+      }
+    }
+
+    const elapsedMs = now() - start;
+    this.mutationStats.lastProcessedBlocks = processedBlocks;
+    this.mutationStats.lastFlushMs = elapsedMs;
+    return {
+      didWork: processedBlocks > 0,
+      processedBlocks,
+      remainingBlocks: this.mutationStats.queuedBlocks,
+      elapsedMs
+    };
   }
 
   addMeshDataForChunk(chunkKey, meshDataArray) {
@@ -319,7 +498,12 @@ export class GlobalInstancedMeshManager {
 
   updateAO(coord, aoLow, aoHigh) {
     const ref = this.coordToRef.get(coord);
-    if (!ref) return false;
+    if (!ref) {
+      if (this.queuedCoordToChunk.has(coord)) {
+        this.pendingAO.set(coord, { aoLow, aoHigh });
+      }
+      return false;
+    }
     const buffer = this.buffers.get(ref.renderKey);
     if (!buffer) return false;
     return buffer.updateAO(ref.index, aoLow, aoHigh);
@@ -346,5 +530,21 @@ export class GlobalInstancedMeshManager {
     this.buffers.clear();
     this.coordToRef.clear();
     this.chunkToCoords.clear();
+    this.pendingAO.clear();
+    this.queuedCoordToChunk.clear();
+    this.mutationQueue.length = 0;
+    this.mutationStats.queuedBlocks = 0;
+  }
+
+  getStats() {
+    return {
+      buffers: this.buffers.size,
+      renderedBlocks: this.coordToRef.size,
+      queuedBlocks: this.mutationStats.queuedBlocks,
+      queueTasks: this.mutationQueue.length,
+      pendingAO: this.pendingAO.size,
+      lastProcessedBlocks: this.mutationStats.lastProcessedBlocks,
+      lastFlushMs: this.mutationStats.lastFlushMs
+    };
   }
 }

@@ -25,6 +25,32 @@ function makeMatrix(x, y, z) {
   return new Float32Array(object.matrix.elements);
 }
 
+function makeMeshData(blocks, type = 'stone') {
+  const matrices = new Float32Array(blocks.length * 16);
+  const aoLow = new Float32Array(blocks.length);
+  const aoHigh = new Float32Array(blocks.length);
+  const orientation = new Float32Array(blocks.length);
+  const instanceIndexMap = {};
+
+  blocks.forEach((block, index) => {
+    matrices.set(makeMatrix(block.x, block.y, block.z), index * 16);
+    aoLow[index] = block.aoLow ?? 1;
+    aoHigh[index] = block.aoHigh ?? 1;
+    orientation[index] = block.orientation ?? 0;
+    instanceIndexMap[encodeCoord(block.x, block.y, block.z)] = index;
+  });
+
+  return [{
+    type,
+    count: blocks.length,
+    matrices,
+    aoLow,
+    aoHigh,
+    orientation,
+    instanceIndexMap
+  }];
+}
+
 describe('GlobalInstancedMeshManager', (test) => {
   test('新增同类型方块时共享一个全局 InstancedMesh', () => {
     const { scene, manager } = createManager();
@@ -151,5 +177,87 @@ describe('GlobalInstancedMeshManager', (test) => {
     assertEqual(buffer.count, 1, '另一个 chunk 的实例应保留');
     assertEqual(manager.coordToRef.has(a), false, '卸载 chunk 坐标应删除');
     assertEqual(manager.coordToRef.has(b), true, '其他 chunk 坐标应保留');
+  });
+
+  test('replaceChunkVisibleBlocks 将新增实例入队，flushMutationQueue 分帧提交', () => {
+    const { manager } = createManager(4);
+    const blocks = [
+      { x: 1, y: 2, z: 3 },
+      { x: 2, y: 2, z: 3 },
+      { x: 3, y: 2, z: 3 }
+    ];
+
+    const queued = manager.replaceChunkVisibleBlocks('0,0', makeMeshData(blocks));
+    assertEqual(queued, 3, 'replace 应把全部可见实例加入队列');
+    assertEqual(manager.coordToRef.size, 0, '入队后不应同步写入，避免单帧尖峰');
+
+    let result = manager.flushMutationQueue({ maxOps: 2, maxMs: 100 });
+    assertEqual(result.processedBlocks, 2, '第一帧只处理预算内实例');
+    assertEqual(result.remainingBlocks, 1, '队列应保留未处理实例');
+    assertEqual(manager.coordToRef.size, 2, '已处理实例应可查');
+
+    result = manager.flushMutationQueue({ maxOps: 2, maxMs: 100 });
+    assertEqual(result.processedBlocks, 1, '第二帧处理剩余实例');
+    assertEqual(result.remainingBlocks, 0, '队列应清空');
+    assertEqual(manager.coordToRef.size, 3, '所有实例最终应写入');
+  });
+
+  test('removeChunk 会清理尚未 flush 的队列任务', () => {
+    const { manager } = createManager(4);
+    const queued = manager.replaceChunkVisibleBlocks('0,0', makeMeshData([
+      { x: 1, y: 2, z: 3 },
+      { x: 2, y: 2, z: 3 }
+    ]));
+
+    assertEqual(queued, 2, '应成功入队');
+    manager.removeChunk('0,0');
+    const result = manager.flushMutationQueue({ maxOps: 10, maxMs: 100 });
+    assertEqual(result.processedBlocks, 0, '卸载后的队列任务不应再写入');
+    assertEqual(manager.coordToRef.size, 0, '卸载 chunk 不应残留实例');
+  });
+
+  test('AO 结果早于分帧实例写入时应缓存并在 flush 时应用', () => {
+    const { manager } = createManager(4);
+    const coord = encodeCoord(1, 2, 3);
+
+    manager.replaceChunkVisibleBlocks('0,0', makeMeshData([
+      { x: 1, y: 2, z: 3, aoLow: 1, aoHigh: 1 }
+    ]));
+    assertEqual(manager.updateAO(coord, 88, 99), false, '实例尚未写入时 updateAO 返回 false');
+    assertEqual(manager.getStats().pendingAO, 1, '已入队实例的 AO 应暂存');
+
+    manager.flushMutationQueue({ maxOps: 1, maxMs: 100 });
+    const buffer = manager.buffers.get('stone');
+    assertEqual(buffer.mesh.geometry.getAttribute('aAoLow').array[0], 88, 'flush 后应应用暂存 aoLow');
+    assertEqual(buffer.mesh.geometry.getAttribute('aAoHigh').array[0], 99, 'flush 后应应用暂存 aoHigh');
+    assertEqual(manager.getStats().pendingAO, 0, '应用后 pending AO 应清空');
+  });
+
+  test('patchChunkVisibleBlocks 更新已有实例，不清空整个 chunk', () => {
+    const { manager } = createManager(4);
+    const keep = encodeCoord(1, 2, 3);
+    const remove = encodeCoord(2, 2, 3);
+    const add = encodeCoord(3, 2, 3);
+
+    manager.replaceChunkVisibleBlocks('0,0', makeMeshData([
+      { x: 1, y: 2, z: 3, aoLow: 1, aoHigh: 1 },
+      { x: 2, y: 2, z: 3, aoLow: 1, aoHigh: 1 }
+    ]));
+    manager.flushMutationQueue({ maxOps: 10, maxMs: 100 });
+
+    const result = manager.patchChunkVisibleBlocks('0,0', makeMeshData([
+      { x: 1, y: 2, z: 3, aoLow: 7, aoHigh: 8 },
+      { x: 3, y: 2, z: 3, aoLow: 9, aoHigh: 10 }
+    ]));
+
+    assertEqual(result.updated, 1, '已有实例应原地更新');
+    assertEqual(result.queued, 1, '新增实例应入队分帧写入');
+    assertEqual(result.removed, 1, '不再可见实例应删除');
+    assertEqual(manager.coordToRef.has(keep), true, '保留坐标不应闪烁消失');
+    assertEqual(manager.coordToRef.has(remove), false, '移除坐标应删除');
+    assertEqual(manager.coordToRef.has(add), false, '新增坐标应等待队列 flush');
+
+    manager.flushMutationQueue({ maxOps: 10, maxMs: 100 });
+    assertEqual(manager.coordToRef.has(add), true, '新增坐标 flush 后应出现');
   });
 });

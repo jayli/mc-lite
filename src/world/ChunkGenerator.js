@@ -106,11 +106,16 @@ export function extendChunk(Chunk) {
 
     if (this.world?.globalInstancedMeshManager) {
       const chunkKey = `${this.cx},${this.cz}`;
-      const instanceCount = this.world.globalInstancedMeshManager.replaceChunkVisibleBlocks(chunkKey, meshDataArray);
+      const isInitialBuild = this.loadState !== 'finalized' && this.loadState !== 'waiting-consolidation';
+      const result = isInitialBuild
+        ? this.world.globalInstancedMeshManager.replaceChunkVisibleBlocks(chunkKey, meshDataArray)
+        : this.world.globalInstancedMeshManager.patchChunkVisibleBlocks(chunkKey, meshDataArray);
       recordChunkPerf('chunk.build-meshes-global', (globalThis.performance?.now?.() ?? Date.now()) - t0, {
         chunkKey,
         meshGroups: meshDataArray.length,
-        instanceCount
+        instanceCount: typeof result === 'number' ? result : result.queued,
+        patchUpdated: result?.updated || 0,
+        patchRemoved: result?.removed || 0
       });
       return;
     }
