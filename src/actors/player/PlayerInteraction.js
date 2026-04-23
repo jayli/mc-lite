@@ -524,7 +524,7 @@ export class PlayerInteraction {
 
       // 如果没找到，遍历该 chunk 的所有 InstancedMesh 查找
       if (!instanceHidden) {
-        const owner = this.player.world.resolveBlockOwner(finalBx, finalBy, finalBz, { allowScan: true });
+        const owner = this.player.world.resolveBlockOwner(finalBx, finalBy, finalBz, { allowScan: false });
         const candidateChunks = [];
         if (owner?.ownerChunk) candidateChunks.push(owner.ownerChunk);
         if (owner?.coordChunk && owner.coordChunk !== owner.ownerChunk) candidateChunks.push(owner.coordChunk);

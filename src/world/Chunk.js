@@ -1848,7 +1848,7 @@ export class Chunk {
    * @param {number} z - 世界坐标 Z
    */
   checkReveal(x, y, z) {
-    const owner = this.world.resolveBlockOwner(x, y, z, { allowScan: true });
+    const owner = this.world.resolveBlockOwner(x, y, z, { allowScan: false });
     if (!owner) return;
 
     const targetChunk = owner.ownerChunk;

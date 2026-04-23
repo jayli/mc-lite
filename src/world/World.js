@@ -669,26 +669,14 @@ export class World {
    *                           避免 Mag7、TNT 等批量删除场景中 AO 阴影计算丢失。
    */
   removeBlocksBatch(positions, isBatch = true) {
-    // 将坐标按实际存储 blockData 的 Chunk 分组
-    // 跨Chunk实体方块的 blockData 存储在结构中心所在的Chunk中
+    // 普通方块只按坐标所属 chunk 分组；特殊实体碰撞独立处理。
     const chunkGroups = new Map();
-    // 同时收集方块坐标所在的Chunk，用于更新渲染网格
-    const renderChunks = new Map();
     const specialEntitiesToDestroy = new Map();
 
     positions.forEach(p => {
       const px = Math.floor(p.x);
       const py = Math.floor(p.y);
       const pz = Math.floor(p.z);
-
-      // 首先查找方块坐标所在的Chunk
-      const cx = Math.floor(p.x / CHUNK_SIZE);
-      const cz = Math.floor(p.z / CHUNK_SIZE);
-      const coordKey = `${cx},${cz}`;
-
-      // 记录方块坐标所在的Chunk（用于渲染更新）
-      if (!renderChunks.has(coordKey)) renderChunks.set(coordKey, []);
-      renderChunks.get(coordKey).push(p);
 
       const specialCollision = this.getSpecialEntityCollision(px, py, pz);
       if (specialCollision) {
@@ -698,13 +686,11 @@ export class World {
         );
       }
 
-      // 与 removeBlock 语义保持一致：同坐标存在多个 owner 时，批量删除也要全部命中
-      const owners = this.getAllBlockOwners(px, py, pz);
-      owners.forEach((owner) => {
-        const targetKey = owner.ownerChunkKey;
-        if (!chunkGroups.has(targetKey)) chunkGroups.set(targetKey, []);
-        chunkGroups.get(targetKey).push(p);
-      });
+      const owner = this.resolveBlockOwner(px, py, pz, { allowScan: false });
+      if (!owner) return;
+      const targetKey = owner.ownerChunkKey;
+      if (!chunkGroups.has(targetKey)) chunkGroups.set(targetKey, []);
+      chunkGroups.get(targetKey).push(p);
     });
 
     for (const collision of specialEntitiesToDestroy.values()) {
@@ -717,19 +703,6 @@ export class World {
       if (chunk) {
         chunk.markPlayerMutation?.();
         chunk.removeBlocksBatch(chunkPosList, isBatch);
-      }
-    }
-
-    // 跨Chunk实体方块渲染更新：
-    // 对于方块坐标所在的Chunk，也需要更新渲染网格
-    for (const [key, chunkPosList] of renderChunks) {
-      // 跳过已经处理过的Chunk（blockData所在的Chunk已经在上面处理过）
-      if (chunkGroups.has(key)) continue;
-
-      const chunk = this.chunks.get(key);
-      if (chunk && chunk.isReady) {
-        // 只更新渲染网格，不更新blockData
-        chunk.removeBlocksBatchRenderOnly(chunkPosList);
       }
     }
 
@@ -773,7 +746,7 @@ export class World {
    * }|null}
    */
   resolveBlockOwner(x, y, z, options = {}) {
-    const allowScan = options.allowScan !== false;
+    const allowScan = options.allowScan === true;
 
     const ix = x | 0;  // Math.floor 的位运算版本（对正数效果相同）
     const iy = y | 0;
@@ -823,7 +796,11 @@ export class World {
       }
     }
 
-    // 2) 跨 Chunk owner 缓存命中
+    if (!allowScan) {
+      return null;
+    }
+
+    // 2) 跨 Chunk owner 缓存命中（仅迁移期诊断/兼容查询使用）
     const ownerChunkKey = this.crossChunkOwnerCache.get(blockCode);
     if (ownerChunkKey) {
       const ownerChunk = this.chunks.get(ownerChunkKey);
@@ -845,12 +822,7 @@ export class World {
       this.crossChunkOwnerCache.delete(blockCode);
     }
 
-    // 3) 快速模式不扫描
-    if (!allowScan) {
-      return null;
-    }
-
-    // 4) 全量扫描已加载 Chunk
+    // 3) 全量扫描已加载 Chunk（正常删除路径不会调用）
     for (const [otherKey, otherChunk] of this.chunks) {
       if (!otherChunk?.isReady || otherKey === coordChunkKey) continue;
 
@@ -1039,7 +1011,7 @@ export class World {
    * @returns {string|null} 方块类型（如 'stone'），如果区块未加载则返回 null
    */
   getBlock(x, y, z) {
-    const owner = this.resolveBlockOwner(x, y, z, { allowScan: true });
+    const owner = this.resolveBlockOwner(x, y, z, { allowScan: false });
     if (owner) return this.getBlockTypeFromEntry(owner.entry);
     return this.getSpecialEntityCollision(x, y, z) ? 'collider' : null;
   }
@@ -1060,7 +1032,7 @@ export class World {
 
   /**
    * 获取指定世界坐标的方块类型（快速路径）
-   * 仅查询：坐标所属 Chunk + crossChunkOwnerCache
+   * 仅查询坐标所属 Chunk。
    * 不执行全量 Chunk 扫描，适用于高频实时判定（如 AI / LOS / 弹道碰撞）
    *
    * @param {number} x - 世界坐标 X
@@ -1082,7 +1054,7 @@ export class World {
    * @returns {{ type: string, orientation: number }|null} 方块信息，如果区块未加载则返回 null
    */
   getBlockEntry(x, y, z) {
-    const owner = this.resolveBlockOwner(x, y, z, { allowScan: true });
+    const owner = this.resolveBlockOwner(x, y, z, { allowScan: false });
     if (owner) return parseBlockEntry(owner.entry);
     return this.getSpecialEntityCollision(x, y, z) ? { type: 'collider', orientation: 0 } : null;
   }
@@ -1184,9 +1156,8 @@ export class World {
    * @param {number} z - 世界坐标 Z
    */
   removeBlock(x, y, z) {
-    // 防御式处理：移除该坐标在所有 Chunk 的重复 owner，避免历史脏数据导致一键只删一层
-    const owners = this.getAllBlockOwners(x, y, z);
-    if (owners.length === 0) {
+    const owner = this.resolveBlockOwner(x, y, z, { allowScan: false });
+    if (!owner) {
       const specialCollision = this.getSpecialEntityCollision(x, y, z);
       if (!specialCollision) return;
       specialCollision.ownerChunk.destroySpecialEntity(specialCollision.entityType, specialCollision.entityId);
@@ -1194,8 +1165,8 @@ export class World {
       this.requestShadowMapUpdate('remove-special-entity');
       return;
     }
-    owners.forEach(owner => owner.ownerChunk.markPlayerMutation?.());
-    owners.forEach(owner => owner.ownerChunk.removeBlock(x, y, z));
+    owner.ownerChunk.markPlayerMutation?.();
+    owner.ownerChunk.removeBlock(x, y, z);
     this.clearBlockLookupCaches();
     this.requestShadowMapUpdate('remove-block');
   }
@@ -1207,15 +1178,15 @@ export class World {
    * @param {number} z - 世界坐标 Z
    */
   removeBlockCollider(x, y, z) {
-    const owners = this.getAllBlockOwners(x, y, z);
-    if (owners.length === 0) {
+    const owner = this.resolveBlockOwner(x, y, z, { allowScan: false });
+    if (!owner) {
       const specialCollision = this.getSpecialEntityCollision(x, y, z);
       if (!specialCollision) return;
       specialCollision.ownerChunk.destroySpecialEntity(specialCollision.entityType, specialCollision.entityId);
       this.clearBlockLookupCaches();
       return;
     }
-    owners.forEach(owner => owner.ownerChunk.removeCollisionKey(x, y, z));
+    owner.ownerChunk.removeCollisionKey(x, y, z);
     this.clearBlockLookupCaches();
   }
 
