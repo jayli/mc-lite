@@ -183,6 +183,31 @@ async function waitForWorldPhase(world, targetPhase, maxWaitCount = 160) {
   return false;
 }
 
+async function runRealWorldWorker(message) {
+  return await new Promise((resolve, reject) => {
+    const worker = new OriginalWorker(new URL('../workers/WorldWorker.js', import.meta.url), {
+      type: 'module'
+    });
+    const timeout = setTimeout(() => {
+      worker.terminate();
+      reject(new Error('WorldWorker test timeout'));
+    }, 15000);
+
+    worker.onmessage = (event) => {
+      clearTimeout(timeout);
+      worker.terminate();
+      resolve(event.data);
+    };
+    worker.onerror = (event) => {
+      clearTimeout(timeout);
+      worker.terminate();
+      reject(event.error || new Error(event.message || 'WorldWorker test failed'));
+    };
+
+    worker.postMessage(message);
+  });
+}
+
 // ============================================
 // 其他依赖模拟
 // ============================================
@@ -462,6 +487,41 @@ describe('World 真实类测试', (test) => {
     assertTrue(world._staticTreeTerrainBoostChunkKeys.has('1,1'), '应包含东南角被树冠覆盖的 chunk');
 
     teardownEnvironment();
+  });
+
+  test('WorldWorker owner 过滤 - 越界 snapshot 方块不应因 rover 结构中心留在当前 chunk 输出中', async () => {
+    const outOfChunkCode = Chunk.encodeCoord(16, 10, 8);
+    const result = await runRealWorldWorker({
+      cx: 0,
+      cz: 0,
+      seed: 1,
+      taskId: 'test:worker-owner-filter',
+      snapshot: {
+        meta: { ownershipVersion: 2 },
+        blocks: {
+          [outOfChunkCode]: { type: 'stone', orientation: 0 }
+        },
+        entities: {
+          modGunMan: [],
+          rovers: [{ x: 15, y: 10, z: 8 }],
+          zombieNests: [],
+          staticTrees: []
+        }
+      },
+      structureCenters: [{ type: 'rover', x: 15, y: 10, z: 8 }],
+      isOptimization: false,
+      textureGroups: {}
+    });
+
+    assertEqual(
+      result.snapshot?.blocks?.[outOfChunkCode],
+      undefined,
+      '越界 snapshot 方块不应再因 rover 结构中心留在当前 chunk snapshot 中'
+    );
+    assertFalse(
+      result.blockDataBlocks.some((block) => block.x === 16 && block.y === 10 && block.z === 8),
+      '越界方块不应进入当前 chunk 的逻辑方块输出'
+    );
   });
 
   test('AO 稳定源事件 - finalized chunk 应刷新自身并标记四邻边界', () => {

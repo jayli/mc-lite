@@ -16,12 +16,6 @@ import { FrozenMountain } from './maps/FrozenMountain.js';
 import { IslandMap } from './maps/IslandMap.js';
 import { PlainLand } from './maps/PlainLand.js';
 import { CityMap } from './maps/CityMap.js';
-import {
-  getStructureRenderDist,
-  isCrossChunkOwnerType,
-  STRUCTURE_HEIGHT_RANGE,
-  STRUCTURE_HEIGHT_RANGE_SPECIAL
-} from '../utils/StructureUtils.js';
 import { calculateAOForBlock } from '../utils/AOUtils.js';
 import { StructureCandidateIndex } from './structure-index/StructureCandidateIndex.js';
 
@@ -443,8 +437,6 @@ onmessage = async function(e) {
   const cityPavilionFootprintCells = new Set(); // 记录 City pavilion 预占地，防止重叠
   const cityTallWellFootprintCells = new Set(); // 记录 City tall_well 预占地，防止重叠
   const cityCoreCandidates = []; // 记录 City 核心区候选点（用于后置填充）
-  const blockSourceTypeMap = new Map(); // 记录方块来源结构类型（仅结构任务）
-  let activeStructureType = null;
 
   // 模拟 Chunk 类的 add 方法 - 改为写入 blockMap
   const fakeChunk = {
@@ -461,9 +453,6 @@ onmessage = async function(e) {
         return;
       }
       blockMap.set(key, { x, y, z, type, solid, orientation });
-      if (activeStructureType) {
-        blockSourceTypeMap.set(key, activeStructureType);
-      }
     },
     getBlockType: (x, y, z) => {
       const key = encodeCoord(x, y, z);
@@ -1405,9 +1394,7 @@ onmessage = async function(e) {
     const islandY = 40 + Math.floor(chunkRandom(cx, cz, seed + 51) * 30);
     const centerWx = cx * CHUNK_SIZE + 8;
     const centerWz = cz * CHUNK_SIZE + 8;
-    activeStructureType = 'island';
     Island.generate(centerWx, islandY, centerWz, fakeChunk, dPlaceholder);
-    activeStructureType = null;
     // 注册空岛结构中心，用于跨Chunk渲染
     structureCenters.push({ type: 'island', x: centerWx, y: islandY, z: centerWz });
   }
@@ -1415,9 +1402,7 @@ onmessage = async function(e) {
     const startX = cx * CHUNK_SIZE + Math.floor(chunkRandom(cx, cz, seed + 53) * CHUNK_SIZE);
     const startZ = cz * CHUNK_SIZE + Math.floor(chunkRandom(cx, cz, seed + 54) * CHUNK_SIZE);
     const size = 30 + Math.floor(chunkRandom(cx, cz, seed + 55) * 21);
-    activeStructureType = 'cloud';
     Cloud.generateCluster(startX, 35, startZ, size, fakeChunk, dPlaceholder);
-    activeStructureType = null;
     // 注册云朵结构中心，用于跨Chunk渲染
     structureCenters.push({ type: 'cloud', x: startX, y: 35, z: startZ });
   }
@@ -1505,12 +1490,9 @@ onmessage = async function(e) {
     appendStaticTreeTask(candidate.x, candidate.y, candidate.z, 'azalea');
   }
 
-  structureQueueWithCenters.forEach(({ task, type }) => {
-    activeStructureType = type || null;
+  structureQueueWithCenters.forEach(({ task }) => {
     task();
-    activeStructureType = null;
   });
-  activeStructureType = null;
   } // end if (!isOptimization) — consolidation 跳过地形重生成
 
   // 结构中心统一去重，避免后续多阶段追加造成重复中心放大判定范围
@@ -1537,41 +1519,8 @@ onmessage = async function(e) {
     }
   }
 
-  // 统一 Chunk 归属判定：
-  // - 大型静态结构（tank、castle 等）：严格按坐标归属，避免重复 owner
-  // - 小型实体（tree、gunman、rover 等）：允许跨 Chunk owner，保持原有渲染行为
-  const belongsToCrossChunkStructure = (bx, by, bz) => {
-    if (!structureCenters || structureCenters.length === 0) return false;
-
-    for (const center of structureCenters) {
-      if (!isCrossChunkOwnerType(center.type)) continue;
-
-      const maxDist = getStructureRenderDist(center.type);
-      const heightRange = STRUCTURE_HEIGHT_RANGE_SPECIAL[center.type] ?? STRUCTURE_HEIGHT_RANGE;
-      const dx = Math.abs(bx - center.x);
-      const dz = Math.abs(bz - center.z);
-      const dy = Math.abs(by - center.y);
-
-      if (dx <= maxDist && dz <= maxDist && dy <= heightRange) {
-        return true;
-      }
-    }
-    return false;
-  };
-
   const isBlockOwnedByCurrentChunk = (block) => {
-    const inCurrentChunk = block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;
-    if (inCurrentChunk) return true;
-
-    // 检查是否属于允许跨 Chunk 的小型实体
-    const sourceType = blockSourceTypeMap.get(encodeCoord(block.x, block.y, block.z));
-    if (sourceType && isCrossChunkOwnerType(sourceType)) {
-      return belongsToCrossChunkStructure(block.x, block.y, block.z, structureCenters);
-    }
-
-    // 对于没有 sourceType 的方块（如从相邻 chunk 传来的空岛/云朵），
-    // 直接检查是否属于跨 Chunk 结构
-    return belongsToCrossChunkStructure(block.x, block.y, block.z, structureCenters);
+    return block.x >= minX && block.x < maxX && block.z >= minZ && block.z < maxZ;
   };
 
   /**
