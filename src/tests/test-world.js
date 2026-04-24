@@ -761,6 +761,102 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('延迟 consolidation 队列 - 未达到 3000ms idle 窗口时不应提前执行', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    let scheduled = 0;
+    const chunk = {
+      cx: 0,
+      cz: 0,
+      disposed: false,
+      isReady: true,
+      isConsolidating: false,
+      dirtyBlocks: 3,
+      scheduleConsolidation: () => { scheduled++; }
+    };
+    world.chunks.set('0,0', chunk);
+    world._pendingDeferredConsolidationChunkKeys.add('0,0');
+    const now = globalThis.performance?.now?.() ?? Date.now();
+    world._lastStreamingActivityAt = now - 1000;
+
+    const processed = world._processDeferredConsolidationQueue({ maxChunks: 1 });
+
+    assertEqual(processed, 0, 'idle 未满 3000ms 时不应执行 deferred consolidation');
+    assertEqual(scheduled, 0, '不应提前调度 chunk consolidation');
+    assertTrue(world._pendingDeferredConsolidationChunkKeys.has('0,0'), '任务应继续留在 deferred consolidation 队列中');
+
+    teardownEnvironment();
+  });
+
+  test('owner 闭环 - 跨 chunk patch 最终应由坐标 chunk 命中查询和删除', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+    const targetX = 16;
+    const targetY = 40;
+    const targetZ = 8;
+    const targetCode = Chunk.encodeCoord(targetX, targetY, targetZ);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    const chunk00Ready = await waitForChunkReady(world, '0,0', 120);
+    const chunk10Ready = await waitForChunkReady(world, '1,0', 120);
+    assertTrue(chunk00Ready && chunk10Ready, '测试前需要 0,0 和 1,0 两个 chunk 都已 ready');
+
+    const chunk00 = world.chunks.get('0,0');
+    const chunk10 = world.chunks.get('1,0');
+    assertNotNull(chunk00, '源 chunk 应存在');
+    assertNotNull(chunk10, '目标 chunk 应存在');
+    world.scatterManager.pendingCrossChunkPatchBuffers.clear();
+    assertEqual(chunk00.hasBlockEntry(targetX, targetY, targetZ), false, '注入前源 chunk 不应已有目标坐标');
+    assertEqual(chunk10.hasBlockEntry(targetX, targetY, targetZ), false, '注入前目标 chunk 不应已有目标坐标');
+
+    world._onChunkGenResult(chunk00, {
+      cx: 0,
+      cz: 0,
+      blockDataBlocks: [
+        { x: targetX, y: targetY, z: targetZ, type: 'stone', orientation: 0 }
+      ],
+      scatteredBlocks: [
+        { x: targetX, y: targetY, z: targetZ, type: 'stone', orientation: 0, aoLow: 1, aoHigh: 1 }
+      ],
+      visibleKeys: [targetCode],
+      solidBlocks: [targetCode],
+      structureCenters: [{ type: 'static_tree', x: 15, y: 10, z: 8 }],
+      modGunMan: [],
+      rovers: [],
+      entities: { modGunMan: [], rovers: [] },
+      snapshot: {
+        meta: { ownershipVersion: 2 },
+        blocks: {},
+        entities: { modGunMan: [], rovers: [], zombieNests: [] }
+      }
+    });
+
+    const patched = world.scatterManager.flushDeferredCrossChunkPatchesAround(0, 0, {
+      maxChunks: 1,
+      maxBlocks: 10
+    });
+
+    assertEqual(patched.processedBlocks, 1, '跨 chunk patch 应只补刷本次注入的一个目标方块');
+    assertEqual(chunk00.hasBlockEntry(targetX, targetY, targetZ), false, '源 chunk 不应持有越界坐标方块');
+    assertTrue(chunk10.hasBlockEntry(targetX, targetY, targetZ), '目标 chunk 应接收该坐标方块');
+
+    const owner = world.resolveBlockOwner(targetX, targetY, targetZ, { allowScan: false });
+    assertEqual(owner?.ownerChunkKey, '1,0', '世界查询应命中坐标所属 chunk');
+    assertEqual(world.getBlock(targetX, targetY, targetZ), 'stone', '世界查询应返回目标 chunk 中的方块');
+
+    world.removeBlock(targetX, targetY, targetZ);
+
+    assertEqual(world.getBlock(targetX, targetY, targetZ), null, '删除后世界查询不应再命中该方块');
+    assertEqual(chunk10.hasBlockEntry(targetX, targetY, targetZ), false, '删除应真正落在目标 chunk');
+
+    teardownEnvironment();
+  });
+
   test('延迟 finalize 队列 - 流式加载活跃时不应执行纯新 runtime chunk 的后置任务', () => {
     setupEnvironment();
 

@@ -595,7 +595,7 @@ export class World {
     if (maxChunks <= 0) return 0;
 
     const currentTime = globalThis.performance?.now?.() ?? Date.now();
-    if (currentTime - this._lastStreamingActivityAt < RUNTIME_DEFERRED_FINALIZE_IDLE_GRACE_MS) {
+    if (currentTime - this._lastStreamingActivityAt < RUNTIME_DEFERRED_CONSOLIDATION_IDLE_GRACE_MS) {
       return 0;
     }
 
