@@ -20,11 +20,11 @@ npm run lint
 - 不强制要求立即修复所有警告，但应保持新增代码无警告
 
 ## 项目简介
-这是一个基于 Three.js 的纯客户端体素游戏应用，没有后端，自启动一个 HTTP 静态服务器进行开发。
+这是一个基于 Three.js 的纯客户端体素游戏应用，没有后端，无构建步骤（no bundler）。使用 ES Modules + Import Maps 直接从 CDN 加载 Three.js（v0.160.0），自启动一个 HTTP 静态服务器进行开发。
 
 ## 开发命令
 - **启动开发服务器**: `npm run start` (端口 8080)
-- **运行测试**: 访问 http://localhost:8080/src/tests/index.html，点击"运行所有测试"
+- **运行测试**: 浏览器内测试，启动服务器后访问 http://localhost:8080/src/tests/index.html，点击"运行所有测试"（无 CLI 测试命令）
 - **代码检查**: `npm run lint` (ESLint 检查代码规范)
 - **自动修复**: `npm run lint:fix` (自动修复可修复的 ESLint 问题)
 - **规格驱动开发**: 使用 `Skill("speckit.specify")`、`Skill("speckit.tasks")`、`Skill("speckit.implement")`
@@ -33,6 +33,7 @@ npm run lint
 
 ## 调试
 - 入口文件: `index.html` — 通过 `<script type="module">` 加载 `src/core/Game.js` 并启动游戏
+- 游戏实例暴露在 `window.game`，可在浏览器控制台访问各子系统，如 `window.game.world`、`window.game.engine`
 
 ## 代码规范
 - **材质统一管理**: `src/core/MaterialManager.js`
@@ -41,11 +42,9 @@ npm run lint
 
 ## 核心架构
 ### 三层架构
-- 表现层: UI 与渲染 : `src/ui/`, `src/core/Engine.js`
-- 业务逻辑层: 游戏系统 : `src/core/Game.js`, `src/world/World.js`
-- 数据层: 持久化与存储 : `src/services/`, `src/constants/`
-
-### 渲染管线设计机制
+- 表现层: UI 与渲染 : `src/ui/`、`src/core/Engine.js`
+- 业务逻辑层: 游戏系统 : `src/core/Game.js`、`src/world/World.js`
+- 数据层: 持久化与存储 : `src/services/`、`src/constants/`
 
 ### 核心分层详解
 | 系统 | 入口文件 | 职责 |
@@ -62,6 +61,22 @@ npm run lint
 | LightSource | `src/core/LightSourceManager.js` | 发光方块的 PointLight 管理 |
 | AO | `src/workers/AOWorker.js` | 专用 AO 计算 Worker，脏集机制异步计算 |
 | FaceCulling | `src/core/FaceCullingSystem.js` | 面剔除系统，协调主线程与 Worker |
+
+### 关键跨文件机制（需要跨文件理解）
+
+1. **Consolidation 合并机制**
+   - 动态添加/删除的方块先作为独立动态网格存在
+   - 脏方块数达到 50 个，或玩家停止操作 1000ms 后，触发后台合并
+   - 合并过程将区块数据发送到 Worker 重新计算所有可见面和 AO，生成优化的 InstancedMesh
+   - **竞态条件风险**: 主线程 AO 更新与 Worker 合并结果可能存在时序冲突
+
+2. **AO 阴影计算（Worker 专用）**
+   - `AOWorker` 专用 Worker 处理所有 AO 计算，避免阻塞主线程
+   - Chunk 维护 `dirtyAOPositions` 脏集，只计算受影响的方块
+   - AO 工具函数统一在 `src/utils/AOUtils.js`，主线程与 Worker 共用
+   - Consolidation 完成后 100ms 防抖触发 AO 刷新，直接覆写 InstancedMesh attribute
+
+3. **批量删除方块注意**: 使用 `isBatch=false` 参数会复用单次删除逻辑，避免竞态条件导致的 AO 丢失
 
 ### 玩家系统
 位于 `src/actors/player/`：

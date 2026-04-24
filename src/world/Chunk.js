@@ -11,7 +11,7 @@ import { persistenceService } from '../services/PersistenceService.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
 import { getBlockProperties, createBlockPropsResolver } from '../constants/BlockData.js';
 import { getRotationAngle, parseBlockEntry } from '../utils/OrientationUtils.js';
-import { getStructureRenderDist, belongsToCrossChunkStructure } from '../utils/StructureUtils.js';
+import { getStructureRenderDist } from '../utils/StructureUtils.js';
 import { createOcclusionChecker, computeBlockAOPacked, packAOData } from '../utils/AOUtils.js';
 import { createChunkNeighborSampler } from './ChunkNeighborUtils.js';
 import { extendChunk as extendWithConsolidation, CHUNK_SIZE, geomMap } from './ChunkConsolidation.js';
@@ -346,8 +346,7 @@ export class Chunk {
 
   /**
    * 检查指定位置是否在当前 Chunk 的责任范围内
-   * - 大型静态结构：严格按坐标归属
-   * - 小型实体（tree、gunman、rover 等）：允许跨 Chunk owner
+   * 统一采用“坐标所属 Chunk 唯一 owner”语义
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y
    * @param {number} z - 世界坐标 Z
@@ -356,17 +355,7 @@ export class Chunk {
   _isInResponsibility(x, y, z) {
     const localX = Math.floor(x) - this.cx * CHUNK_SIZE;
     const localZ = Math.floor(z) - this.cz * CHUNK_SIZE;
-    const isInChunk = localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE;
-
-    if (isInChunk) return true;
-
-    // 检查是否属于允许跨 Chunk 的小型实体
-    // belongsToCrossChunkStructure 内部会过滤大型静态结构
-    if (this.structureCenters?.length > 0) {
-      return belongsToCrossChunkStructure(x, y, z, this.structureCenters);
-    }
-
-    return false;
+    return localX >= 0 && localX < CHUNK_SIZE && localZ >= 0 && localZ < CHUNK_SIZE;
   }
 
   /**

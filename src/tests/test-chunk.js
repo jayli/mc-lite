@@ -409,82 +409,52 @@ describe('Chunk 真实类测试', (test) => {
     teardownEnvironment();
   });
 
-  test('removeBlock - 跨 Chunk 归属方块删除应写入 owner chunk（非标例外结构）', () => {
+  test('removeBlock - 越界坐标不应再由当前 chunk 作为 owner 写入', () => {
     setupEnvironment();
 
     const world = createMockWorld();
-    const ownerChunk = new Chunk(0, 0, world);
-    const neighborChunk = new Chunk(1, 0, world);
-    world.chunks.set('0,0', ownerChunk);
-    world.chunks.set('1,0', neighborChunk);
+    const chunk = new Chunk(0, 0, world);
+    world.chunks.set('0,0', chunk);
 
-    // 模拟跨区归属（当前语义）：
-    // 仅非标例外类型支持跨 Chunk owner，使用 rover 作为测试中心
-    ownerChunk.structureCenters = [{ type: 'rover', x: 15, y: 10, z: 8 }];
-    ownerChunk.addBlockDynamic(16, 10, 8, 'stone', 0);
-    ownerChunk.removeBlock(16, 10, 8);
+    chunk.structureCenters = [{ type: 'rover', x: 15, y: 10, z: 8 }];
+    chunk.addBlockDynamic(16, 10, 8, 'stone', 0);
+    chunk.removeBlock(16, 10, 8);
 
-    const ownerWrite = mockPersistenceService.calls.find(call =>
+    const wrongWrite = mockPersistenceService.calls.find(call =>
       call.method === 'recordChangeForChunk' &&
       call.args[0] === 0 &&
       call.args[1] === 0 &&
       call.args[2] === 16 &&
       call.args[3] === 10 &&
-      call.args[4] === 8 &&
-      call.args[5] &&
-      call.args[5].type === 'air'
+      call.args[4] === 8
     );
 
-    const wrongWrite = mockPersistenceService.calls.find(call =>
-      call.method === 'recordChangeForChunk' &&
-      call.args[0] === 1 &&
-      call.args[1] === 0 &&
-      call.args[2] === 16 &&
-      call.args[3] === 10 &&
-      call.args[4] === 8 &&
-      call.args[5] &&
-      call.args[5].type === 'air'
-    );
-
-    assertNotNull(ownerWrite, '应写入 owner chunk(0,0)');
-    assertEqual(wrongWrite, undefined, '不应写入坐标 chunk(1,0)');
+    assertEqual(wrongWrite, undefined, '当前 chunk 不应写入越界坐标');
 
     teardownEnvironment();
   });
 
-  test('removeBlocksBatch - 跨 Chunk 归属方块批量删除应写入 owner chunk（非标例外结构）', () => {
+  test('removeBlocksBatch - 越界坐标不应再由当前 chunk 批量写入', () => {
     setupEnvironment();
 
     const world = createMockWorld();
-    const ownerChunk = new Chunk(0, 0, world);
-    world.chunks.set('0,0', ownerChunk);
+    const chunk = new Chunk(0, 0, world);
+    world.chunks.set('0,0', chunk);
 
-    ownerChunk.structureCenters = [{ type: 'rover', x: 15, y: 10, z: 8 }];
-    ownerChunk.addBlockDynamic(16, 10, 8, 'stone', 0);
-    ownerChunk.removeBlocksBatch([{ x: 16, y: 10, z: 8 }], false);
+    chunk.structureCenters = [{ type: 'rover', x: 15, y: 10, z: 8 }];
+    chunk.addBlockDynamic(16, 10, 8, 'stone', 0);
+    chunk.removeBlocksBatch([{ x: 16, y: 10, z: 8 }], false);
 
-    const ownerWrite = mockPersistenceService.calls.find(call =>
+    const wrongWrite = mockPersistenceService.calls.find(call =>
       call.method === 'recordChangeForChunk' &&
       call.args[0] === 0 &&
       call.args[1] === 0 &&
       call.args[2] === 16 &&
       call.args[3] === 10 &&
-      call.args[4] === 8 &&
-      call.args[5] === 'air'
+      call.args[4] === 8
     );
 
-    const wrongWrite = mockPersistenceService.calls.find(call =>
-      call.method === 'recordChangeForChunk' &&
-      call.args[0] === 1 &&
-      call.args[1] === 0 &&
-      call.args[2] === 16 &&
-      call.args[3] === 10 &&
-      call.args[4] === 8 &&
-      call.args[5] === 'air'
-    );
-
-    assertNotNull(ownerWrite, '批量删除应写入 owner chunk(0,0)');
-    assertEqual(wrongWrite, undefined, '批量删除不应写入坐标 chunk(1,0)');
+    assertEqual(wrongWrite, undefined, '当前 chunk 不应批量写入越界坐标');
 
     teardownEnvironment();
   });
@@ -911,13 +881,12 @@ describe('Chunk 真实类测试', (test) => {
     teardownEnvironment();
   });
 
-  test('_isInResponsibility - 仅非标例外支持跨 Chunk owner', () => {
+  test('_isInResponsibility - 跨 Chunk 坐标统一不再属于当前 chunk', () => {
     setupEnvironment();
 
     const world = createMockWorld();
     const chunk = new Chunk(0, 0, world);
 
-    // 设置结构中心：rover/static_tree/house 为例外类型，tank 为普通结构
     chunk.structureCenters = [
       { x: 15, y: 10, z: 8, type: 'rover' },
       { x: 15, y: 10, z: 8, type: 'static_tree' },
@@ -925,31 +894,9 @@ describe('Chunk 真实类测试', (test) => {
       { x: 15, y: 10, z: 8, type: 'tank' }
     ];
 
-    // 坐标 (16,10,8) 位于 chunk(1,0) 内，对 chunk(0,0) 来说属于“跨 Chunk”
-    assertTrue(
-      chunk._isInResponsibility(16, 10, 8),
-      'rover 应保留跨 Chunk owner'
-    );
-
-    // static_tree（含 brich_tree）保留跨 Chunk owner，避免树冠切割
-    chunk.structureCenters = [{ x: 15, y: 10, z: 8, type: 'static_tree' }];
-    assertTrue(
-      chunk._isInResponsibility(16, 10, 8),
-      'static_tree 应保留跨 Chunk owner'
-    );
-
-    // house 保留跨 Chunk owner，避免边界切割
-    chunk.structureCenters = [{ x: 15, y: 10, z: 8, type: 'house' }];
-    assertTrue(
-      chunk._isInResponsibility(16, 10, 8),
-      'house 应保留跨 Chunk owner'
-    );
-
-    // 普通结构不再跨 Chunk owner，统一走坐标归属
-    chunk.structureCenters = [{ x: 15, y: 10, z: 8, type: 'tank' }];
     assertFalse(
       chunk._isInResponsibility(16, 10, 8),
-      'tank 不应跨 Chunk owner'
+      '无论结构中心类型如何，越界坐标都不应再属于当前 chunk'
     );
 
     teardownEnvironment();
