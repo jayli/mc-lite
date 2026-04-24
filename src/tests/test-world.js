@@ -796,14 +796,18 @@ describe('World 真实类测试', (test) => {
 
     scene = new THREE.Scene();
     world = new World(scene);
-    const targetX = 16;
+    // targetX = CHUNK_SIZE (16) 确保坐标落在 chunk(1,0) 而非 chunk(0,0)
+    const CHUNK_SIZE = 16;
+    const targetX = CHUNK_SIZE;
     const targetY = 40;
     const targetZ = 8;
     const targetCode = Chunk.encodeCoord(targetX, targetY, targetZ);
 
     world.update(new THREE.Vector3(0, 10, 0), 0.016);
-    const chunk00Ready = await waitForChunkReady(world, '0,0', 120);
-    const chunk10Ready = await waitForChunkReady(world, '1,0', 120);
+    const [chunk00Ready, chunk10Ready] = await Promise.all([
+      waitForChunkReady(world, '0,0', 40),
+      waitForChunkReady(world, '1,0', 40)
+    ]);
     assertTrue(chunk00Ready && chunk10Ready, '测试前需要 0,0 和 1,0 两个 chunk 都已 ready');
 
     const chunk00 = world.chunks.get('0,0');
@@ -824,16 +828,7 @@ describe('World 真实类测试', (test) => {
         { x: targetX, y: targetY, z: targetZ, type: 'stone', orientation: 0, aoLow: 1, aoHigh: 1 }
       ],
       visibleKeys: [targetCode],
-      solidBlocks: [targetCode],
-      structureCenters: [{ type: 'static_tree', x: 15, y: 10, z: 8 }],
-      modGunMan: [],
-      rovers: [],
-      entities: { modGunMan: [], rovers: [] },
-      snapshot: {
-        meta: { ownershipVersion: 2 },
-        blocks: {},
-        entities: { modGunMan: [], rovers: [], zombieNests: [] }
-      }
+      solidBlocks: [targetCode]
     });
 
     const patched = world.scatterManager.flushDeferredCrossChunkPatchesAround(0, 0, {
