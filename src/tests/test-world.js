@@ -524,6 +524,48 @@ describe('World 真实类测试', (test) => {
     );
   });
 
+  test('WorldWorker routing 契约 - 应按 own chunk 和 overflow chunk 预分桶', async () => {
+    const result = await runRealWorldWorker({
+      cx: 0,
+      cz: 0,
+      seed: 1,
+      taskId: 'test:worker-routing-contract',
+      snapshot: {
+        meta: { ownershipVersion: 2 },
+        blocks: {
+          [Chunk.encodeCoord(1, 10, 1)]: { type: 'stone', orientation: 0 },
+          [Chunk.encodeCoord(17, 10, 1)]: { type: 'dirt', orientation: 0 }
+        },
+        entities: {
+          modGunMan: [],
+          rovers: [],
+          zombieNests: [],
+          staticTrees: []
+        }
+      },
+      structureCenters: [],
+      isOptimization: false,
+      textureGroups: {}
+    });
+
+    assertEqual(result.routing?.schemaVersion, 1, '应返回 routing schemaVersion');
+    assertEqual(result.routing?.ownChunk?.chunkKey, '0,0', 'own chunk key 应等于当前 worker chunk');
+    assertTrue(Array.isArray(result.routing?.ownChunk?.blockDataBlocks), 'own chunk 逻辑方块应为数组');
+    assertTrue(Array.isArray(result.routing?.ownChunk?.visibleBlocks), 'own chunk 可见方块应为数组');
+    assertTrue(Array.isArray(result.routing?.overflowChunks), 'overflow chunk 应按数组返回');
+    assertTrue(
+      result.routing.ownChunk.blockDataBlocks.some((block) => block.x === 1 && block.y === 10 && block.z === 1),
+      '当前 chunk 内的方块应落入 own chunk 桶'
+    );
+    assertTrue(
+      result.routing.overflowChunks.some((entry) => entry.chunkKey === '1,0'),
+      '越界方块应落入目标 chunk 的 overflow 桶'
+    );
+    const overflow = result.routing.overflowChunks.find((entry) => entry.chunkKey === '1,0');
+    assertTrue(Array.isArray(overflow.blockDataBlocks), 'overflow 桶应提供逻辑方块数组');
+    assertTrue(Array.isArray(overflow.visibleBlocks), 'overflow 桶应提供可见方块数组');
+  });
+
   test('AO 稳定源事件 - finalized chunk 应刷新自身并标记四邻边界', () => {
     setupEnvironment();
 

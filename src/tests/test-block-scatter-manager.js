@@ -41,6 +41,63 @@ describe('BlockScatterManager 数据契约', (test) => {
     assertEqual(accepted.visibleKeys.has(hiddenCode), false, '隐藏方块不应被标记为可见');
   });
 
+  test('存在 routing 时应优先消费 Worker 预分桶结果，而不是重新按 block 归属', () => {
+    let accepted = null;
+    const world = {
+      chunks: new Map([
+        ['0,0', {
+          isReady: false,
+          acceptScatteredBlocks(blockDataBlocks, visibleBlocks, structureCenters, meshData) {
+            accepted = { blockDataBlocks, visibleBlocks, structureCenters, meshData };
+            this.isReady = true;
+          }
+        }]
+      ])
+    };
+    const scatter = new BlockScatterManager(world);
+
+    scatter.scatter({
+      cx: 0,
+      cz: 0,
+      blockDataBlocks: [
+        { x: 999, y: 1, z: 999, type: 'legacy-should-not-be-used' }
+      ],
+      visibleKeys: [encodeCoord(999, 1, 999)],
+      routing: {
+        schemaVersion: 1,
+        ownChunk: {
+          chunkKey: '0,0',
+          blockDataBlocks: [
+            { x: 1, y: 1, z: 1, type: 'stone' },
+            { x: 2, y: 1, z: 1, type: 'dirt' }
+          ],
+          visibleBlocks: [
+            { x: 1, y: 1, z: 1, type: 'stone' }
+          ],
+          meshData: [{ type: 'stone', count: 1 }]
+        },
+        overflowChunks: [
+          {
+            chunkKey: '1,0',
+            blockDataBlocks: [
+              { x: 17, y: 1, z: 1, type: 'glass' }
+            ],
+            visibleBlocks: [
+              { x: 17, y: 1, z: 1, type: 'glass' }
+            ]
+          }
+        ]
+      },
+      structureCenters: [{ type: 'house', x: 1, y: 2, z: 1 }]
+    });
+
+    assertTrue(accepted !== null, 'own chunk 应收到 routing 分桶结果');
+    assertEqual(accepted.blockDataBlocks.length, 2, '应直接使用 own chunk 分桶中的逻辑方块');
+    assertEqual(accepted.visibleBlocks.length, 1, '应直接使用 own chunk 分桶中的可见方块');
+    assertEqual(accepted.meshData.length, 1, '应透传 own chunk 的 meshData');
+    assertEqual(scatter.getPendingCrossChunkPatchStats().blocks, 1, 'overflow 桶应直接进入 pending patch buffer');
+  });
+
   test('应使用数字编码 visibleKeys 分发可见方块', () => {
     let accepted = null;
     const visibleCode = encodeCoord(1, 1, 1);

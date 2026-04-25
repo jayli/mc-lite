@@ -1143,6 +1143,75 @@ describe('Chunk 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('acceptScatteredBlocks - 应将逻辑方块与可见方块分离消费', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    world.onChunkWorkerReady = () => {};
+    const chunk = new Chunk(0, 0, world);
+    const visibleCode = Chunk.encodeCoord(5, 1, 5);
+    const hiddenCode = Chunk.encodeCoord(6, 1, 5);
+
+    let convertedVisibleKeys = null;
+    chunk._convertScatteredBlocksToMeshData = (visibleBlocks, visibleKeys) => {
+      convertedVisibleKeys = visibleKeys;
+      assertEqual(visibleBlocks.length, 1, '渲染转换只应接收到可见方块');
+      assertEqual(visibleBlocks[0].x, 5, '应只转换 visibleBlocks 中的可见方块');
+      return [];
+    };
+    chunk.buildMeshes = () => {};
+    chunk._initArrayStorageFromBlockData = () => {};
+
+    chunk.acceptScatteredBlocks(
+      [
+        { x: 5, y: 1, z: 5, type: 'sand', orientation: 0 },
+        { x: 6, y: 1, z: 5, type: 'dirt', orientation: 0 }
+      ],
+      [
+        { x: 5, y: 1, z: 5, type: 'sand', orientation: 0 }
+      ],
+      []
+    );
+
+    assertEqual(chunk.blockData.has(visibleCode), true, '可见逻辑方块应写入 blockData');
+    assertEqual(chunk.blockData.has(hiddenCode), true, '隐藏逻辑方块也应写入 blockData');
+    assertEqual(chunk.visibleKeys.has(visibleCode), true, 'visibleBlocks 中的坐标应进入 visibleKeys');
+    assertEqual(chunk.visibleKeys.has(hiddenCode), false, '未出现在 visibleBlocks 中的坐标不应进入 visibleKeys');
+    assertEqual(convertedVisibleKeys.has(visibleCode), true, '渲染路径应保留可见坐标');
+    assertEqual(convertedVisibleKeys.has(hiddenCode), false, '渲染路径不应包含隐藏坐标');
+
+    teardownEnvironment();
+  });
+
+  test('appendScatteredBlocks - 应只根据 visibleBlocks 追加可见标记', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const chunk = new Chunk(0, 0, world);
+    const visibleCode = Chunk.encodeCoord(5, 1, 5);
+    const hiddenCode = Chunk.encodeCoord(6, 1, 5);
+
+    const appended = chunk.appendScatteredBlocks(
+      [
+        { x: 5, y: 1, z: 5, type: 'sand', orientation: 0 },
+        { x: 6, y: 1, z: 5, type: 'dirt', orientation: 0 }
+      ],
+      [
+        { x: 5, y: 1, z: 5, type: 'sand', orientation: 0 }
+      ],
+      [],
+      { deferConsolidation: true }
+    );
+
+    assertEqual(appended, 2, '两个逻辑方块都应被追加进 blockData');
+    assertEqual(chunk.blockData.has(visibleCode), true, '可见逻辑方块应写入 blockData');
+    assertEqual(chunk.blockData.has(hiddenCode), true, '隐藏逻辑方块也应写入 blockData');
+    assertEqual(chunk.visibleKeys.has(visibleCode), true, 'visibleBlocks 中的坐标应进入 visibleKeys');
+    assertEqual(chunk.visibleKeys.has(hiddenCode), false, '未出现在 visibleBlocks 中的坐标不应进入 visibleKeys');
+
+    teardownEnvironment();
+  });
+
   test('_applyConsolidateResult - 有 Worker meshData 时应直接使用，不再本地转换', () => {
     setupEnvironment();
 

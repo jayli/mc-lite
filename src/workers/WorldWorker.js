@@ -155,11 +155,11 @@ function resolveLargeStaticStructureType(params) {
  * 构建 Mesh 数据（用于 Worker 中预计算）
  * @param {Object} fakeChunk - 模拟的 chunk 对象
  * @param {Object} d - 渲染数据 {type: [positions]}
- * @param {number} cx - chunk X
- * @param {number} cz - chunk Z
+ * @param {number} _cx - chunk X
+ * @param {number} _cz - chunk Z
  * @returns {Array} meshDataArray
  */
-function buildMeshData(fakeChunk, d, cx, cz) {
+function buildMeshData(fakeChunk, d, _cx, _cz) {
   const meshDataArray = [];
   const dummy = new THREE.Object3D();
 
@@ -274,6 +274,89 @@ function buildScatteredBlocks(blockMap, visibleKeysSet, aoMap) {
   }
 
   return blocks;
+}
+
+function buildChunkRouting(blockDataBlocks, visibleBlocks, cx, cz, meshData) {
+  const ownChunkKey = `${cx},${cz}`;
+  const ownChunk = {
+    chunkKey: ownChunkKey,
+    blockDataBlocks: [],
+    visibleBlocks: [],
+    meshData: Array.isArray(meshData) ? meshData : []
+  };
+  const overflowMap = new Map();
+
+  const getOrCreateOverflowBucket = (chunkKey) => {
+    let bucket = overflowMap.get(chunkKey);
+    if (!bucket) {
+      bucket = {
+        chunkKey,
+        blockDataBlocks: [],
+        visibleBlocks: []
+      };
+      overflowMap.set(chunkKey, bucket);
+    }
+    return bucket;
+  };
+  const ownBlockCodes = new Set();
+  const overflowBlockCodes = new Map();
+
+  const appendLogicalBlock = (targetKey, block) => {
+    const code = encodeCoord(block.x, block.y, block.z);
+    if (targetKey === ownChunkKey) {
+      if (ownBlockCodes.has(code)) return;
+      ownBlockCodes.add(code);
+      ownChunk.blockDataBlocks.push({
+        x: block.x,
+        y: block.y,
+        z: block.z,
+        type: block.type,
+        orientation: block.orientation || 0
+      });
+      return;
+    }
+
+    const bucket = getOrCreateOverflowBucket(targetKey);
+    let codes = overflowBlockCodes.get(targetKey);
+    if (!codes) {
+      codes = new Set();
+      overflowBlockCodes.set(targetKey, codes);
+    }
+    if (codes.has(code)) return;
+    codes.add(code);
+    bucket.blockDataBlocks.push({
+      x: block.x,
+      y: block.y,
+      z: block.z,
+      type: block.type,
+      orientation: block.orientation || 0
+    });
+  };
+
+  for (const block of blockDataBlocks || []) {
+    const targetCx = Math.floor(block.x / CHUNK_SIZE);
+    const targetCz = Math.floor(block.z / CHUNK_SIZE);
+    const targetKey = `${targetCx},${targetCz}`;
+    appendLogicalBlock(targetKey, block);
+  }
+
+  for (const block of visibleBlocks || []) {
+    const targetCx = Math.floor(block.x / CHUNK_SIZE);
+    const targetCz = Math.floor(block.z / CHUNK_SIZE);
+    const targetKey = `${targetCx},${targetCz}`;
+    appendLogicalBlock(targetKey, block);
+    if (targetKey === ownChunkKey) {
+      ownChunk.visibleBlocks.push(block);
+    } else {
+      getOrCreateOverflowBucket(targetKey).visibleBlocks.push(block);
+    }
+  }
+
+  return {
+    schemaVersion: 1,
+    ownChunk,
+    overflowChunks: Array.from(overflowMap.values())
+  };
 }
 
 /**
@@ -1808,6 +1891,7 @@ onmessage = async function(e) {
   const blockDataBlocks = buildBlockDataBlocks(blockMap);
   const scatteredBlocks = buildScatteredBlocks(blockMap, visibleKeysSet, aoMap);
   const meshData = buildMeshDataForChunk(fakeChunk, d, cx, cz);
+  const routing = buildChunkRouting(blockDataBlocks, scatteredBlocks, cx, cz, meshData);
 
   const workerFinishedAt = performance.now();
   const workerComputeMs = workerFinishedAt - workerReceivedAt;
@@ -1819,6 +1903,7 @@ onmessage = async function(e) {
     cx, cz, callbackKey, taskId,
     blockDataBlocks,
     scatteredBlocks,
+    routing,
     meshData,
     solidBlocks,
     modGunMan, rovers,

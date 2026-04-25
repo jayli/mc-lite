@@ -2299,6 +2299,10 @@ export class Chunk {
     const t0 = globalThis.performance?.now?.() ?? Date.now();
     const minX = this.cx * CHUNK_SIZE;
     const minZ = this.cz * CHUNK_SIZE;
+    const visibleBlocks = Array.isArray(visibleBlockKeys) ? visibleBlockKeys : null;
+    const visibleKeySet = visibleBlocks
+      ? new Set(visibleBlocks.map((block) => Chunk.encodeCoord(block.x, block.y, block.z)))
+      : visibleBlockKeys;
 
     // 确保数据结构已初始化
     if (!this.visibleKeys) this.visibleKeys = new Set();
@@ -2332,8 +2336,15 @@ export class Chunk {
 
     // 构建可见方块编码集合，供 mesh 构建时过滤隐藏方块
     const encodedVisibleKeys = new Set();
-    if (visibleBlockKeys) {
-      for (const key of visibleBlockKeys) {
+    if (visibleBlocks) {
+      for (const block of visibleBlocks) {
+        const code = Chunk.encodeCoord(block.x, block.y, block.z);
+        if (this.deletedBlockTombstones.has(code)) continue;
+        encodedVisibleKeys.add(code);
+        this.visibleKeys.add(code);
+      }
+    } else if (visibleKeySet) {
+      for (const key of visibleKeySet) {
         const code = coordKeyToCode(key);
         if (this.deletedBlockTombstones.has(code)) continue;
         encodedVisibleKeys.add(code);
@@ -2355,7 +2366,7 @@ export class Chunk {
     // 优先消费 Worker 预构建的 meshData，主线程仅保留回退转换路径。
     const meshData = Array.isArray(workerMeshData)
       ? workerMeshData
-      : this._convertScatteredBlocksToMeshData(scatteredBlocks, encodedVisibleKeys, structureCenters);
+      : this._convertScatteredBlocksToMeshData(visibleBlocks || scatteredBlocks, encodedVisibleKeys, structureCenters);
     const t5 = globalThis.performance?.now?.() ?? Date.now();
     this.buildMeshes(meshData);
     const t6 = globalThis.performance?.now?.() ?? Date.now();
@@ -2370,7 +2381,7 @@ export class Chunk {
     recordChunkPerf('chunk.accept-scattered-blocks', t7 - t0, {
       chunkKey: `${this.cx},${this.cz}`,
       inputBlocks: scatteredBlocks?.length || 0,
-      visibleBlockKeys: visibleBlockKeys?.size || 0,
+      visibleBlockKeys: visibleBlocks?.length || visibleKeySet?.size || 0,
       blockDataSize: this.blockData.size,
       meshGroups: meshData?.length || 0,
       writeBlockDataMs: t1 - t0,
@@ -2394,6 +2405,10 @@ export class Chunk {
     const t0 = globalThis.performance?.now?.() ?? Date.now();
     const minX = this.cx * CHUNK_SIZE;
     const minZ = this.cz * CHUNK_SIZE;
+    const visibleBlocks = Array.isArray(visibleBlockKeys) ? visibleBlockKeys : null;
+    const visibleKeySet = visibleBlocks
+      ? new Set(visibleBlocks.map((block) => Chunk.encodeCoord(block.x, block.y, block.z)))
+      : visibleBlockKeys;
 
     // 合并 structureCenters（增量追加场景可能收到来自不同 chunk 的结构中心）
     if (structureCenters?.length > 0) {
@@ -2433,8 +2448,14 @@ export class Chunk {
     }
 
     // 从 visibleBlockKeys 追加可见标记
-    if (visibleBlockKeys) {
-      for (const key of visibleBlockKeys) {
+    if (visibleBlocks) {
+      for (const block of visibleBlocks) {
+        const code = Chunk.encodeCoord(block.x, block.y, block.z);
+        if (this.deletedBlockTombstones.has(code)) continue;
+        this.visibleKeys.add(code);
+      }
+    } else if (visibleKeySet) {
+      for (const key of visibleKeySet) {
         const code = coordKeyToCode(key);
         if (this.deletedBlockTombstones.has(code)) continue;
         this.visibleKeys.add(code);
@@ -2452,7 +2473,7 @@ export class Chunk {
       chunkKey: `${this.cx},${this.cz}`,
       inputBlocks: scatteredBlocks?.length || 0,
       appendedCount,
-      visibleBlockKeys: visibleBlockKeys?.size || 0,
+      visibleBlockKeys: visibleBlocks?.length || visibleKeySet?.size || 0,
       deferConsolidation: options.deferConsolidation === true,
       writeBlockDataMs: t1 - t0,
       initArrayStorageMs: t2 - t1,

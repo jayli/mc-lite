@@ -33,6 +33,7 @@ export class BlockScatterManager {
         ready: false,
         sourceWorkers: new Set(),
         visibleBlockKeys: new Set(),
+        visibleBlocks: [],
         structureCenters: null,
         lastUpdatedAt: 0,
         retryCount: 0
@@ -47,12 +48,99 @@ export class BlockScatterManager {
     const before = buffer.blocks.length;
     if (before === 0) {
       buffer.visibleBlockKeys?.delete?.(code);
+      if (Array.isArray(buffer.visibleBlocks) && buffer.visibleBlocks.length > 0) {
+        buffer.visibleBlocks = buffer.visibleBlocks.filter((block) => encodeCoord(block.x, block.y, block.z) !== code);
+      }
       return 0;
     }
 
     buffer.blocks = buffer.blocks.filter((block) => encodeCoord(block.x, block.y, block.z) !== code);
     buffer.visibleBlockKeys?.delete?.(code);
+    if (Array.isArray(buffer.visibleBlocks) && buffer.visibleBlocks.length > 0) {
+      buffer.visibleBlocks = buffer.visibleBlocks.filter((block) => encodeCoord(block.x, block.y, block.z) !== code);
+    }
     return before - buffer.blocks.length;
+  }
+
+  _markTouchedReadyKeys(touchedKeys) {
+    for (const key of touchedKeys) {
+      if (this.chunkBuffers.has(key)) {
+        this.pendingReadyChunkKeys.add(key);
+      }
+    }
+  }
+
+  _mergeStructureCentersIntoTouchedBuffers(touchedKeys, structureCenters) {
+    if (structureCenters?.length > 0) {
+      for (const key of touchedKeys) {
+        const buffer = this.chunkBuffers.get(key) || this.pendingCrossChunkPatchBuffers.get(key);
+        if (buffer) {
+          buffer.structureCenters = this._mergeStructureCenters(buffer.structureCenters, structureCenters);
+        }
+      }
+    }
+  }
+
+  _scatterWithRouting(workerResult) {
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
+    const { cx, cz, structureCenters, routing } = workerResult;
+    const touchedKeys = new Set();
+    const ownChunk = routing?.ownChunk;
+    const ownKey = ownChunk?.chunkKey || `${cx},${cz}`;
+    const ownBuffer = this._getOrCreateBuffer(this.chunkBuffers, ownKey);
+    ownBuffer.blocks = Array.isArray(ownChunk?.blockDataBlocks) ? [...ownChunk.blockDataBlocks] : [];
+    ownBuffer.visibleBlocks = Array.isArray(ownChunk?.visibleBlocks) ? [...ownChunk.visibleBlocks] : [];
+    ownBuffer.visibleBlockKeys = new Set(ownBuffer.visibleBlocks.map(block => encodeCoord(block.x, block.y, block.z)));
+    ownBuffer.meshData = Array.isArray(ownChunk?.meshData) ? ownChunk.meshData : null;
+    ownBuffer.ready = true;
+    ownBuffer.sourceWorkers.add(`${cx},${cz}`);
+    ownBuffer.lastUpdatedAt = globalThis.performance?.now?.() ?? Date.now();
+    touchedKeys.add(ownKey);
+
+    for (const entry of routing?.overflowChunks || []) {
+      const chunkKey = entry.chunkKey;
+      if (!chunkKey) continue;
+      if (this.skipCrossChunk && chunkKey !== ownKey) continue;
+
+      const buffer = this._getOrCreateBuffer(this.pendingCrossChunkPatchBuffers, chunkKey);
+      const inputBlocks = Array.isArray(entry.blockDataBlocks) ? entry.blockDataBlocks : [];
+      const inputVisibleBlocks = Array.isArray(entry.visibleBlocks) ? entry.visibleBlocks : [];
+
+      for (const block of inputBlocks) {
+        const existingChunk = this.world.chunks.get(chunkKey);
+        if (existingChunk?.isReady && existingChunk.hasBlockEntry?.(block.x, block.y, block.z)) {
+          continue;
+        }
+        buffer.blocks.push(block);
+      }
+
+      if (inputVisibleBlocks.length > 0) {
+        buffer.visibleBlocks.push(...inputVisibleBlocks);
+        for (const block of inputVisibleBlocks) {
+          buffer.visibleBlockKeys.add(encodeCoord(block.x, block.y, block.z));
+        }
+      }
+      buffer.sourceWorkers.add(`${cx},${cz}`);
+      buffer.lastUpdatedAt = globalThis.performance?.now?.() ?? Date.now();
+      touchedKeys.add(chunkKey);
+    }
+
+    this._mergeStructureCentersIntoTouchedBuffers(touchedKeys, structureCenters);
+    this._markTouchedReadyKeys(touchedKeys);
+    this.flushReadyChunks();
+    const t1 = globalThis.performance?.now?.() ?? Date.now();
+    recordChunkPerf('block-scatter.scatter', t1 - t0, {
+      sourceChunkKey: `${cx},${cz}`,
+      distributeMs: t1 - t0,
+      flushReadyChunksMs: 0,
+      blockDataBlocks: ownBuffer.blocks.length,
+      scatteredBlocks: ownBuffer.visibleBlocks.length,
+      touchedKeys: touchedKeys.size,
+      chunkBuffers: this.chunkBuffers.size,
+      pendingPatchBuffers: this.pendingCrossChunkPatchBuffers.size,
+      pendingReadyKeys: this.pendingReadyChunkKeys.size,
+      routingSchemaVersion: routing?.schemaVersion || 0
+    });
   }
 
   invalidatePendingBlock(x, y, z) {
@@ -84,6 +172,11 @@ export class BlockScatterManager {
    * @param {Object} workerResult - Worker 返回的数据
    */
   scatter(workerResult) {
+    if (workerResult?.routing?.schemaVersion) {
+      this._scatterWithRouting(workerResult);
+      return;
+    }
+
     const t0 = globalThis.performance?.now?.() ?? Date.now();
     const { scatteredBlocks = [], visibleKeys, cx, cz, structureCenters, meshData = null } = workerResult;
     const blockDataBlocks = Array.isArray(workerResult.blockDataBlocks)
@@ -121,6 +214,7 @@ export class BlockScatterManager {
       const targetMap = isOwnChunk ? this.chunkBuffers : this.pendingCrossChunkPatchBuffers;
       const buffer = this._getOrCreateBuffer(targetMap, chunkKey);
       buffer.blocks.push(block);
+      buffer.visibleBlocks = [];
       buffer.sourceWorkers.add(`${cx},${cz}`);
       buffer.lastUpdatedAt = globalThis.performance?.now?.() ?? Date.now();
       touchedKeys.add(chunkKey);
@@ -141,25 +235,14 @@ export class BlockScatterManager {
 
     // 2. 合并结构中心信息到本次触达的 buffer（追加而非覆盖）
     // 避免把每个 Worker 的 structureCenters 灌入所有历史 buffer，放大后续归属判定成本。
-    if (structureCenters?.length > 0) {
-      for (const key of touchedKeys) {
-        const buffer = this.chunkBuffers.get(key) || this.pendingCrossChunkPatchBuffers.get(key);
-        if (buffer) {
-          buffer.structureCenters = this._mergeStructureCenters(buffer.structureCenters, structureCenters);
-        }
-      }
-    }
+    this._mergeStructureCentersIntoTouchedBuffers(touchedKeys, structureCenters);
 
     // 3. 标记发起 Worker 的 chunk 为"已加载"
     ownBuffer.ready = true;
 
     // 4. 将本次触达的 buffer key 加入待消费队列，避免全表扫描
     // chunkBuffers 中的 key 只入队 chunkBuffers（不含 pendingCrossChunkPatchBuffers）
-    for (const key of touchedKeys) {
-      if (this.chunkBuffers.has(key)) {
-        this.pendingReadyChunkKeys.add(key);
-      }
-    }
+    this._markTouchedReadyKeys(touchedKeys);
 
     // 5. 通知就绪的 chunk 进行渲染
     this.flushReadyChunks();
@@ -215,21 +298,33 @@ export class BlockScatterManager {
         // 首次渲染：完整接受并构建 mesh（传递 structureCenters 供跨 chunk 结构判断）
         acceptedChunks++;
         acceptedBlocks += buffer.blocks.length;
-        chunk.acceptScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys, buffer.structureCenters, buffer.meshData);
+        chunk.acceptScatteredBlocks(
+          buffer.blocks,
+          Array.isArray(buffer.visibleBlocks) && buffer.visibleBlocks.length > 0 ? buffer.visibleBlocks : buffer.visibleBlockKeys,
+          buffer.structureCenters,
+          buffer.meshData
+        );
         buffer.blocks = [];
         buffer.meshData = null;
         buffer.visibleBlockKeys = new Set();
+        buffer.visibleBlocks = [];
       } else {
         // 增量追加：跨 chunk 流式补片不抢 WorldWorker consolidation 队列
         appendedChunks++;
         appendedBlocks += buffer.blocks.length;
-        chunk.appendScatteredBlocks(buffer.blocks, buffer.visibleBlockKeys, buffer.structureCenters, {
+        chunk.appendScatteredBlocks(
+          buffer.blocks,
+          Array.isArray(buffer.visibleBlocks) && buffer.visibleBlocks.length > 0 ? buffer.visibleBlocks : buffer.visibleBlockKeys,
+          buffer.structureCenters,
+          {
           deferConsolidation: !buffer.ready
-        });
+          }
+        );
         // 清空已处理的方块，释放内存，保留 buffer 结构以接收后续溢出
         buffer.blocks = [];
         buffer.meshData = null;
         buffer.visibleBlockKeys = new Set();
+        buffer.visibleBlocks = [];
       }
     }
     recordChunkPerf('block-scatter.flush-ready', (globalThis.performance?.now?.() ?? Date.now()) - t0, {
