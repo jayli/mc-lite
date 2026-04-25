@@ -20,6 +20,8 @@ export class BlockScatterManager {
     this.pendingCrossChunkPatchBuffers = new Map();
     // 跨 chunk 方块渲染开关，关闭时跨 chunk 的方块会被直接丢弃
     this.skipCrossChunk = false;
+    // 就绪但尚未被 flush 消费的 chunk keys，避免全表扫描 buffer
+    this.pendingReadyChunkKeys = new Set();
   }
 
   _getOrCreateBuffer(map, chunkKey) {
@@ -92,7 +94,8 @@ export class BlockScatterManager {
     const visibleKeysSet = Array.isArray(visibleKeys)
       ? new Set(visibleKeys.map(coordKeyToCode))
       : null;
-    const touchedBuffers = new Set();
+    // 记录本次触达的 chunk keys，替代原先 touchedBuffers 的反向查找
+    const touchedKeys = new Set();
 
     // 1. 遍历所有逻辑方块，按坐标分发
     for (const block of blockDataBlocks) {
@@ -120,7 +123,7 @@ export class BlockScatterManager {
       buffer.blocks.push(block);
       buffer.sourceWorkers.add(`${cx},${cz}`);
       buffer.lastUpdatedAt = globalThis.performance?.now?.() ?? Date.now();
-      touchedBuffers.add(buffer);
+      touchedKeys.add(chunkKey);
 
       // 提取 visibleKeys，标记哪些方块是面剔除可见的
       const blockKey = encodeCoord(block.x, block.y, block.z);
@@ -134,20 +137,31 @@ export class BlockScatterManager {
     const ownKey = `${cx},${cz}`;
     const ownBuffer = this._getOrCreateBuffer(this.chunkBuffers, ownKey);
     ownBuffer.meshData = Array.isArray(meshData) ? meshData : null;
-    touchedBuffers.add(ownBuffer);
+    touchedKeys.add(ownKey);
 
     // 2. 合并结构中心信息到本次触达的 buffer（追加而非覆盖）
     // 避免把每个 Worker 的 structureCenters 灌入所有历史 buffer，放大后续归属判定成本。
     if (structureCenters?.length > 0) {
-      for (const buffer of touchedBuffers) {
-        buffer.structureCenters = this._mergeStructureCenters(buffer.structureCenters, structureCenters);
+      for (const key of touchedKeys) {
+        const buffer = this.chunkBuffers.get(key) || this.pendingCrossChunkPatchBuffers.get(key);
+        if (buffer) {
+          buffer.structureCenters = this._mergeStructureCenters(buffer.structureCenters, structureCenters);
+        }
       }
     }
 
     // 3. 标记发起 Worker 的 chunk 为"已加载"
     ownBuffer.ready = true;
 
-    // 4. 通知就绪的 chunk 进行渲染
+    // 4. 将本次触达的 buffer key 加入待消费队列，避免全表扫描
+    // chunkBuffers 中的 key 只入队 chunkBuffers（不含 pendingCrossChunkPatchBuffers）
+    for (const key of touchedKeys) {
+      if (this.chunkBuffers.has(key)) {
+        this.pendingReadyChunkKeys.add(key);
+      }
+    }
+
+    // 5. 通知就绪的 chunk 进行渲染
     this.flushReadyChunks();
     const t2 = globalThis.performance?.now?.() ?? Date.now();
     recordChunkPerf('block-scatter.scatter', t2 - t0, {
@@ -156,15 +170,17 @@ export class BlockScatterManager {
       flushReadyChunksMs: t2 - t1,
       blockDataBlocks: blockDataBlocks.length,
       scatteredBlocks: scatteredBlocks.length,
-      touchedBuffers: touchedBuffers.size,
+      touchedKeys: touchedKeys.size,
       chunkBuffers: this.chunkBuffers.size,
-      pendingPatchBuffers: this.pendingCrossChunkPatchBuffers.size
+      pendingPatchBuffers: this.pendingCrossChunkPatchBuffers.size,
+      pendingReadyKeys: this.pendingReadyChunkKeys.size
     });
   }
 
   /**
    * 检查 chunk 是否就绪并通知渲染
    * 支持首次渲染和已 ready chunk 的增量追加
+   * 优化：只消费 pendingReadyChunkKeys 中的 key，不再遍历所有 buffer
    */
   flushReadyChunks() {
     const t0 = globalThis.performance?.now?.() ?? Date.now();
@@ -172,10 +188,28 @@ export class BlockScatterManager {
     let appendedChunks = 0;
     let acceptedBlocks = 0;
     let appendedBlocks = 0;
-    for (const [key, buffer] of this.chunkBuffers) {
+    let skippedMissing = 0;
+    let skippedNotReady = 0;
+
+    // 只处理本次新触达的 chunk keys
+    const keysToProcess = [...this.pendingReadyChunkKeys];
+    this.pendingReadyChunkKeys.clear();
+
+    for (const key of keysToProcess) {
+      const buffer = this.chunkBuffers.get(key);
+      if (!buffer) {
+        skippedMissing++;
+        continue;
+      }
+
       const chunk = this.world.chunks.get(key);
       if (!chunk) continue;
-      if (!buffer.ready && !chunk.isReady) continue;
+      if (!buffer.ready && !chunk.isReady) {
+        // 尚未就绪，保留在 pendingReadyChunkKeys 中等待后续触发
+        this.pendingReadyChunkKeys.add(key);
+        skippedNotReady++;
+        continue;
+      }
 
       if (!chunk.isReady) {
         // 首次渲染：完整接受并构建 mesh（传递 structureCenters 供跨 chunk 结构判断）
@@ -202,7 +236,11 @@ export class BlockScatterManager {
       acceptedChunks,
       appendedChunks,
       acceptedBlocks,
-      appendedBlocks
+      appendedBlocks,
+      inputKeys: keysToProcess.length,
+      skippedMissing,
+      skippedNotReady,
+      pendingReadyKeys: this.pendingReadyChunkKeys.size
     });
   }
 
@@ -371,5 +409,6 @@ export class BlockScatterManager {
   unloadChunk(chunkKey) {
     this.chunkBuffers.delete(chunkKey);
     this.pendingCrossChunkPatchBuffers.delete(chunkKey);
+    this.pendingReadyChunkKeys.delete(chunkKey);
   }
 }

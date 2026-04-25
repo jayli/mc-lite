@@ -521,8 +521,6 @@ export class World {
     if (!chunk) return;
     const key = `${chunk.cx},${chunk.cz}`;
 
-    // Chunk finalized 后触发 AO 全量刷新（使用 AOWorker 带邻居数据重算）
-    // WorldWorker 生成 chunk 时没有邻居数据，跨 chunk 方块的 AO 可能不准确。
     this.onChunkAOSourceStable(chunk, {
       fullRefresh: true,
       markNeighborBoundaries: true,

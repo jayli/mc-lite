@@ -664,7 +664,7 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
-  test('onChunkFinalized - 纯新 runtime chunk 不应触发自身 AO 刷新', () => {
+  test('onChunkFinalized - 纯新 runtime chunk finalized 后应立即刷新 AO，且不进入 deferred finalize 队列', () => {
     setupEnvironment();
 
     scene = new THREE.Scene();
@@ -677,7 +677,7 @@ describe('World 真实类测试', (test) => {
       cz: 5,
       isReady: true,
       isConsolidating: false,
-      hasDeferredFinalizeWork: true,
+      hasDeferredFinalizeWork: false,
       dirtyAOPositions: new Set(),
       isPureRuntimeStreamingChunk: () => true,
       _refreshAOFromStableSource: () => { aoRefreshCalls++; },
@@ -687,9 +687,8 @@ describe('World 真实类测试', (test) => {
 
     world.onChunkFinalized(chunk);
 
-    // onChunkFinalized 调用 onChunkAOSourceStable，
-    // 但 runtime-streaming chunk 的 AO 刷新应在 deferred finalize 中处理
-    assertTrue(world._pendingDeferredFinalizeChunkKeys.has('4,5'), '纯新 runtime chunk 应进入延迟 finalize 队列');
+    assertEqual(aoRefreshCalls, 1, '纯新 runtime chunk finalized 后应立即刷新自身 AO');
+    assertFalse(world._pendingDeferredFinalizeChunkKeys.has('4,5'), '纯新 runtime chunk 不应进入 deferred finalize 队列');
 
     teardownEnvironment();
   });
@@ -895,15 +894,24 @@ describe('World 真实类测试', (test) => {
     runtimeChunk.dirtyBlocks = 3;
 
     let consolidateCalled = 0;
+    let finalizedCalls = 0;
     runtimeChunk.consolidate = () => { consolidateCalled++; };
-    runtimeChunk.world.onChunkFinalized = () => {};
+    runtimeChunk.world.onChunkFinalized = () => { finalizedCalls++; };
 
     const result = runtimeChunk.finalizeAssemblyPhase();
 
-    assertTrue(result, '纯新 runtime chunk finalize 应直接完成');
+    assertTrue(result, '纯新 runtime chunk finalize 预检查应直接完成');
     assertEqual(consolidateCalled, 0, '纯新 runtime chunk 不应触发首次 consolidation');
+    assertEqual(runtimeChunk.dirtyBlocks, 0, '预检查后应清空加载期脏块计数');
+    assertFalse(runtimeChunk.hasDeferredFinalizeWork, '纯新 runtime chunk 不应把 finalize 工作后移到 deferred 队列');
+
+    // 新架构：finalize 分为预检查 + 非延迟工作两个阶段
+    const result2 = runtimeChunk.finalizeNonDeferredPhase();
+
+    assertTrue(result2, '非延迟阶段应完成');
     assertEqual(runtimeChunk.loadState, 'finalized', '纯新 runtime chunk 应直接进入 finalized');
-    assertEqual(runtimeChunk.dirtyBlocks, 0, '首次 finalize 后应清空加载期脏块计数');
+    assertEqual(finalizedCalls, 1, '纯新 runtime chunk 应在非延迟阶段完成 finalized 回调');
+    assertFalse(world._pendingDeferredFinalizeChunkKeys.has('0,0'), '纯新 runtime chunk finalize 后不应进入 deferred finalize 队列');
 
     teardownEnvironment();
   });

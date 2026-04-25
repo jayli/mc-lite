@@ -72,7 +72,7 @@ export function recordChunkPerf(label, durationMs, details = {}, options = {}) {
     scope.__CHUNK_PERF_EVENTS.splice(0, scope.__CHUNK_PERF_EVENTS.length - MAX_EVENT_HISTORY);
   }
 
-  const logger = options.logger || console.debug;
+  const logger = options.logger || console.log;
   logger(`[ChunkPerf] ${label}: ${durationMs.toFixed(2)}ms`, {
     ...details,
     durationMs

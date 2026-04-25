@@ -530,25 +530,33 @@ export class GlobalInstancedMeshManager {
     while (this.mutationQueue.length > 0 && processedBlocks < maxOps) {
       if (processedBlocks > 0 && now() - start >= maxMs) break;
 
+      // 优化：按距离选出最近的任务后，批量消费该任务的多个条目，
+      // 避免每处理一个 block 就重新扫描整个队列
       const taskIndex = this._selectNextMutationTaskIndex(playerCx, playerCz);
       const task = this.mutationQueue[taskIndex];
       const { data, entries, chunkKey } = task;
       const { type, matrices, aoLow, aoHigh, orientation } = data;
-      const [coordText, sourceIndex] = entries[task.cursor];
-      const coord = Number(coordText);
-      const matrix = matrices.subarray(sourceIndex * MATRIX_STRIDE, sourceIndex * MATRIX_STRIDE + MATRIX_STRIDE);
 
-      this.addVisibleBlock(coord, { type, orientation: orientation?.[sourceIndex] || 0 }, chunkKey, {
-        matrix,
-        aoLow: aoLow?.[sourceIndex] ?? 1,
-        aoHigh: aoHigh?.[sourceIndex] ?? 1,
-        orientation: orientation?.[sourceIndex] ?? 0
-      }, { commit: false });
-      this.queuedCoordToChunk.delete(coord);
+      // 批量消费当前任务的条目，直到预算耗尽或任务完成
+      while (processedBlocks < maxOps && now() - start < maxMs && task.cursor < entries.length) {
+        const [coordText, sourceIndex] = entries[task.cursor];
+        const coord = Number(coordText);
+        const matrix = matrices.subarray(sourceIndex * MATRIX_STRIDE, sourceIndex * MATRIX_STRIDE + MATRIX_STRIDE);
 
-      task.cursor++;
-      processedBlocks++;
-      this.mutationStats.queuedBlocks = Math.max(0, this.mutationStats.queuedBlocks - 1);
+        this.addVisibleBlock(coord, { type, orientation: orientation?.[sourceIndex] || 0 }, chunkKey, {
+          matrix,
+          aoLow: aoLow?.[sourceIndex] ?? 1,
+          aoHigh: aoHigh?.[sourceIndex] ?? 1,
+          orientation: orientation?.[sourceIndex] ?? 0
+        }, { commit: false });
+        this.queuedCoordToChunk.delete(coord);
+
+        task.cursor++;
+        processedBlocks++;
+        this.mutationStats.queuedBlocks = Math.max(0, this.mutationStats.queuedBlocks - 1);
+      }
+
+      // 当前任务已消费完毕或预算耗尽，移除已完成的任务
       if (task.cursor >= entries.length) {
         this.mutationQueue.splice(taskIndex, 1);
       }

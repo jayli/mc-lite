@@ -1553,12 +1553,14 @@ export class Chunk {
     if (this.loadState === 'finalized') return true;
     if (this.loadState !== 'entities-built' && this.loadState !== 'waiting-consolidation') return false;
 
+    // 预检查：非纯流式 chunk 且有脏块时，触发 consolidation 后等待
     if (this.loadState !== 'waiting-consolidation' && this.dirtyBlocks > 0 && !this.isPureRuntimeStreamingChunk()) {
       this.loadState = 'waiting-consolidation';
       this.consolidate();
       return false;
     }
 
+    // 纯流式 chunk：跳过 consolidation，清理加载期脏块计数和定时器
     if (this.isPureRuntimeStreamingChunk()) {
       this.dirtyBlocks = 0;
       if (this.consolidationTimer) {
@@ -1567,48 +1569,52 @@ export class Chunk {
       }
     }
 
-    const shouldDeferNonRenderFinalize = this.isPureRuntimeStreamingChunk();
-    if (shouldDeferNonRenderFinalize) {
-      this.hasDeferredFinalizeWork = true;
-      this._needsDeferredPersistenceFlush = Boolean(this._pendingPersistenceFlush);
-      this._needsDeferredRuntimeEntityRestore = Boolean(
-        (this.pendingRuntimeEntities?.zombieNests?.length || 0) +
-        (this.pendingRuntimeEntities?.turrets?.length || 0) +
-        (this.pendingRuntimeEntities?.minecarts?.length || 0)
-      );
-      this._needsDeferredLightRegistration = true;
-    }
+    // finalize 仍在主线程装配路径内完成，不把首屏关键工作后移到 idle 阶段
+    this.hasDeferredFinalizeWork = false;
+    this._needsDeferredPersistenceFlush = false;
+    this._needsDeferredRuntimeEntityRestore = false;
+    this._needsDeferredLightRegistration = false;
 
-    if (this._pendingPersistenceFlush && !shouldDeferNonRenderFinalize) {
+    // 预检查完成，通知调度器可以继续后续阶段
+    return true;
+  }
+
+  /**
+   * finalize 非延迟工作阶段（主线程切片执行）
+   * 处理持久化、实体恢复、光源注册，完成后标记 chunk 为 ready
+   */
+  finalizeNonDeferredPhase() {
+    if (this.loadState === 'finalized' || this.disposed) return true;
+
+    // 持久化刷写
+    if (this._pendingPersistenceFlush) {
       this._pendingPersistenceFlush = false;
       getPersistenceService()?.saveChunkData?.(this.cx, this.cz, this.pendingSnapshot);
     }
 
-    if (!shouldDeferNonRenderFinalize) {
-      const zombieNests = this.pendingRuntimeEntities?.zombieNests;
-      if (Array.isArray(zombieNests) && zombieNests.length > 0) {
-        this.world?.zombieNestManager?.restoreNestsForChunk?.(this.cx, this.cz, zombieNests);
-      }
-      const turrets = this.pendingRuntimeEntities?.turrets;
-      if (Array.isArray(turrets) && turrets.length > 0) {
-        this.world?.turretManager?.restoreTurretsForChunk?.(this.cx, this.cz, turrets);
-      }
-      const minecarts = this.pendingRuntimeEntities?.minecarts;
-      if (Array.isArray(minecarts) && minecarts.length > 0) {
-        this.world?.minecartManager?.restoreMinecartsForChunk?.(this.cx, this.cz, minecarts);
-      }
+    // 运行时实体恢复
+    const zombieNests = this.pendingRuntimeEntities?.zombieNests;
+    if (Array.isArray(zombieNests) && zombieNests.length > 0) {
+      this.world?.zombieNestManager?.restoreNestsForChunk?.(this.cx, this.cz, zombieNests);
+    }
+    const turrets = this.pendingRuntimeEntities?.turrets;
+    if (Array.isArray(turrets) && turrets.length > 0) {
+      this.world?.turretManager?.restoreTurretsForChunk?.(this.cx, this.cz, turrets);
+    }
+    const minecarts = this.pendingRuntimeEntities?.minecarts;
+    if (Array.isArray(minecarts) && minecarts.length > 0) {
+      this.world?.minecartManager?.restoreMinecartsForChunk?.(this.cx, this.cz, minecarts);
     }
 
-    if (!shouldDeferNonRenderFinalize) {
-      this._registerLightSources();
-    }
+    // 光源注册
+    this._registerLightSources();
+
+    // 完成
     this.isReady = true;
     this.loadState = 'finalized';
     this.pendingTerrainData = null;
     this.pendingSpecialEntityData = null;
-    if (!shouldDeferNonRenderFinalize) {
-      this.pendingRuntimeEntities = null;
-    }
+    this.pendingRuntimeEntities = null;
     this.pendingSnapshot = null;
     this.world?.onChunkFinalized?.(this);
     return true;
@@ -1652,6 +1658,16 @@ export class Chunk {
       this._needsDeferredRuntimeEntityRestore ||
       this._needsDeferredLightRegistration
     );
+
+    // 所有延迟工作完成后，触发 AO 刷新
+    if (!this.hasDeferredFinalizeWork) {
+      this.world?.onChunkAOSourceStable?.(this, {
+        fullRefresh: true,
+        markNeighborBoundaries: true,
+        reason: 'deferred-finalize-done'
+      });
+    }
+
     return !this.hasDeferredFinalizeWork;
   }
 

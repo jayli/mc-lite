@@ -155,6 +155,43 @@ describe('BlockScatterManager 数据契约', (test) => {
     assertEqual(scatter.getPendingCrossChunkPatchStats().chunks, 1, '远处 chunk 应保留在 pending buffer');
   });
 
+  test('跨 chunk pending patch 应保留 structureCenters 并在补刷时传给目标 chunk', () => {
+    let receivedStructureCenters = null;
+    const world = {
+      chunks: new Map([
+        ['1,0', {
+          isReady: true,
+          isConsolidating: false,
+          appendDeferredCrossChunkPatch(blocks, visibleKeys, structureCenters) {
+            receivedStructureCenters = structureCenters;
+            return blocks.length;
+          }
+        }]
+      ])
+    };
+    const scatter = new BlockScatterManager(world);
+    const structureCenter = { type: 'house', x: 20, y: 5, z: 5 };
+
+    scatter.scatter({
+      cx: 0,
+      cz: 0,
+      blockDataBlocks: [
+        { x: 17, y: 1, z: 1, type: 'stone' }
+      ],
+      visibleKeys: [encodeCoord(17, 1, 1)],
+      structureCenters: [structureCenter]
+    });
+
+    const result = scatter.flushDeferredCrossChunkPatchesAround(0, 0, {
+      maxChunks: 1,
+      maxBlocks: 10
+    });
+
+    assertEqual(result.processedBlocks, 1, '应成功补刷跨 chunk patch');
+    assertEqual(receivedStructureCenters?.length || 0, 1, '目标 chunk 应收到 structureCenters');
+    assertEqual(receivedStructureCenters?.[0]?.type, 'house', 'structureCenter 类型应保留');
+  });
+
   test('空闲补刷会丢弃目标和源都超出活跃范围的 pending patch', () => {
     const world = {
       chunks: new Map()

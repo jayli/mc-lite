@@ -122,7 +122,12 @@ export class ChunkAssemblyScheduler {
         }
         break;
       case 'finalize':
-        chunk.finalizeAssemblyPhase();
+        if (chunk.finalizeAssemblyPhase()) {
+          this.enqueue(chunk, 'non-deferred-finalize', task.priority);
+        }
+        break;
+      case 'non-deferred-finalize':
+        chunk.finalizeNonDeferredPhase();
         break;
       default:
         break;
