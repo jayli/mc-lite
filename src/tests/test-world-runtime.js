@@ -92,4 +92,57 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
 
     globalThis._worldStore = originalWorldStore;
   });
+
+  test('markChunkDirty - 已调度的 flush 不应受后续全局 worldStore 替换影响', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    const storeACalls = [];
+    const storeBCalls = [];
+
+    globalThis._worldStore = {
+      putChunkRecord: async (cx, cz, record) => {
+        storeACalls.push({ cx, cz, record });
+        return true;
+      }
+    };
+
+    const runtimeA = new WorldRuntime();
+    runtimeA.setWorld({
+      chunks: new Map([
+        ['0,0', {
+          blockData: new Map([[123, { type: 'stone', orientation: 0 }]]),
+          staticEntities: [],
+          runtimeSeedData: {}
+        }]
+      ])
+    });
+    runtimeA.markChunkDirty(0, 0);
+
+    globalThis._worldStore = {
+      putChunkRecord: async (cx, cz, record) => {
+        storeBCalls.push({ cx, cz, record });
+        return true;
+      }
+    };
+
+    const runtimeB = new WorldRuntime();
+    runtimeB.setWorld({
+      chunks: new Map([
+        ['1,0', {
+          blockData: new Map([[456, { type: 'dirt', orientation: 0 }]]),
+          staticEntities: [],
+          runtimeSeedData: {}
+        }]
+      ])
+    });
+    runtimeB.markChunkDirty(1, 0);
+
+    await new Promise((resolve) => setTimeout(resolve, 650));
+
+    assertEqual(storeACalls.length, 1, 'runtimeA 应继续写回创建时绑定的 worldStore');
+    assertEqual(storeACalls[0].cx, 0, 'runtimeA 应写回正确 chunk');
+    assertEqual(storeBCalls.length, 1, 'runtimeB 应只写回到新的 worldStore');
+    assertEqual(storeBCalls[0].cx, 1, 'runtimeB 应写回正确 chunk');
+
+    globalThis._worldStore = originalWorldStore;
+  });
 });

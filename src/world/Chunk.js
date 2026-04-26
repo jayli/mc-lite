@@ -386,20 +386,14 @@ export class Chunk {
     const minZ = cz * CHUNK_SIZE;
 
     // 1. 从 blockData 构建方块列表
-    // 注意：预生成阶段的跨 region overflow 回退机制会将相邻 chunk 的方块
-    // 保留在源 chunk 的 blockData 中（"借用"渲染），所以不能严格限制方块
-    // 必须在本 chunk 范围内。保留相邻 chunk 的方块用于正确渲染跨 region 结构。
+    // WorldStore 中每个 ChunkRecord 只允许保存本 chunk 的权威方块。
     const blocks = [];
     for (const [code, entry] of this.blockData) {
       const decoded = Chunk.decodeCoord(Number(code));
       const localX = decoded.x - minX;
       const localZ = decoded.z - minZ;
 
-      // 允许本 chunk 及相邻 chunk 的方块（跨 region 回退场景）
-      // 但限制在合理范围内，防止远处方块被错误渲染
-      const neighborTolerance = 1; // 允许相邻 1 个 chunk 的溢出
-      if (localX < -CHUNK_SIZE * neighborTolerance || localX >= CHUNK_SIZE * (1 + neighborTolerance) ||
-          localZ < -CHUNK_SIZE * neighborTolerance || localZ >= CHUNK_SIZE * (1 + neighborTolerance)) {
+      if (localX < 0 || localX >= CHUNK_SIZE || localZ < 0 || localZ >= CHUNK_SIZE) {
         continue;
       }
 

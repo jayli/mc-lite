@@ -24,6 +24,7 @@ import { encodeCoord } from '../utils/CoordEncoding.js';
 const REGION_SIZE_IN_CHUNKS = 8;
 const DEFAULT_INITIAL_REGION_RADIUS = 3; // 初始生成 7x7 region = 56x56 chunk
 const CHUNK_SIZE = 16;
+const REGION_GENERATION_HALO_IN_CHUNKS = 1;
 
 // --- 依赖注入 ---
 const getWorldStore = () => globalThis._worldStore || worldStore;
@@ -58,6 +59,17 @@ export class WorldGenerationService {
 
   _chunkKey(cx, cz) {
     return `${cx},${cz}`;
+  }
+
+  _isChunkInRegion(cx, cz, rx, rz) {
+    const startCx = rx * this._regionSizeInChunks;
+    const startCz = rz * this._regionSizeInChunks;
+    return (
+      cx >= startCx &&
+      cx < startCx + this._regionSizeInChunks &&
+      cz >= startCz &&
+      cz < startCz + this._regionSizeInChunks
+    );
   }
 
   // ============================================================
@@ -204,21 +216,21 @@ export class WorldGenerationService {
     const chunkKeys = [];
     const startCx = rx * this._regionSizeInChunks;
     const startCz = rz * this._regionSizeInChunks;
+    const endCx = startCx + this._regionSizeInChunks - 1;
+    const endCz = startCz + this._regionSizeInChunks - 1;
 
-    // 收集所有 chunk 的完整 routing 结果（含 overflow）
+    // 收集所有 chunk 的完整 routing 结果（含 halo 与 overflow）
     const chunkResults = {};
 
-    // 逐个生成 chunk
-    for (let dx = 0; dx < this._regionSizeInChunks; dx++) {
-      for (let dz = 0; dz < this._regionSizeInChunks; dz++) {
-        const cx = startCx + dx;
-        const cz = startCz + dz;
+    // 使用 1 chunk halo 生成邻接来源，保证跨 region 的相邻 owner
+    // 能在目标 chunk 已存在时直接落到正确的 target result 中。
+    for (let cx = startCx - REGION_GENERATION_HALO_IN_CHUNKS; cx <= endCx + REGION_GENERATION_HALO_IN_CHUNKS; cx++) {
+      for (let cz = startCz - REGION_GENERATION_HALO_IN_CHUNKS; cz <= endCz + REGION_GENERATION_HALO_IN_CHUNKS; cz++) {
         const chunkKey = this._chunkKey(cx, cz);
 
         const chunkResult = await this._generateChunkWithRouting(cx, cz);
         if (chunkResult) {
           chunkResults[chunkKey] = chunkResult;
-          chunkKeys.push(chunkKey);
         }
       }
     }
@@ -227,8 +239,12 @@ export class WorldGenerationService {
     // 需要按坐标归属分发到正确的 chunk 中
     this._mergeOverflowBlocks(chunkResults);
 
-    // 构建 RegionRecord（只取 blockData / staticEntities / runtimeSeedData）
+    // 构建 RegionRecord：只持久化核心 region 的 owner chunk。
     for (const [chunkKey, result] of Object.entries(chunkResults)) {
+      const [cx, cz] = chunkKey.split(',').map(Number);
+      if (!this._isChunkInRegion(cx, cz, rx, rz)) continue;
+
+      chunkKeys.push(chunkKey);
       chunks[chunkKey] = {
         blockData: result.blockData,
         staticEntities: result.staticEntities,
@@ -299,15 +315,10 @@ export class WorldGenerationService {
    * Worker 生成的方块可能落在相邻 chunk 范围内，通过 routing.overflowChunks
    * 返回。需要按坐标归属分发到正确的 chunk 的 blockData 中。
    *
-   * 跨 region 方块处理：如果目标 chunk 不在当前 region 的 chunkResults 中，
-   * 将方块保留在源 chunk 的 blockData 中（"借用"渲染），防止跨 region 结构
-   * （如边界上的大树）的方块丢失。
-   *
    * @param {Object} chunkResults - { chunkKey: { blockData, routing, ... } }
    */
   _mergeOverflowBlocks(chunkResults) {
-    const CHUNK_SIZE = 16;
-    let crossRegionFallbackCount = 0;
+    let unresolvedOverflowCount = 0;
 
     for (const [_sourceKey, result] of Object.entries(chunkResults)) {
       if (!result.routing?.overflowChunks) continue;
@@ -321,7 +332,7 @@ export class WorldGenerationService {
         if (blocks.length === 0) continue;
 
         if (targetResult) {
-          // 目标 chunk 在当前 region 中，正常分发
+          // 目标 chunk 已在当前批次结果中，正常分发到唯一 owner。
           for (const block of blocks) {
             const targetCx = Math.floor(block.x / CHUNK_SIZE);
             const targetCz = Math.floor(block.z / CHUNK_SIZE);
@@ -336,22 +347,13 @@ export class WorldGenerationService {
               : block.type;
           }
         } else {
-          // 目标 chunk 不在当前 region 中（跨 region），回退到源 chunk 保留
-          for (const block of blocks) {
-            const code = encodeCoord(block.x, block.y, block.z);
-            if (result.blockData[code] !== undefined) continue;
-
-            result.blockData[code] = block.orientation
-              ? { type: block.type, orientation: block.orientation }
-              : block.type;
-            crossRegionFallbackCount++;
-          }
+          unresolvedOverflowCount += blocks.length;
         }
       }
     }
 
-    if (crossRegionFallbackCount > 0) {
-      console.log(`[WorldGenerationService] Cross-region overflow fallback: ${crossRegionFallbackCount} blocks retained in source chunks`);
+    if (unresolvedOverflowCount > 0) {
+      console.warn(`[WorldGenerationService] Overflow blocks unresolved after halo routing: ${unresolvedOverflowCount}`);
     }
   }
 

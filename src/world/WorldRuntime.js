@@ -30,6 +30,7 @@ export class WorldRuntime {
     this._world = null; // World 实例引用，在 World 初始化后注入
     this._regionSizeInChunks = REGION_SIZE_IN_CHUNKS;
     this._flushing = false;
+    this._worldStore = options.worldStore || getWorldStore();
   }
 
   /**
@@ -77,7 +78,7 @@ export class WorldRuntime {
 
     // 2. 缓存未命中，从 WorldStore 读取
     if (!region) {
-      region = await getWorldStore().getRegionRecord(rx, rz);
+      region = await this._worldStore.getRegionRecord(rx, rz);
       if (region) {
         this._regionCache.set(regionKey, region);
       }
@@ -141,7 +142,7 @@ export class WorldRuntime {
    */
   isChunkDirty(cx, cz) {
     const entry = this._dirtyChunks.get(this._chunkKey(cx, cz));
-    return entry && entry.dirty;
+    return !!(entry && entry.dirty);
   }
 
   /**
@@ -178,7 +179,7 @@ export class WorldRuntime {
 
     try {
       dirtyEntry.pendingFlush = true;
-      await getWorldStore().putChunkRecord(cx, cz, {
+      await this._worldStore.putChunkRecord(cx, cz, {
         blockData: this._serializeBlockData(chunk.blockData),
         staticEntities: chunk.staticEntities || [],
         runtimeSeedData: chunk.runtimeSeedData || {}
@@ -229,7 +230,7 @@ export class WorldRuntime {
           for (const [chunkKey, chunkRecord] of group.chunks) {
             region.chunks[chunkKey] = chunkRecord;
           }
-          await getWorldStore().saveRegionRecord(group.rx, group.rz, region);
+          await this._worldStore.saveRegionRecord(group.rx, group.rz, region);
         } else {
           // 创建新 region（不应该发生，因为脏 chunk 必然有 region）
           const newRegion = {
@@ -241,7 +242,7 @@ export class WorldRuntime {
             generatedAt: Date.now(),
             generatorVersion: '1.0'
           };
-          await getWorldStore().saveRegionRecord(group.rx, group.rz, newRegion);
+          await this._worldStore.saveRegionRecord(group.rx, group.rz, newRegion);
         }
 
         // 清除已写回的脏标记
@@ -280,7 +281,7 @@ export class WorldRuntime {
     const regionKey = this._regionKey(rx, rz);
     let region = this._regionCache.get(regionKey);
     if (!region) {
-      region = await getWorldStore().getRegionRecord(rx, rz);
+      region = await this._worldStore.getRegionRecord(rx, rz);
       if (region) {
         this._regionCache.set(regionKey, region);
       }
