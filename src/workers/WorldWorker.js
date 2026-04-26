@@ -486,7 +486,8 @@ onmessage = async function(e) {
     taskId,
     isOptimization = false,
     _consolidationRequestSentAt = 0,  // 主线程发送时间戳
-    textureGroups = {}  // 新增：纹理分组配置
+    textureGroups = {},  // 新增：纹理分组配置
+    skipTerrainGeneration = false  // 存档加载优化：snapshot 完整时跳过地形生成
   } = e.data;
 
   // 同步种子
@@ -560,8 +561,9 @@ onmessage = async function(e) {
 
   // P0 优化：consolidation 场景跳过地形重生成，直接用 snapshot.blocks 构建 blockMap。
   // 主线程的 blockData 是权威数据源，包含完整方块集，无需重新跑地形管线。
+  // skipTerrainGeneration：存档加载路径，当 snapshot 完整时也跳过地形生成。
   let structureQueueWithCenters = []; // 在 if 块外声明，供后续代码引用
-  if (!isOptimization) {
+  if (!isOptimization && !skipTerrainGeneration) {
     // 地形生成：房间、CityMap、FrozenMountain、Pyramid 等所有结构放置
     const rooms = [];
     const roomSeed = Math.abs((cx * 73856093) ^ (cz * 19349663) ^ seed);
@@ -1680,9 +1682,9 @@ onmessage = async function(e) {
 
     // 用 snapshot 中的方块覆盖 blockMap（保留玩家修改）
     if (savedSnapshot.blocks) {
-      // 非 consolidation 路径：需要根据 snapshot 清理当前 Chunk 责任范围内的被删除方块
+      // 非 consolidation / skipTerrainGeneration 路径：需要根据 snapshot 清理当前 Chunk 责任范围内的被删除方块
       // consolidation 路径中 blockMap 为空（地形生成已跳过），无需清理
-      if (!isOptimization) {
+      if (!isOptimization && !skipTerrainGeneration) {
         for (const [key, b] of blockMap) {
           if (isBlockOwnedByCurrentChunk(b)) {
             if (!getBlockFromSnapshot(savedSnapshot.blocks, b.x, b.y, b.z)) {
@@ -1723,8 +1725,9 @@ onmessage = async function(e) {
         const snapshotBlock = { x: bx, y: by, z: bz, type: entry.type };
 
         // consolidation 路径：snapshot 中的方块全部在当前 chunk 范围内，跳过 ownership 检查
+        // skipTerrainGeneration 路径同理：snapshot 就是权威数据源
         // 非 consolidation 路径：防止历史遗留的跨 Chunk 重复键被再次注入
-        if (!isOptimization && !isBlockOwnedByCurrentChunk(snapshotBlock)) {
+        if (!isOptimization && !skipTerrainGeneration && !isBlockOwnedByCurrentChunk(snapshotBlock)) {
           ownershipFilteredSnapshotBlocks++;
           continue;
         }
@@ -1835,17 +1838,17 @@ onmessage = async function(e) {
 
   // 仅保存当前 Chunk 负责的数据（地图语义）
   // 使用数字编码格式，与 Chunk.blockData 一致
-  // consolidation 路径中所有方块都在 chunk 范围内，无需 ownership 过滤
+  // consolidation / skipTerrainGeneration 路径中所有方块都在 chunk 范围内，无需 ownership 过滤
   const blocksForSnapshot = {};
   for (const [, b] of blockMap) {
-    if (!isOptimization && !isBlockOwnedByCurrentChunk(b)) continue;
+    if (!isOptimization && !skipTerrainGeneration && !isBlockOwnedByCurrentChunk(b)) continue;
     const code = encodeCoord(b.x, b.y, b.z);
     blocksForSnapshot[code] = { type: b.type, orientation: b.orientation || 0 };
   }
 
   for (const [key, block] of blockMap) {
-    // consolidation 路径中所有方块都在 chunk 范围内，shouldOwnBlock 永远为 true
-    const shouldOwnBlock = isOptimization || isBlockOwnedByCurrentChunk(block);
+    // consolidation / skipTerrainGeneration 路径中所有方块都在 chunk 范围内，shouldOwnBlock 永远为 true
+    const shouldOwnBlock = isOptimization || skipTerrainGeneration || isBlockOwnedByCurrentChunk(block);
 
     // 固体方块：只要在 Chunk 内或者是跨区结构方块，都添加到 solidBlocks
     if (block.solid && shouldOwnBlock) solidBlocks.push(key);

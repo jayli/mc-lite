@@ -54,6 +54,10 @@ export function extendChunk(Chunk) {
         resolve();
       });
 
+      // 存档加载优化：当 snapshot 已包含完整 blockData 时，
+      // 跳过 Worker 地形生成（噪声、CityMap、结构放置等），直接消费 snapshot 数据
+      const skipTerrainGeneration = snapshot?.blocks && Object.keys(snapshot.blocks).length > 0;
+
       // 4. 发送生成请求到 Worker 池
       worldWorker.postMessage({
         cx: this.cx,
@@ -61,7 +65,8 @@ export function extendChunk(Chunk) {
         taskId,
         seed: WORLD_CONFIG.SEED,
         snapshot,
-        structureCenters: neighborStructureCenters.length > 0 ? neighborStructureCenters : undefined
+        structureCenters: neighborStructureCenters.length > 0 ? neighborStructureCenters : undefined,
+        skipTerrainGeneration
       });
     });
   }
