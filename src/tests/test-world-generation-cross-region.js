@@ -17,10 +17,11 @@ function createTestWorldWorker() {
 
       const hasCrossRegionOverflow = message.cx === 7 && message.cz === 0;
       setTimeout(() => {
-        callback({
+        const chunkKey = `${message.cx},${message.cz}`;
+        const chunkResult = {
           routing: {
             ownChunk: {
-              chunkKey: `${message.cx},${message.cz}`,
+              chunkKey,
               blockDataBlocks: [],
               visibleBlocks: [],
               meshData: []
@@ -42,6 +43,9 @@ function createTestWorldWorker() {
           blockDataBlocks: [],
           entities: { modGunMan: [], rovers: [] },
           structureCenters: []
+        };
+        callback({
+          chunks: { [chunkKey]: chunkResult }
         });
       }, 0);
     }
