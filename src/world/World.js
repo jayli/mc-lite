@@ -177,6 +177,11 @@ export class World {
     this.worldGenerationService.setWorld(this);
   }
 
+  applyWorldMeta(meta) {
+    if (!meta) return;
+    this.worldBoundsController?.initFromMeta?.(meta);
+  }
+
   /**
    * 注入阴影刷新回调
    * @param {(reason?: string) => void} callback - 阴影刷新函数
@@ -242,6 +247,54 @@ export class World {
     const cx = Math.floor(x / CHUNK_SIZE);
     const cz = Math.floor(z / CHUNK_SIZE);
     return this.chunks.get(`${cx},${cz}`) || null;
+  }
+
+  _isChunkInsideSafeBounds(cx, cz) {
+    const bounds = this.worldBoundsController?.getSafeBounds?.();
+    if (!bounds) return true;
+    const minX = cx * CHUNK_SIZE;
+    const minZ = cz * CHUNK_SIZE;
+    const maxX = minX + CHUNK_SIZE - 1;
+    const maxZ = minZ + CHUNK_SIZE - 1;
+    return !(maxX < bounds.minX || minX > bounds.maxX || maxZ < bounds.minZ || minZ > bounds.maxZ);
+  }
+
+  _requestRuntimeChunkRecord(chunk) {
+    if (!chunk || chunk.disposed || !this.worldRuntime) return;
+    chunk.awaitingStoreRecord = true;
+    chunk.needsStoreRetry = true;
+    chunk.loadState = 'awaiting-store-record';
+
+    this.worldRuntime.ensureChunkData(chunk.cx, chunk.cz).then((result) => {
+      if (!result || chunk.disposed) return;
+      if (result.status === 'ready' && result.chunkRecord) {
+        chunk.loadFromRecord(result.chunkRecord);
+        return;
+      }
+
+      if (result.status === 'missing-region' || result.status === 'missing-chunk') {
+        chunk.awaitingStoreRecord = true;
+        chunk.needsStoreRetry = true;
+        chunk.loadState = 'awaiting-store-record';
+      }
+    }).catch((error) => {
+      console.error(`[World] Failed to load runtime chunk record ${chunk.cx},${chunk.cz}:`, error);
+      if (!chunk.disposed) {
+        chunk.awaitingStoreRecord = true;
+        chunk.needsStoreRetry = true;
+        chunk.loadState = 'awaiting-store-record';
+      }
+    });
+  }
+
+  onExpansionFinished(_newBounds) {
+    if (this.bootstrapState.phase !== 'runtime-streaming') return;
+    for (const chunk of this.chunks.values()) {
+      if (!chunk || chunk.disposed || chunk.isReady) continue;
+      if (!chunk.awaitingStoreRecord && !chunk.needsStoreRetry) continue;
+      if (!this._isChunkInsideSafeBounds(chunk.cx, chunk.cz)) continue;
+      this._requestRuntimeChunkRecord(chunk);
+    }
   }
 
   /**
@@ -714,16 +767,7 @@ export class World {
 
           // runtime-streaming 阶段：尝试从 WorldStore 纯装载
           if (this.bootstrapState.phase === 'runtime-streaming' && this.worldRuntime) {
-            this.worldRuntime.ensureChunkData(cx + i, cz + j).then((chunkRecord) => {
-              if (chunkRecord && !chunk.disposed) {
-                chunk.loadFromRecord(chunkRecord);
-              }
-            }).catch(() => {
-              // WorldStore 没有数据，回退到 gen() 路径
-              if (!chunk.disposed && !chunk.isReady) {
-                chunk.gen();
-              }
-            });
+            this._requestRuntimeChunkRecord(chunk);
           }
         }
       }
@@ -1199,6 +1243,9 @@ export class World {
 
     // --- 边界情况处理 ---
     if (!chunk || !chunk.isReady) {
+      if (this.bootstrapState.phase === 'runtime-streaming') {
+        return false;
+      }
       const h = Math.floor(noise(x, z, 0.08) + noise(x, z, 0.02) * 3);
       return y <= h;
     }
@@ -1255,9 +1302,10 @@ export class World {
    * @returns {string|null} 方块类型（如 'stone'），如果区块未加载则返回 null
    */
   getBlock(x, y, z) {
+    if (this.getSpecialEntityCollision(x, y, z)) return 'collider';
     const owner = this.resolveBlockOwner(x, y, z, { allowScan: false });
     if (owner) return this.getBlockTypeFromEntry(owner.entry);
-    return this.getSpecialEntityCollision(x, y, z) ? 'collider' : null;
+    return null;
   }
 
   /**
@@ -1285,9 +1333,10 @@ export class World {
    * @returns {string|null} 方块类型，未命中则返回 null
    */
   getBlockFast(x, y, z) {
+    if (this.getSpecialEntityCollision(x, y, z)) return 'collider';
     const owner = this.resolveBlockOwner(x, y, z, { allowScan: false });
     if (owner) return this.getBlockTypeFromEntry(owner.entry);
-    return this.getSpecialEntityCollision(x, y, z) ? 'collider' : null;
+    return null;
   }
 
   /**
@@ -1298,9 +1347,10 @@ export class World {
    * @returns {{ type: string, orientation: number }|null} 方块信息，如果区块未加载则返回 null
    */
   getBlockEntry(x, y, z) {
+    if (this.getSpecialEntityCollision(x, y, z)) return { type: 'collider', orientation: 0 };
     const owner = this.resolveBlockOwner(x, y, z, { allowScan: false });
     if (owner) return parseBlockEntry(owner.entry);
-    return this.getSpecialEntityCollision(x, y, z) ? { type: 'collider', orientation: 0 } : null;
+    return null;
   }
 
   /**
@@ -1312,6 +1362,14 @@ export class World {
    * @param {number} [orientation=0] - 朝向 (0-3)，当 typeOrEntry 为字符串时使用
    */
   setBlock(x, y, z, typeOrEntry, orientation = 0) {
+    if (this.worldAccessLayer) {
+      const options = typeof typeOrEntry === 'object'
+        ? { orientation: typeOrEntry.orientation || 0 }
+        : { orientation };
+      this.worldAccessLayer.setBlock(x, y, z, typeOrEntry, options);
+      return;
+    }
+
     const cx = Math.floor(x / CHUNK_SIZE);
     const cz = Math.floor(z / CHUNK_SIZE);
     const key = `${cx},${cz}`;
@@ -1331,8 +1389,8 @@ export class World {
       this.worldRuntime.markChunkDirty(cx, cz);
     }
 
-    this.clearBlockLookupCaches();
-    this.requestShadowMapUpdate('set-block');
+      this.clearBlockLookupCaches();
+      this.requestShadowMapUpdate('set-block');
   }
 
   /**
@@ -1406,17 +1464,29 @@ export class World {
    * @param {number} z - 世界坐标 Z
    */
   removeBlock(x, y, z) {
+    if (this.worldAccessLayer) {
+      this.worldAccessLayer.removeBlock(x, y, z);
+      return;
+    }
+
     const owner = this.resolveBlockOwner(x, y, z, { allowScan: false });
     if (!owner) {
       const specialCollision = this.getSpecialEntityCollision(x, y, z);
       if (!specialCollision) return;
+      specialCollision.ownerChunk.markPlayerMutation?.();
       specialCollision.ownerChunk.destroySpecialEntity(specialCollision.entityType, specialCollision.entityId);
+      if (this.bootstrapState.phase === 'runtime-streaming' && this.worldRuntime) {
+        this.worldRuntime.markChunkDirty(specialCollision.ownerChunk.cx, specialCollision.ownerChunk.cz);
+      }
       this.clearBlockLookupCaches();
       this.requestShadowMapUpdate('remove-special-entity');
       return;
     }
     owner.ownerChunk.markPlayerMutation?.();
     owner.ownerChunk.removeBlock(x, y, z);
+    if (this.bootstrapState.phase === 'runtime-streaming' && this.worldRuntime) {
+      this.worldRuntime.markChunkDirty(owner.ownerChunk.cx, owner.ownerChunk.cz);
+    }
     this.clearBlockLookupCaches();
     this.requestShadowMapUpdate('remove-block');
   }

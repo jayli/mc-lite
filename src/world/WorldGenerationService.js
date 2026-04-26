@@ -442,14 +442,13 @@ export class WorldGenerationService {
     // 检查是否已经在扩图中
     if (this._world.worldBoundsController.isExpanding) return false;
 
-    console.log(`[WorldGenerationService] Starting world expansion: ${directions.join(', ')}`);
-    this._world.worldBoundsController.startExpansion(directions);
+    // 获取当前 WorldMeta
+    const meta = await getWorldStore().getWorldMeta();
+    if (!meta) return false;
+
     this._isGenerating = true;
 
     try {
-      // 获取当前 WorldMeta
-      const meta = await getWorldStore().getWorldMeta();
-      if (!meta) return false;
 
       const { rx: _currentRx, rz: _currentRz } = this._chunkToRegion(
         Math.floor(playerX / CHUNK_SIZE),
@@ -515,11 +514,18 @@ export class WorldGenerationService {
         maxZ: (currentMaxRz + (directions.includes('south') ? expandRegions : 0) + 1) * this._regionSizeInChunks * CHUNK_SIZE - 1
       };
 
+      console.log(`[WorldGenerationService] Starting world expansion: ${directions.join(', ')}`);
+      this._world.worldBoundsController.startExpansion(directions, newBounds);
+      meta.expandTargetBounds = { ...newBounds };
+      await getWorldStore().saveWorldMeta(meta);
+
       this._world.worldBoundsController.finishExpansion(newBounds);
       meta.generatedBounds = { ...newBounds };
       meta.safeBounds = { ...newBounds };
       meta.expandTargetBounds = { ...newBounds };
       await getWorldStore().saveWorldMeta(meta);
+      this._world.applyWorldMeta?.(meta);
+      this._world.onExpansionFinished?.(newBounds);
 
       console.log(`[WorldGenerationService] World expansion complete: ${completed} regions`);
       return true;

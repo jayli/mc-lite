@@ -279,6 +279,7 @@ export class PlayerInteraction {
    * @returns {boolean} 是否成功放置
    */
   tryPlaceBlock(x, y, z, type) {
+    const worldAccess = this.player.world.worldAccessLayer;
     // 通过实体注册表检查是否为特殊方块
     const game = this.player.game;
     if (game?.entityRegistry?.isSpecialBlock(type)) {
@@ -304,7 +305,7 @@ export class PlayerInteraction {
     const orientation = this.getPlacementOrientation(x, y, z, type);
     // 放置后清除移除记忆
     this.clearRemovedBlock();
-    this.player.world.setBlock(x, y, z, type, orientation);
+    worldAccess?.setBlock?.(x, y, z, type, { orientation });
     this.player.inventory.remove(type, 1);
     audioManager.playSound('put', 0.3);
     return true;
@@ -318,6 +319,7 @@ export class PlayerInteraction {
    * @returns {boolean} 是否成功放置
    */
   tryPlaceBed(x, y, z) {
+    const worldAccess = this.player.world.worldAccessLayer;
     // 计算玩家面向方向，确定床尾位置
     const playerPos = this.player.position;
     const dx = playerPos.x - (x + 0.5);
@@ -357,10 +359,10 @@ export class PlayerInteraction {
     }
 
     // 放置床头
-    this.player.world.setBlock(x, y, z, 'bed_head', 0);
-
-    // 放置床尾
-    this.player.world.setBlock(tailX, y, tailZ, 'bed_tail', 0);
+    worldAccess?.applyBatchEdits?.([
+      { x, y, z, type: 'bed_head', orientation: 0 },
+      { x: tailX, y, z: tailZ, type: 'bed_tail', orientation: 0 }
+    ]);
 
     // 消耗物品并播放音效
     this.player.inventory.remove('bed_alias_block', 1);
@@ -443,6 +445,7 @@ export class PlayerInteraction {
    * @param {boolean} isHandBreak - 是否是徒手破坏
    */
   removeBlock(hit, isHandBreak = false) {
+    const worldAccess = this.player.world.worldAccessLayer;
     let m = hit.object;
     while (m && !m.userData.isEntity && !m.userData.type && m.parent && !m.isInstancedMesh && m.type !== 'Scene') m = m.parent;
     const type = m.userData.type || 'unknown';
@@ -480,7 +483,7 @@ export class PlayerInteraction {
       } else {
         this.player.spawnParticles(this.player._tempVector, entry.type);
       }
-      this.player.world.removeBlock(resolvedHit.x, resolvedHit.y, resolvedHit.z);
+      worldAccess?.removeBlock?.(resolvedHit.x, resolvedHit.y, resolvedHit.z);
       audioManager.playSound('delete_get', 0.3);
       if (entry.type !== 'water' && entry.type !== 'cloud') {
         this.player.inventory.add(entry.type === 'grass' ? 'dirt' : entry.type, 1);
@@ -548,7 +551,7 @@ export class PlayerInteraction {
       } else {
         this.player.spawnParticles(this.player._tempVector, targetType || type);
       }
-      this.player.world.removeBlock(finalBx, finalBy, finalBz);
+      worldAccess?.removeBlock?.(finalBx, finalBy, finalBz);
       audioManager.playSound('delete_get', 0.3);
       if (type !== 'water' && type !== 'cloud') this.player.inventory.add(type === 'grass' ? 'dirt' : type, 1);
     } else {
@@ -562,7 +565,7 @@ export class PlayerInteraction {
           this.player.spawnParticles(m.position, type || 'stone');
         }
         if (type === 'chest') {
-          this.player.world.removeBlock(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z));
+          worldAccess?.removeBlock?.(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z));
           this.player.inventory.add('chest', 1);
           audioManager.playSound('delete_get', 0.3);
         }
@@ -573,7 +576,7 @@ export class PlayerInteraction {
         if (entry) {
           this.recordRemovedBlock(bx, by, bz, entry.type, entry.orientation);
         }
-        this.player.world.removeBlock(bx, by, bz);
+        worldAccess?.removeBlock?.(bx, by, bz);
         audioManager.playSound('delete_get', 0.3);
         // 徒手破坏时使用新的破碎特效，否则使用原有粒子特效
         if (isHandBreak) {
@@ -609,7 +612,7 @@ export class PlayerInteraction {
         if (this.player.ignitingTNTs.has(key)) return;
         this.player.ignitingTNTs.add(key);
         setTimeout(() => {
-          this.player.world.removeBlock(tnt.x, tnt.y, tnt.z);
+          worldAccess?.removeBlock?.(tnt.x, tnt.y, tnt.z);
           this.player.ignitingTNTs.delete(key);
           this.explode(tnt.x, tnt.y, tnt.z);
         }, tnt.delay);
@@ -675,7 +678,7 @@ export class PlayerInteraction {
   explode(x, y, z) {
     const bx = Math.floor(x), by = Math.floor(y), bz = Math.floor(z);
     if (this.player.world.getBlock(bx, by, bz) === 'tnt') {
-      this.player.world.removeBlock(bx, by, bz);
+      worldAccess?.removeBlock?.(bx, by, bz);
       this.player.ignitingTNTs.delete(`${bx},${by},${bz}`);
     }
     const nearbyDeltas = {};

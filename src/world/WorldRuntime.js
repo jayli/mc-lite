@@ -26,6 +26,7 @@ export class WorldRuntime {
   constructor(options = {}) {
     this._regionCache = new RegionCache(options.regionCache || {});
     this._dirtyChunks = new Map(); // "cx,cz" -> { cx, cz, dirty: true, pendingFlush: false }
+    this._flushTimers = new Map(); // "cx,cz" -> timeout id
     this._world = null; // World 实例引用，在 World 初始化后注入
     this._regionSizeInChunks = REGION_SIZE_IN_CHUNKS;
     this._flushing = false;
@@ -65,7 +66,7 @@ export class WorldRuntime {
    *
    * @param {number} cx
    * @param {number} cz
-   * @returns {Promise<object|null>} chunkRecord { blockData, staticEntities, runtimeSeedData }
+   * @returns {Promise<object>} { status, chunkRecord? }
    */
   async ensureChunkData(cx, cz) {
     const { rx, rz } = this._chunkToRegion(cx, cz);
@@ -83,17 +84,24 @@ export class WorldRuntime {
     }
 
     // 3. 从 RegionRecord 中切出目标 chunk
-    if (!region || !region.chunks) return null;
+    if (!region || !region.chunks) {
+      return { status: 'missing-region' };
+    }
     const chunkKey = this._chunkKey(cx, cz);
     const chunkData = region.chunks[chunkKey];
-    if (!chunkData) return null;
+    if (!chunkData) {
+      return { status: 'missing-chunk' };
+    }
 
     return {
-      cx,
-      cz,
-      blockData: chunkData.blockData || {},
-      staticEntities: chunkData.staticEntities || [],
-      runtimeSeedData: chunkData.runtimeSeedData || {}
+      status: 'ready',
+      chunkRecord: {
+        cx,
+        cz,
+        blockData: chunkData.blockData || {},
+        staticEntities: chunkData.staticEntities || [],
+        runtimeSeedData: chunkData.runtimeSeedData || {}
+      }
     };
   }
 
@@ -125,6 +133,7 @@ export class WorldRuntime {
     if (!this._dirtyChunks.has(key)) {
       this._dirtyChunks.set(key, { cx, cz, dirty: true, pendingFlush: false });
     }
+    this._scheduleFlush(cx, cz);
   }
 
   /**
@@ -161,6 +170,7 @@ export class WorldRuntime {
     const key = this._chunkKey(cx, cz);
     const dirtyEntry = this._dirtyChunks.get(key);
     if (!dirtyEntry) return;
+    this._clearScheduledFlush(cx, cz);
 
     // 获取当前 chunk 的 runtime blockData
     const chunk = this._world?.chunks?.get(key);
@@ -179,6 +189,7 @@ export class WorldRuntime {
     } catch (error) {
       console.error(`[WorldRuntime] Failed to flush chunk ${key}:`, error);
       dirtyEntry.pendingFlush = false;
+      this._scheduleFlush(cx, cz);
     }
   }
 
@@ -249,6 +260,7 @@ export class WorldRuntime {
    * @param {number} cz
    */
   async flushBeforeUnload(cx, cz) {
+    this._clearScheduledFlush(cx, cz);
     if (this.isChunkDirty(cx, cz)) {
       await this.flushChunk(cx, cz);
     }
@@ -303,6 +315,27 @@ export class WorldRuntime {
       return obj;
     }
     return blockData;
+  }
+
+  _scheduleFlush(cx, cz, delayMs = 500) {
+    const key = this._chunkKey(cx, cz);
+    this._clearScheduledFlush(cx, cz);
+    const timer = globalThis.setTimeout(() => {
+      this._flushTimers.delete(key);
+      this.flushChunk(cx, cz).catch((error) => {
+        console.error(`[WorldRuntime] Debounced flush failed for ${key}:`, error);
+      });
+    }, delayMs);
+    this._flushTimers.set(key, timer);
+  }
+
+  _clearScheduledFlush(cx, cz) {
+    const key = this._chunkKey(cx, cz);
+    const timer = this._flushTimers.get(key);
+    if (timer) {
+      globalThis.clearTimeout(timer);
+      this._flushTimers.delete(key);
+    }
   }
 
   /**

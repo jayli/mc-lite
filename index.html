@@ -245,11 +245,13 @@ import { Game } from './src/core/Game.js';
                   const loadingSubtext = loadingModal?.querySelector('.game-loading-subtext');
                   if (loadingSubtext) loadingSubtext.textContent = '正在预生成世界...';
 
-                  await game.world.worldGenerationService.generateInitialWorld({
+                  const worldMeta = await game.world.worldGenerationService.generateInitialWorld({
                     spawnX: 0,
                     spawnZ: 0,
                     forceReset: true
                   });
+
+                  game.world.applyWorldMeta?.(worldMeta);
 
                   // 预生成完成，直接解锁 gameplay
                   game.world.bootstrapState.phase = 'runtime-streaming';

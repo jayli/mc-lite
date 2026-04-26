@@ -102,6 +102,8 @@ export class Chunk {
     this.isReady = false;
     this.loadState = 'created';
     this.spawnReason = world?.bootstrapState?.phase === 'runtime-streaming' ? 'runtime-streaming' : 'bootstrap';
+    this.awaitingStoreRecord = this.spawnReason === 'runtime-streaming';
+    this.needsStoreRetry = this.spawnReason === 'runtime-streaming';
     this.hasPlayerMutations = false;
     this.deletedBlockTombstones = new Set();
     this.queuedAssemblyStages = new Set();
@@ -278,11 +280,14 @@ export class Chunk {
    */
   async loadFromRecord(chunkRecord) {
     if (!chunkRecord) {
-      // 没有权威数据，回退到 gen() 路径
-      this.gen();
+      this.awaitingStoreRecord = true;
+      this.needsStoreRetry = true;
+      this.loadState = 'awaiting-store-record';
       return;
     }
 
+    this.awaitingStoreRecord = false;
+    this.needsStoreRetry = false;
     this.loadState = 'loading-from-record';
 
     // 1. 注入 blockData

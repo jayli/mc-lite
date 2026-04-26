@@ -1041,6 +1041,32 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('removeBlock - runtime-streaming 下应标记对应 chunk 为脏', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.setBlock(5, 10, 5, 'stone', 0);
+    world.bootstrapState.phase = 'runtime-streaming';
+
+    const dirtyCalls = [];
+    world.worldRuntime = {
+      markChunkDirty(cx, cz) {
+        dirtyCalls.push(`${cx},${cz}`);
+      }
+    };
+
+    world.removeBlock(5, 10, 5);
+
+    assertEqual(dirtyCalls.length, 1, '删除方块后应标记一次脏 chunk');
+    assertEqual(dirtyCalls[0], '0,0', '应标记坐标所属 chunk');
+
+    teardownEnvironment();
+  });
+
   test('removeBlock - 移除不存在的方块', async () => {
     setupEnvironment();
 

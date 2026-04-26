@@ -48,6 +48,11 @@ export class WorldAccessLayer {
     const world = this._world;
     if (!world) return null;
 
+    const specialCollision = world.getSpecialEntityCollision?.(x, y, z);
+    if (specialCollision) {
+      return { type: 'collider', orientation: 0 };
+    }
+
     const chunk = world._getChunkAt?.(x, z);
     if (!chunk) return null;
 
@@ -86,7 +91,9 @@ export class WorldAccessLayer {
 
     const chunk = world._getChunkAt?.(x, z);
     if (!chunk) {
-      // chunk 未加载，回退到 world 层面的 solidBlocks 索引
+      if (world.bootstrapState?.phase === 'runtime-streaming') {
+        return false;
+      }
       return world.isSolidFallback?.(x, y, z) || false;
     }
 
@@ -170,15 +177,16 @@ export class WorldAccessLayer {
 
     const orientation = options.orientation || 0;
     const entry = typeof type === 'object' ? type : { type, orientation };
+    const nextType = typeof type === 'object' ? type.type : type;
 
-    // 直接修改 runtime blockData
-    chunk._updateBlockState?.(x, y, z, type, entry);
+    chunk.markPlayerMutation?.();
+    chunk.addBlockDynamic?.(x, y, z, entry, orientation);
 
     // 标记 chunk 为脏，异步写回
     world.worldRuntime?.markChunkDirty(chunk.cx, chunk.cz);
 
-    // 触发渲染更新
-    world.onBlockChanged?.(chunk, x, y, z, type, entry);
+    world.clearBlockLookupCaches?.();
+    world.requestShadowMapUpdate?.(nextType === 'air' ? 'remove-block' : 'set-block');
   }
 
   /**
@@ -201,22 +209,36 @@ export class WorldAccessLayer {
     const world = this._world;
     if (!world) return;
 
-    const dirtyChunks = new Set();
+    const chunkGroups = new Map();
 
     for (const edit of edits) {
       const chunk = world._getChunkAt?.(edit.x, edit.z);
       if (!chunk) continue;
-
-      const entry = { type: edit.type, orientation: edit.orientation || 0 };
-      chunk._updateBlockState?.(edit.x, edit.y, edit.z, edit.type, entry);
-      dirtyChunks.add(`${chunk.cx},${chunk.cz}`);
+      const key = `${chunk.cx},${chunk.cz}`;
+      if (!chunkGroups.has(key)) {
+        chunkGroups.set(key, { chunk, blocks: [] });
+      }
+      chunkGroups.get(key).blocks.push({
+        x: edit.x,
+        y: edit.y,
+        z: edit.z,
+        type: edit.type,
+        orientation: edit.orientation || 0
+      });
     }
 
-    // 批量标记脏
-    for (const key of dirtyChunks) {
+    for (const [key, group] of chunkGroups) {
+      group.chunk.markPlayerMutation?.();
+      group.chunk.addBlocksBatchFast?.(group.blocks, {
+        deferConsolidation: false,
+        replaceExisting: true
+      });
       const [cx, cz] = key.split(',').map(Number);
       world.worldRuntime?.markChunkDirty(cx, cz);
     }
+
+    world.clearBlockLookupCaches?.();
+    world.requestShadowMapUpdate?.('apply-batch-edits');
   }
 
   // ============================================================

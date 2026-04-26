@@ -121,18 +121,9 @@ export class WorldBoundsController {
    * @returns {boolean} true = 应阻挡
    */
   shouldBlockMovement(fromX, fromZ, toX, toZ) {
-    // 起点已经在安全边界内 → 允许移动
-    if (this.isInsideSafeBounds(fromX, fromZ)) {
-      return false;
-    }
-
-    // 起点和终点都在安全边界外 → 阻挡
-    if (!this.isInsideSafeBounds(toX, toZ)) {
-      return true;
-    }
-
-    // 起点在外、终点在内 → 允许进入
-    return false;
+    void fromX;
+    void fromZ;
+    return !this.isInsideSafeBounds(toX, toZ);
   }
 
   // ============================================================
@@ -189,9 +180,12 @@ export class WorldBoundsController {
    * 标记开始扩图
    * @param {Array<string>} directions - 扩图方向
    */
-  startExpansion(directions) {
+  startExpansion(directions, targetBounds = null) {
     this._isExpanding = true;
     this._expansionDirection = directions;
+    if (targetBounds) {
+      this.expandTargetBounds = { ...targetBounds };
+    }
   }
 
   /**
