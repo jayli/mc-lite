@@ -14,6 +14,12 @@ import { ChunkAssemblyScheduler } from './ChunkAssemblyScheduler.js';
 import { RuntimeIdleScheduler } from './RuntimeIdleScheduler.js';
 import { recordChunkPerf } from '../utils/ChunkPerfMonitor.js';
 import { GlobalInstancedMeshManager } from '../core/GlobalInstancedMeshManager.js';
+// WorldStore 新架构
+import { WorldRuntime } from './WorldRuntime.js';
+import { WorldAccessLayer } from './WorldAccessLayer.js';
+import { WorldBoundsController } from './WorldBoundsController.js';
+import { WorldGenerationService } from './WorldGenerationService.js';
+import { worldStore } from './WorldStore.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
@@ -160,6 +166,15 @@ export class World {
     // 方块分发管理器
     this.scatterManager = new BlockScatterManager(this);
     this._registerRuntimeIdleTasks();
+
+    // --- WorldStore 新架构初始化 ---
+    this.worldStore = worldStore;
+    this.worldRuntime = new WorldRuntime();
+    this.worldRuntime.setWorld(this);
+    this.worldAccessLayer = new WorldAccessLayer(this);
+    this.worldBoundsController = new WorldBoundsController();
+    this.worldGenerationService = new WorldGenerationService();
+    this.worldGenerationService.setWorld(this);
   }
 
   /**
@@ -215,6 +230,35 @@ export class World {
 
   getRenderDistance() {
     return this.renderDistance;
+  }
+
+  /**
+   * 获取指定坐标所属的 chunk（辅助方法，供 WorldAccessLayer 使用）
+   * @param {number} x
+   * @param {number} z
+   * @returns {Chunk|null}
+   */
+  _getChunkAt(x, z) {
+    const cx = Math.floor(x / CHUNK_SIZE);
+    const cz = Math.floor(z / CHUNK_SIZE);
+    return this.chunks.get(`${cx},${cz}`) || null;
+  }
+
+  /**
+   * 方块变更后的回调（供 WorldAccessLayer 调用）
+   * 触发渲染更新、AO 刷新等
+   */
+  onBlockChanged(chunk, x, y, z, type, entry) {
+    if (type === 'air') {
+      // 移除方块：调用 Chunk 的动态删除
+      chunk?.removeBlockDynamic?.(x, y, z);
+    } else {
+      // 放置方块：Chunk 已通过 _updateBlockState 更新 blockData
+      // 这里触发渲染挂载
+      chunk?.addBlockDynamic?.(x, y, z, entry, entry?.orientation || 0);
+    }
+    this.clearBlockLookupCaches();
+    this.requestShadowMapUpdate('block-changed');
   }
 
   getDeferredCrossChunkPatchStats() {
@@ -642,6 +686,16 @@ export class World {
     let chunkTopologyChanged = false;
     this._lastPlayerPos.copy(playerPos);
 
+    // --- 边界控制：接近边缘时触发后台扩图 ---
+    if (this.bootstrapState.phase === 'runtime-streaming' && this.worldGenerationService) {
+      this.worldGenerationService.expandWorldIfNeeded({
+        playerX: playerPos.x,
+        playerZ: playerPos.z
+      }).catch(err => {
+        console.error('[World] World expansion failed:', err);
+      });
+    }
+
     // 计算玩家所在的区块坐标
     const cx = Math.floor(playerPos.x / CHUNK_SIZE);
     const cz = Math.floor(playerPos.z / CHUNK_SIZE);
@@ -657,6 +711,20 @@ export class World {
           this.chunks.set(key, chunk);
           this.scene.add(chunk.group);
           chunkTopologyChanged = true;
+
+          // runtime-streaming 阶段：尝试从 WorldStore 纯装载
+          if (this.bootstrapState.phase === 'runtime-streaming' && this.worldRuntime) {
+            this.worldRuntime.ensureChunkData(cx + i, cz + j).then((chunkRecord) => {
+              if (chunkRecord && !chunk.disposed) {
+                chunk.loadFromRecord(chunkRecord);
+              }
+            }).catch(() => {
+              // WorldStore 没有数据，回退到 gen() 路径
+              if (!chunk.disposed && !chunk.isReady) {
+                chunk.gen();
+              }
+            });
+          }
         }
       }
     }
@@ -673,7 +741,12 @@ export class World {
         this.scatterManager?.unloadChunk(key);
         this.scene.remove(chunk.group);
         // 重要：在卸载前请求持久化，确保修改不丢失
-        getPersistenceService().saveChunkData(chunk.cx, chunk.cz);
+        // runtime-streaming 阶段：通过 WorldRuntime 异步写回
+        if (this.bootstrapState.phase === 'runtime-streaming' && this.worldRuntime) {
+          this.worldRuntime.flushBeforeUnload(chunk.cx, chunk.cz).catch(() => {});
+        } else {
+          getPersistenceService().saveChunkData(chunk.cx, chunk.cz);
+        }
         // 清理待处理的 Face Culling 更新
         chunk.pendingBatchFaceCullingUpdates?.clear();
         if (chunk.batchFaceCullingTimer) {
@@ -860,6 +933,11 @@ export class World {
       if (chunk) {
         chunk.markPlayerMutation?.();
         chunk.removeBlocksBatch(chunkPosList, isBatch);
+      }
+      // runtime-streaming 阶段：标记 chunk 为脏，异步写回
+      if (this.bootstrapState.phase === 'runtime-streaming' && this.worldRuntime) {
+        const [cx, cz] = key.split(',').map(Number);
+        this.worldRuntime.markChunkDirty(cx, cz);
       }
     }
 
@@ -1161,6 +1239,15 @@ export class World {
   }
 
   /**
+   * 当 chunk 未加载时，isSolid 的回退查询
+   * 供 WorldAccessLayer 使用
+   */
+  isSolidFallback(x, y, z) {
+    const h = Math.floor(noise(x, z, 0.08) + noise(x, z, 0.02) * 3);
+    return y <= h;
+  }
+
+  /**
    * 获取指定世界坐标的方块类型名称
    * @param {number} x - 世界坐标 X
    * @param {number} y - 世界坐标 Y
@@ -1238,6 +1325,12 @@ export class World {
     // 逻辑委托：调用区块的动态添加方法，处理网格生成和邻居面更新
     chunk.markPlayerMutation?.();
     chunk.addBlockDynamic(x, y, z, typeOrEntry, orientation);
+
+    // runtime-streaming 阶段：标记 chunk 为脏，异步写回
+    if (this.bootstrapState.phase === 'runtime-streaming' && this.worldRuntime) {
+      this.worldRuntime.markChunkDirty(cx, cz);
+    }
+
     this.clearBlockLookupCaches();
     this.requestShadowMapUpdate('set-block');
   }

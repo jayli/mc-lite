@@ -240,6 +240,23 @@ import { Game } from './src/core/Game.js';
                 const game = new Game();
                 if (saveData) {
                   await game.applySaveData(saveData);
+                } else {
+                  // 新世界：阻塞预生成初始世界
+                  const loadingSubtext = loadingModal?.querySelector('.game-loading-subtext');
+                  if (loadingSubtext) loadingSubtext.textContent = '正在预生成世界...';
+
+                  await game.world.worldGenerationService.generateInitialWorld({
+                    spawnX: 0,
+                    spawnZ: 0,
+                    forceReset: true
+                  });
+
+                  // 预生成完成，直接解锁 gameplay
+                  game.world.bootstrapState.phase = 'runtime-streaming';
+                  game.world.bootstrapState.targetChunkKeys.clear();
+                  game.world.bootstrapState.finalizedChunkKeys.clear();
+
+                  if (loadingSubtext) loadingSubtext.textContent = '正在生成世界，请稍候';
                 }
                 game.start();
                 window.game = game;

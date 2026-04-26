@@ -254,7 +254,179 @@ export class Chunk {
     this.saveTimeout = null;
 
     // 启动区块生成
-    this.gen();
+    // 注意：runtime-streaming 阶段不再隐式调 gen()，由 World 显式控制装载路径
+    if (world?.bootstrapState?.phase !== 'runtime-streaming') {
+      this.gen();
+    }
+  }
+
+  // ============================================================
+  // 纯装载路径：从 ChunkRecord 装载数据（不调用 gen()）
+  // ============================================================
+
+  /**
+   * 从权威 ChunkRecord 装载数据（纯装载，不生成地形）
+   *
+   * 流程：
+   * 1. 注入 blockData（从 IndexedDB 读取的权威数据）
+   * 2. 重建 blockDataArray / blockPalette / solidBlocks / solidBlockIds
+   * 3. 发送 build-chunk-mesh 给 Worker
+   * 4. Worker 返回 visibleKeys + meshData
+   * 5. 主线程挂载渲染
+   *
+   * @param {object} chunkRecord - { blockData, staticEntities, runtimeSeedData }
+   */
+  async loadFromRecord(chunkRecord) {
+    if (!chunkRecord) {
+      // 没有权威数据，回退到 gen() 路径
+      this.gen();
+      return;
+    }
+
+    this.loadState = 'loading-from-record';
+
+    // 1. 注入 blockData
+    if (chunkRecord.blockData) {
+      this._injectBlockData(chunkRecord.blockData);
+    }
+
+    // 2. 注入静态实体
+    if (chunkRecord.staticEntities?.length > 0) {
+      this._injectStaticEntities(chunkRecord.staticEntities);
+    }
+
+    // 3. 注入结构中心
+    if (chunkRecord.runtimeSeedData?.structureCenters) {
+      this.structureCenters = chunkRecord.runtimeSeedData.structureCenters;
+    }
+
+    // 4. 标记快照已加载
+    this.pendingSnapshot = {
+      blocks: { ...chunkRecord.blockData },
+      entities: { modGunMan: [], rovers: [] }
+    };
+
+    // 5. 直接从 blockData 构建 mesh（跳过 scatter，预生成阶段已完成打散）
+    this.loadState = 'terrain-built';
+    this._buildMeshFromExistingBlockData();
+    this.isReady = true;
+    this.world?.onChunkWorkerReady?.(this);
+  }
+
+  /**
+   * 注入 blockData 并重建所有派生结构
+   */
+  _injectBlockData(blockData) {
+    // 清空现有数据
+    this.blockData.clear();
+    this.blockDataArray.fill(0);
+    this.blockPalette.clear();
+    this.blockPaletteReverse.clear();
+    this.solidBlocks.clear();
+    this.solidBlockIds.clear();
+    this.nextBlockId = 1;
+
+    // 注入新数据
+    for (const [key, entry] of Object.entries(blockData)) {
+      const code = Number(key);
+      const decoded = Chunk.decodeCoord(code);
+      const type = typeof entry === 'string' ? entry : entry.type;
+      const orientation = typeof entry === 'object' ? (entry.orientation || 0) : 0;
+
+      this.blockData.set(code, entry);
+
+      const props = getBlockProps(type);
+      if (props?.isSolid) {
+        this.solidBlocks.add(code);
+      }
+
+      // 尝试填充 blockDataArray（仅 Y:0~15）
+      const blockIndex = this._getBlockIndex(decoded.x, decoded.y, decoded.z);
+      if (blockIndex >= 0 && type !== 'air') {
+        const blockEntry = typeof entry === 'string' ? entry : { type, orientation };
+        const blockId = this._getOrCreateBlockId(blockEntry);
+        this.blockDataArray[blockIndex] = blockId;
+        if (props?.isSolid) {
+          this.solidBlockIds.add(blockId);
+        }
+      }
+    }
+  }
+
+  /**
+   * 注入静态实体
+   */
+  _injectStaticEntities(entities) {
+    for (const entity of entities) {
+      if (entity.type === 'modGunMan' && entity.positions) {
+        this.entities.modGunMan.push(...entity.positions);
+      }
+      if (entity.type === 'rovers' && entity.positions) {
+        this.entities.rovers.push(...entity.positions);
+      }
+    }
+  }
+
+  /**
+   * 从已有的 blockData 直接构建 mesh（跳过 scatter 流程）
+   *
+   * 用于 loadFromRecord 纯装载路径：预生成阶段已完成方块打散，
+   * ChunkRecord 的 blockData 就是最终归属数据，不需要再走 BlockScatterManager。
+   */
+  _buildMeshFromExistingBlockData() {
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
+    const cx = this.cx;
+    const cz = this.cz;
+    const minX = cx * CHUNK_SIZE;
+    const minZ = cz * CHUNK_SIZE;
+
+    // 1. 从 blockData 构建方块列表
+    // 注意：预生成阶段的跨 region overflow 回退机制会将相邻 chunk 的方块
+    // 保留在源 chunk 的 blockData 中（"借用"渲染），所以不能严格限制方块
+    // 必须在本 chunk 范围内。保留相邻 chunk 的方块用于正确渲染跨 region 结构。
+    const blocks = [];
+    for (const [code, entry] of this.blockData) {
+      const decoded = Chunk.decodeCoord(Number(code));
+      const localX = decoded.x - minX;
+      const localZ = decoded.z - minZ;
+
+      // 允许本 chunk 及相邻 chunk 的方块（跨 region 回退场景）
+      // 但限制在合理范围内，防止远处方块被错误渲染
+      const neighborTolerance = 1; // 允许相邻 1 个 chunk 的溢出
+      if (localX < -CHUNK_SIZE * neighborTolerance || localX >= CHUNK_SIZE * (1 + neighborTolerance) ||
+          localZ < -CHUNK_SIZE * neighborTolerance || localZ >= CHUNK_SIZE * (1 + neighborTolerance)) {
+        continue;
+      }
+
+      const type = typeof entry === 'string' ? entry : entry.type;
+      if (type === 'air') continue;
+
+      const orientation = typeof entry === 'object' ? (entry.orientation || 0) : 0;
+      blocks.push({ x: decoded.x, y: decoded.y, z: decoded.z, type, orientation });
+    }
+
+    // 2. 按类型分组，计算可见性和 AO
+    const meshData = this._convertScatteredBlocksToMeshData(blocks, null, this.structureCenters || []);
+    const t1 = globalThis.performance?.now?.() ?? Date.now();
+
+    // 3. 构建 visibleKeys（所有非空气方块）
+    this.visibleKeys.clear();
+    for (const block of blocks) {
+      this.visibleKeys.add(Chunk.encodeCoord(block.x, block.y, block.z));
+    }
+
+    // 4. 构建 mesh
+    this.buildMeshes(meshData);
+    const t2 = globalThis.performance?.now?.() ?? Date.now();
+
+    recordChunkPerf('chunk.load-from-record', t2 - t0, {
+      chunkKey: `${cx},${cz}`,
+      blockDataSize: this.blockData.size,
+      blockCount: blocks.length,
+      meshGroups: meshData?.length || 0,
+      convertMeshDataMs: t1 - t0,
+      buildMeshesMs: t2 - t1
+    });
   }
 
   // ============================================================

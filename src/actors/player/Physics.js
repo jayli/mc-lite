@@ -75,6 +75,23 @@ export class Physics {
   }
 
   /**
+   * 检查移动是否被世界硬边界阻挡
+   * @param {number} nextX - 目标 X
+   * @param {number} nextZ - 目标 Z
+   * @returns {boolean} true = 被阻挡，不可移动
+   */
+  isMovementBlockedByWorldBounds(nextX, nextZ) {
+    const world = this.world;
+    if (!world?.worldBoundsController) return false;
+    return world.worldBoundsController.shouldBlockMovement(
+      this.player.position.x,
+      this.player.position.z,
+      nextX,
+      nextZ
+    );
+  }
+
+  /**
    * 检查指定位置是否有矿车，并返回矿车对象
    * @param {number} x - X 坐标
    * @param {number} y - Y 坐标（用于检测矿车所在格子）
