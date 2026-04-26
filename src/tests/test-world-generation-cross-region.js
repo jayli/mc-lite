@@ -1,5 +1,5 @@
 import { describe } from './runner.js';
-import { assertEqual, assertFalse, assertNotNull, assertTrue, assertUndefined } from './assert.js';
+import { assertDeepEqual, assertEqual, assertFalse, assertNotNull, assertTrue, assertUndefined } from './assert.js';
 import { WorldGenerationService } from '../world/WorldGenerationService.js';
 import { workerCallbacks } from '../world/ChunkConsolidation.js';
 import { encodeCoord } from '../utils/CoordEncoding.js';
@@ -49,6 +49,71 @@ function createTestWorldWorker() {
 }
 
 describe('WorldGenerationService 跨 region owner 归属测试', (test) => {
+  test('_mergeOverflowBlocks - 应返回可诊断的 unresolved overflow 摘要', () => {
+    const service = new WorldGenerationService();
+    const chunkResults = {
+      '0,0': {
+        blockData: {},
+        routing: {
+          overflowChunks: [{
+            chunkKey: '2,0',
+            blockDataBlocks: [
+              { x: 32, y: 5, z: 0, type: 'stone', orientation: 0 },
+              { x: 32, y: 5, z: 0, type: 'stone', orientation: 0 },
+              { x: 33, y: 5, z: 0, type: 'stone', orientation: 0 }
+            ]
+          }, {
+            chunkKey: '0,2',
+            blockDataBlocks: [
+              { x: 0, y: 6, z: 32, type: 'wood', orientation: 0 }
+            ]
+          }]
+        }
+      },
+      '1,0': {
+        blockData: {},
+        routing: {
+          overflowChunks: [{
+            chunkKey: '3,0',
+            blockDataBlocks: [
+              { x: 48, y: 7, z: 0, type: 'glass_block', orientation: 0 }
+            ]
+          }]
+        }
+      }
+    };
+
+    const diagnostics = service._mergeOverflowBlocks(chunkResults);
+
+    assertEqual(diagnostics.unresolved.rawBlocks, 5, '应统计原始 unresolved block 数');
+    assertEqual(diagnostics.unresolved.uniqueCoords, 4, '应统计去重后的 unresolved 坐标数');
+    assertDeepEqual(
+      diagnostics.unresolved.topTargetChunks,
+      [
+        { chunkKey: '2,0', blocks: 3 },
+        { chunkKey: '0,2', blocks: 1 },
+        { chunkKey: '3,0', blocks: 1 }
+      ],
+      '应统计 unresolved 目标 chunk 热点'
+    );
+    assertDeepEqual(
+      diagnostics.unresolved.topSourceChunks,
+      [
+        { chunkKey: '0,0', blocks: 4 },
+        { chunkKey: '1,0', blocks: 1 }
+      ],
+      '应统计 unresolved 来源 chunk 热点'
+    );
+    assertDeepEqual(
+      diagnostics.unresolved.topDistanceBuckets,
+      [
+        { offset: '2,0', blocks: 4 },
+        { offset: '0,2', blocks: 1 }
+      ],
+      '应统计 unresolved chunk 偏移分布'
+    );
+  });
+
   test('generateRegion - 源 region 不应借用保存越界方块', async () => {
     const savedRegions = [];
     globalThis._worldStore = {

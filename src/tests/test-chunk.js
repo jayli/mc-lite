@@ -50,6 +50,39 @@ class MockWorldWorker {
 // 模拟 persistenceService
 const mockPersistenceService = {
   calls: [],
+  _worldMeta: null,
+  _regions: new Map(),
+  reset() {
+    this.calls = [];
+    this._worldMeta = null;
+    this._regions.clear();
+  },
+  async postMessage(action, payload = {}) {
+    switch (action) {
+      case 'getWorldMeta':
+        return this._worldMeta;
+      case 'saveWorldMeta':
+        this._worldMeta = payload.meta || null;
+        return true;
+      case 'getRegionRecord':
+        return this._regions.get(payload.regionKey) || null;
+      case 'saveRegionRecord':
+        this._regions.set(payload.regionKey, payload.record);
+        return true;
+      case 'saveRegionRecordsBatch':
+        for (const item of payload.records || []) {
+          this._regions.set(item.regionKey, item.record);
+        }
+        return true;
+      case 'getAllRegionKeys':
+        return Array.from(this._regions.keys());
+      case 'clearWorld':
+        this.reset();
+        return true;
+      default:
+        return null;
+    }
+  },
   recordChange: (...args) => {
     mockPersistenceService.calls.push({ method: 'recordChange', args });
   },
@@ -116,18 +149,25 @@ describe('Chunk 真实类测试', (test) => {
     globalThis._blockData = mockBlockData;
     globalThis._carModel = new THREE.Group();
     globalThis._gunManModel = new THREE.Group();
-    mockPersistenceService.calls = [];
+    mockPersistenceService.reset();
   };
 
   // 恢复原始环境
   const teardownEnvironment = () => {
-    if (originalWorker) globalThis.Worker = originalWorker;
-    if (originalPersistenceService) globalThis._persistenceService = originalPersistenceService;
-    if (originalFaceCullingSystem) globalThis._faceCullingSystem = originalFaceCullingSystem;
-    if (originalMaterials) globalThis._materials = originalMaterials;
-    if (originalBlockData) globalThis._blockData = originalBlockData;
-    if (originalCarModel) globalThis._carModel = originalCarModel;
-    if (originalGunManModel) globalThis._gunManModel = originalGunManModel;
+    if (originalWorker === undefined) delete globalThis.Worker;
+    else globalThis.Worker = originalWorker;
+    if (originalPersistenceService === undefined) delete globalThis._persistenceService;
+    else globalThis._persistenceService = originalPersistenceService;
+    if (originalFaceCullingSystem === undefined) delete globalThis._faceCullingSystem;
+    else globalThis._faceCullingSystem = originalFaceCullingSystem;
+    if (originalMaterials === undefined) delete globalThis._materials;
+    else globalThis._materials = originalMaterials;
+    if (originalBlockData === undefined) delete globalThis._blockData;
+    else globalThis._blockData = originalBlockData;
+    if (originalCarModel === undefined) delete globalThis._carModel;
+    else globalThis._carModel = originalCarModel;
+    if (originalGunManModel === undefined) delete globalThis._gunManModel;
+    else globalThis._gunManModel = originalGunManModel;
   };
 
   // =========== 基础状态测试 ===========

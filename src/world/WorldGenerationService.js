@@ -237,7 +237,7 @@ export class WorldGenerationService {
 
     // 合并 overflow 方块：Worker 生成的方块可能落在相邻 chunk，
     // 需要按坐标归属分发到正确的 chunk 中
-    this._mergeOverflowBlocks(chunkResults);
+    this._mergeOverflowBlocks(chunkResults, { regionKey });
 
     // 构建 RegionRecord：只持久化核心 region 的 owner chunk。
     for (const [chunkKey, result] of Object.entries(chunkResults)) {
@@ -317,10 +317,25 @@ export class WorldGenerationService {
    *
    * @param {Object} chunkResults - { chunkKey: { blockData, routing, ... } }
    */
-  _mergeOverflowBlocks(chunkResults) {
-    let unresolvedOverflowCount = 0;
+  _mergeOverflowBlocks(chunkResults, context = {}) {
+    const diagnostics = {
+      resolved: {
+        rawBlocks: 0
+      },
+      unresolved: {
+        rawBlocks: 0,
+        uniqueCoords: 0,
+        topTargetChunks: [],
+        topSourceChunks: [],
+        topDistanceBuckets: []
+      }
+    };
+    const unresolvedCoordSet = new Set();
+    const unresolvedTargetChunkCounts = new Map();
+    const unresolvedSourceChunkCounts = new Map();
+    const unresolvedDistanceCounts = new Map();
 
-    for (const [_sourceKey, result] of Object.entries(chunkResults)) {
+    for (const [sourceKey, result] of Object.entries(chunkResults)) {
       if (!result.routing?.overflowChunks) continue;
 
       for (const overflowEntry of result.routing.overflowChunks) {
@@ -345,16 +360,45 @@ export class WorldGenerationService {
             targetResult.blockData[code] = block.orientation
               ? { type: block.type, orientation: block.orientation }
               : block.type;
+            diagnostics.resolved.rawBlocks++;
           }
         } else {
-          unresolvedOverflowCount += blocks.length;
+          diagnostics.unresolved.rawBlocks += blocks.length;
+          unresolvedTargetChunkCounts.set(targetKey, (unresolvedTargetChunkCounts.get(targetKey) || 0) + blocks.length);
+          unresolvedSourceChunkCounts.set(sourceKey, (unresolvedSourceChunkCounts.get(sourceKey) || 0) + blocks.length);
+
+          const [sourceCx, sourceCz] = sourceKey.split(',').map(Number);
+          const [targetCx, targetCz] = targetKey.split(',').map(Number);
+          const offsetKey = `${targetCx - sourceCx},${targetCz - sourceCz}`;
+          unresolvedDistanceCounts.set(offsetKey, (unresolvedDistanceCounts.get(offsetKey) || 0) + blocks.length);
+
+          for (const block of blocks) {
+            unresolvedCoordSet.add(encodeCoord(block.x, block.y, block.z));
+          }
         }
       }
     }
 
-    if (unresolvedOverflowCount > 0) {
-      console.warn(`[WorldGenerationService] Overflow blocks unresolved after halo routing: ${unresolvedOverflowCount}`);
+    diagnostics.unresolved.uniqueCoords = unresolvedCoordSet.size;
+    diagnostics.unresolved.topTargetChunks = this._toSortedCountArray(unresolvedTargetChunkCounts, 'chunkKey');
+    diagnostics.unresolved.topSourceChunks = this._toSortedCountArray(unresolvedSourceChunkCounts, 'chunkKey');
+    diagnostics.unresolved.topDistanceBuckets = this._toSortedCountArray(unresolvedDistanceCounts, 'offset');
+
+    if (diagnostics.unresolved.rawBlocks > 0) {
+      console.warn('[WorldGenerationService] Overflow blocks unresolved after halo routing', {
+        regionKey: context.regionKey || null,
+        ...diagnostics.unresolved
+      });
     }
+
+    return diagnostics;
+  }
+
+  _toSortedCountArray(counts, keyName, limit = 5) {
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, limit)
+      .map(([key, blocks]) => ({ [keyName]: key, blocks }));
   }
 
   /**

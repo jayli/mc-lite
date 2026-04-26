@@ -214,6 +214,38 @@ async function runRealWorldWorker(message) {
 
 // 模拟 persistenceService
 const mockPersistenceService = {
+  _worldMeta: null,
+  _regions: new Map(),
+  reset() {
+    this._worldMeta = null;
+    this._regions.clear();
+  },
+  async postMessage(action, payload = {}) {
+    switch (action) {
+      case 'getWorldMeta':
+        return this._worldMeta;
+      case 'saveWorldMeta':
+        this._worldMeta = payload.meta || null;
+        return true;
+      case 'getRegionRecord':
+        return this._regions.get(payload.regionKey) || null;
+      case 'saveRegionRecord':
+        this._regions.set(payload.regionKey, payload.record);
+        return true;
+      case 'saveRegionRecordsBatch':
+        for (const item of payload.records || []) {
+          this._regions.set(item.regionKey, item.record);
+        }
+        return true;
+      case 'getAllRegionKeys':
+        return Array.from(this._regions.keys());
+      case 'clearWorld':
+        this.reset();
+        return true;
+      default:
+        return null;
+    }
+  },
   recordChange: () => {},
   recordChangeForChunk: () => {},
   saveChunkData: () => Promise.resolve(),
@@ -261,6 +293,7 @@ const setupEnvironment = () => {
   globalThis._ParticleSystem = MockParticleSystem;
   globalThis._carModel = new THREE.Group();
   globalThis._gunManModel = new THREE.Group();
+  mockPersistenceService.reset();
 
   // 启用 Worker 模拟
   shouldMockWorkers = true;
@@ -268,20 +301,57 @@ const setupEnvironment = () => {
 
 // 恢复原始环境
 const teardownEnvironment = () => {
-  if (originalPersistenceService) globalThis._persistenceService = originalPersistenceService;
-  if (originalFaceCullingSystem) globalThis._faceCullingSystem = originalFaceCullingSystem;
-  if (originalMaterials) globalThis._materials = originalMaterials;
-  if (originalBlockData) globalThis._blockData = originalBlockData;
-  if (originalChestManager) globalThis._chestManager = originalChestManager;
-  if (originalParticleSystem) globalThis._ParticleSystem = originalParticleSystem;
-  if (originalCarModel) globalThis._carModel = originalCarModel;
-  if (originalGunManModel) globalThis._gunManModel = originalGunManModel;
+  if (originalPersistenceService === undefined) delete globalThis._persistenceService;
+  else globalThis._persistenceService = originalPersistenceService;
+  if (originalFaceCullingSystem === undefined) delete globalThis._faceCullingSystem;
+  else globalThis._faceCullingSystem = originalFaceCullingSystem;
+  if (originalMaterials === undefined) delete globalThis._materials;
+  else globalThis._materials = originalMaterials;
+  if (originalBlockData === undefined) delete globalThis._blockData;
+  else globalThis._blockData = originalBlockData;
+  if (originalChestManager === undefined) delete globalThis._chestManager;
+  else globalThis._chestManager = originalChestManager;
+  if (originalParticleSystem === undefined) delete globalThis._ParticleSystem;
+  else globalThis._ParticleSystem = originalParticleSystem;
+  if (originalCarModel === undefined) delete globalThis._carModel;
+  else globalThis._carModel = originalCarModel;
+  if (originalGunManModel === undefined) delete globalThis._gunManModel;
+  else globalThis._gunManModel = originalGunManModel;
 
   // 禁用 Worker 模拟
   shouldMockWorkers = false;
 };
 
 describe('World 真实类测试', (test) => {
+  test('测试环境 persistence mock 支持 WorldStore 的 postMessage 接口', async () => {
+    mockPersistenceService.reset();
+
+    const record = {
+      regionKey: '0,0',
+      chunks: {
+        '0,0': {
+          blockData: { 123: { type: 'stone', orientation: 0 } }
+        }
+      }
+    };
+
+    await mockPersistenceService.postMessage('saveRegionRecord', {
+      regionKey: '0,0',
+      record
+    });
+    const loaded = await mockPersistenceService.postMessage('getRegionRecord', {
+      regionKey: '0,0'
+    });
+
+    assertEqual(loaded, record, 'mock 应能读回 region record');
+
+    await mockPersistenceService.postMessage('clearWorld');
+    const cleared = await mockPersistenceService.postMessage('getRegionRecord', {
+      regionKey: '0,0'
+    });
+    assertEqual(cleared, null, 'clearWorld 后 region record 应被清空');
+  });
+
   test('consumeStreamingPerfSnapshot 每秒聚合一次流式加载统计', () => {
     const world = Object.create(World.prototype);
     world.bootstrapState = { phase: 'runtime-streaming' };
