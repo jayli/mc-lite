@@ -15,38 +15,34 @@ function createTestWorldWorker() {
         throw new Error(`Missing worker callback for task ${message.taskId}`);
       }
 
-      const hasCrossRegionOverflow = message.cx === 7 && message.cz === 0;
-      setTimeout(() => {
-        const chunkKey = `${message.cx},${message.cz}`;
-        const chunkResult = {
-          routing: {
-            ownChunk: {
-              chunkKey,
-              blockDataBlocks: [],
-              visibleBlocks: [],
-              meshData: []
+      const { rx, rz } = message;
+      const chunks = {};
+
+      for (let localCx = 0; localCx < 8; localCx++) {
+        for (let localCz = 0; localCz < 8; localCz++) {
+          const cx = rx * 8 + localCx;
+          const cz = rz * 8 + localCz;
+          const chunkKey = `${cx},${cz}`;
+
+          // 目标 region (1,0) 中，chunk 8,0 应持有跨界方块
+          const isTargetChunk = cx === 8 && cz === 0 && rx === 1 && rz === 0;
+
+          chunks[chunkKey] = {
+            routing: {
+              ownChunk: { chunkKey, blockDataBlocks: [], visibleBlocks: [], meshData: [] },
+              overflowChunks: []
             },
-            overflowChunks: hasCrossRegionOverflow
-              ? [{
-                chunkKey: '8,0',
-                blockDataBlocks: [{
-                  x: 128,
-                  y: 5,
-                  z: 0,
-                  type: 'stone',
-                  orientation: 0
-                }],
-                visibleBlocks: []
-              }]
-              : []
-          },
-          blockDataBlocks: [],
-          entities: { modGunMan: [], rovers: [] },
-          structureCenters: []
-        };
-        callback({
-          chunks: { [chunkKey]: chunkResult }
-        });
+            blockDataBlocks: isTargetChunk
+              ? [{ x: 128, y: 5, z: 0, type: 'stone', orientation: 0 }]
+              : [],
+            entities: { modGunMan: [], rovers: [] },
+            structureCenters: []
+          };
+        }
+      }
+
+      setTimeout(() => {
+        callback({ chunks });
       }, 0);
     }
   };
