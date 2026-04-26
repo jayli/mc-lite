@@ -474,7 +474,963 @@ function buildBatchedMeshData(fakeChunk, d, textureGroups) {
   return meshDataArray;
 }
 
+/**
+ * 生成单个 chunk，使用外部注入的共享状态（region 级生成路径）。
+ *
+ * @param {Object} params
+ * @param {number} params.cx - Chunk X
+ * @param {number} params.cz - Chunk Z
+ * @param {number} params.seed - 世界种子
+ * @param {StructureCandidateIndex} params.candidateIndex - 共享的候选索引
+ * @param {Set} params.largeStructureTaskKeySet - 共享的大结构去重集合
+ * @param {Array} [params.structureQueueWithCenters] - 共享的结构生成队列（可选，region 路径传入）
+ * @param {Array} [params.structureCenters] - 共享的结构中心列表（可选，region 路径传入）
+ * @param {Array} [params.modGunMan] - 共享的 gun_man 实体列表（可选，region 路径传入）
+ * @param {Array} [params.rovers] - 共享的 rover 实体列表（可选，region 路径传入）
+ * @returns {Object} chunk 结果 { blockDataBlocks, scatteredBlocks, routing, meshData, ... }
+ */
+function generateChunkWithSharedState(params) {
+  const {
+    cx, cz, seed,
+    candidateIndex,
+    largeStructureTaskKeySet,
+    structureQueueWithCenters: injectedStructureQueueWithCenters,
+    structureCenters: injectedStructureCenters,
+    modGunMan: injectedModGunMan,
+    rovers: injectedRovers
+  } = params;
+
+  const CHUNK_SIZE_LOCAL = 16;
+  const minX = cx * CHUNK_SIZE_LOCAL;
+  const maxX = (cx + 1) * CHUNK_SIZE_LOCAL;
+  const minZ = cz * CHUNK_SIZE_LOCAL;
+  const maxZ = (cz + 1) * CHUNK_SIZE_LOCAL;
+
+  const blockMap = new Map();
+  const modGunMan = injectedModGunMan || [];
+  const rovers = injectedRovers || [];
+  const structureQueue = [];
+  const structureCenters = injectedStructureCenters || [];
+  const islandTowerCenters = new Set();
+  const plainLandCastleCenters = new Set();
+  const cityStructureCenters = new Set();
+  const cityFillerHouseCenters = new Set();
+  const cityTreeCenters = new Set();
+  const cityTallTreeCenters = new Set();
+  const citySwampTreeCenters = new Set();
+  const cityYellowTreeCenters = new Set();
+  const cityBirchTreeCenters = new Set();
+  const cityFlowerBedCenters = new Set();
+  const cityPavilionFootprintCells = new Set();
+  const cityTallWellFootprintCells = new Set();
+  const cityCoreCandidates = [];
+
+  // 在 region 路径下，injectedStructureQueueWithCenters 已存在，直接复用；
+  // 独立 chunk 路径下创建局部队列（最终会丢弃，因为结果只看 blockDataBlocks）。
+  const structureQueueWithCenters = injectedStructureQueueWithCenters || [];
+
+  const fakeChunk = {
+    add: (x, y, z, type, dObj, solid = true, orientation = 0) => {
+      const key = encodeCoord(x, y, z);
+      const existing = blockMap.get(key);
+      if (existing && existing.type !== 'air' && type !== 'air') return;
+      blockMap.set(key, { x, y, z, type, solid, orientation });
+    },
+    getBlockType: (x, y, z) => {
+      const key = encodeCoord(x, y, z);
+      return blockMap.get(key)?.type || null;
+    }
+  };
+
+  // --- 以下为完整的地形生成逻辑，复制自 onmessage ---
+
+  const rooms = [];
+  const roomSeed = Math.abs((cx * 73856093) ^ (cz * 19349663) ^ seed);
+  let rRand = roomSeed;
+  const nextRand = () => {
+    rRand = (rRand * 1103515245 + 12345) & 0x7fffffff;
+    return rRand / 0x7fffffff;
+  };
+
+  for (let i = 0; i < ROOMS_PER_CHUNK; i++) {
+    const rx = Math.floor(nextRand() * CHUNK_SIZE_LOCAL);
+    const rz = Math.floor(nextRand() * CHUNK_SIZE_LOCAL);
+    const ry = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1));
+    const rw = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1));
+    const rh = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1));
+    const rd = 2 + Math.floor(nextRand() * (MAX_ROOM_SIZE - 1));
+    rooms.push({
+      minX: cx * CHUNK_SIZE_LOCAL + rx - Math.floor(rw / 2),
+      maxX: cx * CHUNK_SIZE_LOCAL + rx + Math.floor(rw / 2),
+      minY: ry,
+      maxY: ry + rh,
+      minZ: cz * CHUNK_SIZE_LOCAL + rz - Math.floor(rd / 2),
+      maxZ: cz * CHUNK_SIZE_LOCAL + rz + Math.floor(rd / 2)
+    });
+  }
+
+  const centerBiome = terrainGen.getBiome(cx * CHUNK_SIZE_LOCAL, cz * CHUNK_SIZE_LOCAL);
+  const cityLayout = CityMap.getCityLayout(seed, terrainGen);
+  const cityPlacementMap = cityLayout?.placementMap || new Map();
+  const cityFillerPlacementMap = cityLayout?.fillerPlacementMap || new Map();
+  const dPlaceholder = {};
+
+  function createStructureTask(taskFn, centerX, centerY, centerZ, type, centers = null, centerKey = null) {
+    taskFn.centerX = centerX;
+    taskFn.centerY = centerY;
+    taskFn.centerZ = centerZ;
+    taskFn.type = type;
+    structureQueue.push(taskFn);
+    if (centers && centerKey) {
+      centers.add(centerKey);
+    }
+    return taskFn;
+  }
+
+  function isNearRecordedCenter(centerSet, x, z, minDist) {
+    for (const key of centerSet) {
+      const [cxVal, czVal] = key.split(',').map(Number);
+      if (Math.max(Math.abs(cxVal - x), Math.abs(czVal - z)) < minDist) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function getLoaderBottomFootprint(loader) {
+    const data = loader?.getData?.();
+    if (!data || !Array.isArray(data.blocks) || data.blocks.length === 0) return null;
+    let minY = Infinity;
+    for (const block of data.blocks) {
+      if (block.y < minY) minY = block.y;
+    }
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    let count = 0;
+    for (const block of data.blocks) {
+      if (block.y !== minY) continue;
+      if (block.x < minX) minX = block.x;
+      if (block.x > maxX) maxX = block.x;
+      if (block.z < minZ) minZ = block.z;
+      if (block.z > maxZ) maxZ = block.z;
+      count++;
+    }
+    if (count === 0) return null;
+    return { minX, maxX, minZ, maxZ };
+  }
+
+  const pavilionFootprint = getLoaderBottomFootprint(pavilion) || { minX: -5, maxX: 5, minZ: -3, maxZ: 3 };
+  const pavilionHalfX = Math.ceil(Math.max(Math.abs(pavilionFootprint.minX), Math.abs(pavilionFootprint.maxX)));
+  const pavilionHalfZ = Math.ceil(Math.max(Math.abs(pavilionFootprint.minZ), Math.abs(pavilionFootprint.maxZ)));
+  const tallWellFootprint = getLoaderBottomFootprint(tallWell) || { minX: -5, maxX: 5, minZ: -3, maxZ: 3 };
+  const tallWellHalfX = Math.ceil(Math.max(Math.abs(tallWellFootprint.minX), Math.abs(tallWellFootprint.maxX)));
+  const tallWellHalfZ = Math.ceil(Math.max(Math.abs(tallWellFootprint.minZ), Math.abs(tallWellFootprint.maxZ)));
+
+  function collectPavilionFootprintCells(centerX, centerZ) {
+    const cells = [];
+    for (let ox = pavilionFootprint.minX; ox <= pavilionFootprint.maxX; ox++) {
+      for (let oz = pavilionFootprint.minZ; oz <= pavilionFootprint.maxZ; oz++) {
+        cells.push(`${centerX + ox},${centerZ + oz}`);
+      }
+    }
+    return cells;
+  }
+
+  function isPavilionFootprintReserved(centerX, centerZ) {
+    const cells = collectPavilionFootprintCells(centerX, centerZ);
+    for (const key of cells) {
+      if (cityPavilionFootprintCells.has(key)) return true;
+    }
+    return false;
+  }
+
+  function reservePavilionFootprint(centerX, centerZ) {
+    const cells = collectPavilionFootprintCells(centerX, centerZ);
+    for (const key of cells) {
+      cityPavilionFootprintCells.add(key);
+    }
+  }
+
+  function isPavilionSpaceClear(centerX, centerY, centerZ) {
+    for (let ox = pavilionFootprint.minX; ox <= pavilionFootprint.maxX; ox++) {
+      for (let oz = pavilionFootprint.minZ; oz <= pavilionFootprint.maxZ; oz++) {
+        const wx = centerX + ox;
+        const wz = centerZ + oz;
+        const cellInfo = CityMap.getCityInfo(wx, wz, seed, terrainGen);
+        if (!cellInfo || cellInfo.transitionFactor > 0) return false;
+        const surfaceY = CityMap.getCitySurfaceY(wx, wz, seed, terrainGen);
+        if (surfaceY === null || Math.abs(surfaceY + 1 - centerY) > 1) return false;
+        for (let y = centerY; y <= centerY + 2; y++) {
+          if (fakeChunk.getBlockType(wx, y, wz)) return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  function canPlaceCityPavilion(centerX, centerY, centerZ) {
+    const pavilionRadius = Math.max(pavilionHalfX, pavilionHalfZ);
+    const nearMajorBuilding = CityMap.isPointNearCityStructure(centerX, centerZ, seed, terrainGen, pavilionRadius + 1);
+    const nearFillerHouse = isNearRecordedCenter(cityFillerHouseCenters, centerX, centerZ, pavilionRadius + 3);
+    const nearFlowerBed = isNearRecordedCenter(cityFlowerBedCenters, centerX, centerZ, pavilionRadius + 5);
+    const nearTree = isNearRecordedCenter(cityTreeCenters, centerX, centerZ, pavilionRadius + 4) ||
+      isNearRecordedCenter(cityTallTreeCenters, centerX, centerZ, pavilionRadius + 5) ||
+      isNearRecordedCenter(citySwampTreeCenters, centerX, centerZ, pavilionRadius + 4) ||
+      isNearRecordedCenter(cityYellowTreeCenters, centerX, centerZ, pavilionRadius + 4) ||
+      isNearRecordedCenter(cityBirchTreeCenters, centerX, centerZ, pavilionRadius + 4);
+    if (nearMajorBuilding || nearFillerHouse || nearFlowerBed || nearTree) return false;
+    if (isPavilionFootprintReserved(centerX, centerZ)) return false;
+    return isPavilionSpaceClear(centerX, centerY, centerZ);
+  }
+
+  let hasQueuedCityPavilion = false;
+  function queueCityPavilion(centerX, centerY, centerZ) {
+    if (!canPlaceCityPavilion(centerX, centerY, centerZ)) return false;
+    createStructureTask(
+      generatePavilion.bind(null, centerX, centerY, centerZ, fakeChunk, dPlaceholder),
+      centerX, centerY, centerZ, 'pavilion'
+    );
+    reservePavilionFootprint(centerX, centerZ);
+    hasQueuedCityPavilion = true;
+    return true;
+  }
+
+  function collectTallWellFootprintCells(centerX, centerZ) {
+    const cells = [];
+    for (let ox = tallWellFootprint.minX; ox <= tallWellFootprint.maxX; ox++) {
+      for (let oz = tallWellFootprint.minZ; oz <= tallWellFootprint.maxZ; oz++) {
+        cells.push(`${centerX + ox},${centerZ + oz}`);
+      }
+    }
+    return cells;
+  }
+
+  function isTallWellFootprintReserved(centerX, centerZ) {
+    const cells = collectTallWellFootprintCells(centerX, centerZ);
+    for (const key of cells) {
+      if (cityTallWellFootprintCells.has(key)) return true;
+    }
+    return false;
+  }
+
+  function reserveTallWellFootprint(centerX, centerZ) {
+    const cells = collectTallWellFootprintCells(centerX, centerZ);
+    for (const key of cells) {
+      cityTallWellFootprintCells.add(key);
+    }
+  }
+
+  function isTallWellSpaceClear(centerX, centerY, centerZ) {
+    for (let ox = tallWellFootprint.minX; ox <= tallWellFootprint.maxX; ox++) {
+      for (let oz = tallWellFootprint.minZ; oz <= tallWellFootprint.maxZ; oz++) {
+        const wx = centerX + ox;
+        const wz = centerZ + oz;
+        const cellInfo = CityMap.getCityInfo(wx, wz, seed, terrainGen);
+        if (!cellInfo || cellInfo.transitionFactor > 0) return false;
+        const surfaceY = CityMap.getCitySurfaceY(wx, wz, seed, terrainGen);
+        if (surfaceY === null || Math.abs(surfaceY + 1 - centerY) > 1) return false;
+        for (let y = centerY; y <= centerY + 2; y++) {
+          if (fakeChunk.getBlockType(wx, y, wz)) return false;
+        }
+      }
+    }
+    return true;
+  }
+
+  function canPlaceCityTallWell(centerX, centerY, centerZ) {
+    const tallWellRadius = Math.max(tallWellHalfX, tallWellHalfZ);
+    const nearMajorBuilding = CityMap.isPointNearCityStructure(centerX, centerZ, seed, terrainGen, tallWellRadius);
+    const nearFillerHouse = isNearRecordedCenter(cityFillerHouseCenters, centerX, centerZ, tallWellRadius + 1);
+    const nearFlowerBed = isNearRecordedCenter(cityFlowerBedCenters, centerX, centerZ, tallWellRadius + 2);
+    const nearTree = isNearRecordedCenter(cityTreeCenters, centerX, centerZ, tallWellRadius + 2) ||
+      isNearRecordedCenter(cityTallTreeCenters, centerX, centerZ, tallWellRadius + 3) ||
+      isNearRecordedCenter(citySwampTreeCenters, centerX, centerZ, tallWellRadius + 2) ||
+      isNearRecordedCenter(cityYellowTreeCenters, centerX, centerZ, tallWellRadius + 2) ||
+      isNearRecordedCenter(cityBirchTreeCenters, centerX, centerZ, tallWellRadius + 2);
+    if (nearMajorBuilding || nearFillerHouse || nearFlowerBed || nearTree) return false;
+    if (isTallWellFootprintReserved(centerX, centerZ)) return false;
+    return isTallWellSpaceClear(centerX, centerY, centerZ);
+  }
+
+  let hasQueuedCityTallWell = false;
+  function queueCityTallWell(centerX, centerY, centerZ) {
+    if (!canPlaceCityTallWell(centerX, centerY, centerZ)) return false;
+    createStructureTask(
+      generateTallWell.bind(null, centerX, centerY, centerZ, fakeChunk, dPlaceholder),
+      centerX, centerY, centerZ, 'tall_well'
+    );
+    reserveTallWellFootprint(centerX, centerZ);
+    hasQueuedCityTallWell = true;
+    return true;
+  }
+
+  function generateTallWell(x, y, z, chunk, dObj) {
+    tallWell.generate(x, y, z, chunk, dObj, true);
+  }
+
+  for (let x = 0; x < CHUNK_SIZE_LOCAL; x++) {
+    for (let z = 0; z < CHUNK_SIZE_LOCAL; z++) {
+      const wx = cx * CHUNK_SIZE_LOCAL + x;
+      const wz = cz * CHUNK_SIZE_LOCAL + z;
+      const wLvl = -2;
+      const safeForStructure = x >= 3 && x <= 12 && z >= 3 && z <= 12;
+
+      const pyInfo = Pyramid.getPyramidInfo(wx, wz, seed, terrainGen);
+      const inPyramid = pyInfo !== null;
+      const slInfo = SnowLand.getSnowLandInfo(wx, wz, seed, terrainGen);
+      const inSnowLand = slInfo !== null;
+      const fmInfo = FrozenMountain.getFrozenMountainInfo(wx, wz, seed, terrainGen);
+      const inFrozenMountain = fmInfo !== null;
+      const islandInfo = IslandMap.getIslandInfo(wx, wz, seed, terrainGen);
+      const inIsland = islandInfo !== null;
+      const plainLandInfo = PlainLand.getPlainLandInfo(wx, wz, seed, terrainGen);
+      const inPlainLand = plainLandInfo !== null;
+      const cityInfo = CityMap.getCityInfo(wx, wz, seed, terrainGen);
+      const inCity = cityInfo !== null;
+      const baseBiomeAtPos = getBaseBiome(wx, wz);
+      const activeBiome = (centerBiome === 'CITY' && !inCity) ? baseBiomeAtPos : centerBiome;
+      const h = terrainGen.generateHeight(wx, wz, activeBiome);
+
+      if (inCity) {
+        const cityResult = CityMap.generate(wx, wz, h, cityInfo, fakeChunk, dPlaceholder, seed, terrainGen);
+        if (cityInfo.transitionFactor === 0) {
+          cityCoreCandidates.push({ x: wx, y: cityResult.surfaceY + 1, z: wz });
+        }
+        const cityStructure = cityPlacementMap.get(`${wx},${wz}`) || cityFillerPlacementMap.get(`${wx},${wz}`) || null;
+        if (cityStructure && !cityStructureCenters.has(cityStructure.id)) {
+          const centerY = cityResult.surfaceY + 1;
+          const centerKey = cityStructure.id;
+          const taskFactories = {
+            castle: generateCastle, bigHouse: generateBigHouse, regularHouse1: generateRegularHouse1,
+            desertTempleTube: generateDesertTempleTube, boxHouse: generateBoxHouse, desertVillage: generateDesertVillage,
+            doubleTower: generateDoubleTower, treeTower: generateTreeTower, junglePyramid: generateJunglePyramid,
+            tank: generateTank, gate: generateGate, pyramidIsland: generatePyramidIsland,
+            smallHouse: generateSmallHouse, tower: generateTower, treeHouse: generateTreeHouse,
+            uglyHouse: generateUglyHouse, whiteTower: generateWhiteTower, woodHouse: generateWoodHouse
+          };
+          const factory = taskFactories[cityStructure.type];
+          if (factory) {
+            createStructureTask(
+              factory.bind(null, cityStructure.x, centerY, cityStructure.z, fakeChunk, dPlaceholder),
+              cityStructure.x, centerY, cityStructure.z,
+              cityStructure.type, cityStructureCenters, centerKey
+            );
+          }
+        }
+
+        if (seededRandom(wx, wz, seed + 800) < 0.0044) {
+          const treeKey = `${wx},${wz}`;
+          const nearMajorBuilding = CityMap.isPointNearCityStructure(wx, wz, seed, terrainGen, 2);
+          const nearFillerHouse = isNearRecordedCenter(cityFillerHouseCenters, wx, wz, 8);
+          const nearOtherTree = isNearRecordedCenter(cityTreeCenters, wx, wz, 6);
+          if (!nearMajorBuilding && !nearFillerHouse && !nearOtherTree) {
+            createStructureTask(
+              Tree.generate.bind(Tree, wx, cityResult.surfaceY + 1, wz, fakeChunk, 'default', dPlaceholder),
+              wx, cityResult.surfaceY + 1, wz, 'static_tree', cityTreeCenters, treeKey
+            );
+          }
+        }
+        if (seededRandom(wx, wz, seed + 801) < 0.0017) {
+          const treeKey = `${wx},${wz}`;
+          const nearMajorBuilding = CityMap.isPointNearCityStructure(wx, wz, seed, terrainGen, 3);
+          const nearFillerHouse = isNearRecordedCenter(cityFillerHouseCenters, wx, wz, 10);
+          const nearOtherTree = isNearRecordedCenter(cityTreeCenters, wx, wz, 7);
+          const nearOtherTallTree = isNearRecordedCenter(cityTallTreeCenters, wx, wz, 10);
+          if (!nearMajorBuilding && !nearFillerHouse && !nearOtherTree && !nearOtherTallTree) {
+            createStructureTask(
+              Tree.generate.bind(Tree, wx, cityResult.surfaceY + 1, wz, fakeChunk, 'big', dPlaceholder),
+              wx, cityResult.surfaceY + 1, wz, 'static_tree', cityTallTreeCenters, treeKey
+            );
+          }
+        }
+        if (seededRandom(wx, wz, seed + 803) < 0.0044) {
+          const treeKey = `${wx},${wz}`;
+          const nearMajorBuilding = CityMap.isPointNearCityStructure(wx, wz, seed, terrainGen, 2);
+          const nearFillerHouse = isNearRecordedCenter(cityFillerHouseCenters, wx, wz, 8);
+          const nearOtherSwamp = isNearRecordedCenter(citySwampTreeCenters, wx, wz, 7);
+          if (!nearMajorBuilding && !nearFillerHouse && !nearOtherSwamp) {
+            createStructureTask(
+              Tree.generate.bind(Tree, wx, cityResult.surfaceY + 1, wz, fakeChunk, 'swamp', dPlaceholder),
+              wx, cityResult.surfaceY + 1, wz, 'static_tree', citySwampTreeCenters, treeKey
+            );
+          }
+        }
+        if (seededRandom(wx, wz, seed + 804) < 0.0022) {
+          const treeKey = `${wx},${wz}`;
+          const nearMajorBuilding = CityMap.isPointNearCityStructure(wx, wz, seed, terrainGen, 2);
+          const nearFillerHouse = isNearRecordedCenter(cityFillerHouseCenters, wx, wz, 8);
+          const nearOtherYellow = isNearRecordedCenter(cityYellowTreeCenters, wx, wz, 7);
+          if (!nearMajorBuilding && !nearFillerHouse && !nearOtherYellow) {
+            createStructureTask(
+              Tree.generate.bind(Tree, wx, cityResult.surfaceY + 1, wz, fakeChunk, 'big', dPlaceholder, null, 'yellow_leaves'),
+              wx, cityResult.surfaceY + 1, wz, 'static_tree', cityYellowTreeCenters, treeKey
+            );
+          }
+        }
+        if (seededRandom(wx, wz, seed + 805) < 0.00147) {
+          const treeKey = `${wx},${wz}`;
+          const nearMajorBuilding = CityMap.isPointNearCityStructure(wx, wz, seed, terrainGen, 2);
+          const nearFillerHouse = isNearRecordedCenter(cityFillerHouseCenters, wx, wz, 8);
+          const nearOtherBirch = isNearRecordedCenter(cityBirchTreeCenters, wx, wz, 7);
+          if (!nearMajorBuilding && !nearFillerHouse && !nearOtherBirch) {
+            createStructureTask(
+              generateBirchTree.bind(null, wx, cityResult.surfaceY + 1, wz, fakeChunk, dPlaceholder),
+              wx, cityResult.surfaceY + 1, wz, 'static_tree', cityBirchTreeCenters, treeKey
+            );
+          }
+        }
+        if (cityInfo.transitionFactor === 0 && seededRandom(wx, wz, seed + 823) < CITY_FLOWER_BED_CHANCE) {
+          const flowerBedKey = `${wx},${wz}`;
+          const nearMajorBuilding = CityMap.isPointNearCityStructure(wx, wz, seed, terrainGen, 1);
+          if (!nearMajorBuilding) {
+            createStructureTask(
+              generateFlowerBed.bind(null, wx, cityResult.surfaceY + 1, wz, fakeChunk, dPlaceholder),
+              wx, cityResult.surfaceY + 1, wz, 'flower_bed', cityFlowerBedCenters, flowerBedKey
+            );
+          }
+        }
+        if (seededRandom(wx, wz, seed + 812) < 0.0007) {
+          const houseKey = `${wx},${wz}`;
+          const nearMajorBuilding = CityMap.isPointNearCityStructure(wx, wz, seed, terrainGen, 4);
+          const nearOtherHouse = isNearRecordedCenter(cityFillerHouseCenters, wx, wz, 12);
+          const nearTree = isNearRecordedCenter(cityTreeCenters, wx, wz, 8);
+          const nearTallTree = isNearRecordedCenter(cityTallTreeCenters, wx, wz, 10);
+          if (!nearMajorBuilding && !nearOtherHouse && !nearTree && !nearTallTree) {
+            createStructureTask(
+              generateStructure.bind(null, 'house', wx, cityResult.surfaceY + 1, wz, fakeChunk, dPlaceholder, rovers),
+              wx, cityResult.surfaceY + 1, wz, 'house', cityFillerHouseCenters, houseKey
+            );
+          }
+        }
+      } else if (inPyramid) {
+        Pyramid.generate(wx, wz, h, pyInfo, fakeChunk, dPlaceholder);
+      } else if (inIsland) {
+        const islandResult = IslandMap.generate(wx, wz, h, islandInfo, fakeChunk, dPlaceholder, seed);
+        const distanceFromCenter = islandInfo.distFromCenter;
+        const towerExclusionRadius = 5;
+        const waterRingMax = 15 + 4 + 20;
+        if (distanceFromCenter > 15 + 4 && distanceFromCenter < waterRingMax) {
+          const seaY = -2;
+          const bedrockY = seaY - 11;
+          for (let y = seaY - 1; y >= bedrockY; y--) {
+            fakeChunk.add(wx, y, wz, 'sand', dPlaceholder);
+          }
+        }
+        if (!islandResult && distanceFromCenter <= 15 + 4) {
+          const seaY = -2;
+          const bedrockY = seaY - 11;
+          for (let y = seaY - 1; y >= bedrockY; y--) {
+            fakeChunk.add(wx, y, wz, 'sand', dPlaceholder);
+          }
+        }
+        if (islandResult && islandInfo.zone === 'core' && !islandResult.isBelowSeaLevel) {
+          const isTowerCenter = wx === islandInfo.centerX && wz === islandInfo.centerZ;
+          const towerCenterKey = `${islandInfo.centerX},${islandInfo.centerZ}`;
+          if (isTowerCenter && !islandTowerCenters.has(towerCenterKey)) {
+            createStructureTask(
+              generateTower.bind(null, islandInfo.centerX, islandResult.surfaceY + 1, islandInfo.centerZ, fakeChunk, dPlaceholder),
+              islandInfo.centerX, islandResult.surfaceY + 1, islandInfo.centerZ,
+              'tower', islandTowerCenters, towerCenterKey
+            );
+          }
+          const treeChance = seededRandom(wx, wz, seed + 100);
+          const treeCount = islandInfo.transitionFactor === 0 ? (treeChance < 0.0015 ? 2 : treeChance < 0.003 ? 1 : 0) : 0;
+          if (treeCount > 0) {
+            for (let i = 0; i < treeCount; i++) {
+              const treeOffsetX = Math.floor(seededRandom(i, i + 10, seed + 200) * 10) - 5;
+              const treeOffsetZ = Math.floor(seededRandom(i + 5, i + 15, seed + 201) * 10) - 5;
+              const treeX = wx + treeOffsetX;
+              const treeZ = wz + treeOffsetZ;
+              const treeY = islandResult.surfaceY + 1;
+              const treeIslandInfo = IslandMap.getIslandInfo(treeX, treeZ, seed, terrainGen);
+              const distFromTowerCenter = Math.max(Math.abs(treeX - islandInfo.centerX), Math.abs(treeZ - islandInfo.centerZ));
+              if (treeIslandInfo && treeIslandInfo.zone === 'core' && distFromTowerCenter > towerExclusionRadius) {
+                createStructureTask(
+                  Tree.generate.bind(Tree, treeX, treeY, treeZ, fakeChunk, 'default', dPlaceholder),
+                  treeX, treeY, treeZ, 'static_tree'
+                );
+              }
+            }
+          }
+        }
+      } else if (inPlainLand) {
+        PlainLand.generate(wx, wz, h, plainLandInfo, fakeChunk, dPlaceholder);
+        const isPyramidIslandCenter = wx === plainLandInfo.centerX && wz === plainLandInfo.centerZ;
+        const pyramidIslandCenterKey = `${plainLandInfo.centerX},${plainLandInfo.centerZ}`;
+        if (isPyramidIslandCenter && !plainLandCastleCenters.has(pyramidIslandCenterKey)) {
+          createStructureTask(
+            generatePyramidIsland.bind(null, plainLandInfo.centerX, plainLandInfo.centerY ? h + 1 : h + 1, plainLandInfo.centerZ, fakeChunk, dPlaceholder),
+            plainLandInfo.centerX, h + 1, plainLandInfo.centerZ,
+            'pyramidIsland', plainLandCastleCenters, pyramidIslandCenterKey
+          );
+        }
+      } else if (inSnowLand) {
+        const snowResult = SnowLand.generate(wx, wz, h, slInfo, fakeChunk, dPlaceholder);
+        if (slInfo.transitionFactor === 0 && !snowResult.isBelowSeaLevel && seededRandom(wx, wz, seed + 10) < 0.002) {
+          createStructureTask(
+            generateBirchTreeWithSnow.bind(null, wx, snowResult.surfaceY + 1, wz, fakeChunk, dPlaceholder),
+            wx, snowResult.surfaceY + 1, wz, 'static_tree'
+          );
+        }
+      } else if (inFrozenMountain) {
+        const fmResult = FrozenMountain.generate(wx, wz, h, fmInfo, fakeChunk, dPlaceholder);
+        if (fmInfo.transitionFactor === 0 && !fmResult.isBelowSeaLevel && seededRandom(wx, wz, seed + 11) < 0.0010) {
+          createStructureTask(
+            generateBirchTreeWithSnow.bind(null, wx, fmResult.surfaceY + 1, wz, fakeChunk, dPlaceholder),
+            wx, fmResult.surfaceY + 1, wz, 'static_tree'
+          );
+        }
+      } else if (h < wLvl) {
+        fakeChunk.add(wx, h, wz, 'sand', dPlaceholder);
+        fakeChunk.add(wx, h - 1, wz, 'end_stone', dPlaceholder);
+        if (activeBiome === 'SWAMP' && seededRandom(wx, wz, seed + 12) < 0.08) {
+          fakeChunk.add(wx, wLvl + 0.5, wz, 'lilypad', dPlaceholder, false);
+        }
+        if (h < -6 && seededRandom(wx, wz, seed + 13) < 0.001 && safeForStructure) {
+          structureQueue.push(() => generateStructure('ship', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers));
+        }
+      } else {
+        let surf = 'grass', sub = 'dirt';
+        if (activeBiome === 'DESERT') { surf = 'sand'; sub = 'sand'; }
+        if (activeBiome === 'CITY') { surf = 'sand'; sub = 'sand'; }
+        if (activeBiome === 'AZALEA') { surf = 'moss'; sub = 'dirt'; }
+        if (activeBiome === 'SWAMP') { surf = 'swamp_grass'; sub = 'dirt'; }
+
+        fakeChunk.add(wx, h, wz, surf, dPlaceholder);
+        fakeChunk.add(wx, h - 1, wz, sub, dPlaceholder);
+
+        for (let k = 2; k <= 12; k++) {
+          if (k === 12) { fakeChunk.add(wx, h - k, wz, 'end_stone', dPlaceholder); continue; }
+          if (k === 11) { fakeChunk.add(wx, h - k, wz, 'stone', dPlaceholder); continue; }
+          let inRoom = false;
+          for (const r of rooms) {
+            if (wx >= r.minX && wx <= r.maxX && wz >= r.minZ && wz <= r.maxZ && k >= r.minY && k <= r.maxY) {
+              inRoom = true;
+              break;
+            }
+          }
+          if (inRoom) continue;
+          const blockRand = seededRandom(wx, wz, seed + 100 + k);
+          const blockType = blockRand < 0.01 ? 'gold_ore' : 'stone';
+          fakeChunk.add(wx, h - k, wz, blockType, dPlaceholder);
+        }
+
+        if (activeBiome === 'FOREST') {
+          const forestRand = seededRandom(wx, wz, seed + 14);
+          if (forestRand < 0.04) {
+            if (seededRandom(wx, wz, seed + 15) < 0.15) {
+              createStructureTask(generateYellowTree.bind(null, wx, h + 1, wz, fakeChunk, dPlaceholder), wx, h + 1, wz, 'static_tree');
+            } else {
+              if (seededRandom(wx, wz, seed + 16) < 0.1) {
+                createStructureTask(generateBirchTree.bind(null, wx, h + 1, wz, fakeChunk, dPlaceholder), wx, h + 1, wz, 'static_tree');
+              } else {
+                const leafRand = seededRandom(wx, wz, seed + 17);
+                const isYellow = leafRand < 0.1;
+                const leafType = isYellow ? 'yellow_leaves' : null;
+                const logRand = seededRandom(wx, wz, seed + 18);
+                const isBirch = logRand < 0.1;
+                const logType = isBirch ? 'birch_log' : null;
+                createStructureTask(
+                  Tree.generate.bind(Tree, wx, h + 1, wz, fakeChunk, 'big', dPlaceholder, logType, leafType),
+                  wx, h + 1, wz, 'static_tree'
+                );
+              }
+            }
+          } else if (forestRand < 0.10) {
+            const plantRand = seededRandom(wx, wz, seed + 19);
+            if (plantRand < 0.25) fakeChunk.add(wx, h + 1, wz, 'azure_bluet', dPlaceholder, false);
+            else if (plantRand < 0.40) fakeChunk.add(wx, h + 1, wz, 'oxeye_daisy', dPlaceholder, false);
+            else if (plantRand < 0.55) fakeChunk.add(wx, h + 1, wz, 'red_mushroom', dPlaceholder, false);
+            else if (plantRand < 0.70) fakeChunk.add(wx, h + 1, wz, 'dead_bush', dPlaceholder, false);
+          }
+        } else if (activeBiome === 'AZALEA') {
+          if (seededRandom(wx, wz, seed + 19) < 0.045) {
+            createStructureTask(Tree.generate.bind(Tree, wx, h + 1, wz, fakeChunk, 'azalea', dPlaceholder), wx, h + 1, wz, 'static_tree');
+          }
+        } else if (activeBiome === 'SWAMP') {
+          if (seededRandom(wx, wz, seed + 20) < 0.03) {
+            createStructureTask(Tree.generate.bind(Tree, wx, h + 1, wz, fakeChunk, 'swamp', dPlaceholder), wx, h + 1, wz, 'static_tree');
+          }
+        } else if (activeBiome === 'DESERT') {
+          let occupied = false;
+          if (seededRandom(wx, wz, seed + 21) < 0.01) fakeChunk.add(wx, h + 1, wz, 'cactus', dPlaceholder);
+          if (!occupied && isOccupiedForLargeStaticDesert(wx, wz, seed)) {
+            fakeChunk.add(wx, h + 1, wz, 'dead_bush', dPlaceholder, false);
+            occupied = true;
+          }
+          if (seededRandom(wx, wz, seed + 22) < 0.0005 && safeForStructure) {
+            createStructureTask(
+              generateStructure.bind(null, 'rover', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers),
+              wx, h + 1, wz, 'rover'
+            );
+          }
+          const largeStaticType = resolveLargeStaticStructureType({
+            wx, wz, seed, biome: activeBiome,
+            surfaceType: getSurfaceTypeByBiome(activeBiome),
+            safeForStructure, occupied
+          });
+          if (largeStaticType === 'desertPyramid') {
+            createStructureTask(generateDesertPyramid.bind(null, wx, h + 1, wz, fakeChunk, dPlaceholder), wx, h + 1, wz, 'desertPyramid');
+            occupied = true;
+          } else if (largeStaticType === 'desertVillage') {
+            createStructureTask(generateDesertVillage.bind(null, wx, h + 1, wz, fakeChunk, dPlaceholder), wx, h + 1, wz, 'desertVillage');
+            occupied = true;
+          } else if (largeStaticType === 'uglyHouse') {
+            createStructureTask(generateUglyHouse.bind(null, wx, h + 1, wz, fakeChunk, dPlaceholder), wx, h + 1, wz, 'uglyHouse');
+            occupied = true;
+          } else if (largeStaticType === 'whiteTower') {
+            createStructureTask(generateWhiteTower.bind(null, wx, h + 1, wz, fakeChunk, dPlaceholder), wx, h + 1, wz, 'whiteTower');
+            occupied = true;
+          }
+        } else if (activeBiome === 'CITY') {
+          // City 区块边缘不额外生成装饰
+        } else {
+          let occupied = false;
+          const spawnRand = seededRandom(wx, wz, seed);
+          if (surf === 'grass' && spawnRand < 0.0005) {
+            modGunMan.push({ x: wx, y: h + 1, z: wz });
+            occupied = true;
+          }
+          if (!occupied && seededRandom(wx, wz, seed + 1) < 0.005) {
+            createStructureTask(Tree.generate.bind(Tree, wx, h + 1, wz, fakeChunk, 'default', dPlaceholder), wx, h + 1, wz, 'static_tree');
+            occupied = true;
+          }
+          if (!occupied) {
+            const randPlant = seededRandom(wx, wz, seed + 2);
+            if (randPlant < 0.05) fakeChunk.add(wx, h + 1, wz, 'short_grass', dPlaceholder, false);
+            else if (randPlant < 0.10) {
+              const flowerRand = seededRandom(wx, wz, seed + 3);
+              let flowerType = flowerRand < 0.33 ? 'allium' : flowerRand < 0.66 ? 'flower' : 'azure_bluet';
+              fakeChunk.add(wx, h + 1, wz, flowerType, dPlaceholder, false);
+            } else if (randPlant < 0.11) fakeChunk.add(wx, h + 1, wz, 'oxeye_daisy', dPlaceholder, false);
+            else if (randPlant < 0.115) fakeChunk.add(wx, h + 1, wz, 'red_mushroom', dPlaceholder, false);
+            else if (randPlant < 0.13) fakeChunk.add(wx, h + 1, wz, 'dead_bush', dPlaceholder, false);
+          }
+          if (seededRandom(wx, wz, seed + 4) < 0.001 && safeForStructure) {
+            createStructureTask(
+              generateStructure.bind(null, 'house', wx, h + 1, wz, fakeChunk, dPlaceholder, rovers),
+              wx, h + 1, wz, 'house'
+            );
+          }
+          const largeStaticType = resolveLargeStaticStructureType({
+            wx, wz, seed, biome: centerBiome,
+            surfaceType: surf, safeForStructure, occupied
+          });
+          if (largeStaticType === 'tank') {
+            createStructureTask(generateTank.bind(null, wx, h + 1, wz, fakeChunk, dPlaceholder), wx, h + 1, wz, 'tank');
+            occupied = true;
+          }
+        }
+      }
+
+      if (terrainGen.shouldGenerateCloud(wx, wz)) {
+        Cloud.generate(wx, 55, wz, fakeChunk, dPlaceholder);
+      }
+    }
+  }
+
+  // City 后置填充
+  for (const candidate of cityCoreCandidates) {
+    if (seededRandom(candidate.x, candidate.z, seed + 826) >= CITY_TALL_WELL_CHANCE) continue;
+    queueCityTallWell(candidate.x, candidate.y, candidate.z);
+  }
+  for (const candidate of cityCoreCandidates) {
+    if (seededRandom(candidate.x, candidate.z, seed + 824) >= CITY_PAVILION_CHANCE) continue;
+    queueCityPavilion(candidate.x, candidate.y, candidate.z);
+  }
+
+  const cityCenterChunkX = cityLayout ? Math.floor(cityLayout.centerX / CHUNK_SIZE_LOCAL) : null;
+  const cityCenterChunkZ = cityLayout ? Math.floor(cityLayout.centerZ / CHUNK_SIZE_LOCAL) : null;
+  const shouldRunCityFallback = cityCenterChunkX === cx && cityCenterChunkZ === cz;
+  if (!hasQueuedCityPavilion && cityCoreCandidates.length > 0 && shouldRunCityFallback) {
+    const fallbackCandidates = cityCoreCandidates
+      .map((c) => ({ ...c, score: seededRandom(c.x, c.z, seed + 825) }))
+      .sort((a, b) => a.score - b.score);
+    for (const candidate of fallbackCandidates) {
+      if (queueCityPavilion(candidate.x, candidate.y, candidate.z)) break;
+    }
+  }
+  if (!hasQueuedCityTallWell && cityCoreCandidates.length > 0 && seededRandom(cx, cz, seed + 828) < CITY_TALL_WELL_CHANCE) {
+    const fallbackCandidates = cityCoreCandidates
+      .map((c) => ({ ...c, score: seededRandom(c.x, c.z, seed + 827) }))
+      .sort((a, b) => a.score - b.score);
+    for (const candidate of fallbackCandidates) {
+      if (queueCityTallWell(candidate.x, candidate.y, candidate.z)) break;
+    }
+  }
+
+  const chunkRandom = (cx, cz, s) => {
+    const val = Math.sin(cx * 12.9898 + cz * 78.233 + s) * 43758.5453123;
+    return val - Math.floor(val);
+  };
+
+  if (chunkRandom(cx, cz, seed + 50) < 0.08) {
+    const islandY = 40 + Math.floor(chunkRandom(cx, cz, seed + 51) * 30);
+    const centerWx = cx * CHUNK_SIZE_LOCAL + 8;
+    const centerWz = cz * CHUNK_SIZE_LOCAL + 8;
+    Island.generate(centerWx, islandY, centerWz, fakeChunk, dPlaceholder);
+    structureCenters.push({ type: 'island', x: centerWx, y: islandY, z: centerWz });
+  }
+  if (chunkRandom(cx, cz, seed + 52) < 0.20) {
+    const startX = cx * CHUNK_SIZE_LOCAL + Math.floor(chunkRandom(cx, cz, seed + 53) * CHUNK_SIZE_LOCAL);
+    const startZ = cz * CHUNK_SIZE_LOCAL + Math.floor(chunkRandom(cx, cz, seed + 54) * CHUNK_SIZE_LOCAL);
+    const size = 30 + Math.floor(chunkRandom(cx, cz, seed + 55) * 21);
+    Cloud.generateCluster(startX, 35, startZ, size, fakeChunk, dPlaceholder);
+    structureCenters.push({ type: 'cloud', x: startX, y: 35, z: startZ });
+  }
+
+  // 执行结构生成队列
+  structureQueueWithCenters.length = 0;
+  for (const task of structureQueue) {
+    structureQueueWithCenters.push({
+      task,
+      centerX: task.centerX, centerY: task.centerY, centerZ: task.centerZ, type: task.type
+    });
+  }
+
+  const largeStaticTaskFactories = {
+    bigHouse: (x, y, z) => () => generateBigHouse(x, y, z, fakeChunk, dPlaceholder),
+    regularHouse1: (x, y, z) => () => generateRegularHouse1(x, y, z, fakeChunk, dPlaceholder),
+    desertTempleTube: (x, y, z) => () => generateDesertTempleTube(x, y, z, fakeChunk, dPlaceholder),
+    boxHouse: (x, y, z) => () => generateBoxHouse(x, y, z, fakeChunk, dPlaceholder),
+    castle: (x, y, z) => () => generateCastle(x, y, z, fakeChunk, dPlaceholder),
+    doubleTower: (x, y, z) => () => generateDoubleTower(x, y, z, fakeChunk, dPlaceholder),
+    treeTower: (x, y, z) => () => generateTreeTower(x, y, z, fakeChunk, dPlaceholder),
+    junglePyramid: (x, y, z) => () => generateJunglePyramid(x, y, z, fakeChunk, dPlaceholder),
+    gate: (x, y, z) => () => generateGate(x, y, z, fakeChunk, dPlaceholder),
+    pyramidIsland: (x, y, z) => () => generatePyramidIsland(x, y, z, fakeChunk, dPlaceholder),
+    smallHouse: (x, y, z) => () => generateSmallHouse(x, y, z, fakeChunk, dPlaceholder),
+    tank: (x, y, z) => () => generateTank(x, y, z, fakeChunk, dPlaceholder),
+    tower: (x, y, z) => () => generateTower(x, y, z, fakeChunk, dPlaceholder),
+    treeHouse: (x, y, z) => () => generateTreeHouse(x, y, z, fakeChunk, dPlaceholder),
+    whiteTower: (x, y, z) => () => generateWhiteTower(x, y, z, fakeChunk, dPlaceholder),
+    woodHouse: (x, y, z) => () => generateWoodHouse(x, y, z, fakeChunk, dPlaceholder),
+    uglyHouse: (x, y, z) => () => generateUglyHouse(x, y, z, fakeChunk, dPlaceholder),
+    desertVillage: (x, y, z) => () => generateDesertVillage(x, y, z, fakeChunk, dPlaceholder),
+    desertPyramid: (x, y, z) => () => generateDesertPyramid(x, y, z, fakeChunk, dPlaceholder)
+  };
+  const appendLargeStaticTask = (type, centerX, centerY, centerZ) => {
+    const dedupeKey = `${type}:${centerX},${centerY},${centerZ}`;
+    if (largeStructureTaskKeySet.has(dedupeKey)) return;
+    largeStructureTaskKeySet.add(dedupeKey);
+    const createTask = largeStaticTaskFactories[type];
+    if (!createTask) return;
+    const task = createTask(centerX, centerY, centerZ);
+    if (!task) return;
+    task.centerX = centerX;
+    task.centerY = centerY;
+    task.centerZ = centerZ;
+    task.type = type;
+    structureQueueWithCenters.push({ task, centerX, centerY, centerZ, type });
+  };
+  const appendStaticTreeTask = (centerX, centerY, centerZ, treeType = 'default') => {
+    const dedupeKey = `static_tree:${centerX},${centerY},${centerZ}`;
+    if (largeStructureTaskKeySet.has(dedupeKey)) return;
+    largeStructureTaskKeySet.add(dedupeKey);
+    let task = null;
+    if (treeType === 'azalea') {
+      task = () => Tree.generate(centerX, centerY, centerZ, fakeChunk, 'azalea', dPlaceholder);
+    } else if (treeType === 'swamp') {
+      task = () => Tree.generate(centerX, centerY, centerZ, fakeChunk, 'swamp', dPlaceholder);
+    } else {
+      task = () => Tree.generate(centerX, centerY, centerZ, fakeChunk, 'default', dPlaceholder);
+    }
+    task.centerX = centerX;
+    task.centerY = centerY;
+    task.centerZ = centerZ;
+    task.type = 'static_tree';
+    structureQueueWithCenters.push({ task, centerX, centerY, centerZ, type: 'static_tree' });
+  };
+
+  // 使用结构候选索引查询大型静态结构
+  const largeCandidates = candidateIndex.getCandidatesForChunk(cx, cz, seed, terrainGen);
+  for (const candidate of largeCandidates) {
+    appendLargeStaticTask(candidate.type, candidate.x, candidate.y, candidate.z);
+  }
+  const staticTreeCandidates = candidateIndex.getStaticTreeCandidatesForChunk(cx, cz, seed, terrainGen);
+  for (const candidate of staticTreeCandidates) {
+    appendStaticTreeTask(candidate.x, candidate.y, candidate.z, 'azalea');
+  }
+
+  structureQueueWithCenters.forEach(({ task }) => {
+    task();
+  });
+
+  // --- 后处理（结构中心去重、方块数据构建、路由）---
+
+  const structureCenterKeySet = new Set();
+  const pushStructureCenter = (center) => {
+    if (!center || !center.type || center.x === undefined || center.y === undefined || center.z === undefined) return;
+    const centerKey = `${center.type}:${center.x},${center.y},${center.z}`;
+    if (structureCenterKeySet.has(centerKey)) return;
+    structureCenterKeySet.add(centerKey);
+    structureCenters.push(center);
+  };
+
+  structureCenters.length = 0;
+  structureQueueWithCenters.forEach(({ centerX, centerY, centerZ, type }) => {
+    if (!type || centerX === undefined) return;
+    pushStructureCenter({ type, x: centerX, y: centerY, z: centerZ });
+  });
+
+  // region 生成路径没有 snapshot，直接构建方块数据
+  const blockDataBlocks = buildBlockDataBlocks(blockMap);
+  const routing = buildChunkRouting(blockDataBlocks, [], cx, cz, []);
+
+  return {
+    blockDataBlocks,
+    routing,
+    modGunMan: [...modGunMan],
+    rovers: [...rovers],
+    structureCenters: [...structureCenters],
+    entities: { modGunMan: [...modGunMan], rovers: [...rovers] }
+  };
+}
+
+/**
+ * 在 Worker 内部完成 region 内的 overflow 方块路由。
+ * 替代主线程的 _mergeOverflowBlocks。
+ */
+function resolveOverflowWithinRegion(regionChunks, rx, rz, regionChunkSize) {
+  let resolved = 0;
+  let unresolved = 0;
+  const unresolvedCoords = new Set();
+  const unresolvedByDistance = new Map();
+
+  const regionMinCx = rx * regionChunkSize;
+  const regionMaxCx = regionMinCx + regionChunkSize - 1;
+  const regionMinCz = rz * regionChunkSize;
+  const regionMaxCz = regionMinCz + regionChunkSize - 1;
+
+  // 为每个 chunk 建立 O(1) 查找表，避免 O(n²) 的 .find()
+  const chunkBlockCodeSets = new Map();
+  for (const [key, result] of Object.entries(regionChunks)) {
+    if (!result.blockDataBlocks) continue;
+    const codeSet = new Set();
+    for (const block of result.blockDataBlocks) {
+      codeSet.add(encodeCoord(block.x, block.y, block.z));
+    }
+    chunkBlockCodeSets.set(key, codeSet);
+  }
+
+  for (const [sourceKey, result] of Object.entries(regionChunks)) {
+    if (!result.routing?.overflowChunks) continue;
+
+    for (const overflowEntry of result.routing.overflowChunks) {
+      const [targetCx, targetCz] = overflowEntry.chunkKey.split(',').map(Number);
+      const isInRegion = (
+        targetCx >= regionMinCx && targetCx <= regionMaxCx &&
+        targetCz >= regionMinCz && targetCz <= regionMaxCz
+      );
+
+      if (!isInRegion) {
+        const blockCount = overflowEntry.blockDataBlocks?.length || 0;
+        unresolved += blockCount;
+        const [sourceCx, sourceCz] = sourceKey.split(',').map(Number);
+        const offsetKey = `${targetCx - sourceCx},${targetCz - sourceCz}`;
+        unresolvedByDistance.set(offsetKey, (unresolvedByDistance.get(offsetKey) || 0) + blockCount);
+        for (const block of (overflowEntry.blockDataBlocks || [])) {
+          unresolvedCoords.add(encodeCoord(block.x, block.y, block.z));
+        }
+        continue;
+      }
+
+      const targetResult = regionChunks[overflowEntry.chunkKey];
+      if (!targetResult) continue;
+
+      const targetCodeSet = chunkBlockCodeSets.get(overflowEntry.chunkKey);
+      if (!targetCodeSet) continue;
+
+      for (const block of (overflowEntry.blockDataBlocks || [])) {
+        const code = encodeCoord(block.x, block.y, block.z);
+        if (targetCodeSet.has(code)) continue;
+
+        targetResult.blockDataBlocks.push({
+          x: block.x,
+          y: block.y,
+          z: block.z,
+          type: block.type,
+          orientation: block.orientation || 0
+        });
+        targetCodeSet.add(code);
+        resolved++;
+      }
+    }
+  }
+
+  return {
+    resolved,
+    unresolved,
+    uniqueUnresolvedCoords: unresolvedCoords.size,
+    topDistanceBuckets: Array.from(unresolvedByDistance.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([offset, blocks]) => ({ offset, blocks }))
+  };
+}
+
+/**
+ * Region 级生成入口函数。
+ * 在单个 worker 调用内同步循环生成整个 region 的所有 chunk，
+ * 共享候选索引和去重集合，内部完成 overflow routing。
+ */
+async function handleRegionGeneration(data) {
+  const { rx, rz, seed, taskId } = data;
+  const REGION_CHUNK_SIZE = 8;
+
+  // 1. Region 级共享状态
+  const regionCandidateIndex = new StructureCandidateIndex();
+  const regionLargeStructureTaskKeySet = new Set();
+  const regionStructureQueueWithCenters = [];
+  const regionStructureCenters = [];
+  const regionModGunMan = [];
+  const regionRovers = [];
+
+  // 2. 逐个 chunk 同步生成
+  const regionChunks = {};
+  for (let localCx = 0; localCx < REGION_CHUNK_SIZE; localCx++) {
+    for (let localCz = 0; localCz < REGION_CHUNK_SIZE; localCz++) {
+      const cx = rx * REGION_CHUNK_SIZE + localCx;
+      const cz = rz * REGION_CHUNK_SIZE + localCz;
+
+      const chunkResult = generateChunkWithSharedState({
+        cx, cz, seed,
+        candidateIndex: regionCandidateIndex,
+        largeStructureTaskKeySet: regionLargeStructureTaskKeySet,
+        structureQueueWithCenters: regionStructureQueueWithCenters,
+        structureCenters: regionStructureCenters,
+        modGunMan: regionModGunMan,
+        rovers: regionRovers
+      });
+
+      regionChunks[`${cx},${cz}`] = chunkResult;
+    }
+  }
+
+  // 3. Worker 内部 overflow routing
+  const routingDiagnostics = resolveOverflowWithinRegion(
+    regionChunks, rx, rz, REGION_CHUNK_SIZE
+  );
+
+  // 4. 返回完整 region 结果
+  postMessage({
+    type: 'regionGenerated',
+    rx, rz,
+    chunks: regionChunks,
+    routingDiagnostics,
+    taskId
+  });
+}
+
 onmessage = async function(e) {
+  const { type = 'generateChunk' } = e.data;
+
+  // Region 级生成：路由到专用处理函数
+  if (type === 'generateRegion') {
+    await handleRegionGeneration(e.data);
+    return;
+  }
+
+  // 以下为现有的 chunk 级生成逻辑（generateChunk / consolidation 路径）
   const workerReceivedAt = performance.now();
   const {
     cx,
@@ -485,9 +1441,9 @@ onmessage = async function(e) {
     callbackKey,
     taskId,
     isOptimization = false,
-    _consolidationRequestSentAt = 0,  // 主线程发送时间戳
-    textureGroups = {},  // 新增：纹理分组配置
-    skipTerrainGeneration = false  // 存档加载优化：snapshot 完整时跳过地形生成
+    _consolidationRequestSentAt = 0,
+    textureGroups = {},
+    skipTerrainGeneration = false
   } = e.data;
 
   // 同步种子

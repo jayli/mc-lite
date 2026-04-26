@@ -24,7 +24,7 @@ import { encodeCoord } from '../utils/CoordEncoding.js';
 const REGION_SIZE_IN_CHUNKS = 8;
 const DEFAULT_INITIAL_REGION_RADIUS = 3; // 初始生成 7x7 region = 56x56 chunk
 const CHUNK_SIZE = 16;
-const REGION_GENERATION_HALO_IN_CHUNKS = 1;
+const _REGION_GENERATION_HALO_IN_CHUNKS = 1; // 预生成不再使用，保留供向后兼容
 
 // --- 依赖注入 ---
 const getWorldStore = () => globalThis._worldStore || worldStore;
@@ -202,71 +202,104 @@ export class WorldGenerationService {
   /**
    * 生成单个 region（8x8 chunk）
    *
-   * 策略：逐个 chunk 调用 WorldWorker 生成，收集所有 chunk 结果，
-   * 合并为 RegionRecord 写入 WorldStore。
-   *
-   * 注意：跨 chunk 结构（如城市建筑）由 CityMap 的确定性布局保证一致性。
+   * 策略：一次 worker 调用完成整个 region 的生成，
+   * worker 内部共享候选索引和去重集合，完成 overflow routing。
    *
    * @param {number} rx
    * @param {number} rz
    */
   async _generateRegion(rx, rz) {
     const regionKey = this._regionKey(rx, rz);
-    const chunks = {};
-    const chunkKeys = [];
-    const startCx = rx * this._regionSizeInChunks;
-    const startCz = rz * this._regionSizeInChunks;
-    const endCx = startCx + this._regionSizeInChunks - 1;
-    const endCz = startCz + this._regionSizeInChunks - 1;
 
-    // 收集所有 chunk 的完整 routing 结果（含 halo 与 overflow）
-    const chunkResults = {};
+    return new Promise((resolve) => {
+      const taskId = `pregen-region:${rx},${rz}:${Date.now()}`;
 
-    // 使用 1 chunk halo 生成邻接来源，保证跨 region 的相邻 owner
-    // 能在目标 chunk 已存在时直接落到正确的 target result 中。
-    for (let cx = startCx - REGION_GENERATION_HALO_IN_CHUNKS; cx <= endCx + REGION_GENERATION_HALO_IN_CHUNKS; cx++) {
-      for (let cz = startCz - REGION_GENERATION_HALO_IN_CHUNKS; cz <= endCz + REGION_GENERATION_HALO_IN_CHUNKS; cz++) {
-        const chunkKey = this._chunkKey(cx, cz);
+      workerCallbacks.set(taskId, (data) => {
+        // 构建 RegionRecord：直接使用 worker 返回的 chunks
+        const chunks = {};
+        const chunkKeys = [];
 
-        const chunkResult = await this._generateChunkWithRouting(cx, cz);
-        if (chunkResult) {
-          chunkResults[chunkKey] = chunkResult;
+        for (const [chunkKey, result] of Object.entries(data.chunks)) {
+          const [cx, cz] = chunkKey.split(',').map(Number);
+          if (!this._isChunkInRegion(cx, cz, rx, rz)) continue;
+
+          chunkKeys.push(chunkKey);
+          chunks[chunkKey] = {
+            blockData: this._buildBlockDataFromRouting(result),
+            staticEntities: this._buildStaticEntitiesFromResult(result),
+            runtimeSeedData: {
+              structureCenters: result.structureCenters || []
+            }
+          };
         }
-      }
+
+        const regionRecord = {
+          regionKey,
+          rx,
+          rz,
+          chunkKeys,
+          chunks,
+          generatedAt: Date.now(),
+          generatorVersion: '1.0',
+          routingDiagnostics: data.routingDiagnostics
+        };
+
+        getWorldStore().saveRegionRecord(rx, rz, regionRecord);
+
+        if (data.routingDiagnostics?.unresolved > 0) {
+          console.warn('[WorldGenerationService] Region generation had unresolved overflow blocks', {
+            regionKey,
+            ...data.routingDiagnostics
+          });
+        }
+
+        resolve(regionRecord);
+      });
+
+      getWorldWorker().postMessage({
+        type: 'generateRegion',
+        rx,
+        rz,
+        taskId,
+        seed: this._seed
+      });
+    });
+  }
+
+  /**
+   * 从 chunk 结果中提取 blockData（优先使用 blockDataBlocks）。
+   */
+  _buildBlockDataFromRouting(result) {
+    const blockData = {};
+    const blocks = result.blockDataBlocks || [];
+    for (const block of blocks) {
+      const code = encodeCoord(block.x, block.y, block.z);
+      const entry = block.orientation
+        ? { type: block.type, orientation: block.orientation }
+        : block.type;
+      blockData[code] = entry;
     }
+    return blockData;
+  }
 
-    // 合并 overflow 方块：Worker 生成的方块可能落在相邻 chunk，
-    // 需要按坐标归属分发到正确的 chunk 中
-    this._mergeOverflowBlocks(chunkResults, { regionKey });
-
-    // 构建 RegionRecord：只持久化核心 region 的 owner chunk。
-    for (const [chunkKey, result] of Object.entries(chunkResults)) {
-      const [cx, cz] = chunkKey.split(',').map(Number);
-      if (!this._isChunkInRegion(cx, cz, rx, rz)) continue;
-
-      chunkKeys.push(chunkKey);
-      chunks[chunkKey] = {
-        blockData: result.blockData,
-        staticEntities: result.staticEntities,
-        runtimeSeedData: result.runtimeSeedData
-      };
+  /**
+   * 从 chunk 结果构建静态实体数据。
+   */
+  _buildStaticEntitiesFromResult(result) {
+    const entities = [];
+    if (result.entities?.modGunMan?.length > 0) {
+      entities.push({
+        type: 'modGunMan',
+        positions: result.entities.modGunMan
+      });
     }
-
-    // 构建 RegionRecord
-    const regionRecord = {
-      regionKey,
-      rx,
-      rz,
-      chunkKeys,
-      chunks,
-      generatedAt: Date.now(),
-      generatorVersion: '1.0'
-    };
-
-    // 写入 WorldStore
-    await getWorldStore().saveRegionRecord(rx, rz, regionRecord);
-
-    return regionRecord;
+    if (result.entities?.rovers?.length > 0) {
+      entities.push({
+        type: 'rovers',
+        positions: result.entities.rovers
+      });
+    }
+    return entities;
   }
 
   /**
