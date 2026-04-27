@@ -31,6 +31,7 @@ export class WorldRuntime {
     this._regionSizeInChunks = REGION_SIZE_IN_CHUNKS;
     this._flushing = false;
     this._worldStore = options.worldStore || getWorldStore();
+    this._regionLoadPromises = new Map(); // regionKey -> Promise，用于并发请求去重
   }
 
   /**
@@ -71,20 +72,9 @@ export class WorldRuntime {
    */
   async ensureChunkData(cx, cz) {
     const { rx, rz } = this._chunkToRegion(cx, cz);
-    const regionKey = this._regionKey(rx, rz);
+    const region = await this.ensureRegion(rx, rz);
 
-    // 1. 尝试从 RegionCache 获取
-    let region = this._regionCache.get(regionKey);
-
-    // 2. 缓存未命中，从 WorldStore 读取
-    if (!region) {
-      region = await this._worldStore.getRegionRecord(rx, rz);
-      if (region) {
-        this._regionCache.set(regionKey, region);
-      }
-    }
-
-    // 3. 从 RegionRecord 中切出目标 chunk
+    // 从 RegionRecord 中切出目标 chunk
     if (!region || !region.chunks) {
       return { status: 'missing-region' };
     }
@@ -279,14 +269,31 @@ export class WorldRuntime {
    */
   async ensureRegion(rx, rz) {
     const regionKey = this._regionKey(rx, rz);
-    let region = this._regionCache.get(regionKey);
-    if (!region) {
-      region = await this._worldStore.getRegionRecord(rx, rz);
-      if (region) {
-        this._regionCache.set(regionKey, region);
-      }
-    }
-    return region;
+
+    // 1. 缓存命中
+    const cached = this._regionCache.get(regionKey);
+    if (cached) return cached;
+
+    // 2. 检查是否已有正在进行的请求
+    const existingPromise = this._regionLoadPromises.get(regionKey);
+    if (existingPromise) return existingPromise;
+
+    // 3. 发起新请求
+    const loadPromise = this._worldStore.getRegionRecord(rx, rz)
+      .then((record) => {
+        if (record) {
+          this._regionCache.set(regionKey, record);
+        }
+        this._regionLoadPromises.delete(regionKey);
+        return record;
+      })
+      .catch((err) => {
+        this._regionLoadPromises.delete(regionKey);
+        throw err;
+      });
+
+    this._regionLoadPromises.set(regionKey, loadPromise);
+    return loadPromise;
   }
 
   /**
@@ -337,6 +344,42 @@ export class WorldRuntime {
       globalThis.clearTimeout(timer);
       this._flushTimers.delete(key);
     }
+  }
+
+  /**
+   * 预取玩家周围的 region（尽力而为，不阻塞）
+   * @param {number} playerCx - 玩家所在 chunk X
+   * @param {number} playerCz - 玩家所在 chunk Z
+   * @param {number} [maxPrefetches=1] - 每轮最多预取数量
+   * @returns {number} 实际预取的 region 数量
+   */
+  prefetchRegions(playerCx, playerCz, maxPrefetches = 1) {
+    const playerRx = Math.floor(playerCx / this._regionSizeInChunks);
+    const playerRz = Math.floor(playerCz / this._regionSizeInChunks);
+
+    // 相邻 4 个 region（上/下/左/右）
+    const neighbors = [
+      { rx: playerRx - 1, rz: playerRz },
+      { rx: playerRx + 1, rz: playerRz },
+      { rx: playerRx, rz: playerRz - 1 },
+      { rx: playerRx, rz: playerRz + 1 }
+    ];
+
+    let prefetched = 0;
+    for (const { rx, rz } of neighbors) {
+      if (prefetched >= maxPrefetches) break;
+      const regionKey = this._regionKey(rx, rz);
+
+      // 跳过已缓存或正在加载的
+      if (this._regionCache.has(regionKey)) continue;
+      if (this._regionLoadPromises.has(regionKey)) continue;
+
+      // 静默预取（不 await，不阻塞）
+      this.ensureRegion(rx, rz).catch(() => {});
+      prefetched++;
+    }
+
+    return prefetched;
   }
 
   /**

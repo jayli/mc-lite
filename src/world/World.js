@@ -175,6 +175,12 @@ export class World {
     this.worldBoundsController = new WorldBoundsController();
     this.worldGenerationService = new WorldGenerationService();
     this.worldGenerationService.setWorld(this);
+
+    // --- Region 预取定时器 ---
+    this._prefetchIntervalMs = 500;
+    this._prefetchTimer = globalThis.setInterval(() => {
+      this._runPrefetch();
+    }, this._prefetchIntervalMs);
   }
 
   applyWorldMeta(meta) {
@@ -221,6 +227,22 @@ export class World {
 
   isGameplayReady() {
     return this.bootstrapState.phase === 'runtime-streaming';
+  }
+
+  _runPrefetch() {
+    if (this.bootstrapState.phase !== 'runtime-streaming') return;
+    if (!this.worldRuntime) return;
+
+    const playerCx = Math.floor(this._lastPlayerPos.x / CHUNK_SIZE);
+    const playerCz = Math.floor(this._lastPlayerPos.z / CHUNK_SIZE);
+    this.worldRuntime.prefetchRegions(playerCx, playerCz, 1);
+  }
+
+  dispose() {
+    if (this._prefetchTimer) {
+      globalThis.clearInterval(this._prefetchTimer);
+      this._prefetchTimer = null;
+    }
   }
 
   _ensureBootstrapTargets(cx, cz) {
