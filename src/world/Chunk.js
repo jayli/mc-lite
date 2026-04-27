@@ -147,6 +147,7 @@ export class Chunk {
      */
     this.solidBlocks = new Set();
     this.visibleKeys = new Set();
+    this.lightSourceCoords = new Set(); // 光源方块坐标索引，避免遍历整个 blockData
     this.instanceIndexMap = new Map();
 
     /**
@@ -329,6 +330,7 @@ export class Chunk {
     this.blockPaletteReverse.clear();
     this.solidBlocks.clear();
     this.solidBlockIds.clear();
+    this.lightSourceCoords.clear();
     this.nextBlockId = 1;
 
     // 注入新数据
@@ -343,6 +345,9 @@ export class Chunk {
       const props = getBlockProps(type);
       if (props?.isSolid) {
         this.solidBlocks.add(code);
+      }
+      if (props?.isLightSource) {
+        this.lightSourceCoords.add(code);
       }
 
       // 尝试填充 blockDataArray（仅 Y:0~15）
@@ -562,6 +567,12 @@ export class Chunk {
       this.solidBlocks.add(code);
     } else {
       this.solidBlocks.delete(code);
+    }
+
+    // 同步光源索引：先移除旧记录，再根据新类型决定是否加入
+    this.lightSourceCoords.delete(code);
+    if (props.isLightSource) {
+      this.lightSourceCoords.add(code);
     }
 
     // === 新的数组存储（高性能） ===
@@ -1571,8 +1582,10 @@ export class Chunk {
     // 初始化数据结构
     if (!this.visibleKeys) this.visibleKeys = new Set();
     if (!this.solidBlocks) this.solidBlocks = new Set();
+    if (!this.lightSourceCoords) this.lightSourceCoords = new Set();
     this.visibleKeys.clear();
     this.solidBlocks.clear();
+    this.lightSourceCoords.clear();
 
     if (visibleKeys) {
       for (const key of visibleKeys) {
@@ -1848,20 +1861,18 @@ export class Chunk {
 
   /**
    * 注册该 Chunk 中的所有光源方块
-   * 扫描 blockData 中标记为 isLightSource 的方块，创建对应的 PointLight
+   * 直接遍历 lightSourceCoords 索引，无需扫描整个 blockData
    */
   _registerLightSources() {
     if (!this.world.lightSourceManager) return;
 
-    for (const [code, entry] of this.blockData) {
+    for (const code of this.lightSourceCoords) {
+      const entry = this.blockData.get(code);
+      if (!entry) continue;
       const parsed = parseBlockEntry(entry);
       if (!parsed.type || parsed.type === 'air') continue;
-
-      const props = getBlockProps(parsed.type);
-      if (props.isLightSource) {
-        const { x, y, z } = Chunk.decodeCoord(code);
-        this.world.lightSourceManager.addLight(x, y, z, parsed.type);
-      }
+      const { x, y, z } = Chunk.decodeCoord(code);
+      this.world.lightSourceManager.addLight(x, y, z, parsed.type);
     }
   }
 
@@ -1872,15 +1883,9 @@ export class Chunk {
   _unregisterLightSources() {
     if (!this.world.lightSourceManager) return;
 
-    for (const [code, entry] of this.blockData) {
-      const parsed = parseBlockEntry(entry);
-      if (!parsed.type || parsed.type === 'air') continue;
-
-      const props = getBlockProps(parsed.type);
-      if (props.isLightSource) {
-        const { x, y, z } = Chunk.decodeCoord(code);
-        this.world.lightSourceManager.removeLight(x, y, z);
-      }
+    for (const code of this.lightSourceCoords) {
+      const { x, y, z } = Chunk.decodeCoord(code);
+      this.world.lightSourceManager.removeLight(x, y, z);
     }
   }
 
@@ -2152,6 +2157,7 @@ export class Chunk {
         this.blockData.delete(code);
         this.visibleKeys.delete(code);
         this.solidBlocks.delete(code);
+        this.lightSourceCoords.delete(code);
         getPersistenceService().recordChangeForChunk(this.cx, this.cz, px, py, pz, 'air');
 
         // 记录 AO Worker 副本同步 delta
@@ -2478,6 +2484,7 @@ export class Chunk {
     // 确保数据结构已初始化
     if (!this.visibleKeys) this.visibleKeys = new Set();
     if (!this.solidBlocks) this.solidBlocks = new Set();
+    if (!this.lightSourceCoords) this.lightSourceCoords = new Set();
 
     for (const block of scatteredBlocks) {
       const localX = block.x - minX;
@@ -2501,6 +2508,11 @@ export class Chunk {
       const props = getBlockProps(block.type);
       if (props.isSolid) {
         this.solidBlocks.add(code);
+      }
+      // 同步光源索引
+      this.lightSourceCoords.delete(code);
+      if (props.isLightSource) {
+        this.lightSourceCoords.add(code);
       }
     }
     const t1 = globalThis.performance?.now?.() ?? Date.now();
@@ -2613,6 +2625,11 @@ export class Chunk {
       const props = getBlockProps(block.type);
       if (props.isSolid) {
         this.solidBlocks.add(code);
+      }
+      // 同步光源索引
+      this.lightSourceCoords.delete(code);
+      if (props.isLightSource) {
+        this.lightSourceCoords.add(code);
       }
 
       appendedCount++;
