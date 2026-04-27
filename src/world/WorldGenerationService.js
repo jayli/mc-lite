@@ -175,12 +175,17 @@ export class WorldGenerationService {
 
       for (let rx = minRx; rx <= maxRx; rx++) {
         for (let rz = minRz; rz <= maxRz; rz++) {
-          await this._generateRegion(rx, rz);
-          completedRegions++;
-          if (onProgress) {
-            onProgress(completedRegions, totalRegions);
+          try {
+            await this._generateRegion(rx, rz);
+            completedRegions++;
+            if (onProgress) {
+              onProgress(completedRegions, totalRegions);
+            }
+            console.log(`[WorldGenerationService] Region ${rx},${rz} done (${completedRegions}/${totalRegions})`);
+          } catch (err) {
+            console.error(`[WorldGenerationService] Region ${rx},${rz} generation failed:`, err);
+            // 继续生成其他 region，不中断整个预生成流程
           }
-          console.log(`[WorldGenerationService] Region ${rx},${rz} done (${completedRegions}/${totalRegions})`);
         }
       }
 
@@ -211,10 +216,10 @@ export class WorldGenerationService {
   async _generateRegion(rx, rz) {
     const regionKey = this._regionKey(rx, rz);
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const taskId = `pregen-region:${rx},${rz}:${Date.now()}`;
 
-      workerCallbacks.set(taskId, (data) => {
+      workerCallbacks.set(taskId, async (data) => {
         // 构建 RegionRecord：直接使用 worker 返回的 chunks
         const chunks = {};
         const chunkKeys = [];
@@ -244,7 +249,13 @@ export class WorldGenerationService {
           routingDiagnostics: data.routingDiagnostics
         };
 
-        getWorldStore().saveRegionRecord(rx, rz, regionRecord);
+        try {
+          await getWorldStore().saveRegionRecord(rx, rz, regionRecord);
+        } catch (err) {
+          console.error('[WorldGenerationService] Failed to save region record:', err);
+          reject(err);
+          return;
+        }
 
         if (data.routingDiagnostics?.unresolved > 0) {
           console.warn('[WorldGenerationService] Region generation had unresolved overflow blocks', {
@@ -581,8 +592,13 @@ export class WorldGenerationService {
       // 执行生成
       let completed = 0;
       for (const { rx, rz } of regionsToGenerate) {
-        await this._generateRegion(rx, rz);
-        completed++;
+        try {
+          await this._generateRegion(rx, rz);
+          completed++;
+        } catch (err) {
+          console.error(`[WorldGenerationService] Expansion region ${rx},${rz} generation failed:`, err);
+          // 继续生成其他 region，不中断扩图流程
+        }
       }
 
       // 更新边界

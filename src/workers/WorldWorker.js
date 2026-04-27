@@ -1276,13 +1276,27 @@ function generateChunkWithSharedState(params) {
   const blockDataBlocks = buildBlockDataBlocks(blockMap);
   const routing = buildChunkRouting(blockDataBlocks, [], cx, cz, []);
 
+  // 过滤实体：只保留坐标落在当前 chunk 边界内的实体
+  const chunkMinX = cx * CHUNK_SIZE_LOCAL;
+  const chunkMaxX = (cx + 1) * CHUNK_SIZE_LOCAL;
+  const chunkMinZ = cz * CHUNK_SIZE_LOCAL;
+  const chunkMaxZ = (cz + 1) * CHUNK_SIZE_LOCAL;
+
+  const isInChunkBounds = (e) => (
+    e.x >= chunkMinX && e.x < chunkMaxX &&
+    e.z >= chunkMinZ && e.z < chunkMaxZ
+  );
+
+  const chunkModGunMan = modGunMan.filter(isInChunkBounds);
+  const chunkRovers = rovers.filter(isInChunkBounds);
+
   return {
     blockDataBlocks,
     routing,
-    modGunMan: [...modGunMan],
-    rovers: [...rovers],
+    modGunMan: chunkModGunMan,
+    rovers: chunkRovers,
     structureCenters: [...structureCenters],
-    entities: { modGunMan: [...modGunMan], rovers: [...rovers] }
+    entities: { modGunMan: chunkModGunMan, rovers: chunkRovers }
   };
 }
 
@@ -1375,6 +1389,8 @@ function resolveOverflowWithinRegion(regionChunks, rx, rz, regionChunkSize) {
  */
 async function handleRegionGeneration(data) {
   const { rx, rz, seed, taskId } = data;
+  setSeed(seed);
+  await structuresPreload;
   const REGION_CHUNK_SIZE = 8;
 
   // 1. Region 级共享状态
