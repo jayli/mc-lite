@@ -320,7 +320,7 @@ describe('PersistenceService 真实类测试', (test) => {
   // =========== 配置测试 ===========
   test('PERSISTENCE_CONFIG 值正确', () => {
     assertEqual(PERSISTENCE_CONFIG.DB_NAME, 'mc_lite_persistence', '数据库名称正确');
-    assertEqual(PERSISTENCE_CONFIG.DB_VERSION, 2, '数据库版本正确（v2: WorldStore 架构）');
+    assertEqual(PERSISTENCE_CONFIG.DB_VERSION, 3, '数据库版本正确（v3: WorldStore + world_overflow 架构）');
     assertEqual(PERSISTENCE_CONFIG.STORE_NAME, 'world_deltas', '存储名称正确');
     assertEqual(PERSISTENCE_CONFIG.SESSION_ONLY, true, '默认仅会话模式');
     assertEqual(PERSISTENCE_CONFIG.CACHE_LIMIT, 100, '缓存限制为 100');

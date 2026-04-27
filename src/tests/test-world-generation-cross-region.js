@@ -184,9 +184,9 @@ describe('WorldGenerationService 跨 region owner 归属测试', (test) => {
 });
 
 describe('WorldGenerationService 跨 region overflow 收集与分发', (test) => {
-  test('_collectCrossRegionOverflow - 应将 overflow 按目标 region 分组', () => {
+  test('_collectCrossRegionOverflow - 应将 overflow 按目标 region 分组', async () => {
     const service = new WorldGenerationService();
-    service._collectCrossRegionOverflow({
+    await service._collectCrossRegionOverflow({
       routingDiagnostics: {
         unresolvedOverflowBlocks: [
           { chunkKey: '8,0', blockDataBlocks: [{ x: 128, y: 5, z: 0, type: 'stone' }] },
@@ -205,7 +205,6 @@ describe('WorldGenerationService 跨 region overflow 收集与分发', (test) =>
     const savedRegions = [];
     globalThis._worldStore = {
       getRegionRecord: async (rx, rz) => {
-        const key = `${rx},${rz}`;
         const found = savedRegions.find((r) => r.rx === rx && r.rz === rz);
         return found ? found.record : null;
       },
@@ -249,14 +248,10 @@ describe('WorldGenerationService 跨 region overflow 收集与分发', (test) =>
     assertFalse(service._crossRegionOverflowMap.has('1,0'), '分发后应从 map 中移除');
   });
 
-  test('_distributeCrossRegionOverflow - 目标 region 不在同批次时应持久化', async () => {
-    let persistedOverflow = null;
+  test('_distributeCrossRegionOverflow - 目标 region 不在同批次时应保留在内存 map 中', async () => {
     globalThis._worldStore = {
       getRegionRecord: async () => null,
-      saveRegionRecord: async () => {},
-      saveOverflowBlocks: async (rx, rz, data) => {
-        persistedOverflow = { rx, rz, data };
-      }
+      saveRegionRecord: async () => {}
     };
 
     const service = new WorldGenerationService();
@@ -266,36 +261,7 @@ describe('WorldGenerationService 跨 region overflow 收集与分发', (test) =>
 
     await service._distributeCrossRegionOverflow(['1,0']);
 
-    assertNotNull(persistedOverflow, '应持久化到 world_overflow');
-    assertEqual(persistedOverflow.rx, 5, '应持久化到目标 region rx=5');
-    assertEqual(persistedOverflow.rz, 5, '应持久化到目标 region rz=5');
-    assertFalse(service._crossRegionOverflowMap.has('5,5'), '持久化后应从 map 中移除');
-  });
-
-  test('_consumeOverflowForRegion - 扩图时应消费已持久化的 overflow', async () => {
-    let removedRegionKey = null;
-    globalThis._worldStore = {
-      getOverflowBlocks: async () => ({
-        '8,0': [{ x: 128, y: 5, z: 0, type: 'stone', orientation: 0 }]
-      }),
-      getRegionRecord: async () => ({
-        regionKey: '1,0',
-        rx: 1, rz: 0,
-        chunkKeys: ['8,0'],
-        chunks: {
-          '8,0': { blockData: {}, staticEntities: [], runtimeSeedData: {} }
-        }
-      }),
-      saveRegionRecord: async () => {},
-      removeOverflowBlocks: async (rx, rz) => {
-        removedRegionKey = `${rx},${rz}`;
-      }
-    };
-
-    const service = new WorldGenerationService();
-    await service._consumeOverflowForRegion(1, 0);
-
-    assertEqual(removedRegionKey, '1,0', '消费后应删除 overflow 记录');
+    assertTrue(service._crossRegionOverflowMap.has('5,5'), '非同批次的 overflow 应保留在 map 中');
   });
 });
 
