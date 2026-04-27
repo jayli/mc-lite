@@ -7,6 +7,7 @@ let db = null;
 // WorldStore 专用 object store 名称
 const WORLD_META_STORE = 'world_meta';
 const WORLD_REGION_STORE = 'world_regions';
+const WORLD_OVERFLOW_STORE = 'world_overflow';
 
 /**
  * 初始化 IndexedDB 数据库
@@ -15,6 +16,10 @@ const WORLD_REGION_STORE = 'world_regions';
 async function init() {
   // 如果旧连接版本过低（缺少新 stores），关闭后重新打开以触发升级
   if (db && !db.objectStoreNames.contains(WORLD_META_STORE)) {
+    db.close();
+    db = null;
+  }
+  if (db && !db.objectStoreNames.contains(WORLD_OVERFLOW_STORE)) {
     db.close();
     db = null;
   }
@@ -32,6 +37,9 @@ async function init() {
       }
       if (!dbInstance.objectStoreNames.contains(WORLD_REGION_STORE)) {
         dbInstance.createObjectStore(WORLD_REGION_STORE, { keyPath: 'regionKey' });
+      }
+      if (!dbInstance.objectStoreNames.contains(WORLD_OVERFLOW_STORE)) {
+        dbInstance.createObjectStore(WORLD_OVERFLOW_STORE, { keyPath: 'regionKey' });
       }
     }
   );
@@ -161,17 +169,54 @@ function getAllRegionKeys() {
 }
 
 /**
- * 清除世界数据（WorldMeta + RegionRecord + world_deltas）
+ * 保存跨 region 的 overflow 方块数据
+ * @param {string} regionKey - "rx,rz"
+ * @param {object} overflowData - overflow 方块数据
+ */
+function saveOverflowBlocks(regionKey, overflowData) {
+  return performTransaction(db, WORLD_OVERFLOW_STORE, 'readwrite', (store) =>
+    store.put({
+      regionKey,
+      data: overflowData,
+      lastModified: Date.now()
+    })
+  );
+}
+
+/**
+ * 获取跨 region 的 overflow 方块数据
+ * @param {string} regionKey - "rx,rz"
+ * @returns {Promise<object|null>}
+ */
+function getOverflowBlocks(regionKey) {
+  return performTransaction(db, WORLD_OVERFLOW_STORE, 'readonly', (store) =>
+    store.get(regionKey)
+  ).then((result) => result ? result.data : null);
+}
+
+/**
+ * 删除跨 region 的 overflow 方块数据
+ * @param {string} regionKey - "rx,rz"
+ */
+function removeOverflowBlocks(regionKey) {
+  return performTransaction(db, WORLD_OVERFLOW_STORE, 'readwrite', (store) =>
+    store.delete(regionKey)
+  );
+}
+
+/**
+ * 清除世界数据（WorldMeta + RegionRecord + world_deltas + world_overflow）
  */
 function clearWorld() {
   if (!db) {
     return Promise.reject(new Error('DB not initialized'));
   }
   return new Promise((resolve, reject) => {
-    const tx = db.transaction([WORLD_META_STORE, WORLD_REGION_STORE, PERSISTENCE_CONFIG.STORE_NAME], 'readwrite');
+    const tx = db.transaction([WORLD_META_STORE, WORLD_REGION_STORE, PERSISTENCE_CONFIG.STORE_NAME, WORLD_OVERFLOW_STORE], 'readwrite');
     tx.objectStore(WORLD_META_STORE).clear();
     tx.objectStore(WORLD_REGION_STORE).clear();
     tx.objectStore(PERSISTENCE_CONFIG.STORE_NAME).clear();
+    tx.objectStore(WORLD_OVERFLOW_STORE).clear();
     tx.oncomplete = () => resolve(true);
     tx.onerror = () => reject(tx.error);
   });
@@ -218,6 +263,17 @@ self.onmessage = async (event) => {
         break;
       case 'getAllRegionKeys':
         result = await getAllRegionKeys();
+        break;
+      case 'saveOverflowBlocks':
+        await saveOverflowBlocks(payload.regionKey, payload.overflowData);
+        result = true;
+        break;
+      case 'getOverflowBlocks':
+        result = await getOverflowBlocks(payload.regionKey);
+        break;
+      case 'removeOverflowBlocks':
+        await removeOverflowBlocks(payload.regionKey);
+        result = true;
         break;
       case 'clearWorld':
         await clearWorld();

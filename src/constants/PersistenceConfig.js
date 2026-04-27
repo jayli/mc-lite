@@ -4,7 +4,7 @@
  */
 export const PERSISTENCE_CONFIG = {
   DB_NAME: 'mc_lite_persistence',
-  DB_VERSION: 2, // v2: 新增 world_meta 和 world_regions stores（WorldStore 架构）
+  DB_VERSION: 3, // v3: 新增 world_overflow store（跨 region overflow 持久化）
   STORE_NAME: 'world_deltas',
   // 区块尺寸
   CHUNK_SIZE: 16,
