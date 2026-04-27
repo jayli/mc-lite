@@ -1309,6 +1309,7 @@ function resolveOverflowWithinRegion(regionChunks, rx, rz, regionChunkSize) {
   let unresolved = 0;
   const unresolvedCoords = new Set();
   const unresolvedByDistance = new Map();
+  const unresolvedOverflowBlocks = [];
 
   const regionMinCx = rx * regionChunkSize;
   const regionMaxCx = regionMinCx + regionChunkSize - 1;
@@ -1345,6 +1346,11 @@ function resolveOverflowWithinRegion(regionChunks, rx, rz, regionChunkSize) {
         for (const block of (overflowEntry.blockDataBlocks || [])) {
           unresolvedCoords.add(encodeCoord(block.x, block.y, block.z));
         }
+        // 收集跨 region overflow 数据用于主线程分发
+        unresolvedOverflowBlocks.push({
+          chunkKey: overflowEntry.chunkKey,
+          blockDataBlocks: overflowEntry.blockDataBlocks || []
+        });
         continue;
       }
 
@@ -1378,7 +1384,8 @@ function resolveOverflowWithinRegion(regionChunks, rx, rz, regionChunkSize) {
     topDistanceBuckets: Array.from(unresolvedByDistance.entries())
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
-      .map(([offset, blocks]) => ({ offset, blocks }))
+      .map(([offset, blocks]) => ({ offset, blocks })),
+    unresolvedOverflowBlocks
   };
 }
 
