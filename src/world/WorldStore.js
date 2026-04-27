@@ -218,6 +218,42 @@ export class WorldStore {
   }
 
   // ============================================================
+  // Cross-Region Overflow Blocks 读写
+  // ============================================================
+
+  /**
+   * 保存跨 region overflow blocks
+   * @param {number} rx
+   * @param {number} rz
+   * @param {object} overflowData - { "cx,cz": [{x,y,z,type,orientation}, ...] }
+   */
+  async saveOverflowBlocks(rx, rz, overflowData) {
+    const regionKey = this.regionKey(rx, rz);
+    return getPersistenceService().postMessage('saveOverflowBlocks', { regionKey, overflowData });
+  }
+
+  /**
+   * 读取跨 region overflow blocks
+   * @param {number} rx
+   * @param {number} rz
+   * @returns {Promise<object|null>} { "cx,cz": [...] }
+   */
+  async getOverflowBlocks(rx, rz) {
+    const regionKey = this.regionKey(rx, rz);
+    return getPersistenceService().postMessage('getOverflowBlocks', { regionKey });
+  }
+
+  /**
+   * 删除跨 region overflow blocks
+   * @param {number} rx
+   * @param {number} rz
+   */
+  async removeOverflowBlocks(rx, rz) {
+    const regionKey = this.regionKey(rx, rz);
+    return getPersistenceService().postMessage('removeOverflowBlocks', { regionKey });
+  }
+
+  // ============================================================
   // 清除世界数据
   // ============================================================
 
