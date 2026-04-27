@@ -38,6 +38,7 @@ export class WorldGenerationService {
     this._world = null;
     this._isGenerating = false;
     this._onProgress = options.onProgress || null;
+    this._crossRegionOverflowMap = new Map(); // 暂存跨 region overflow
   }
 
   setWorld(world) {
@@ -189,6 +190,15 @@ export class WorldGenerationService {
         }
       }
 
+      // 分发跨 region overflow blocks
+      const generatedRegionKeys = [];
+      for (let rx = minRx; rx <= maxRx; rx++) {
+        for (let rz = minRz; rz <= maxRz; rz++) {
+          generatedRegionKeys.push(this._regionKey(rx, rz));
+        }
+      }
+      await this._distributeCrossRegionOverflow(generatedRegionKeys);
+
       // 4. 更新状态
       meta.generationState = 'done';
       await getWorldStore().saveWorldMeta(meta);
@@ -198,6 +208,134 @@ export class WorldGenerationService {
     } finally {
       this._isGenerating = false;
     }
+  }
+
+  /**
+   * 收集 Worker 返回的跨 region overflow blocks
+   * @param {object} data - Worker 返回的 regionGenerated 数据
+   */
+  _collectCrossRegionOverflow(data) {
+    const overflowBlocks = data.routingDiagnostics?.unresolvedOverflowBlocks || [];
+    for (const entry of overflowBlocks) {
+      const [targetCx, targetCz] = entry.chunkKey.split(',').map(Number);
+      const { rx: targetRx, rz: targetRz } = this._chunkToRegion(targetCx, targetCz);
+      const targetRegionKey = this._regionKey(targetRx, targetRz);
+
+      if (!this._crossRegionOverflowMap.has(targetRegionKey)) {
+        this._crossRegionOverflowMap.set(targetRegionKey, []);
+      }
+      this._crossRegionOverflowMap.get(targetRegionKey).push(entry);
+    }
+  }
+
+  /**
+   * 分发跨 region overflow blocks 到目标 region。
+   * 目标 region 已在当前批次中的直接合并到 RegionRecord；
+   * 不在当前批次中的持久化到 world_overflow store。
+   *
+   * @param {Array<string>} targetRegionKeys - 当前批次已生成的 region keys
+   */
+  async _distributeCrossRegionOverflow(targetRegionKeys) {
+    const targetKeySet = new Set(targetRegionKeys);
+    const remainingEntries = [];
+
+    for (const [regionKey, entries] of this._crossRegionOverflowMap) {
+      if (targetKeySet.has(regionKey)) {
+        const [rx, rz] = regionKey.split(',').map(Number);
+        const record = await getWorldStore().getRegionRecord(rx, rz);
+        if (!record) {
+          remainingEntries.push({ regionKey, entries });
+          continue;
+        }
+
+        for (const entry of entries) {
+          const chunkData = record.chunks[entry.chunkKey];
+          if (!chunkData) continue;
+          for (const block of entry.blockDataBlocks) {
+            const code = encodeCoord(block.x, block.y, block.z);
+            if (chunkData.blockData[code] === undefined) {
+              chunkData.blockData[code] = block.orientation
+                ? { type: block.type, orientation: block.orientation }
+                : block.type;
+            }
+          }
+        }
+
+        await getWorldStore().saveRegionRecord(rx, rz, record);
+      } else {
+        remainingEntries.push({ regionKey, entries });
+      }
+    }
+
+    for (const regionKey of targetKeySet) {
+      if (this._crossRegionOverflowMap.has(regionKey)) {
+        this._crossRegionOverflowMap.delete(regionKey);
+      }
+    }
+
+    for (const { regionKey, entries } of remainingEntries) {
+      if (!this._crossRegionOverflowMap.has(regionKey)) continue;
+
+      const [rx, rz] = regionKey.split(',').map(Number);
+      const overflowData = {};
+      for (const entry of entries) {
+        if (!overflowData[entry.chunkKey]) {
+          overflowData[entry.chunkKey] = [];
+        }
+        for (const block of entry.blockDataBlocks) {
+          const code = encodeCoord(block.x, block.y, block.z);
+          const alreadyExists = overflowData[entry.chunkKey].some(
+            (b) => encodeCoord(b.x, b.y, b.z) === code
+          );
+          if (!alreadyExists) {
+            overflowData[entry.chunkKey].push(block);
+          }
+        }
+      }
+
+      try {
+        await getWorldStore().saveOverflowBlocks(rx, rz, overflowData);
+        this._crossRegionOverflowMap.delete(regionKey);
+      } catch (err) {
+        console.error('[WorldGenerationService] Failed to persist overflow blocks for region', regionKey, err);
+      }
+    }
+  }
+
+  /**
+   * 消费持久化到 world_overflow store 中属于指定 region 的方块。
+   * 在扩图生成新 region 后调用。
+   *
+   * @param {number} rx
+   * @param {number} rz
+   */
+  async _consumeOverflowForRegion(rx, rz) {
+    const overflowData = await getWorldStore().getOverflowBlocks(rx, rz);
+    if (!overflowData) return;
+
+    const record = await getWorldStore().getRegionRecord(rx, rz);
+    if (!record) return;
+
+    let mergedCount = 0;
+    for (const [chunkKey, blocks] of Object.entries(overflowData)) {
+      const chunkData = record.chunks[chunkKey];
+      if (!chunkData) continue;
+      for (const block of blocks) {
+        const code = encodeCoord(block.x, block.y, block.z);
+        if (chunkData.blockData[code] === undefined) {
+          chunkData.blockData[code] = block.orientation
+            ? { type: block.type, orientation: block.orientation }
+            : block.type;
+          mergedCount++;
+        }
+      }
+    }
+
+    if (mergedCount > 0) {
+      await getWorldStore().saveRegionRecord(rx, rz, record);
+      console.log(`[WorldGenerationService] Merged ${mergedCount} overflow blocks into region ${rx},${rz}`);
+    }
+    await getWorldStore().removeOverflowBlocks(rx, rz);
   }
 
   // ============================================================
@@ -256,6 +394,9 @@ export class WorldGenerationService {
           reject(err);
           return;
         }
+
+        // 收集跨 region overflow blocks
+        this._collectCrossRegionOverflow(data);
 
         if (data.routingDiagnostics?.unresolved > 0) {
           console.warn('[WorldGenerationService] Region generation had unresolved overflow blocks', {
@@ -600,6 +741,19 @@ export class WorldGenerationService {
           // 继续生成其他 region，不中断扩图流程
         }
       }
+
+      // 消费已持久化的 overflow blocks
+      for (const { rx, rz } of regionsToGenerate) {
+        try {
+          await this._consumeOverflowForRegion(rx, rz);
+        } catch (err) {
+          console.error(`[WorldGenerationService] Failed to consume overflow for region ${rx},${rz}:`, err);
+        }
+      }
+
+      // 分发新生成 region 之间的 overflow
+      const newRegionKeys = regionsToGenerate.map(({ rx, rz }) => this._regionKey(rx, rz));
+      await this._distributeCrossRegionOverflow(newRegionKeys);
 
       // 更新边界
       const newBounds = {
