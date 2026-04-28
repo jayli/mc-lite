@@ -45,7 +45,8 @@ RegionRecord
 |---------|------|------|
 | turret | `position` | 方块坐标（取整） |
 | | `rotation` | 炮塔当前旋转角度（弧度） |
-| minecart | `position` | 矿车当前位置 |
+| minecart | `id` | 矿车唯一标识符（用于跨 chunk 去重） |
+| | `position` | 矿车当前位置 |
 | | `direction` | 矿车朝向方向 |
 | zombieNest | `position` | 巢穴位置 |
 | | `criticalBlock` | 关键方块位置和类型 |
@@ -87,7 +88,7 @@ finalizeNonDeferredPhase()
 
 ## 边界情况处理
 
-1. **矿车跨 chunk 移动**：从旧 chunk 移除 + 添加到新 chunk，两个 `putChunkRecord` 不原子。下次加载时按位置键去重。
+1. **矿车跨 chunk 移动**：从旧 chunk 移除 + 添加到新 chunk，两个 `putChunkRecord` 不原子。由于矿车已有稳定 `id`，恢复阶段在 `MinecartManager.restoreMinecartsForChunk()` 中按 `id` 全局去重（`this.minecarts.has(item.id)`），同一矿车不会重复实例化。
 2. **数据格式版本**：预留 `runtimeEntities.version` 字段，未来扩展时使用。
 3. **RegionRecord 不存在**：写入前检查 region 是否存在，不存在则跳过并 warn。
 

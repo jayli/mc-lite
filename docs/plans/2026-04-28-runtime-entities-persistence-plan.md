@@ -328,13 +328,34 @@ async removeMinecartFromSnapshot(minecart) {
 
 删除 `ensureChunkSnapshot` 方法（约第286-300行）。
 
-**Step 5: Run lint**
+**Step 5: 在 restoreMinecartsForChunk 中加入 UUID 全局去重**
+
+修改 `restoreMinecartsForChunk` 方法（约第359行），在循环开头增加 `id` 去重检查，防止矿车跨 chunk 移动后重复恢复：
+
+```javascript
+for (const item of minecarts) {
+  if (!item?.position) continue;
+
+  // UUID 全局去重：跨 chunk 移动时，旧 chunk 和新 chunk 可能同时保有同一矿车记录
+  if (item.id && this.minecarts.has(item.id)) continue;
+
+  if (this.getChunkKeyByPosition(item.position) !== currentChunkKey) continue;
+
+  // 原有位置去重保留（防止同一 chunk 内重复记录）
+  const posKey = this.getPositionKey(item.position);
+  if (this.positionIndex.has(posKey)) continue;
+
+  // ...后续恢复逻辑不变
+}
+```
+
+**Step 6: Run lint**
 
 ```bash
 npm run lint
 ```
 
-**Step 6: Commit**
+**Step 7: Commit**
 
 ```bash
 git add src/actors/minecart/MinecartManager.js
