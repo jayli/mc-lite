@@ -7,6 +7,33 @@ import * as THREE from 'three';
 import { shortestAngleDiff, lerpAngle, angleTo, distance, normalizeAngle } from '../../utils/MathUtils.js';
 import { getBlockProperties } from '../../constants/BlockData.js';
 
+// 全局纹理缓存（所有炮塔实例共享）
+let _turretTextureCache = null;
+
+function loadTurretTexturesCached() {
+  if (_turretTextureCache) return _turretTextureCache;
+  const textureLoader = new THREE.TextureLoader();
+  const loadTexture = (url) => {
+    const texture = textureLoader.load(url);
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.NearestFilter;
+    texture.generateMipmaps = false;
+    texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  };
+  _turretTextureCache = {
+    front: loadTexture(TURRET_CONFIG.ARMOR_TEXTURES.FRONT),
+    side: loadTexture(TURRET_CONFIG.ARMOR_TEXTURES.SIDE),
+    top: loadTexture(TURRET_CONFIG.ARMOR_TEXTURES.TOP),
+    back: loadTexture(TURRET_CONFIG.ARMOR_TEXTURES.BACK)
+  };
+  return _turretTextureCache;
+}
+
+export function preloadTurretTextures() {
+  loadTurretTexturesCached();
+}
+
 // 炮塔配置常量
 export const TURRET_CONFIG = {
   // --- 检测与瞄准 ---
@@ -90,6 +117,7 @@ export class Turret {
    * @param {World} params.world - 世界引用
    * @param {THREE.Scene} params.scene - Three.js 场景
    * @param {Function} params.onFire - 射击回调
+   * @param {Object} [params.textures] - 可选的预加载纹理（避免重复加载）
    */
   constructor(params) {
     this.id = params.id;
@@ -97,6 +125,7 @@ export class Turret {
     this.world = params.world;
     this.scene = params.scene;
     this.onFire = params.onFire || null;
+    this.textures = params.textures || null; // 预加载纹理
 
     // 状态
     this.state = 'ACTIVE'; // 'ACTIVE' | 'DESTROYED'
@@ -198,30 +227,15 @@ export class Turret {
   createTurretTopBlocks() {
     console.log(`[Turret ${this.id}] 创建现代化楔形炮塔...`);
 
-    // 创建纹理加载器
-    const textureLoader = new THREE.TextureLoader();
-
-    // 加载纹理并配置参数
-    const loadTexture = (url) => {
-      const texture = textureLoader.load(url);
-      texture.magFilter = THREE.NearestFilter;
-      texture.minFilter = THREE.NearestFilter;
-      texture.generateMipmaps = false;
-      texture.colorSpace = THREE.SRGBColorSpace;
-      return texture;
-    };
-
-    // 加载各面纹理
-    const frontTexture = loadTexture(TURRET_CONFIG.ARMOR_TEXTURES.FRONT);
-    const sideTexture = loadTexture(TURRET_CONFIG.ARMOR_TEXTURES.SIDE);
-    const topTexture = loadTexture(TURRET_CONFIG.ARMOR_TEXTURES.TOP);
-    const backTexture = loadTexture(TURRET_CONFIG.ARMOR_TEXTURES.BACK);
+    // 使用预加载纹理或从全局缓存加载
+    const textures = this.textures || loadTurretTexturesCached();
+    if (!textures) return; // 纹理未就绪时跳过（恢复路径不应触发）
 
     // === 创建炮塔主体（楔形结构） ===
 
     // 1. 前装甲板（倾斜前表面 - 向后倾斜约22度，类似坦克前装甲）
     const frontGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.FRONT);
-    const frontMaterial = new THREE.MeshLambertMaterial({ map: frontTexture });
+    const frontMaterial = new THREE.MeshLambertMaterial({ map: textures.front });
     const front = new THREE.Mesh(frontGeometry, frontMaterial);
     // 向后倾斜，使前装甲有斜度（坦克风格）
     front.rotation.x = -Math.PI / 8; // -22.5度
@@ -231,7 +245,7 @@ export class Turret {
 
     // 2. 左侧装甲板
     const leftGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.SIDE);
-    const leftMaterial = new THREE.MeshLambertMaterial({ map: sideTexture });
+    const leftMaterial = new THREE.MeshLambertMaterial({ map: textures.side });
     const left = new THREE.Mesh(leftGeometry, leftMaterial);
     left.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.LEFT);
     this.pitchObject.add(left);
@@ -239,7 +253,7 @@ export class Turret {
 
     // 3. 右侧装甲板
     const rightGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.SIDE);
-    const rightMaterial = new THREE.MeshLambertMaterial({ map: sideTexture });
+    const rightMaterial = new THREE.MeshLambertMaterial({ map: textures.side });
     const right = new THREE.Mesh(rightGeometry, rightMaterial);
     right.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.RIGHT);
     this.pitchObject.add(right);
@@ -247,7 +261,7 @@ export class Turret {
 
     // 4. 顶部装甲板
     const topGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.TOP);
-    const topMaterial = new THREE.MeshLambertMaterial({ map: topTexture });
+    const topMaterial = new THREE.MeshLambertMaterial({ map: textures.top });
     const top = new THREE.Mesh(topGeometry, topMaterial);
     top.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.TOP);
     this.pitchObject.add(top);
@@ -255,7 +269,7 @@ export class Turret {
 
     // 5. 后装甲板（深色）
     const backGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.BACK);
-    const backMaterial = new THREE.MeshLambertMaterial({ map: backTexture });
+    const backMaterial = new THREE.MeshLambertMaterial({ map: textures.back });
     const back = new THREE.Mesh(backGeometry, backMaterial);
     back.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.BACK);
     this.pitchObject.add(back);

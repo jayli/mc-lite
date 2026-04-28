@@ -323,6 +323,9 @@ export class Chunk {
       entities: { modGunMan: [], rovers: [] }
     };
 
+    // 标记这是纯加载路径，assembleEntityPhase 不应触发持久化刷写
+    this._isPureLoadPath = true;
+
     // 7. 恢复运行时实体数据
     this.pendingRuntimeEntities = {
       zombieNests: [],
@@ -1767,7 +1770,10 @@ export class Chunk {
       if (persistence?.cache?.set) {
         persistence.cache.set(chunkKey, snapshot);
       }
-      this._pendingPersistenceFlush = true;
+      // 纯加载路径不触发持久化刷写（数据刚从 WorldStore 加载）
+      if (!this._isPureLoadPath) {
+        this._pendingPersistenceFlush = true;
+      }
 
       // 从合并后的 snapshot 中提取运行时实体数据，供 finalize 阶段恢复
       const entities = snapshot.entities || {};
@@ -1856,18 +1862,20 @@ export class Chunk {
       getPersistenceService()?.saveChunkData?.(this.cx, this.cz, this.pendingSnapshot);
     }
 
-    // 运行时实体恢复
+    // 运行时实体恢复 — 延迟到 runDeferredFinalizePhase 中异步执行
+    // 避免在 chunk 加载关键路径上同步创建大量 mesh/纹理导致卡顿
     const zombieNests = this.pendingRuntimeEntities?.zombieNests;
-    if (Array.isArray(zombieNests) && zombieNests.length > 0) {
-      this.world?.zombieNestManager?.restoreNestsForChunk?.(this.cx, this.cz, zombieNests);
-    }
     const turrets = this.pendingRuntimeEntities?.turrets;
-    if (Array.isArray(turrets) && turrets.length > 0) {
-      this.world?.turretManager?.restoreTurretsForChunk?.(this.cx, this.cz, turrets);
-    }
     const minecarts = this.pendingRuntimeEntities?.minecarts;
-    if (Array.isArray(minecarts) && minecarts.length > 0) {
-      this.world?.minecartManager?.restoreMinecartsForChunk?.(this.cx, this.cz, minecarts);
+    const hasRuntimeEntities = (
+      (Array.isArray(zombieNests) && zombieNests.length > 0) ||
+      (Array.isArray(turrets) && turrets.length > 0) ||
+      (Array.isArray(minecarts) && minecarts.length > 0)
+    );
+
+    if (hasRuntimeEntities) {
+      this._needsDeferredRuntimeEntityRestore = true;
+      this.hasDeferredFinalizeWork = true;
     }
 
     // 光源注册

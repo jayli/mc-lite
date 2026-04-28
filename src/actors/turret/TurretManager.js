@@ -3,11 +3,14 @@
  * 炮塔管理器 - 管理所有炮塔的创建、更新和销毁
  */
 
-import { Turret } from './Turret.js';
+import { Turret, preloadTurretTextures as preloadTextures } from './Turret.js';
 import { ProjectilePool } from './ProjectilePool.js';
 import { audioManager } from '../../core/AudioManager.js';
 import { PERSISTENCE_CONFIG } from '../../constants/PersistenceConfig.js';
 import * as THREE from 'three';
+
+// 重命名以避免与 Turret.js 内部函数冲突
+const preloadTurretTextures = preloadTextures;
 
 export class TurretManager {
   /**
@@ -19,6 +22,9 @@ export class TurretManager {
     this.scene = scene;
     this.world = world;
     this.enemyManager = enemyManager;
+
+    // 预加载纹理（仅首次）
+    preloadTurretTextures();
 
     // 存储所有炮塔 Map<id, Turret>
     this.turrets = new Map();

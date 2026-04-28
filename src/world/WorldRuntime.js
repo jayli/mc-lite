@@ -326,8 +326,10 @@ export class WorldRuntime {
 
     if (legacyData?.entities) {
       chunkRecord.runtimeEntities = legacyData.entities;
-      // 回填到 worldStore
-      await this._worldStore.putChunkRecord(cx, cz, chunkRecord);
+      // 异步回填到 worldStore（不阻塞 chunk 加载）
+      this._worldStore.putChunkRecord(cx, cz, chunkRecord).catch((err) => {
+        console.warn(`[WorldRuntime] Failed to backfill migrated entities for chunk ${cx},${cz}:`, err);
+      });
       console.log(`[WorldRuntime] migrated runtime entities for chunk ${cx},${cz}`);
     } else {
       // world_deltas 中也没有，创建空结构
