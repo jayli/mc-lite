@@ -84,6 +84,10 @@ export class SpecialEntitiesShadowStore {
 
   deserializeAndMerge(cx, cz, data) {
     const chunk = this._ensureChunk(cx, cz);
+    // 先清空已有数据，避免测试间或调用间数据叠加
+    chunk.turrets.clear();
+    chunk.zombieNests.clear();
+    chunk.minecarts.clear();
     if (data?.turrets?.length) {
       for (const turret of data.turrets) {
         chunk.turrets.set(turret.id, turret);

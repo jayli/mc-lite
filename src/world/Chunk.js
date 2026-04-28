@@ -330,39 +330,31 @@ export class Chunk {
 
     // 7. 恢复运行时实体数据
     // 优先级: chunkRecord.runtimeEntities > cache.entities (渐进式迁移回退)
-    // 如果 ShadowStore 为空，先回填到 ShadowStore
-    const existing = specialEntitiesShadowStore.getAllEntitiesInChunk(this.cx, this.cz);
-    const hasShadowData = (
-      existing.turrets.length > 0 ||
-      existing.zombieNests.length > 0 ||
-      existing.minecarts.length > 0
+    // 不依赖 ShadowStore 的状态（全局单例可能被其他测试/场景填充），
+    // 仅根据 chunkRecord 中是否有 runtimeEntities 来判断是否走迁移路径。
+    const hasRuntimeEntities = chunkRecord.runtimeEntities && (
+      chunkRecord.runtimeEntities.turrets?.length > 0 ||
+      chunkRecord.runtimeEntities.zombieNests?.length > 0 ||
+      chunkRecord.runtimeEntities.minecarts?.length > 0
     );
 
-    if (!hasShadowData) {
-      const hasRuntimeEntities = chunkRecord.runtimeEntities && (
-        chunkRecord.runtimeEntities.turrets?.length > 0 ||
-        chunkRecord.runtimeEntities.zombieNests?.length > 0 ||
-        chunkRecord.runtimeEntities.minecarts?.length > 0
-      );
-
-      if (hasRuntimeEntities) {
-        // 新格式：直接使用 chunkRecord.runtimeEntities
-        specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, chunkRecord.runtimeEntities);
-        this._needsEntityMigration = false;
+    if (hasRuntimeEntities) {
+      // 新格式：直接从 chunkRecord 读取
+      specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, chunkRecord.runtimeEntities);
+      this._needsEntityMigration = false;
+    } else {
+      // 旧格式：回退到 cache.entities（渐进式迁移）
+      const hydrateResult = persistence?.hydrateChunkBlocks?.(chunkKey, {});
+      const cacheEntities = hydrateResult?.entities;
+      if (cacheEntities && (
+        cacheEntities.turrets?.length > 0 ||
+        cacheEntities.zombieNests?.length > 0 ||
+        cacheEntities.minecarts?.length > 0
+      )) {
+        specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, cacheEntities);
+        this._needsEntityMigration = true;
       } else {
-        // 旧格式：回退到 cache.entities（渐进式迁移）
-        const hydrateResult = persistence?.hydrateChunkBlocks?.(chunkKey, {});
-        const cacheEntities = hydrateResult?.entities;
-        if (cacheEntities && (
-          cacheEntities.turrets?.length > 0 ||
-          cacheEntities.zombieNests?.length > 0 ||
-          cacheEntities.minecarts?.length > 0
-        )) {
-          specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, cacheEntities);
-          this._needsEntityMigration = true;
-        } else {
-          this._needsEntityMigration = false;
-        }
+        this._needsEntityMigration = false;
       }
     }
 
@@ -1465,7 +1457,11 @@ export class Chunk {
         z: record.z
       });
 
-      // 从 blockDataArray 中清除对应坐标，确保 resolveBlockOwner 不会命中地形方块
+      // 从 blockData、blockDataArray 和 solidBlocks 中清除对应坐标，确保 resolveBlockOwner 不会命中地形方块
+      const code = Chunk.encodeCoord(x, y, z);
+      this.blockData.delete(code);
+      this.solidBlocks.delete(code);
+
       const lx = x & 15;
       const ly = y - this.worldY;
       const lz = z & 15;
