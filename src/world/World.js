@@ -232,6 +232,7 @@ export class World {
   _runPrefetch() {
     if (this.bootstrapState.phase !== 'runtime-streaming') return;
     if (!this.worldRuntime) return;
+    if (typeof this.worldRuntime.prefetchRegions !== 'function') return;
 
     const playerCx = Math.floor(this._lastPlayerPos.x / CHUNK_SIZE);
     const playerCz = Math.floor(this._lastPlayerPos.z / CHUNK_SIZE);
