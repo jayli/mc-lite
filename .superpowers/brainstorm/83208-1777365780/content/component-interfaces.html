@@ -1,0 +1,190 @@
+<h2>方案 A 设计：组件接口</h2>
+<p class="subtitle">第 2/3 节：关键组件的接口变更</p>
+
+<div class="section">
+<h3>1. WorldRuntime.flushBeforeUnload — 新增 entities 参数</h3>
+
+<div class="mockup">
+<div class="mockup-header">before（当前）</div>
+<div class="mockup-body" style="font-family:monospace;font-size:12px;">
+<pre style="color:#aaa;margin:0;">
+flushBeforeUnload(cx, cz, blockDataSnapshot) {
+  const chunk = this.world.chunks.get(`${cx},${cz}`);
+  const record = {
+    blockData: blockDataSnapshot || chunk.blockData,
+    staticEntities: [...chunk.staticEntities],
+    runtimeSeedData: { structureCenters: chunk.structureCenters }
+  };
+  this.worldStore.putChunkRecord(cx, cz, record);
+}
+</pre>
+</div>
+</div>
+
+<div class="mockup">
+<div class="mockup-header">after（变更后）</div>
+<div class="mockup-body" style="font-family:monospace;font-size:12px;">
+<pre style="color:#aaa;margin:0;">
+flushBeforeUnload(cx, cz, blockDataSnapshot, entitiesSnapshot) {
+  const chunk = this.world.chunks.get(`${cx},${cz}`);
+  const record = {
+    blockData: blockDataSnapshot || chunk.blockData,
+    staticEntities: [...chunk.staticEntities],
+    runtimeSeedData: { structureCenters: chunk.structureCenters },
+    runtimeEntities: entitiesSnapshot || this._collectEntitiesForChunk(cx, cz)
+  };
+  this.worldStore.putChunkRecord(cx, cz, record);
+}
+
+_collectEntitiesForChunk(cx, cz) {
+  return {
+    turrets: this.game.turretManager.getEntitiesForChunk(cx, cz),
+    zombieNests: this.game.zombieNestManager.getEntitiesForChunk(cx, cz),
+    minecarts: this.game.minecartManager.getEntitiesForChunk(cx, cz)
+  };
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div class="section">
+<h3>2. Chunk.loadFromRecord — runtimeEntities 读取</h3>
+
+<div class="mockup">
+<div class="mockup-header">before（当前）</div>
+<div class="mockup-body" style="font-family:monospace;font-size:12px;">
+<pre style="color:#aaa;margin:0;">
+loadFromRecord(chunkRecord) {
+  // ... blockData 处理 ...
+
+  // 从 cache 读取 runtime entities
+  const cacheEntry = persistence.cache.get(chunkKey);
+  const entities = cacheEntry?.entities || {};
+  this.pendingRuntimeEntities = {
+    zombieNests: entities.zombieNests || [],
+    turrets: entities.turrets || [],
+    minecarts: entities.minecarts || []
+  };
+}
+</pre>
+</div>
+</div>
+
+<div class="mockup">
+<div class="mockup-header">after（变更后）</div>
+<div class="mockup-body" style="font-family:monospace;font-size:12px;">
+<pre style="color:#aaa;margin:0;">
+loadFromRecord(chunkRecord) {
+  // ... blockData 处理 ...
+
+  // 优先从 chunkRecord 读取 runtime entities（新格式）
+  if (chunkRecord.runtimeEntities) {
+    this.pendingRuntimeEntities = {
+      zombieNests: chunkRecord.runtimeEntities.zombieNests || [],
+      turrets: chunkRecord.runtimeEntities.turrets || [],
+      minecarts: chunkRecord.runtimeEntities.minecarts || []
+    };
+  } else {
+    // 旧格式兼容：从 cache.entities 读取（渐进迁移路径）
+    const cacheEntry = persistence.cache.get(chunkKey);
+    this.pendingRuntimeEntities = {
+      zombieNests: cacheEntry?.entities?.zombieNests || [],
+      turrets: cacheEntry?.entities?.turrets || [],
+      minecarts: cacheEntry?.entities?.minecarts || []
+    };
+    // 标记需要渐进迁移
+    this._needsEntityMigration = true;
+  }
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div class="section">
+<h3>3. WorldRuntime.ensureChunkData — 渐进迁移</h3>
+
+<div class="mockup">
+<div class="mockup-header">新增方法</div>
+<div class="mockup-body" style="font-family:monospace;font-size:12px;">
+<pre style="color:#aaa;margin:0;">
+async _ensureChunkEntitiesMigrated(cx, cz, chunkRecord) {
+  if (chunkRecord.runtimeEntities) return;
+
+  const chunkKey = `${cx},${cz}`;
+  const legacyData = await persistence.workerGetChunkData(cx, cz);
+
+  if (legacyData?.entities) {
+    chunkRecord.runtimeEntities = legacyData.entities;
+
+    // 回填到 worldStore
+    this.worldStore.putChunkRecord(cx, cz, chunkRecord);
+
+    // 清理已迁移的数据（可选）
+    // await persistence.workerRemoveChunkData(cx, cz);
+
+    console.log(`[WorldRuntime] migrated runtime entities for ${chunkKey}`);
+  } else {
+    // world_deltas 中也没有，创建空结构
+    chunkRecord.runtimeEntities = {
+      turrets: [],
+      zombieNests: [],
+      minecarts: []
+    };
+  }
+}
+</pre>
+</div>
+</div>
+</div>
+
+<div class="section">
+<h3>4. Game.collectSnapshot — 手动存档统一</h3>
+
+<div class="mockup">
+<div class="mockup-header">before（当前）</div>
+<div class="mockup-body" style="font-family:monospace;font-size:12px;">
+<pre style="color:#aaa;margin:0;">
+collectSnapshot() {
+  const worldDeltas = [];
+  for (const [key, data] of persistenceService.cache.entries()) {
+    worldDeltas.push({ key, ...data });
+  }
+  return {
+    player: { ... },
+    worldDeltas,
+    seed: this.seed,
+    settings: { ... }
+  };
+}
+</pre>
+</div>
+</div>
+
+<div class="mockup">
+<div class="mockup-header">after（变更后）</div>
+<div class="mockup-body" style="font-family:monospace;font-size:12px;">
+<pre style="color:#aaa;margin:0;">
+collectSnapshot() {
+  const worldDeltas = [];
+  // 从 worldStore 读取已加载 chunk 的完整数据
+  for (const [key, chunk] of this.world.chunks.entries()) {
+    const record = this.world.worldStore.getChunkRecord(chunk.cx, chunk.cz);
+    worldDeltas.push({
+      key,
+      blocks: record.blockData,
+      entities: record.runtimeEntities || {}
+    });
+  }
+  return {
+    player: { ... },
+    worldDeltas,
+    seed: this.seed,
+    settings: { ... }
+  };
+}
+</pre>
+</div>
+</div>
+</div>

@@ -323,25 +323,33 @@ export class Chunk {
       entities: { modGunMan: [], rovers: [] }
     };
 
-    // 7. 从持久化缓存中恢复运行时实体数据（炮塔、矿车、丧尸巢穴）
-    const existingData = persistence?.cache?.get?.(chunkKey);
-    if (existingData?.entities) {
-      this.pendingSnapshot.entities = {
-        ...this.pendingSnapshot.entities,
-        ...existingData.entities
+    // 7. 恢复运行时实体数据
+    this.pendingRuntimeEntities = {
+      zombieNests: [],
+      turrets: [],
+      minecarts: []
+    };
+
+    this._needsEntityMigration = false;
+
+    if (chunkRecord.runtimeEntities) {
+      // 新格式：直接从 chunkRecord 读取
+      this.pendingRuntimeEntities = {
+        zombieNests: chunkRecord.runtimeEntities.zombieNests || [],
+        turrets: chunkRecord.runtimeEntities.turrets || [],
+        minecarts: chunkRecord.runtimeEntities.minecarts || []
       };
-      const entities = this.pendingSnapshot.entities;
-      if (
-        (Array.isArray(entities.zombieNests) && entities.zombieNests.length > 0) ||
-        (Array.isArray(entities.turrets) && entities.turrets.length > 0) ||
-        (Array.isArray(entities.minecarts) && entities.minecarts.length > 0)
-      ) {
-        this.pendingRuntimeEntities = {
-          zombieNests: entities.zombieNests || [],
-          turrets: entities.turrets || [],
-          minecarts: entities.minecarts || []
-        };
-      }
+    } else {
+      // 旧格式兼容：从 cache.entities 读取，标记需要渐进迁移
+      const persistence = getPersistenceService();
+      const cacheEntry = persistence?.cache?.get?.(chunkKey);
+      const entities = cacheEntry?.entities || {};
+      this.pendingRuntimeEntities = {
+        zombieNests: entities.zombieNests || [],
+        turrets: entities.turrets || [],
+        minecarts: entities.minecarts || []
+      };
+      this._needsEntityMigration = true;
     }
 
     // 5. 直接从 blockData 构建 mesh（跳过 scatter，预生成阶段已完成打散）
@@ -351,7 +359,7 @@ export class Chunk {
     this.world?.onChunkWorkerReady?.(this);
 
     // 6. 恢复运行时实体（从 pendingRuntimeEntities 读取）
-    this.finalizeNonDeferredPhase();
+    await this.finalizeNonDeferredPhase();
   }
 
   /**
@@ -1817,8 +1825,30 @@ export class Chunk {
    * finalize 非延迟工作阶段（主线程切片执行）
    * 处理持久化、实体恢复、光源注册，完成后标记 chunk 为 ready
    */
-  finalizeNonDeferredPhase() {
+  async finalizeNonDeferredPhase() {
     if (this.loadState === 'finalized' || this.disposed) return true;
+
+    // 渐进迁移：如果检测到旧格式数据，触发迁移
+    if (this._needsEntityMigration) {
+      const worldRuntime = this.world?.worldRuntime;
+      if (worldRuntime) {
+        const chunkRecord = {
+          blockData: {},
+          staticEntities: [],
+          runtimeSeedData: { structureCenters: [] },
+          runtimeEntities: null
+        };
+        await worldRuntime._ensureChunkEntitiesMigrated(this.cx, this.cz, chunkRecord);
+        if (chunkRecord.runtimeEntities) {
+          this.pendingRuntimeEntities = {
+            zombieNests: chunkRecord.runtimeEntities.zombieNests || [],
+            turrets: chunkRecord.runtimeEntities.turrets || [],
+            minecarts: chunkRecord.runtimeEntities.minecarts || []
+          };
+        }
+      }
+      this._needsEntityMigration = false;
+    }
 
     // 持久化刷写
     if (this._pendingPersistenceFlush) {
@@ -1914,7 +1944,7 @@ export class Chunk {
    * 直接遍历 lightSourceCoords 索引，无需扫描整个 blockData
    */
   _registerLightSources() {
-    if (!this.world.lightSourceManager) return;
+    if (!this.world?.lightSourceManager) return;
 
     for (const code of this.lightSourceCoords) {
       const entry = this.blockData.get(code);

@@ -42,7 +42,7 @@ export class ChunkAssemblyScheduler {
     return this.queue.length;
   }
 
-  processWithinBudget(options = {}) {
+  async processWithinBudget(options = {}) {
     const budgetMs = Number.isFinite(options.budgetMs) ? options.budgetMs : 4;
     const maxTasks = Number.isFinite(options.maxTasks) ? options.maxTasks : 2;
     const start = now();
@@ -53,7 +53,7 @@ export class ChunkAssemblyScheduler {
       const task = this._takeNext();
       if (!task) break;
       processed++;
-      this._runTask(task);
+      await this._runTask(task);
     }
 
     if (processed > 0 || initialQueueLength > 0 || this.queue.length > 0) {
@@ -72,7 +72,7 @@ export class ChunkAssemblyScheduler {
     const maxIterations = Number.isFinite(options.maxIterations) ? options.maxIterations : 200;
     let iterations = 0;
     while (this.hasWork() && iterations < maxIterations) {
-      this.processWithinBudget({ budgetMs: Number.POSITIVE_INFINITY, maxTasks: 1000 });
+      await this.processWithinBudget({ budgetMs: Number.POSITIVE_INFINITY, maxTasks: 1000 });
       await Promise.resolve();
       iterations++;
     }
@@ -99,7 +99,7 @@ export class ChunkAssemblyScheduler {
     return this.queue.splice(bestIndex, 1)[0];
   }
 
-  _runTask(task) {
+  async _runTask(task) {
     const { chunk, stage } = task;
     const start = now();
     chunk.queuedAssemblyStages?.delete(stage);
@@ -127,7 +127,7 @@ export class ChunkAssemblyScheduler {
         }
         break;
       case 'non-deferred-finalize':
-        chunk.finalizeNonDeferredPhase();
+        await chunk.finalizeNonDeferredPhase();
         break;
       default:
         break;

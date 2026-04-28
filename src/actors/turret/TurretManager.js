@@ -425,6 +425,24 @@ export class TurretManager {
   }
 
   /**
+   * 收集指定 chunk 内的所有炮塔快照数据。
+   * @param {number} cx - chunk X 坐标
+   * @param {number} cz - chunk Z 坐标
+   * @returns {Array<{id: string, position: {x:number,y:number,z:number}, rotation: number}>}
+   */
+  getEntitiesForChunk(cx, cz) {
+    const result = [];
+    for (const turret of this.turrets.values()) {
+      const tcx = Math.floor(turret.position.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      const tcz = Math.floor(turret.position.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      if (tcx === cx && tcz === cz) {
+        result.push(this.toTurretSnapshot(turret));
+      }
+    }
+    return result;
+  }
+
+  /**
    * 清除所有炮塔
    */
   clearAll() {

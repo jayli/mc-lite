@@ -67,6 +67,8 @@ export class Game {
     this.minecartRenderer = new MinecartInstancedRenderer(this.engine.scene);
     this.minecartManager = new MinecartManager(this.engine.scene, this.world, this.minecartRenderer);
     this.world.minecartManager = this.minecartManager;
+    // 将 Game 实例注入 worldRuntime，用于实体收集
+    this.world.worldRuntime.setWorld(this.world, this);
 
     // 初始化实体注册表
     this.entityRegistry = new EntityRegistry();
@@ -571,16 +573,16 @@ export class Game {
    * 收集当前游戏快照并保存到磁盘
    */
   async saveToDisk() {
-    const snapshot = this.collectSnapshot();
+    const snapshot = await this.collectSnapshot();
     console.log(`[Save] Game saved with seed: ${WORLD_CONFIG.SEED}`);
     await manualSaveService.save(snapshot);
   }
 
   /**
-   * 收集当前游戏快照数据
-   * @returns {object} 游戏快照对象
+   * 收集当前游戏快照数据（从 worldStore 读取权威数据）
+   * @returns {Promise<object>} 游戏快照对象
    */
-  collectSnapshot() {
+  async collectSnapshot() {
     const playerSnapshot = {
       x: this.player.position.x,        // 玩家在X轴上的位置坐标
       y: this.player.position.y,        // 玩家在Y轴上的位置坐标
@@ -589,15 +591,16 @@ export class Game {
       yaw: this.player.rotation.y       // 玩家的偏航角度（左右视角/水平旋转）
     };
 
-    // 序列化 persistenceService 中的所有区块增量
+    // 从 worldStore 读取所有区块记录
     const worldDeltas = [];
-    for (const [key, data] of persistenceService.cache.entries()) {
-      if (!data) continue; // 跳过无效条目
-      worldDeltas.push({ key, ...data });
-      // 调试：记录包含炮塔的区块
-      if (data.entities?.turrets?.length > 0) {
-        console.log(`[Save] 导出炮塔数据: chunk ${key}, 数量:`, data.entities.turrets.length);
-      }
+    for (const [key, chunk] of this.world.chunks.entries()) {
+      const record = await this.world.worldStore.getChunkRecord(chunk.cx, chunk.cz);
+      if (!record) continue;
+      worldDeltas.push({
+        key,
+        blocks: record.blockData,
+        entities: record.runtimeEntities || {}
+      });
     }
 
     return {

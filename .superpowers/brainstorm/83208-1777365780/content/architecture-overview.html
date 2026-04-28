@@ -1,0 +1,93 @@
+<h2>第二阶段架构概览</h2>
+<p class="subtitle">从一阶段到二阶段：特殊实体跨重启持久化改造</p>
+
+<div class="section">
+<h3>一阶段回顾（已完成）</h3>
+<p>解决了单次 runtime 会话内 chunk 卸载/重载的正确性问题，通过 cache 快照桥接层实现了：</p>
+<ul>
+<li>Chunk 卸载前同步快照 blockData</li>
+<li>cache 优先读取优先级</li>
+<li>特殊实体快照增强（id 去重）</li>
+</ul>
+</div>
+
+<div class="section">
+<h3>第二阶段目标</h3>
+<p>将特殊实体正式迁入 worldStore / IndexedDB，实现跨页面重启的持久化恢复。</p>
+
+<div class="cards">
+<div class="card" data-choice="eval-cache" onclick="toggleSelect(this)">
+<div class="card-image" style="background:#1a1a2e;padding:15px;font-family:monospace;font-size:12px;">
+<pre style="color:#aaa;margin:0;">// 当前 cache.entities 结构
+{
+  "turrets": [...],
+  "zombieNests": [...],
+  "minecarts": [...]
+}
+// 仅存在于内存
+// 页面关闭即丢失
+</pre>
+</div>
+<div class="card-body">
+<h3>1. 评估 cache.entities 迁入 worldStore</h3>
+<p>扩展 ChunkRecord 格式，runtime entities 纳入 worldStore 统一管理</p>
+</div>
+</div>
+
+<div class="card" data-choice="design-repo" onclick="toggleSelect(this)">
+<div class="card-image" style="background:#1a1a2e;padding:15px;font-family:monospace;font-size:12px;">
+<pre style="color:#aaa;margin:0;">// 设想的 Repository 抽象
+RuntimeEntityRepository {
+  getEntities(chunkKey, type)
+  saveEntity(chunkKey, entity)
+  removeEntity(chunkKey, id)
+  flushToStore(chunkKey)
+}
+// 统一三个 manager 的读写
+</pre>
+</div>
+<div class="card-body">
+<h3>2. 设计 RuntimeEntityRepository</h3>
+<p>统一炮塔/巢穴/矿车的快照读写抽象，消除重复逻辑</p>
+</div>
+</div>
+
+<div class="card" data-choice="design-lifecycle" onclick="toggleSelect(this)">
+<div class="card-image" style="background:#1a1a2e;padding:15px;font-family:monospace;font-size:12px;">
+<pre style="color:#aaa;margin:0;">// chunk 级生命周期
+chunk.activate()   → 实体加载、启动逻辑
+chunk.deactivate() → 实体停用、写入快照
+
+// 当前：manager 全局持有
+// 目标：显式生命周期
+</pre>
+</div>
+<div class="card-body">
+<h3>3. chunk 级 activate/deactivate</h3>
+<p>显式生命周期管理，评估性能收益与复杂度</p>
+</div>
+</div>
+</div>
+</div>
+
+<div class="section">
+<h3>关键决策点</h3>
+<div class="pros-cons">
+<div class="pros">
+<h4>统一路径的好处</h4>
+<ul>
+<li>手动存档和自动持久化合并为单一路径</li>
+<li>特殊实体纳入 worldDeltas</li>
+<li>跨重启恢复成为可能</li>
+</ul>
+</div>
+<div class="cons">
+<h4>需要解决的问题</h4>
+<ul>
+<li>ChunkRecord 格式扩展（向后兼容）</li>
+<li>worker 序列化协议变更</li>
+<li>迁移现有存档数据</li>
+</ul>
+</div>
+</div>
+</div>

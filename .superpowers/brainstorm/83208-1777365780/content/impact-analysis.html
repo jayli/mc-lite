@@ -1,0 +1,94 @@
+<h2>方案 A 设计：影响分析</h2>
+<p class="subtitle">第 3/3 节：影响范围、兼容性、风险</p>
+
+<div class="section">
+<h3>修改文件清单</h3>
+
+<table style="width:100%;border-collapse:collapse;font-size:14px;">
+<tr style="border-bottom:1px solid #333;">
+<th style="text-align:left;padding:8px;">文件</th>
+<th style="text-align:left;padding:8px;">变更类型</th>
+<th style="text-align:left;padding:8px;">说明</th>
+</tr>
+<tr style="border-bottom:1px solid #222;">
+<td style="padding:8px;">WorldStore.js</td>
+<td style="padding:8px;color:#4fc3f7;">扩展</td>
+<td style="padding:8px;">ChunkRecord 格式注释更新，不改变读取逻辑</td>
+</tr>
+<tr style="border-bottom:1px solid #222;">
+<td style="padding:8px;">WorldRuntime.js</td>
+<td style="padding:8px;color:#4fc3f7;">修改</td>
+<td style="padding:8px;">flushBeforeUnload 新增 entities 参数 + _collectEntitiesForChunk + _ensureChunkEntitiesMigrated</td>
+</tr>
+<tr style="border-bottom:1px solid #222;">
+<td style="padding:8px;">World.js</td>
+<td style="padding:8px;color:#4fc3f7;">修改</td>
+<td style="padding:8px;">unload 路径传入 entities 参数到 flushBeforeUnload</td>
+</tr>
+<tr style="border-bottom:1px solid #222;">
+<td style="padding:8px;">Chunk.js</td>
+<td style="padding:8px;color:#4fc3f7;">修改</td>
+<td style="padding:8px;">loadFromRecord 读取 runtimeEntities + _needsEntityMigration 标记</td>
+</tr>
+<tr style="border-bottom:1px solid #222;">
+<td style="padding:8px;">Game.js</td>
+<td style="padding:8px;color:#4fc3f7;">修改</td>
+<td style="padding:8px;">collectSnapshot 改为从 worldStore 读取 + restoreSnapshot 处理 runtimeEntities</td>
+</tr>
+<tr style="border-bottom:1px solid #222;">
+<td style="padding:8px;">PersistenceService.js</td>
+<td style="padding:8px;color:#4fc3f7;">修改</td>
+<td style="padding:8px;">cache.entities 保留为临时层，渐进迁移后不再作为权威源</td>
+</tr>
+<tr style="border-bottom:1px solid #222;">
+<td style="padding:8px;">ManualSaveWorker.js</td>
+<td style="padding:8px;color:#4fc3f7;">修改</td>
+<td style="padding:8px;">load 路径兼容 runtimeEntities 格式的 worldDeltas</td>
+</tr>
+</table>
+</div>
+
+<div class="section">
+<h3>向后兼容性</h3>
+
+<div class="pros-cons">
+<div class="pros">
+<h4>兼容性保障</h4>
+<ul>
+<li>ChunkRecord.runtimeEntities 是可选字段，旧存档不含此字段</li>
+<li>Chunk.loadFromRecord 回退到 cache.entities 读取旧格式</li>
+<li>ensureChunkEntitiesMigrated 在读取时自动迁移，无需手动操作</li>
+<li>world_deltas 表在迁移后保留（不删除），仅作为降级保护</li>
+<li>手动存档加载兼容新旧两种 worldDeltas 格式</li>
+</ul>
+</div>
+<div class="cons">
+<h4>潜在风险</h4>
+<ul>
+<li>collectSnapshot 改为从 worldStore 读取，但只有已加载 chunk 会被序列化——未加载区域不会进入存档。这需要在 UI 中提示用户"当前存档仅包含已探索区域"</li>
+<li>三个 manager 仍持有全局实体引用，长时间运行可能积累内存（但这与一阶段行为一致）</li>
+</ul>
+</div>
+</div>
+</div>
+
+<div class="section">
+<h3>明确不做的事</h3>
+<ul>
+<li>RuntimeEntityRepository 抽象层（独立职责拆分，留待后续）</li>
+<li>chunk activate/deactivate 生命周期钩子</li>
+<li>world_deltas 表的彻底删除（保留作为降级保护）</li>
+<li>Worker 端 entity 处理（entities 始终在主线程收集和写入）</li>
+<li>Region 级 entity 聚合（保持 chunk 级粒度）</li>
+</ul>
+</div>
+
+<div class="section">
+<h3>验证策略</h3>
+<ul>
+<li>回归测试：放置炮塔/巢穴/矿车 → 跑远卸载 → 返回确认恢复</li>
+<li>跨重启测试：放置实体 → 关闭页面 → 重新打开 → 确认实体存在</li>
+<li>手动存档测试：存档 → 清除 world_deltas → 加载 → 确认实体正确恢复</li>
+<li>渐进迁移测试：加载旧存档 → 读取包含实体的 chunk → 确认 runtimeEntities 已回填</li>
+</ul>
+</div>

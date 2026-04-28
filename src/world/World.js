@@ -663,12 +663,12 @@ export class World {
     }
   }
 
-  processAssemblyQueues() {
+  async processAssemblyQueues() {
     if (this.chunkAssemblyScheduler.hasWork()) {
       this.runtimeIdleScheduler?.markBusy('chunk-assembly');
     }
     const isBootstrap = this.bootstrapState.phase === 'bootstrapping';
-    this.chunkAssemblyScheduler.processWithinBudget({
+    await this.chunkAssemblyScheduler.processWithinBudget({
       budgetMs: isBootstrap ? 12 : 8,
       maxTasks: isBootstrap ? 8 : 6
     });
@@ -740,7 +740,7 @@ export class World {
     let iterations = 0;
     const maxIterations = Number.isFinite(options.maxIterations) ? options.maxIterations : 200;
     while (this.bootstrapState.phase === 'bootstrapping' && iterations < maxIterations) {
-      this.processAssemblyQueues();
+      await this.processAssemblyQueues();
       if (!this.chunkAssemblyScheduler.hasWork()) {
         const outstanding = [...this.bootstrapState.targetChunkKeys].some((key) => {
           const chunk = this.chunks.get(key);
@@ -809,9 +809,10 @@ export class World {
           this.minecartManager.stopMinecartsForChunk(chunk.cx, chunk.cz);
         }
 
-        // 3. 触发异步 worldStore flush（传入已抓取的快照，不再回头取活动 chunk）
+        // 3. 收集 runtime entities 快照并触发异步 worldStore flush
         if (this.bootstrapState.phase === 'runtime-streaming' && this.worldRuntime) {
-          this.worldRuntime.flushBeforeUnload(chunk.cx, chunk.cz, chunk.blockData).catch(() => {});
+          const entities = this._collectRuntimeEntitiesForChunk(chunk);
+          this.worldRuntime.flushBeforeUnload(chunk.cx, chunk.cz, chunk.blockData, entities).catch(() => {});
         } else {
           persistence?.saveChunkData?.(chunk.cx, chunk.cz);
         }
@@ -920,6 +921,17 @@ export class World {
 
     // 更新宝箱打开/关闭动画
     getChestManager().update(dt);
+  }
+
+  /**
+   * 收集指定 chunk 的 runtime entities 快照，用于 chunk unload 时持久化。
+   */
+  _collectRuntimeEntitiesForChunk(chunk) {
+    return {
+      turrets: this.turretManager?.getEntitiesForChunk?.(chunk.cx, chunk.cz) || [],
+      zombieNests: this.zombieNestManager?.getEntitiesForChunk?.(chunk.cx, chunk.cz) || [],
+      minecarts: this.minecartManager?.getEntitiesForChunk?.(chunk.cx, chunk.cz) || []
+    };
   }
 
   /**

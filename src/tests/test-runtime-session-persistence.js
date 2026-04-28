@@ -246,3 +246,109 @@ describe('运行时会话持久化测试', (test) => {
   });
 
 });
+
+describe('渐进式迁移: chunkRecord 不含 runtimeEntities 时从 world_deltas 迁移', (test) => {
+  test('loadFromRecord 应从 chunkRecord.runtimeEntities 读取新格式数据', async () => {
+    const service = createTestService();
+    globalThis._persistenceService = service;
+    try {
+      const chunk = new Chunk(0, 0);
+      // stub finalize 以便检查 pendingRuntimeEntities
+      let finalized = false;
+      chunk.finalizeNonDeferredPhase = async () => { finalized = true; return true; };
+
+      const chunkRecord = {
+        blockData: {},
+        staticEntities: [],
+        runtimeSeedData: { structureCenters: [] },
+        runtimeEntities: {
+          turrets: [{ id: 't1', position: { x: 8, y: 4, z: 8 }, rotation: { yaw: 0, pitch: 0 } }],
+          zombieNests: [],
+          minecarts: []
+        }
+      };
+
+      await chunk.loadFromRecord(chunkRecord);
+
+      assertTrue(chunk.pendingRuntimeEntities.turrets.length === 1, '应从 runtimeEntities 读取炮塔');
+      assertTrue(chunk.pendingRuntimeEntities.turrets[0].id === 't1', '炮塔 id 应正确');
+      assertTrue(!chunk._needsEntityMigration, '不应标记需要迁移');
+      assertTrue(finalized, 'finalizeNonDeferredPhase 应被调用');
+    } finally {
+      globalThis._persistenceService = null;
+    }
+  });
+
+  test('loadFromRecord 应回退到 cache.entities 并标记迁移', async () => {
+    const service = createTestService();
+    globalThis._persistenceService = service;
+    try {
+      const chunk = new Chunk(0, 0);
+      let finalized = false;
+      chunk.finalizeNonDeferredPhase = async () => { finalized = true; return true; };
+
+      // 确保 cache 中有 entities 数据
+      service.ensureChunkSnapshot('0,0');
+      service.cache.get('0,0').entities = {
+        turrets: [{ id: 't2', position: { x: 5, y: 3, z: 5 }, rotation: { yaw: 1, pitch: 0 } }],
+        zombieNests: [],
+        minecarts: []
+      };
+
+      // chunkRecord 不含 runtimeEntities（旧格式）
+      const chunkRecord = {
+        blockData: {},
+        staticEntities: [],
+        runtimeSeedData: { structureCenters: [] }
+      };
+
+      await chunk.loadFromRecord(chunkRecord);
+
+      assertTrue(chunk.pendingRuntimeEntities.turrets.length === 1, '应从 cache.entities 读取炮塔');
+      assertTrue(chunk.pendingRuntimeEntities.turrets[0].id === 't2', '炮塔 id 应正确');
+      assertTrue(chunk._needsEntityMigration, '应标记需要迁移');
+      assertTrue(finalized, 'finalizeNonDeferredPhase 应被调用');
+    } finally {
+      globalThis._persistenceService = null;
+    }
+  });
+
+  test('chunkRecord.runtimeEntities 应优先于 cache.entities', async () => {
+    const service = createTestService();
+    globalThis._persistenceService = service;
+    try {
+      const chunk = new Chunk(0, 0);
+      let finalized = false;
+      chunk.finalizeNonDeferredPhase = async () => { finalized = true; return true; };
+
+      // cache 中有旧数据
+      service.ensureChunkSnapshot('0,0');
+      service.cache.get('0,0').entities = {
+        turrets: [{ id: 'old', position: { x: 1, y: 1, z: 1 }, rotation: { yaw: 0, pitch: 0 } }],
+        zombieNests: [],
+        minecarts: []
+      };
+
+      // chunkRecord 中有新数据
+      const chunkRecord = {
+        blockData: {},
+        staticEntities: [],
+        runtimeSeedData: { structureCenters: [] },
+        runtimeEntities: {
+          turrets: [{ id: 'new', position: { x: 2, y: 2, z: 2 }, rotation: { yaw: 0, pitch: 0 } }],
+          zombieNests: [],
+          minecarts: []
+        }
+      };
+
+      await chunk.loadFromRecord(chunkRecord);
+
+      assertTrue(chunk.pendingRuntimeEntities.turrets.length === 1, '应只读取 runtimeEntities');
+      assertTrue(chunk.pendingRuntimeEntities.turrets[0].id === 'new', '应使用 chunkRecord.runtimeEntities 的数据');
+      assertTrue(!chunk._needsEntityMigration, '不应标记需要迁移');
+      assertTrue(finalized, 'finalizeNonDeferredPhase 应被调用');
+    } finally {
+      globalThis._persistenceService = null;
+    }
+  });
+});

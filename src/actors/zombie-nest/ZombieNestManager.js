@@ -315,6 +315,24 @@ export class ZombieNestManager {
   }
 
   /**
+   * 收集指定 chunk 内的所有丧尸巢穴快照数据。
+   * @param {number} cx - chunk X 坐标
+   * @param {number} cz - chunk Z 坐标
+   * @returns {Array<{id: string, position: {x:number,y:number,z:number}, criticalBlock: {x:number,y:number,z:number,type:string}, lastSpawnTime: number}>}
+   */
+  getEntitiesForChunk(cx, cz) {
+    const result = [];
+    for (const nest of this.nests.values()) {
+      const ncx = Math.floor(nest.position.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      const ncz = Math.floor(nest.position.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      if (ncx === cx && ncz === cz) {
+        result.push(this.toNestSnapshot(nest));
+      }
+    }
+    return result;
+  }
+
+  /**
    * 销毁所有巢穴
    * @returns {void}
    */

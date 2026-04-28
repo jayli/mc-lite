@@ -16,6 +16,7 @@
  */
 import { RegionCache } from './RegionCache.js';
 import { worldStore } from './WorldStore.js';
+import { persistenceService } from '../services/PersistenceService.js';
 
 // --- 依赖注入 ---
 const getWorldStore = () => globalThis._worldStore || worldStore;
@@ -28,6 +29,7 @@ export class WorldRuntime {
     this._dirtyChunks = new Map(); // "cx,cz" -> { cx, cz, dirty: true, pendingFlush: false }
     this._flushTimers = new Map(); // "cx,cz" -> timeout id
     this._world = null; // World 实例引用，在 World 初始化后注入
+    this._game = null; // Game 实例引用，用于访问特殊实体管理器
     this._regionSizeInChunks = REGION_SIZE_IN_CHUNKS;
     this._flushing = false;
     this._worldStore = options.worldStore || getWorldStore();
@@ -35,10 +37,11 @@ export class WorldRuntime {
   }
 
   /**
-   * 注入 World 实例引用
+   * 注入 World 和 Game 实例引用
    */
-  setWorld(world) {
+  setWorld(world, game) {
     this._world = world;
+    this._game = game;
   }
 
   /**
@@ -84,15 +87,22 @@ export class WorldRuntime {
       return { status: 'missing-chunk' };
     }
 
+    const chunkRecord = {
+      cx,
+      cz,
+      blockData: chunkData.blockData || {},
+      staticEntities: chunkData.staticEntities || [],
+      runtimeSeedData: chunkData.runtimeSeedData || {}
+    };
+
+    // 渐进式迁移：如果 chunkRecord 不含 runtimeEntities，尝试从 world_deltas 迁移
+    if (!chunkRecord.runtimeEntities) {
+      await this._ensureChunkEntitiesMigrated(cx, cz, chunkRecord);
+    }
+
     return {
       status: 'ready',
-      chunkRecord: {
-        cx,
-        cz,
-        blockData: chunkData.blockData || {},
-        staticEntities: chunkData.staticEntities || [],
-        runtimeSeedData: chunkData.runtimeSeedData || {}
-      }
+      chunkRecord
     };
   }
 
@@ -258,11 +268,65 @@ export class WorldRuntime {
    * 卸载 chunk 前强制写回
    * @param {number} cx
    * @param {number} cz
+   * @param {object|null} blockDataSnapshot
+   * @param {object|null} entitiesSnapshot
    */
-  async flushBeforeUnload(cx, cz, blockDataSnapshot = null) {
-    this._clearScheduledFlush(cx, cz);
-    if (this.isChunkDirty(cx, cz)) {
-      await this.flushChunk(cx, cz, blockDataSnapshot);
+  async flushBeforeUnload(cx, cz, blockDataSnapshot, entitiesSnapshot) {
+    const key = this._chunkKey(cx, cz);
+    const chunk = this._world?.chunks?.get(key);
+
+    const entities = entitiesSnapshot
+      || (this._game ? this._collectEntitiesForChunk(cx, cz) : null)
+      || { turrets: [], zombieNests: [], minecarts: [] };
+
+    const record = {
+      blockData: blockDataSnapshot || (chunk ? this._serializeBlockData(chunk.blockData) : {}),
+      staticEntities: chunk?.staticEntities ? [...chunk.staticEntities] : [],
+      runtimeSeedData: chunk?.structureCenters
+        ? { structureCenters: chunk.structureCenters }
+        : { structureCenters: [] },
+      runtimeEntities: entities
+    };
+
+    await this._worldStore.putChunkRecord(cx, cz, record);
+    this._dirtyChunks.delete(key);
+  }
+
+  /**
+   * 从三个特殊实体 manager 收集指定 chunk 的实体快照。
+   */
+  _collectEntitiesForChunk(cx, cz) {
+    const game = this._game;
+    if (!game) return { turrets: [], zombieNests: [], minecarts: [] };
+
+    return {
+      turrets: game.turretManager?.getEntitiesForChunk?.(cx, cz) || [],
+      zombieNests: game.zombieNestManager?.getEntitiesForChunk?.(cx, cz) || [],
+      minecarts: game.minecartManager?.getEntitiesForChunk?.(cx, cz) || []
+    };
+  }
+
+  /**
+   * 渐进式迁移：当 chunkRecord 不含 runtimeEntities 时，从 world_deltas 表读取
+   * entities 并回填到 worldStore。
+   */
+  async _ensureChunkEntitiesMigrated(cx, cz, chunkRecord) {
+    const persistence = persistenceService;
+    if (!persistence) {
+      chunkRecord.runtimeEntities = { turrets: [], zombieNests: [], minecarts: [] };
+      return;
+    }
+
+    const legacyData = await persistence.workerGetChunkData(cx, cz);
+
+    if (legacyData?.entities) {
+      chunkRecord.runtimeEntities = legacyData.entities;
+      // 回填到 worldStore
+      await this._worldStore.putChunkRecord(cx, cz, chunkRecord);
+      console.log(`[WorldRuntime] migrated runtime entities for chunk ${cx},${cz}`);
+    } else {
+      // world_deltas 中也没有，创建空结构
+      chunkRecord.runtimeEntities = { turrets: [], zombieNests: [], minecarts: [] };
     }
   }
 

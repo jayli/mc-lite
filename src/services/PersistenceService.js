@@ -269,6 +269,20 @@ export class PersistenceService {
   }
 
   /**
+   * 从 world_deltas 表读取指定 chunk 的完整数据（包含 blocks 和 entities）。
+   * 仅用于渐进式迁移：当 chunkRecord 不含 runtimeEntities 时，从此方法
+   * 获取旧格式的 entities 数据。
+   * @param {number} cx
+   * @param {number} cz
+   * @returns {Promise<{blocks?: object, entities?: {turrets?: Array, zombieNests?: Array, minecarts?: Array}}|null>}
+   */
+  async workerGetChunkData(cx, cz) {
+    await this.initPromise;
+    const key = `${cx},${cz}`;
+    return this.rpc.postMessage('getChunkData', { key });
+  }
+
+  /**
    * 注入存档数据到缓存中 (供加载存档使用)
    * 兼容旧格式（字符串 key）和新格式（数字编码）
    * @param {Array} worldDeltas - 存档中的区块增量数组

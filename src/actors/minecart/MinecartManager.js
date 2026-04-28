@@ -444,6 +444,24 @@ export class MinecartManager {
   }
 
   /**
+   * 收集指定 chunk 内的所有矿车快照数据。
+   * @param {number} cx - chunk X 坐标
+   * @param {number} cz - chunk Z 坐标
+   * @returns {Array<object>} — minecart.toJSON() 返回的完整序列化数据
+   */
+  getEntitiesForChunk(cx, cz) {
+    const result = [];
+    for (const minecart of this.minecarts.values()) {
+      const mcx = Math.floor(minecart.position.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      const mcz = Math.floor(minecart.position.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      if (mcx === cx && mcz === cz) {
+        result.push(minecart.toJSON());
+      }
+    }
+    return result;
+  }
+
+  /**
    * 销毁所有矿车
    */
   destroyAll() {

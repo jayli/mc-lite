@@ -1018,7 +1018,7 @@ describe('World 真实类测试', (test) => {
     assertFalse(runtimeChunk.hasDeferredFinalizeWork, '纯新 runtime chunk 不应把 finalize 工作后移到 deferred 队列');
 
     // 新架构：finalize 分为预检查 + 非延迟工作两个阶段
-    const result2 = runtimeChunk.finalizeNonDeferredPhase();
+    const result2 = await runtimeChunk.finalizeNonDeferredPhase();
 
     assertTrue(result2, '非延迟阶段应完成');
     assertEqual(runtimeChunk.loadState, 'finalized', '纯新 runtime chunk 应直接进入 finalized');
