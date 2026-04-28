@@ -127,8 +127,12 @@ export class PersistenceService {
     const chunkKey = `${ownerCx},${ownerCz}`;
     const blockCode = encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
 
-    const chunkData = this.cache.get(chunkKey);
-    if (!chunkData || !chunkData.blocks) return;
+    let chunkData = this.cache.get(chunkKey);
+    if (!chunkData || !chunkData.blocks) {
+      // runtime-streaming 下自动创建会话快照
+      chunkData = { blocks: {}, entities: {} };
+      this.cache.set(chunkKey, chunkData);
+    }
 
     // 解析输入参数
     let entry;
@@ -165,8 +169,17 @@ export class PersistenceService {
 
     try {
       await this.postMessage('saveChunkData', { key, data: chunkData });
-      // 如果是传入的新数据，更新缓存
-      if (data) this.cache.set(key, data);
+      // 如果是传入的新数据，合并到缓存（不覆盖已有 entities/blocks）
+      if (data) {
+        const existing = this.cache.get(key);
+        if (existing) {
+          // 合并：传入的 data 补充到现有缓存，不抹掉已有数据
+          existing.blocks = data.blocks ? { ...existing.blocks, ...data.blocks } : existing.blocks;
+          existing.entities = data.entities ? { ...existing.entities, ...data.entities } : existing.entities;
+        } else {
+          this.cache.set(key, { blocks: data.blocks || {}, entities: data.entities || {} });
+        }
+      }
     } catch (error) {
       console.error(`Failed to save chunk ${key}:`, error);
     }
@@ -183,6 +196,76 @@ export class PersistenceService {
     } catch (error) {
       console.error('Failed to clear session:', error);
     }
+  }
+
+  /**
+   * 确保指定 chunk 的快照存在
+   * 若不存在，用 seed 初始化 { blocks, entities }
+   * @param {string} chunkKey - "cx,cz"
+   * @param {object} seed - 初始数据
+   * @returns {object} 快照对象 { blocks, entities }
+   */
+  ensureChunkSnapshot(chunkKey, seed = {}) {
+    if (!this.cache.has(chunkKey)) {
+      this.cache.set(chunkKey, {
+        blocks: seed.blocks || {},
+        entities: seed.entities || {}
+      });
+    }
+    return this.cache.get(chunkKey);
+  }
+
+  /**
+   * 同步快照 chunk 的 blockData 到会话缓存
+   * 用于 chunk 卸载前的同步写回（不依赖异步 flush）
+   * @param {string} chunkKey - "cx,cz"
+   * @param {Map|object} blockData - blockData Map 或普通对象
+   */
+  snapshotChunkBlocks(chunkKey, blockData) {
+    const snapshot = this.ensureChunkSnapshot(chunkKey);
+    const blocks = {};
+    if (blockData instanceof Map) {
+      for (const [key, value] of blockData) {
+        blocks[key] = typeof value === 'string' ? value : { ...value };
+      }
+    } else if (blockData && typeof blockData === 'object') {
+      for (const [key, value] of Object.entries(blockData)) {
+        blocks[key] = typeof value === 'string' ? value : { ...value };
+      }
+    }
+    snapshot.blocks = blocks;
+    return snapshot;
+  }
+
+  /**
+   * 用外部 blockData 填充/合并到会话缓存
+   * 若 cache 还没有 blocks，用 blockData 种进去
+   * 若已有 blocks，以 cache 为准（overlay 语义）
+   * @param {string} chunkKey - "cx,cz"
+   * @param {object} blockData - 普通对象格式的 blockData
+   */
+  hydrateChunkBlocks(chunkKey, blockData) {
+    const snapshot = this.ensureChunkSnapshot(chunkKey);
+    if (!snapshot.blocks || Object.keys(snapshot.blocks).length === 0) {
+      // cache 为空，用外部数据填充
+      snapshot.blocks = blockData ? { ...blockData } : {};
+    }
+    // 若 cache 已有数据，保持 cache 优先（overlay 语义）
+    return snapshot;
+  }
+
+  /**
+   * 用外部数据替换会话缓存中的 blocks
+   * 注意：不会覆盖已有 entities
+   * @param {string} chunkKey - "cx,cz"
+   * @param {object} blockData - 普通对象格式的 blockData
+   */
+  replaceChunkBlocks(chunkKey, blockData) {
+    const snapshot = this.ensureChunkSnapshot(chunkKey);
+    const existingEntities = snapshot.entities;
+    snapshot.blocks = blockData ? { ...blockData } : {};
+    snapshot.entities = existingEntities;
+    return snapshot;
   }
 
   /**

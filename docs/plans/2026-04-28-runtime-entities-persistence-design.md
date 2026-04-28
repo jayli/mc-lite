@@ -377,6 +377,32 @@
 
 1. 是否把 `cache.entities` 正式搬入 `worldStore`
 2. 是否需要 `RuntimeEntityRepository`
+3. 是否为炮塔/巢穴改成显式 chunk 激活/停用
+4. IndexedDB 存档协议
+
+---
+
+## 10. 第一阶段实施状态
+
+**状态**: 已完成（2026-04-28）
+
+### 已完成
+
+1. `persistenceService.cache` 恢复为 session overlay，新增 `ensureChunkSnapshot`、`snapshotChunkBlocks`、`hydrateChunkBlocks`、`replaceChunkBlocks`
+2. `recordChangeForChunk` 在 cache 缺失时自动创建快照
+3. `Chunk.loadFromRecord` 明确 block 读取优先级：`cache.blocks > chunkRecord.blockData`
+4. World.js 卸载顺序修正：`snapshot -> stopMinecarts -> flush -> dispose -> delete`
+5. `WorldRuntime.flushChunk/flushBeforeUnload` 支持传入已抓取快照
+6. 炮塔快照补 `id`，恢复时优先复用
+7. 丧尸巢穴快照补 `id + lastSpawnTime`，恢复时复用
+8. 矿车 `saveMinecartToSnapshot` 改用 `id` 去重
+
+### 明确未开始
+
+1. 特殊实体正式入 `worldStore` / IndexedDB
+2. `RuntimeEntityRepository` 抽象
+3. chunk 级 activate/deactivate 生命周期
+4. 跨重启持久化（关闭页面后恢复）
 3. 是否要为炮塔/巢穴改成显式 chunk 激活/停用
 4. 保存/读档与 IndexedDB 的统一协议
 

@@ -313,12 +313,15 @@ export class MinecartManager {
     if (!chunkData) return;
 
     const list = chunkData.entities.minecarts;
-    const posKey = this.getPositionKey(entry);
-    const idx = list.findIndex(item => this.getPositionKey(item) === posKey);
+    // 优先用 id 去重，position 作为兼容保护
+    const idx = list.findIndex(item => item.id === entry.id);
     if (idx >= 0) {
       list[idx] = entry;
     } else {
-      list.push(entry);
+      const posKey = this.getPositionKey(entry);
+      const posIdx = list.findIndex(item => this.getPositionKey(item) === posKey);
+      if (posIdx >= 0) list[posIdx] = entry;
+      else list.push(entry);
     }
 
     const [cx, cz] = chunkKey.split(',').map(Number);
@@ -364,11 +367,12 @@ export class MinecartManager {
       if (!item?.position) continue;
       if (this.getChunkKeyByPosition(item.position) !== currentChunkKey) continue;
 
-      // 检查是否已存在（避免重复恢复）
+      // 检查是否已存在（按 id 或位置避免重复恢复）
+      if (item.id && this.minecarts.has(item.id)) continue;
       const posKey = this.getPositionKey(item.position);
       if (this.positionIndex.has(posKey)) continue;
 
-      // 创建矿车实例
+      // 创建矿车实例（优先复用快照 id）
       const minecart = Minecart.fromJSON(item, this.world);
       minecart.chunkKey = currentChunkKey;
       minecart.onDestroy = (id) => this.onMinecartDestroyed(id);

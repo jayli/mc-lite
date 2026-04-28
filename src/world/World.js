@@ -800,27 +800,35 @@ export class World {
     // 遍历已加载区块，卸载超出渲染距离（额外加1作为缓冲）的区块
     for (const [key, chunk] of this.chunks) {
       if (Math.abs(chunk.cx - cx) > this.renderDistance + 1 || Math.abs(chunk.cz - cz) > this.renderDistance + 1) {
-        // 重要：在卸载前通知 MinecartManager 停止该 Chunk 内的矿车运动并保存状态
+        // 1. 同步快照当前 blockData 到会话缓存（不依赖后续异步 flush）
+        const persistence = getPersistenceService();
+        persistence?.snapshotChunkBlocks?.(key, chunk.blockData);
+
+        // 2. 通知 MinecartManager 停止该 Chunk 内的矿车运动并保存状态
         if (this.minecartManager) {
           this.minecartManager.stopMinecartsForChunk(chunk.cx, chunk.cz);
         }
-        // 清理方块分发 buffer
+
+        // 3. 触发异步 worldStore flush（传入已抓取的快照，不再回头取活动 chunk）
+        if (this.bootstrapState.phase === 'runtime-streaming' && this.worldRuntime) {
+          this.worldRuntime.flushBeforeUnload(chunk.cx, chunk.cz, chunk.blockData).catch(() => {});
+        } else {
+          persistence?.saveChunkData?.(chunk.cx, chunk.cz);
+        }
+
+        // 4. 清理方块分发 buffer
         this.scatterManager?.unloadChunk(key);
         this.scene.remove(chunk.group);
-        // 重要：在卸载前请求持久化，确保修改不丢失
-        // runtime-streaming 阶段：通过 WorldRuntime 异步写回
-        if (this.bootstrapState.phase === 'runtime-streaming' && this.worldRuntime) {
-          this.worldRuntime.flushBeforeUnload(chunk.cx, chunk.cz).catch(() => {});
-        } else {
-          getPersistenceService().saveChunkData(chunk.cx, chunk.cz);
-        }
-        // 清理待处理的 Face Culling 更新
+
+        // 5. 清理待处理的 Face Culling 更新
         chunk.pendingBatchFaceCullingUpdates?.clear();
         if (chunk.batchFaceCullingTimer) {
           clearTimeout(chunk.batchFaceCullingTimer);
           chunk.batchFaceCullingTimer = null;
         }
-        chunk.dispose(); // 释放显存
+
+        // 6. 释放显存并从活动 chunk 集合移除
+        chunk.dispose();
         this.chunks.delete(key);
         chunkTopologyChanged = true;
       }

@@ -291,30 +291,39 @@ export class Chunk {
     this.needsStoreRetry = false;
     this.loadState = 'loading-from-record';
 
-    // 1. 注入 blockData
-    if (chunkRecord.blockData) {
-      this._injectBlockData(chunkRecord.blockData);
+    const persistence = getPersistenceService();
+    const chunkKey = `${this.cx},${this.cz}`;
+
+    // 1. 确保会话快照存在
+    persistence?.ensureChunkSnapshot?.(chunkKey);
+
+    // 2. 合并 blockData：cache.blocks 优先于 chunkRecord.blockData（overlay 语义）
+    const effectiveBlockData = persistence?.hydrateChunkBlocks?.(chunkKey, chunkRecord.blockData || {}).blocks
+      || chunkRecord.blockData
+      || {};
+
+    // 3. 注入合并后的 blockData
+    if (effectiveBlockData && Object.keys(effectiveBlockData).length > 0) {
+      this._injectBlockData(effectiveBlockData);
     }
 
-    // 2. 注入静态实体
+    // 4. 注入静态实体
     if (chunkRecord.staticEntities?.length > 0) {
       this._injectStaticEntities(chunkRecord.staticEntities);
     }
 
-    // 3. 注入结构中心
+    // 5. 注入结构中心
     if (chunkRecord.runtimeSeedData?.structureCenters) {
       this.structureCenters = chunkRecord.runtimeSeedData.structureCenters;
     }
 
-    // 4. 标记快照已加载，合并持久化缓存中的实体数据
+    // 6. 构建 pendingSnapshot，block 来源为合并后的 effectiveBlockData
     this.pendingSnapshot = {
-      blocks: { ...chunkRecord.blockData },
+      blocks: { ...effectiveBlockData },
       entities: { modGunMan: [], rovers: [] }
     };
 
-    // 从持久化缓存中恢复运行时实体数据（炮塔、矿车、丧尸巢穴）
-    const persistence = getPersistenceService();
-    const chunkKey = `${this.cx},${this.cz}`;
+    // 7. 从持久化缓存中恢复运行时实体数据（炮塔、矿车、丧尸巢穴）
     const existingData = persistence?.cache?.get?.(chunkKey);
     if (existingData?.entities) {
       this.pendingSnapshot.entities = {

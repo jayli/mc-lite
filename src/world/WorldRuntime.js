@@ -157,22 +157,31 @@ export class WorldRuntime {
    * 将单个脏 chunk 写回 WorldStore
    * 由 WorldAccessLayer 调用，玩家交互后异步执行
    */
-  async flushChunk(cx, cz) {
+  async flushChunk(cx, cz, blockDataSnapshot = null) {
     const key = this._chunkKey(cx, cz);
     const dirtyEntry = this._dirtyChunks.get(key);
     if (!dirtyEntry) return;
     this._clearScheduledFlush(cx, cz);
 
-    // 获取当前 chunk 的 runtime blockData
-    const chunk = this._world?.chunks?.get(key);
-    if (!chunk || !chunk.blockData) return;
+    // 获取 blockData：优先使用传入的快照，其次从活动 chunk 读取
+    let blockData = blockDataSnapshot;
+    let staticEntities = [];
+    let runtimeSeedData = {};
+
+    if (!blockData) {
+      const chunk = this._world?.chunks?.get(key);
+      if (!chunk || !chunk.blockData) return;
+      blockData = chunk.blockData;
+      staticEntities = chunk.staticEntities || [];
+      runtimeSeedData = chunk.runtimeSeedData || {};
+    }
 
     try {
       dirtyEntry.pendingFlush = true;
       await this._worldStore.putChunkRecord(cx, cz, {
-        blockData: this._serializeBlockData(chunk.blockData),
-        staticEntities: chunk.staticEntities || [],
-        runtimeSeedData: chunk.runtimeSeedData || {}
+        blockData: this._serializeBlockData(blockData),
+        staticEntities,
+        runtimeSeedData
       });
       dirtyEntry.dirty = false;
       dirtyEntry.pendingFlush = false;
@@ -250,10 +259,10 @@ export class WorldRuntime {
    * @param {number} cx
    * @param {number} cz
    */
-  async flushBeforeUnload(cx, cz) {
+  async flushBeforeUnload(cx, cz, blockDataSnapshot = null) {
     this._clearScheduledFlush(cx, cz);
     if (this.isChunkDirty(cx, cz)) {
-      await this.flushChunk(cx, cz);
+      await this.flushChunk(cx, cz, blockDataSnapshot);
     }
   }
 

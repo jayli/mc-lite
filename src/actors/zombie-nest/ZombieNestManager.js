@@ -116,18 +116,20 @@ export class ZombieNestManager {
   /**
    * 巢穴序列化记录
    * @param {ZombieNest} nest
-   * @returns {{position:{x:number,y:number,z:number},criticalBlock:{x:number,y:number,z:number,type:string}}|null}
+   * @returns {{id:string,position:{x:number,y:number,z:number},criticalBlock:{x:number,y:number,z:number,type:string},lastSpawnTime:number}|null}
    */
   toNestSnapshot(nest) {
     if (!nest || !nest.position || !nest.criticalBlock) return null;
     const position = this.normalizePosition(nest.position);
     const critical = this.normalizePosition(nest.criticalBlock);
     return {
+      id: nest.id,
       position,
       criticalBlock: {
         ...critical,
         type: nest.criticalBlock.type
-      }
+      },
+      lastSpawnTime: nest.lastSpawnTime
     };
   }
 
@@ -145,10 +147,16 @@ export class ZombieNestManager {
     const chunkData = this.ensureChunkSnapshot(chunkKey);
     if (!chunkData) return;
     const list = chunkData.entities.zombieNests;
-    const posKey = this.getPositionKey(entry.position);
-    const idx = list.findIndex(item => this.getPositionKey(item.position) === posKey);
-    if (idx >= 0) list[idx] = entry;
-    else list.push(entry);
+    // 优先用 id 去重，position 作为兼容保护
+    const idx = list.findIndex(item => item.id === entry.id);
+    if (idx >= 0) {
+      list[idx] = entry;
+    } else {
+      const posKey = this.getPositionKey(entry.position);
+      const posIdx = list.findIndex(item => this.getPositionKey(item.position) === posKey);
+      if (posIdx >= 0) list[posIdx] = entry;
+      else list.push(entry);
+    }
 
     const [cx, cz] = chunkKey.split(',').map(Number);
     persistence.saveChunkData?.(cx, cz, chunkData);
@@ -168,8 +176,8 @@ export class ZombieNestManager {
     const chunkData = this.ensureChunkSnapshot(chunkKey);
     if (!chunkData) return;
     const list = chunkData.entities.zombieNests;
-    const posKey = this.getPositionKey(entry.position);
-    const next = list.filter(item => this.getPositionKey(item.position) !== posKey);
+    // 优先用 id 匹配
+    const next = list.filter(item => item.id !== entry.id);
     chunkData.entities.zombieNests = next;
 
     const [cx, cz] = chunkKey.split(',').map(Number);
@@ -204,7 +212,8 @@ export class ZombieNestManager {
       return null;
     }
 
-    const id = `zombie_nest_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    // 优先复用快照 id
+    const id = params.restoredId || `zombie_nest_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
     const nest = new ZombieNest({
       id,
       position,
@@ -213,6 +222,11 @@ export class ZombieNestManager {
       onSpawn: (spawnData) => this.handleNestSpawn(spawnData),
       onDestroy: (nestId) => this.handleNestDestroy(nestId)
     });
+
+    // 恢复 lastSpawnTime，避免刷怪节奏重置
+    if (params.lastSpawnTime) {
+      nest.lastSpawnTime = params.lastSpawnTime;
+    }
 
     this.nests.set(id, nest);
     this.nestPositionIndex.set(positionKey, id);
@@ -237,9 +251,12 @@ export class ZombieNestManager {
     for (const item of nests) {
       if (!item?.position || !item?.criticalBlock) continue;
       if (this.getChunkKeyByPosition(item.position) !== currentChunkKey) continue;
+      // 优先复用快照 id 和 lastSpawnTime
       this.createNest({
         position: item.position,
-        criticalBlock: item.criticalBlock
+        criticalBlock: item.criticalBlock,
+        restoredId: item.id || null,
+        lastSpawnTime: item.lastSpawnTime || null
       }, {
         skipLimit: true,
         persist: false

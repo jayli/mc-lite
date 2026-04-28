@@ -100,12 +100,13 @@ export class TurretManager {
   /**
    * 炮塔序列化记录
    * @param {Turret} turret
-   * @returns {{position:{x:number,y:number,z:number},rotation:number}|null}
+   * @returns {{id:string,position:{x:number,y:number,z:number},rotation:number}|null}
    */
   toTurretSnapshot(turret) {
     if (!turret || !turret.position) return null;
     const position = this.normalizePosition(turret.position);
     return {
+      id: turret.id,
       position,
       rotation: turret.currentRotation || 0
     };
@@ -125,10 +126,16 @@ export class TurretManager {
     const chunkData = this.ensureChunkSnapshot(chunkKey);
     if (!chunkData) return;
     const list = chunkData.entities.turrets;
-    const posKey = this.getPositionKey(entry.position);
-    const idx = list.findIndex(item => this.getPositionKey(item.position) === posKey);
-    if (idx >= 0) list[idx] = entry;
-    else list.push(entry);
+    // 优先用 id 去重，position 作为兼容保护
+    const idx = list.findIndex(item => item.id === entry.id);
+    if (idx >= 0) {
+      list[idx] = entry;
+    } else {
+      const posKey = this.getPositionKey(entry.position);
+      const posIdx = list.findIndex(item => this.getPositionKey(item.position) === posKey);
+      if (posIdx >= 0) list[posIdx] = entry;
+      else list.push(entry);
+    }
 
     const [cx, cz] = chunkKey.split(',').map(Number);
     persistence.saveChunkData?.(cx, cz, chunkData);
@@ -148,8 +155,8 @@ export class TurretManager {
     const chunkData = this.ensureChunkSnapshot(chunkKey);
     if (!chunkData) return;
     const list = chunkData.entities.turrets;
-    const posKey = this.getPositionKey(entry.position);
-    const next = list.filter(item => this.getPositionKey(item.position) !== posKey);
+    // 优先用 id 匹配
+    const next = list.filter(item => item.id !== entry.id);
     chunkData.entities.turrets = next;
 
     const [cx, cz] = chunkKey.split(',').map(Number);
@@ -183,8 +190,8 @@ export class TurretManager {
       return this.turrets.get(existingId) || null;
     }
 
-    // 生成唯一ID
-    const id = `turret_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // 生成唯一ID，优先复用快照 id
+    const id = options.restoredId || `turret_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // 将普通对象转换为 THREE.Vector3 传给 Turret 构造函数
     const positionVec3 = new THREE.Vector3(normalizedPos.x, normalizedPos.y, normalizedPos.z);
@@ -268,10 +275,12 @@ export class TurretManager {
     for (const item of turrets) {
       if (!item?.position) continue;
       if (this.getChunkKeyByPosition(item.position) !== currentChunkKey) continue;
+      // 优先复用快照 id
+      const restoredId = item.id || null;
       this.createTurret(
         item.position,
         item.rotation || 0,
-        { skipLimit: true, persist: false }
+        { skipLimit: true, persist: false, restoredId }
       );
     }
   }

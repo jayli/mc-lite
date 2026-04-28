@@ -374,7 +374,7 @@ Expected: PASS
 - Modify: `docs/plans/2026-04-28-runtime-entities-persistence-design.md`
 - Modify: `docs/plans/2026-04-28-runtime-entities-persistence-plan.md`
 
-- [ ] **Step 1: 在文档尾部补“第二阶段范围”**
+- [x] **Step 1: 在文档尾部补“第二阶段范围”**
 
 列出但不实现：
 
@@ -383,12 +383,14 @@ Expected: PASS
 3. chunk 级 activate/deactivate
 4. IndexedDB 存档协议
 
-- [ ] **Step 2: 标记第一阶段完成判据**
+- [x] **Step 2: 标记第一阶段完成判据**
 
 要求：
 
 1. 明确“runtime 会话正确”已完成
 2. 明确“跨重启持久化”尚未开始
+
+**实施状态**: 第一阶段已实现（2026-04-28）
 
 ---
 
