@@ -1,513 +1,452 @@
 # Runtime Entities Persistence Implementation Plan
 
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Migrate turret, minecart, and zombie nest persistence from the old `persistenceService.cache` to WorldStore `RegionRecord.runtimeEntities`, ensuring entities survive chunk unload/reload cycles.
+**Goal:** 将 `turret`、`minecart`、`zombieNest` 从旧的 `persistenceService.cache.entities` 机制迁移到 `worldStore / IndexedDB` 权威模型，并补齐 chunk 卸载/恢复、渲染恢复、旧路径兼容、并发写入保护。
 
-**Architecture:** Add a `runtimeEntities` field to `RegionRecord.chunks[cx,cz]`. Entity managers write via `worldStore.putChunkRecord()`. Chunk reads via `getChunkRecord()` → `pendingRuntimeEntities` → `finalizeNonDeferredPhase()` restores instances.
+**Architecture:** 不再让各 Manager 直接 `getChunkRecord -> 改对象 -> putChunkRecord`。新增统一的 `RuntimeEntityRepository` 作为 `runtimeEntities` 的唯一写入入口；`blockData` 与 `runtimeEntities` 分层管理；活动实例采用“按 chunk 激活/停用”的显式生命周期。
 
-**Tech Stack:** JavaScript (ES Modules), IndexedDB via PersistenceWorker, WorldStore/RegionRecord architecture
-
----
-
-### Task 1: WorldStore — 在 getChunkRecord/putChunkRecord 中支持 runtimeEntities
-
-**Files:**
-- Modify: `src/world/WorldStore.js:124-165`
-- Test: 浏览器中验证
-
-**Step 1: 修改 getChunkRecord 返回值**
-
-在 `src/world/WorldStore.js` 的 `getChunkRecord` 方法（约第124行）中，返回对象增加 `runtimeEntities` 字段：
-
-```javascript
-// 当前返回：
-return {
-  cx,
-  cz,
-  blockData: chunkData.blockData || {},
-  staticEntities: chunkData.staticEntities || [],
-  runtimeSeedData: chunkData.runtimeSeedData || {}
-};
-
-// 修改为：
-return {
-  cx,
-  cz,
-  blockData: chunkData.blockData || {},
-  staticEntities: chunkData.staticEntities || [],
-  runtimeEntities: chunkData.runtimeEntities || null,
-  runtimeSeedData: chunkData.runtimeSeedData || {}
-};
-```
-
-同样修改 `getChunkRecordsInRegion` 方法（约第147行）中对应的返回对象，也增加 `runtimeEntities` 字段。
-
-**Step 2: 修改 putChunkRecord 接受 runtimeEntities**
-
-`putChunkRecord` 方法（约第178行）直接接收 `chunkRecord` 对象并写入 `region.chunks[key] = chunkRecord`。由于是全对象覆盖写入，只要调用方传入 `runtimeEntities` 字段，自动就会被保存。**无需修改代码**，只需要在文档中确认该字段会被透传。
-
-**Step 3: 确认无需改动**
-
-- `saveRegionRecord` 和 `saveRegionRecordsBatch` 是直接序列化整个 region 对象，`runtimeEntities` 自动包含
-- PersistenceWorker 的 `saveRegionRecord` handler 也是直接 `store.put({ regionKey, data: record })`，自动序列化所有字段
-
-**Step 4: Commit**
-
-```bash
-git add src/world/WorldStore.js
-git commit -m "feat(worldstore): add runtimeEntities field to getChunkRecord projection"
-```
+**Tech Stack:** JavaScript (ES Modules), `WorldStore`, `WorldRuntime`, IndexedDB Worker RPC, Three.js, 现有 Chunk 装配与 Instanced 渲染体系
 
 ---
 
-### Task 2: Chunk — 从 worldStore 读取 runtimeEntities 替代旧 cache 路径
+## 先决原则
 
-**Files:**
-- Modify: `src/world/Chunk.js:282-346` (loadFromRecord 方法)
+### 必须遵守
+- `worldStore / IndexedDB` 是权威源，`persistenceService.cache` 只是兼容桥和工作缓存。
+- 任何新逻辑不得只写旧 `cache.entities`。
+- 不能直接在三个 Manager 内部分散实现 chunkRecord 读改写。
+- 必须同时验证两条装载链路：
+  - `WorldRuntime.ensureChunkData()` -> `Chunk.loadFromRecord()`
+  - `Chunk.gen()` / `assembleEntityPhase()` 的旧快照路径
 
-**Step 1: 修改 loadFromRecord 中的 runtimeEntities 读取逻辑**
-
-在 `src/world/Chunk.js` 的 `loadFromRecord` 方法中（约第315-336行），将旧 cache 路径替换为从 `chunkRecord.runtimeEntities` 读取：
-
-```javascript
-// 当前代码（第315-336行）：
-// 从持久化缓存中恢复运行时实体数据（炮塔、矿车、丧尸巢穴）
-const persistence = getPersistenceService();
-const chunkKey = `${this.cx},${this.cz}`;
-const existingData = persistence?.cache?.get?.(chunkKey);
-if (existingData?.entities) {
-  this.pendingSnapshot.entities = {
-    ...this.pendingSnapshot.entities,
-    ...existingData.entities
-  };
-  const entities = this.pendingSnapshot.entities;
-  if (
-    (Array.isArray(entities.zombieNests) && entities.zombieNests.length > 0) ||
-    (Array.isArray(entities.turrets) && entities.turrets.length > 0) ||
-    (Array.isArray(entities.minecarts) && entities.minecarts.length > 0)
-  ) {
-    this.pendingRuntimeEntities = {
-      zombieNests: entities.zombieNests || [],
-      turrets: entities.turrets || [],
-      minecarts: entities.minecarts || []
-    };
-  }
-}
-
-// 替换为：
-// 从 WorldStore runtimeEntities 恢复运行时实体数据
-const runtimeEntities = chunkRecord.runtimeEntities;
-if (runtimeEntities && typeof runtimeEntities === 'object') {
-  const zombieNests = Array.isArray(runtimeEntities.zombieNests) ? runtimeEntities.zombieNests : [];
-  const turrets = Array.isArray(runtimeEntities.turrets) ? runtimeEntities.turrets : [];
-  const minecarts = Array.isArray(runtimeEntities.minecarts) ? runtimeEntities.minecarts : [];
-  if (zombieNests.length > 0 || turrets.length > 0 || minecarts.length > 0) {
-    this.pendingRuntimeEntities = { zombieNests, turrets, minecarts };
-  }
-}
-```
-
-**Step 2: Commit**
-
-```bash
-git add src/world/Chunk.js
-git commit -m "feat(chunk): read runtimeEntities from worldStore instead of old persistence cache"
-```
+### 本计划不接受的“伪完成”
+- 仅修改 `Chunk.loadFromRecord()`
+- 仅给 `WorldStore.getChunkRecord()` 加字段
+- 只让实体“刷新页面能恢复”，但 chunk 卸载/恢复仍异常
+- 只验证 minecart，不验证 turret / zombieNest
 
 ---
 
-### Task 3: TurretManager — 写入路径迁移到 WorldStore
+### Task 1: 代码路径盘点与契约冻结
 
 **Files:**
-- Modify: `src/actors/turret/TurretManager.js:80-157` (ensureChunkSnapshot, saveTurretToSnapshot, removeTurretFromSnapshot)
-- Test: 浏览器中放置/销毁炮塔，刷新页面验证炮塔保留
+- Modify: `docs/plans/2026-04-28-runtime-entities-persistence-design.md`
+- Modify: `docs/plans/2026-04-28-runtime-entities-persistence-plan.md`
+- Reference: `src/world/Chunk.js`
+- Reference: `src/world/WorldRuntime.js`
+- Reference: `src/world/WorldStore.js`
+- Reference: `src/actors/turret/TurretManager.js`
+- Reference: `src/actors/minecart/MinecartManager.js`
+- Reference: `src/actors/zombie-nest/ZombieNestManager.js`
 
-**Step 1: 添加 worldStore 注入**
+- [ ] **Step 1: 冻结数据职责边界**
 
-在 TurretManager 的 `getPersistenceService` 方法之后添加 `getWorldStore` 方法：
+确认并记录：
+- `blockData` 管结构方块、普通方块、轨道、consolidation、AO
+- `runtimeEntities` 管逻辑实体元数据与最小行为状态
+- manager 活动实例不是权威持久化数据
 
-```javascript
-/**
- * 获取 worldStore（优先测试注入）
- * @returns {object|null}
- */
-getWorldStore() {
-  return globalThis._worldStore || this.world?.worldStore || null;
-}
-```
+- [ ] **Step 2: 冻结三类实体的最小持久化字段**
 
-**Step 2: 替换 saveTurretToSnapshot**
+整理为最终契约：
+- `turret`: `id`、`ownerChunk`、`anchor`、`renderState.yaw/pitch`、关键支撑块
+- `minecart`: `id`、`ownerChunk`、`anchor`、`orientation`、`movementState`、`lastTrackPosition`、`linkedMinecartIds`
+- `zombieNest`: `id`、`ownerChunk`、`anchor`、`criticalBlock`、`lastSpawnAt`
 
-替换现有 `saveTurretToSnapshot` 方法（约第119-135行）：
+- [ ] **Step 3: 明确本次兼容策略**
 
-```javascript
-/**
- * 将炮塔写入 WorldStore
- * @param {Turret} turret
- * @returns {void}
- */
-async saveTurretToSnapshot(turret) {
-  const worldStore = this.getWorldStore();
-  if (!worldStore) return;
-  const entry = this.toTurretSnapshot(turret);
-  if (!entry) return;
+确认采用：
+- 写：只写 `worldStore.runtimeEntities`
+- 读：优先 `worldStore.runtimeEntities`，必要时迁移旧 `cache.entities`
 
-  const cx = Math.floor(entry.position.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
-  const cz = Math.floor(entry.position.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
+- [ ] **Step 4: 人工检查设计文档与计划文档是否一致**
 
-  // 读取当前 chunkRecord（包含已有的 runtimeEntities）
-  const chunkRecord = await worldStore.getChunkRecord(cx, cz);
-  if (!chunkRecord) return;
-
-  // 初始化 runtimeEntities
-  if (!chunkRecord.runtimeEntities) chunkRecord.runtimeEntities = {};
-  if (!Array.isArray(chunkRecord.runtimeEntities.turrets)) {
-    chunkRecord.runtimeEntities.turrets = [];
-  }
-
-  // 更新或添加
-  const posKey = this.getPositionKey(entry.position);
-  const list = chunkRecord.runtimeEntities.turrets;
-  const idx = list.findIndex(item => this.getPositionKey(item.position) === posKey);
-  if (idx >= 0) list[idx] = entry;
-  else list.push(entry);
-
-  // 写回
-  await worldStore.putChunkRecord(cx, cz, chunkRecord);
-}
-```
-
-**Step 3: 替换 removeTurretFromSnapshot**
-
-替换现有 `removeTurretFromSnapshot` 方法（约第142-157行）：
-
-```javascript
-/**
- * 从 WorldStore 中移除炮塔
- * @param {Turret} turret
- * @returns {void}
- */
-async removeTurretFromSnapshot(turret) {
-  const worldStore = this.getWorldStore();
-  if (!worldStore) return;
-  const entry = this.toTurretSnapshot(turret);
-  if (!entry) return;
-
-  const cx = Math.floor(entry.position.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
-  const cz = Math.floor(entry.position.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
-
-  const chunkRecord = await worldStore.getChunkRecord(cx, cz);
-  if (!chunkRecord?.runtimeEntities?.turrets) return;
-
-  const posKey = this.getPositionKey(entry.position);
-  chunkRecord.runtimeEntities.turrets = chunkRecord.runtimeEntities.turrets.filter(
-    item => this.getPositionKey(item.position) !== posKey
-  );
-
-  await worldStore.putChunkRecord(cx, cz, chunkRecord);
-}
-```
-
-**Step 4: 移除 ensureChunkSnapshot 和旧的 cache 相关方法**
-
-删除 `ensureChunkSnapshot` 方法（约第84-98行），不再需要。保留 `getPersistenceService` 方法（可能其他地方还有引用）。
-
-**Step 5: 更新 createTurret 中的 persist 调用**
-
-`createTurret` 方法（约第208行）中 `this.saveTurretToSnapshot(turret)` 现在是 async 方法，但不需要 await（fire-and-forget 异步写入）：
-
-```javascript
-// 保持不变，因为 saveTurretToSnapshot 内部已经是异步的
-// 不需要添加 await，避免阻塞主线程
-if (shouldPersist) {
-  this.saveTurretToSnapshot(turret);
-}
-```
-
-**Step 6: Run lint**
-
-```bash
-npm run lint
-```
-
-**Step 7: Commit**
-
-```bash
-git add src/actors/turret/TurretManager.js
-git commit -m "feat(turret): migrate persistence to WorldStore runtimeEntities"
-```
+检查目标、边界、字段与生命周期是否完全一致，不允许文档内部互相矛盾。
 
 ---
 
-### Task 4: MinecartManager — 写入路径迁移到 WorldStore
+### Task 2: 建立统一仓储层，禁止 Manager 直接改 WorldStore
 
 **Files:**
-- Modify: `src/actors/minecart/MinecartManager.js:286-350` (ensureChunkSnapshot, saveMinecartToSnapshot, removeMinecartFromSnapshot)
-- Test: 浏览器中放置/拾取矿车，刷新页面验证矿车保留
+- Create: `src/world/runtime-entities/RuntimeEntityRepository.js`
+- Modify: `src/world/WorldStore.js`
+- Modify: `src/world/WorldRuntime.js`
 
-**Step 1: 添加 worldStore 注入**
+- [ ] **Step 1: 新建 `RuntimeEntityRepository` 骨架**
 
-在 MinecartManager 的 `getPersistenceService` 方法之后添加：
+提供最少接口：
 
-```javascript
-/**
- * 获取 worldStore（优先测试注入）
- * @returns {object|null}
- */
-getWorldStore() {
-  return globalThis._worldStore || this.world?.worldStore || null;
-}
+```js
+loadChunkRuntimeEntities(cx, cz)
+updateChunkRuntimeEntities(cx, cz, updater)
+upsertEntity(cx, cz, type, entityRecord)
+removeEntity(cx, cz, type, entityId)
+moveEntity(fromCx, fromCz, toCx, toCz, type, entityRecord)
+migrateLegacyEntitiesIfNeeded(cx, cz, legacyEntities)
 ```
 
-**Step 2: 替换 saveMinecartToSnapshot**
+- [ ] **Step 2: 给仓储层实现按 chunk 串行化更新**
 
-替换现有方法（约第306-326行）：
+要求：
+- 内部维护 `Map<chunkKey, Promise>` 或等价队列
+- 同一 chunk 的 `updateChunkRuntimeEntities()` 串行执行
+- `updater` 总是基于最新值生成新值
 
-```javascript
-/**
- * 将矿车写入 WorldStore
- * @param {Minecart} minecart
- */
-async saveMinecartToSnapshot(minecart) {
-  const worldStore = this.getWorldStore();
-  if (!worldStore) return;
+- [ ] **Step 3: 统一 `runtimeEntities` 的默认结构**
 
-  const entry = minecart.toJSON();
-  const chunkKey = this.getChunkKeyByPosition(entry);
-  const [cx, cz] = chunkKey.split(',').map(Number);
+保证仓储层输出始终是：
 
-  const chunkRecord = await worldStore.getChunkRecord(cx, cz);
-  if (!chunkRecord) return;
-
-  if (!chunkRecord.runtimeEntities) chunkRecord.runtimeEntities = {};
-  if (!Array.isArray(chunkRecord.runtimeEntities.minecarts)) {
-    chunkRecord.runtimeEntities.minecarts = [];
-  }
-
-  const list = chunkRecord.runtimeEntities.minecarts;
-  const posKey = this.getPositionKey(entry);
-  const idx = list.findIndex(item => this.getPositionKey(item) === posKey);
-  if (idx >= 0) list[idx] = entry;
-  else list.push(entry);
-
-  await worldStore.putChunkRecord(cx, cz, chunkRecord);
-}
+```js
+{ version: 1, byType: { turrets: [], minecarts: [], zombieNests: [] } }
 ```
 
-**Step 3: 替换 removeMinecartFromSnapshot**
+避免调用方自己判空和拼结构。
 
-替换现有方法（约第332-350行）：
+- [ ] **Step 4: 扩展 `WorldStore` 的投影与合并能力**
 
-```javascript
-/**
- * 从 WorldStore 中移除矿车
- * @param {Minecart} minecart
- */
-async removeMinecartFromSnapshot(minecart) {
-  const worldStore = this.getWorldStore();
-  if (!worldStore) return;
+修改要求：
+- `getChunkRecord()` / `getChunkRecordsInRegion()` 投影出 `runtimeEntities`
+- `putChunkRecord()` 明确为字段级合并，而不是全对象覆盖
+- 对 `runtimeEntities` 支持“缺省保留、显式覆盖”语义
 
-  const entry = minecart.toJSON();
-  const chunkKey = this.getChunkKeyByPosition(entry);
-  const [cx, cz] = chunkKey.split(',').map(Number);
+- [ ] **Step 5: 给 `WorldRuntime.flushChunk()` 留出只写 block 工作集的清晰边界**
 
-  const chunkRecord = await worldStore.getChunkRecord(cx, cz);
-  if (!chunkRecord?.runtimeEntities?.minecarts) return;
+确认 `flushChunk()` 只写：
+- `blockData`
+- `staticEntities`
+- `runtimeSeedData`
 
-  const posKey = this.getPositionKey(entry);
-  chunkRecord.runtimeEntities.minecarts = chunkRecord.runtimeEntities.minecarts.filter(
-    item => this.getPositionKey(item) !== posKey
-  );
+不得在这里拼装 `runtimeEntities`。
 
-  await worldStore.putChunkRecord(cx, cz, chunkRecord);
-}
-```
+- [ ] **Step 6: Run lint**
 
-**Step 4: 删除 ensureChunkSnapshot 方法**
-
-删除 `ensureChunkSnapshot` 方法（约第286-300行）。
-
-**Step 5: 在 restoreMinecartsForChunk 中加入 UUID 全局去重**
-
-修改 `restoreMinecartsForChunk` 方法（约第359行），在循环开头增加 `id` 去重检查，防止矿车跨 chunk 移动后重复恢复：
-
-```javascript
-for (const item of minecarts) {
-  if (!item?.position) continue;
-
-  // UUID 全局去重：跨 chunk 移动时，旧 chunk 和新 chunk 可能同时保有同一矿车记录
-  if (item.id && this.minecarts.has(item.id)) continue;
-
-  if (this.getChunkKeyByPosition(item.position) !== currentChunkKey) continue;
-
-  // 原有位置去重保留（防止同一 chunk 内重复记录）
-  const posKey = this.getPositionKey(item.position);
-  if (this.positionIndex.has(posKey)) continue;
-
-  // ...后续恢复逻辑不变
-}
-```
-
-**Step 6: Run lint**
-
-```bash
-npm run lint
-```
-
-**Step 7: Commit**
-
-```bash
-git add src/actors/minecart/MinecartManager.js
-git commit -m "feat(minecart): migrate persistence to WorldStore runtimeEntities"
-```
+Run: `npm run lint`  
+Expected: PASS
 
 ---
 
-### Task 5: ZombieNestManager — 写入路径迁移到 WorldStore
+### Task 3: 打通读取链路，统一从 runtimeEntities 恢复
 
 **Files:**
-- Modify: `src/actors/zombie-nest/ZombieNestManager.js:100-177` (ensureChunkSnapshot, saveNestToSnapshot, removeNestFromSnapshot)
-- Test: 浏览器中放置/销毁巢穴，刷新页面验证巢穴保留
+- Modify: `src/world/Chunk.js`
+- Modify: `src/world/WorldRuntime.js`
+- Create: `src/world/runtime-entities/RuntimeEntityLoadBridge.js`（如有必要）
 
-**Step 1: 添加 worldStore 注入**
+- [ ] **Step 1: 修正 `Chunk.loadFromRecord()`**
 
-```javascript
-/**
- * 获取 worldStore（优先测试注入）
- * @returns {object|null}
- */
-getWorldStore() {
-  return globalThis._worldStore || this.world?.worldStore || null;
-}
-```
+从 `chunkRecord.runtimeEntities` 读取，并填充 `pendingRuntimeEntities`。
 
-**Step 2: 替换 saveNestToSnapshot**
+要求：
+- 不再依赖旧 `cache.entities` 作为主来源
+- 兼容 `runtimeEntities.version` 与 `byType` 结构
 
-替换现有方法（约第139-155行）：
+- [ ] **Step 2: 修正 `assembleEntityPhase()` 的旧快照逻辑**
 
-```javascript
-/**
- * 将巢穴写入 WorldStore
- * @param {ZombieNest} nest
- * @returns {void}
- */
-async saveNestToSnapshot(nest) {
-  const worldStore = this.getWorldStore();
-  if (!worldStore) return;
-  const entry = this.toNestSnapshot(nest);
-  if (!entry) return;
+这里不能简单删除旧逻辑；要改成兼容桥：
+- 若 `pendingRuntimeEntities` 已有 `worldStore` 数据，则直接使用
+- 若 `worldStore` 为空但旧 `snapshot.entities` / `cache.entities` 有值，则走迁移流程
 
-  const cx = Math.floor(entry.position.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
-  const cz = Math.floor(entry.position.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
+- [ ] **Step 3: 提炼统一的 runtime entity hydration 逻辑**
 
-  const chunkRecord = await worldStore.getChunkRecord(cx, cz);
-  if (!chunkRecord) return;
+避免 `loadFromRecord()` 和 `assembleEntityPhase()` 各自拷一套解析代码。
 
-  if (!chunkRecord.runtimeEntities) chunkRecord.runtimeEntities = {};
-  if (!Array.isArray(chunkRecord.runtimeEntities.zombieNests)) {
-    chunkRecord.runtimeEntities.zombieNests = [];
-  }
+推荐：
+- 提炼 `extractPendingRuntimeEntities(recordOrLegacySnapshot)`
+- 或创建 `RuntimeEntityLoadBridge`
 
-  const list = chunkRecord.runtimeEntities.zombieNests;
-  const posKey = this.getPositionKey(entry.position);
-  const idx = list.findIndex(item => this.getPositionKey(item.position) === posKey);
-  if (idx >= 0) list[idx] = entry;
-  else list.push(entry);
+- [ ] **Step 4: 保留旧路径的最小兼容性，不让旧 cache 反向覆盖新权威值**
 
-  await worldStore.putChunkRecord(cx, cz, chunkRecord);
-}
-```
+必须保证：
+- 旧 `cache.entities` 只能在 `worldStore.runtimeEntities` 缺失时参与迁移
+- 不能再无条件 merge 到新权威值上面
 
-**Step 3: 替换 removeNestFromSnapshot**
+- [ ] **Step 5: Run lint**
 
-替换现有方法（约第162-177行）：
-
-```javascript
-/**
- * 从 WorldStore 中移除巢穴
- * @param {ZombieNest} nest
- * @returns {void}
- */
-async removeNestFromSnapshot(nest) {
-  const worldStore = this.getWorldStore();
-  if (!worldStore) return;
-  const entry = this.toNestSnapshot(nest);
-  if (!entry) return;
-
-  const cx = Math.floor(entry.position.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
-  const cz = Math.floor(entry.position.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
-
-  const chunkRecord = await worldStore.getChunkRecord(cx, cz);
-  if (!chunkRecord?.runtimeEntities?.zombieNests) return;
-
-  const posKey = this.getPositionKey(entry.position);
-  chunkRecord.runtimeEntities.zombieNests = chunkRecord.runtimeEntities.zombieNests.filter(
-    item => this.getPositionKey(item.position) !== posKey
-  );
-
-  await worldStore.putChunkRecord(cx, cz, chunkRecord);
-}
-```
-
-**Step 4: 删除 ensureChunkSnapshot 方法**
-
-删除 `ensureChunkSnapshot` 方法（约第100-114行）。
-
-**Step 5: Run lint**
-
-```bash
-npm run lint
-```
-
-**Step 6: Commit**
-
-```bash
-git add src/actors/zombie-nest/ZombieNestManager.js
-git commit -m "feat(zombie-nest): migrate persistence to WorldStore runtimeEntities"
-```
+Run: `npm run lint`  
+Expected: PASS
 
 ---
 
-### Task 6: 验证与收尾
+### Task 4: 为三个 Manager 补齐激活/停用生命周期
 
 **Files:**
-- No code changes
-- Test: 浏览器内手动测试
+- Modify: `src/actors/turret/TurretManager.js`
+- Modify: `src/actors/minecart/MinecartManager.js`
+- Modify: `src/actors/zombie-nest/ZombieNestManager.js`
+- Modify: `src/world/World.js`
 
-**Step 1: 运行 lint 检查全部文件**
+- [ ] **Step 1: 为三个 Manager 注入统一仓储层访问**
 
-```bash
-npm run lint
+不要再保留“Manager 自己直接操纵 `worldStore`”的实现。统一改为依赖 `RuntimeEntityRepository`。
+
+- [ ] **Step 2: 新增按 chunk 激活接口**
+
+接口示例：
+
+```js
+activateChunkEntities(cx, cz, records)
 ```
 
-确保无新增警告。如有，简要修复。
+要求：
+- `restoreXxxForChunk()` 可保留为兼容入口，但内部统一委托到新接口
+- 激活时只创建活动实例，不再重复写回持久层
 
-**Step 2: 浏览器内验证 — 炮塔**
+- [ ] **Step 3: 新增按 chunk 停用接口**
 
-1. 启动开发服务器: `npm run start`
-2. 访问 http://localhost:8080
-3. 放置一个炮塔
-4. 走远让炮塔所在 chunk 卸载，再走回来
-5. 刷新页面，确认炮塔仍然存在
-6. 检查 IndexedDB 中 `world_region_records` 表，确认对应 region 的 chunks 下有 `runtimeEntities.turrets` 数据
+接口示例：
 
-**Step 3: 浏览器内验证 — 矿车**
-
-1. 放置铁轨和矿车
-2. 让矿车移动（或等待它自动移动）
-3. 走远再回来
-4. 刷新页面，确认矿车保留
-
-**Step 4: 浏览器内验证 — 丧尸巢穴**
-
-1. 放置一个丧尸巢穴
-2. 走远再回来
-3. 刷新页面，确认巢穴保留且能正常刷怪
-
-**Step 5: Commit (如有小修复)**
-
-```bash
-git add .
-git commit -m "fix: address lint and minor issues from runtime entities migration"
+```js
+deactivateChunkEntities(cx, cz, { persist: true, reason: 'chunk-unload' })
 ```
+
+要求：
+- `turret`：销毁独立视觉对象，但不删除持久记录
+- `zombieNest`：销毁逻辑实例，但不删除持久记录
+- `minecart`：先停止运动并保存，再销毁实例
+
+- [ ] **Step 4: 修改 `World.update()` 中的 chunk 卸载顺序**
+
+固定顺序：
+1. 各 manager 先停用 owner chunk 内活动实例
+2. `worldRuntime.flushBeforeUnload()` 落地方块工作集
+3. `chunk.dispose()`
+
+- [ ] **Step 5: 给 manager 增加按 chunk 索引**
+
+需要维护例如：
+- `Map<chunkKey, Set<entityId>>`
+
+原因：
+- 卸载时快速找到归属该 chunk 的活动实体
+- 避免全量扫描 manager map
+
+- [ ] **Step 6: Run lint**
+
+Run: `npm run lint`  
+Expected: PASS
+
+---
+
+### Task 5: 分实体完成序列化/反序列化与状态延续
+
+**Files:**
+- Modify: `src/actors/turret/TurretManager.js`
+- Modify: `src/actors/turret/Turret.js`
+- Modify: `src/actors/minecart/MinecartManager.js`
+- Modify: `src/actors/minecart/Minecart.js`
+- Modify: `src/actors/zombie-nest/ZombieNestManager.js`
+- Modify: `src/actors/zombie-nest/ZombieNest.js`
+
+- [ ] **Step 1: `turret` 统一稳定 ID 与序列化结构**
+
+要求：
+- 放置时创建稳定 `id`
+- 恢复时沿用原 `id`
+- 序列化 `yaw/pitch` 与关键支撑块信息
+
+- [ ] **Step 2: `minecart` 补全持久化字段**
+
+要求：
+- 不再只按位置去重
+- 恢复时优先按 `id` 去重
+- 序列化 `movementState`、`lastTrackPosition`、`linkedMinecartIds`
+
+- [ ] **Step 3: `zombieNest` 补全刷怪节奏状态**
+
+要求：
+- 保存 `lastSpawnAt`
+- 恢复时不要把刷怪节奏重置为“刚创建”
+
+- [ ] **Step 4: 明确哪些状态故意不持久化**
+
+代码里加简短注释说明：
+- 炮弹对象不持久化
+- 当前目标引用不持久化
+- 敌人实例不持久化
+
+- [ ] **Step 5: Run lint**
+
+Run: `npm run lint`  
+Expected: PASS
+
+---
+
+### Task 6: 处理结构破坏、拾取、跨 chunk 迁移
+
+**Files:**
+- Modify: `src/world/Chunk.js`
+- Modify: `src/actors/turret/TurretManager.js`
+- Modify: `src/actors/minecart/MinecartManager.js`
+- Modify: `src/actors/zombie-nest/ZombieNestManager.js`
+- Modify: `src/actors/player/PlayerInteraction.js`（如需要）
+
+- [ ] **Step 1: 明确结构破坏时谁负责删除 runtime entity 记录**
+
+要求：
+- `turret` 支撑柱被破坏后，删除其权威记录
+- `zombieNest` `criticalBlock` 被破坏后，删除其权威记录
+
+不能只依赖“活动实例自己消失”，否则持久层会残留脏记录。
+
+- [ ] **Step 2: 统一 minecart 的拾取/爆炸/碰撞删除路径**
+
+要求：
+- 所有删除路径都通过仓储层移除权威记录
+- 不能出现只删内存实例、不删 `runtimeEntities` 的分叉逻辑
+
+- [ ] **Step 3: 支持 minecart 跨 chunk owner 迁移**
+
+要求：
+- 以 `moveEntity()` 形式原子化表达“从旧 owner chunk 移除 + 新 owner chunk 添加”
+- 第一版可以内部串行做两次更新，但必须封装在仓储层，不能散落在 manager
+
+- [ ] **Step 4: 检查 `Chunk._handleEntityRemoval()` 与特殊实体逻辑是否有冲突**
+
+当前 `_handleEntityRemoval()` 只处理 `collider` 类实体；确认不会误以为它已覆盖 turret / nest / minecart。
+
+- [ ] **Step 5: Run lint**
+
+Run: `npm run lint`  
+Expected: PASS
+
+---
+
+### Task 7: 兼容迁移旧 `cache.entities` / 旧存档数据
+
+**Files:**
+- Modify: `src/world/runtime-entities/RuntimeEntityRepository.js`
+- Modify: `src/services/PersistenceService.js`（如需要迁移辅助）
+- Modify: `src/world/Chunk.js`
+- Modify: `src/core/Game.js`（若旧手动存档恢复逻辑需要桥接）
+
+- [ ] **Step 1: 实现旧 `entities` 结构到新 `runtimeEntities` 的转换器**
+
+输入示例：
+```js
+{ turrets: [...], minecarts: [...], zombieNests: [...] }
+```
+
+输出示例：
+```js
+{ version: 1, byType: { turrets: [...], minecarts: [...], zombieNests: [...] } }
+```
+
+- [ ] **Step 2: 只在新权威记录缺失时触发迁移**
+
+避免旧数据覆盖新数据。
+
+- [ ] **Step 3: 完成一次迁移后写回 worldStore**
+
+并考虑清理旧字段，至少避免下一次再次重复迁移。
+
+- [ ] **Step 4: 检查 `Game` 的旧恢复入口**
+
+[Game.js](/Users/bachi/jaylli/mc-lite/src/core/Game.js) 仍有从 `saveData.worldDeltas[].entities` 恢复特殊实体的逻辑；需要决定：
+- 是继续保留为旧存档入口
+- 还是统一先转成新 `runtimeEntities` 再恢复
+
+本次推荐后者，避免运行时再维护两套恢复逻辑。
+
+- [ ] **Step 5: Run lint**
+
+Run: `npm run lint`  
+Expected: PASS
+
+---
+
+### Task 8: 回归验证矩阵
+
+**Files:**
+- Test: 浏览器手工验证
+- Test: `src/tests/index.html`（如已有可复用测试）
+- Optional Modify: 新增最小测试入口或 debug 命令
+
+- [ ] **Step 1: 验证 turret 完整链路**
+
+手工验证：
+1. 放置炮塔
+2. 刷新页面后仍存在
+3. 跑远触发 chunk 卸载，再回来恢复
+4. 破坏关键 obsidian 后权威记录被删除
+5. 再次刷新页面不会“复活”幽灵炮塔
+
+- [ ] **Step 2: 验证 zombieNest 完整链路**
+
+手工验证：
+1. 放置巢穴
+2. 结构方块正常进入 chunk 渲染
+3. 跑远卸载后，回来结构方块恢复、逻辑实例恢复
+4. 刷怪节奏不因卸载/恢复被重置
+5. 破坏关键方块后不会残留幽灵记录
+
+- [ ] **Step 3: 验证 minecart 完整链路**
+
+手工验证：
+1. 放置轨道和矿车
+2. 运动中跑远卸载，回来后位置和状态合理
+3. 拾取/爆炸后记录删除
+4. 跨 chunk 运动后不重复、不丢失
+5. 联动矿车关系恢复正确
+
+- [ ] **Step 4: 验证双装载路径一致性**
+
+验证以下两种情况下行为一致：
+- 纯 runtime-streaming 从 `worldStore` 读回
+- 仍经 `Chunk.gen()` / 旧快照桥恢复
+
+- [ ] **Step 5: 执行 lint**
+
+Run: `npm run lint`  
+Expected: PASS
+
+- [ ] **Step 6: 浏览器测试**
+
+Run: `npm run start`  
+Then open: `http://localhost:8080/src/tests/index.html`  
+Expected: 现有测试不回归；若无相关自动测试，至少确认页面可正常加载并进行手工场景验证
+
+---
+
+### Task 9: 清理与文档收口
+
+**Files:**
+- Modify: `docs/plans/2026-04-28-runtime-entities-persistence-design.md`
+- Modify: `docs/plans/2026-04-28-runtime-entities-persistence-plan.md`
+- Optional Modify: 相关模块顶部注释
+
+- [ ] **Step 1: 删除已经被新仓储层替代的误导性注释**
+
+特别是：
+- “持久化快照中存在实体列表” 之类只对应旧 `cache` 的描述
+- 暗示 manager 是权威数据源的注释
+
+- [ ] **Step 2: 为关键边界补中文注释**
+
+重点写清：
+- `blockData` vs `runtimeEntities`
+- 激活态 vs 持久态
+- chunk 卸载前的调用顺序
+
+- [ ] **Step 3: 最后人工审查一次是否仍残留旧路径单写逻辑**
+
+用全文搜索检查：
+- `cache.entities`
+- `saveXxxToSnapshot`
+- `removeXxxFromSnapshot`
+- `restoreXxxForChunk`
+
+确认命名与语义已经收敛。
+
+---
+
+## 完成定义
+
+以下条件同时满足，才算这次改造完成：
+
+1. `turret`、`minecart`、`zombieNest` 全部以 `worldStore.runtimeEntities` 为权威持久化源。
+2. chunk 卸载时，特殊实体活动实例会被正确停用；chunk 恢复时会正确重新激活。
+3. `blockData` 与 `runtimeEntities` 的边界清晰，没有互相覆盖。
+4. `WorldRuntime.flushChunk()` 与实体写入不再互相打架。
+5. 旧 `cache.entities` 只作为迁移桥，不再是常规写入路径。
+6. 三类实体都通过“刷新页面 + 跑远卸载 + 返回恢复 + 破坏/拾取删除”的手工回归。
