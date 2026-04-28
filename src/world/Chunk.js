@@ -116,6 +116,7 @@ export class Chunk {
     this._needsDeferredPersistenceFlush = false;
     this._needsDeferredRuntimeEntityRestore = false;
     this._needsDeferredLightRegistration = false;
+    this._needsEntityMigration = false;
     this.disposed = false;
 
     // =========================================
@@ -327,8 +328,9 @@ export class Chunk {
     // 标记这是纯加载路径，assembleEntityPhase 不应触发持久化刷写
     this._isPureLoadPath = true;
 
-    // 7. 恢复运行时实体数据 — 从 ShadowStore 读取
-    // 如果 ShadowStore 为空但 chunkRecord 有数据，先回填到 ShadowStore
+    // 7. 恢复运行时实体数据
+    // 优先级: chunkRecord.runtimeEntities > cache.entities (渐进式迁移回退)
+    // 如果 ShadowStore 为空，先回填到 ShadowStore
     const existing = specialEntitiesShadowStore.getAllEntitiesInChunk(this.cx, this.cz);
     const hasShadowData = (
       existing.turrets.length > 0 ||
@@ -336,9 +338,32 @@ export class Chunk {
       existing.minecarts.length > 0
     );
 
-    if (!hasShadowData && chunkRecord.runtimeEntities) {
-      // 首次加载：将 chunkRecord 中的实体数据回填到 ShadowStore
-      specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, chunkRecord.runtimeEntities);
+    if (!hasShadowData) {
+      const hasRuntimeEntities = chunkRecord.runtimeEntities && (
+        chunkRecord.runtimeEntities.turrets?.length > 0 ||
+        chunkRecord.runtimeEntities.zombieNests?.length > 0 ||
+        chunkRecord.runtimeEntities.minecarts?.length > 0
+      );
+
+      if (hasRuntimeEntities) {
+        // 新格式：直接使用 chunkRecord.runtimeEntities
+        specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, chunkRecord.runtimeEntities);
+        this._needsEntityMigration = false;
+      } else {
+        // 旧格式：回退到 cache.entities（渐进式迁移）
+        const hydrateResult = persistence?.hydrateChunkBlocks?.(chunkKey, {});
+        const cacheEntities = hydrateResult?.entities;
+        if (cacheEntities && (
+          cacheEntities.turrets?.length > 0 ||
+          cacheEntities.zombieNests?.length > 0 ||
+          cacheEntities.minecarts?.length > 0
+        )) {
+          specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, cacheEntities);
+          this._needsEntityMigration = true;
+        } else {
+          this._needsEntityMigration = false;
+        }
+      }
     }
 
     this.pendingRuntimeEntities = specialEntitiesShadowStore.getAllEntitiesInChunk(this.cx, this.cz);
