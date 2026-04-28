@@ -20,6 +20,7 @@ import { WorldAccessLayer } from './WorldAccessLayer.js';
 import { WorldBoundsController } from './WorldBoundsController.js';
 import { WorldGenerationService } from './WorldGenerationService.js';
 import { worldStore } from './WorldStore.js';
+import { specialEntitiesShadowStore } from './SpecialEntitiesShadowStore.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
 const getPersistenceService = () => globalThis._persistenceService || persistenceService;
@@ -924,14 +925,10 @@ export class World {
   }
 
   /**
-   * 收集指定 chunk 的 runtime entities 快照，用于 chunk unload 时持久化。
+   * 从 ShadowStore 读取指定 chunk 的 runtime entities 快照。
    */
   _collectRuntimeEntitiesForChunk(chunk) {
-    return {
-      turrets: this.turretManager?.getEntitiesForChunk?.(chunk.cx, chunk.cz) || [],
-      zombieNests: this.zombieNestManager?.getEntitiesForChunk?.(chunk.cx, chunk.cz) || [],
-      minecarts: this.minecartManager?.getEntitiesForChunk?.(chunk.cx, chunk.cz) || []
-    };
+    return specialEntitiesShadowStore.getAllEntitiesInChunk(chunk.cx, chunk.cz);
   }
 
   /**

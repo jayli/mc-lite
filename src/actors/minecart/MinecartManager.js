@@ -1,6 +1,6 @@
 /**
  * MinecartManager.js
- * 矿车管理器 - 管理所有矿车的创建、更新和销毁
+ * 矿车管理器 — 纯行为层（数据由 SpecialEntitiesShadowStore 管理）
  */
 
 import { Minecart } from './Minecart.js';
@@ -15,14 +15,18 @@ export class MinecartManager {
    * @param {THREE.Scene} scene - Three.js 场景
    * @param {World} world - 世界引用
    * @param {MinecartInstancedRenderer} renderer - 可选的渲染器实例
+   * @param {SpecialEntitiesShadowStore} shadowStore - 特殊实体影子存储
+   * @param {ShadowSyncDispatcher} dispatcher - 异步同步调度器
    */
-  constructor(scene, world, renderer = null) {
+  constructor(scene, world, renderer = null, shadowStore, dispatcher) {
     this.scene = scene;
     this.world = world;
     this.renderer = renderer;
+    this.shadowStore = shadowStore;
+    this.dispatcher = dispatcher;
 
-    // 存储所有矿车 Map<id, Minecart>
-    this.minecarts = new Map();
+    // 活跃的矿车行为实例 Map<id, Minecart>（仅用于 update 循环）
+    this.activeMinecarts = new Map();
 
     // 位置索引：key: "x,y,z" -> minecartId
     this.positionIndex = new Map();
@@ -34,20 +38,8 @@ export class MinecartManager {
     this.movementSystem = new MinecartMovementSystem(world);
   }
 
-  /**
-   * 设置渲染器
-   * @param {MinecartInstancedRenderer} renderer
-   */
   setRenderer(renderer) {
     this.renderer = renderer;
-  }
-
-  /**
-   * 获取持久化服务（优先测试注入）
-   * @returns {object|null}
-   */
-  getPersistenceService() {
-    return globalThis._persistenceService || this.world?.persistenceService || null;
   }
 
   /**
@@ -101,12 +93,10 @@ export class MinecartManager {
    * @returns {{canPlace: boolean, reason?: string}}
    */
   canPlaceAt(x, y, z) {
-    // 检查矿车数量上限
-    if (this.minecarts.size >= this.maxMinecarts) {
+    if (this.activeMinecarts.size >= this.maxMinecarts) {
       return { canPlace: false, reason: '矿车数量已达上限' };
     }
 
-    // 检查位置是否已被占用
     const posKey = this.getPositionKey({ x, y, z });
     if (this.positionIndex.has(posKey)) {
       return { canPlace: false, reason: '该铁轨已有矿车' };
@@ -115,18 +105,11 @@ export class MinecartManager {
     return { canPlace: true };
   }
 
-  /**
-   * 获取指定位置的矿车
-   * @param {number} x - X坐标
-   * @param {number} y - Y坐标
-   * @param {number} z - Z坐标
-   * @returns {Minecart|null}
-   */
   getMinecartAt(x, y, z) {
     const posKey = this.getPositionKey({ x, y, z });
     const minecartId = this.positionIndex.get(posKey);
     if (minecartId) {
-      return this.minecarts.get(minecartId) || null;
+      return this.activeMinecarts.get(minecartId) || null;
     }
     return null;
   }
@@ -155,27 +138,23 @@ export class MinecartManager {
   createMinecart(position, orientation) {
     const pos = this.normalizePosition(position);
 
-    // 检查是否可以放置
     const { canPlace, reason } = this.canPlaceAt(pos.x, pos.y, pos.z);
     if (!canPlace) {
       console.warn(`[MinecartManager] 无法创建矿车: ${reason}`);
       return null;
     }
 
-    // 创建矿车实例（不再需要 scene 参数）
     const minecart = new Minecart({
       id: this.generateId(),
       position: new THREE.Vector3(pos.x, pos.y, pos.z),
-      orientation: orientation,
+      orientation,
       world: this.world,
       onDestroy: (id) => this.onMinecartDestroyed(id)
     });
 
-    // 根据轨道方向自动调整矿车朝向
     if (this.movementSystem) {
       const availableDirs = this.movementSystem.getAvailableTrackDirections(minecart);
       if (availableDirs.length > 0) {
-        // 优先选择与传入朝向最接近的方向
         let bestDir = availableDirs[0];
         let minDiff = 4;
         for (const dir of availableDirs) {
@@ -189,16 +168,19 @@ export class MinecartManager {
       }
     }
 
-    // 设置归属 chunk
     minecart.chunkKey = this.getChunkKeyByPosition(pos);
 
-    // 添加到管理结构
-    this.minecarts.set(minecart.id, minecart);
+    this.activeMinecarts.set(minecart.id, minecart);
     const posKey = this.getPositionKey(pos);
     this.positionIndex.set(posKey, minecart.id);
 
-    // 持久化
-    this.saveMinecartToSnapshot(minecart);
+    // 写入 ShadowStore
+    if (this.shadowStore) {
+      const cx = Math.floor(pos.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      const cz = Math.floor(pos.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      this.shadowStore.addEntity('minecart', cx, cz, minecart.id, minecart.toJSON());
+      if (this.dispatcher) this.dispatcher.markDirty(cx, cz);
+    }
 
     return minecart;
   }
@@ -209,21 +191,26 @@ export class MinecartManager {
    * @returns {boolean}
    */
   removeMinecart(minecartId) {
-    const minecart = this.minecarts.get(minecartId);
+    const minecart = this.activeMinecarts.get(minecartId);
     if (!minecart) {
       console.warn(`[MinecartManager] 矿车不存在: ${minecartId}`);
       return false;
     }
 
-    // 从持久化快照移除
-    this.removeMinecartFromSnapshot(minecart);
+    // 从 ShadowStore 移除
+    if (this.shadowStore) {
+      const cx = Math.floor(minecart.position.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      const cz = Math.floor(minecart.position.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      this.shadowStore.removeEntity('minecart', cx, cz, minecartId);
+      if (this.dispatcher) this.dispatcher.markDirty(cx, cz);
+    }
 
     // 从位置索引移除
     const posKey = this.getPositionKey(minecart.position);
     this.positionIndex.delete(posKey);
 
     // 从管理结构移除
-    this.minecarts.delete(minecartId);
+    this.activeMinecarts.delete(minecartId);
 
     // 销毁矿车
     minecart.destroy();
@@ -269,134 +256,78 @@ export class MinecartManager {
    * @param {string} minecartId - 矿车ID
    */
   onMinecartDestroyed(minecartId) {
-    // 从管理结构移除（如果尚未移除）
-    const minecart = this.minecarts.get(minecartId);
+    const minecart = this.activeMinecarts.get(minecartId);
     if (minecart) {
       const posKey = this.getPositionKey(minecart.position);
       this.positionIndex.delete(posKey);
-      this.minecarts.delete(minecartId);
+
+      // 从 ShadowStore 移除
+      if (this.shadowStore) {
+        const cx = Math.floor(minecart.position.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
+        const cz = Math.floor(minecart.position.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
+        this.shadowStore.removeEntity('minecart', cx, cz, minecartId);
+        if (this.dispatcher) this.dispatcher.markDirty(cx, cz);
+      }
     }
+    this.activeMinecarts.delete(minecartId);
   }
 
   /**
-   * 确保持久化快照中存在矿车列表
-   * @param {string} chunkKey
-   * @returns {object|null}
-   */
-  ensureChunkSnapshot(chunkKey) {
-    const persistence = this.getPersistenceService();
-    if (!persistence?.cache) return null;
-
-    let chunkData = persistence.cache.get(chunkKey);
-    if (!chunkData) {
-      chunkData = { blocks: {}, entities: {} };
-      persistence.cache.set(chunkKey, chunkData);
-    }
-    if (!chunkData.entities) chunkData.entities = {};
-    if (!Array.isArray(chunkData.entities.minecarts)) {
-      chunkData.entities.minecarts = [];
-    }
-    return chunkData;
-  }
-
-  /**
-   * 将矿车写入归属 Chunk 快照
-   * @param {Minecart} minecart
-   */
-  saveMinecartToSnapshot(minecart) {
-    const persistence = this.getPersistenceService();
-    if (!persistence) return;
-
-    const entry = minecart.toJSON();
-    const chunkKey = this.getChunkKeyByPosition(entry);
-    const chunkData = this.ensureChunkSnapshot(chunkKey);
-    if (!chunkData) return;
-
-    const list = chunkData.entities.minecarts;
-    // 优先用 id 去重，position 作为兼容保护
-    const idx = list.findIndex(item => item.id === entry.id);
-    if (idx >= 0) {
-      list[idx] = entry;
-    } else {
-      const posKey = this.getPositionKey(entry);
-      const posIdx = list.findIndex(item => this.getPositionKey(item) === posKey);
-      if (posIdx >= 0) list[posIdx] = entry;
-      else list.push(entry);
-    }
-
-    const [cx, cz] = chunkKey.split(',').map(Number);
-    persistence.saveChunkData?.(cx, cz, chunkData);
-  }
-
-  /**
-   * 从归属 Chunk 快照中移除矿车
-   * @param {Minecart} minecart
-   */
-  removeMinecartFromSnapshot(minecart) {
-    const persistence = this.getPersistenceService();
-    if (!persistence) return;
-
-    const entry = minecart.toJSON();
-    const chunkKey = this.getChunkKeyByPosition(entry);
-    const chunkData = this.ensureChunkSnapshot(chunkKey);
-    if (!chunkData) return;
-
-    const list = chunkData.entities.minecarts;
-    const posKey = this.getPositionKey(entry);
-    const idx = list.findIndex(item => this.getPositionKey(item) === posKey);
-    if (idx >= 0) {
-      list.splice(idx, 1);
-    }
-
-    const [cx, cz] = chunkKey.split(',').map(Number);
-    persistence.saveChunkData?.(cx, cz, chunkData);
-  }
-
-  /**
-   * 从 Chunk 快照恢复矿车实例（直接按记录重建）
+   * 从 ShadowStore 恢复矿车实例（支持分帧）
    * @param {number} cx - Chunk X
    * @param {number} cz - Chunk Z
-   * @param {Array} minecarts - 快照中的矿车列表
-   * @returns {void}
+   * @param {number} [startIndex=0] - 起始索引
+   * @param {number} [maxCount=3] - 本帧最多恢复数量
+   * @returns {boolean} 是否还有更多矿车待恢复
    */
-  restoreMinecartsForChunk(cx, cz, minecarts) {
-    if (!Array.isArray(minecarts) || minecarts.length === 0) return;
-    const currentChunkKey = `${cx},${cz}`;
+  restoreMinecartsForChunk(cx, cz, startIndex = 0, maxCount = 3) {
+    if (!this.shadowStore) return false;
+    const minecarts = this.shadowStore.getAllEntities('minecart', cx, cz);
+    if (minecarts.length === 0) return false;
 
-    for (const item of minecarts) {
+    const currentChunkKey = `${cx},${cz}`;
+    let restored = 0;
+    let i = startIndex;
+
+    for (; i < minecarts.length && restored < maxCount; i++) {
+      const item = minecarts[i];
       if (!item?.position) continue;
       if (this.getChunkKeyByPosition(item.position) !== currentChunkKey) continue;
 
-      // 检查是否已存在（按 id 或位置避免重复恢复）
-      if (item.id && this.minecarts.has(item.id)) continue;
+      if (item.id && this.activeMinecarts.has(item.id)) continue;
       const posKey = this.getPositionKey(item.position);
       if (this.positionIndex.has(posKey)) continue;
 
-      // 创建矿车实例（优先复用快照 id）
       const minecart = Minecart.fromJSON(item, this.world);
       minecart.chunkKey = currentChunkKey;
       minecart.onDestroy = (id) => this.onMinecartDestroyed(id);
 
-      // 添加到管理结构
-      this.minecarts.set(minecart.id, minecart);
+      this.activeMinecarts.set(minecart.id, minecart);
       this.positionIndex.set(posKey, minecart.id);
 
       console.log(`[MinecartManager] 恢复矿车: ${minecart.id} 位置: (${item.x}, ${item.y}, ${item.z})`);
+      restored++;
     }
+
+    while (i < minecarts.length) {
+      const item = minecarts[i];
+      if (item?.position && this.getChunkKeyByPosition(item.position) === currentChunkKey) {
+        return true;
+      }
+      i++;
+    }
+    return false;
   }
 
   /**
-   * 停止指定 Chunk 内所有矿车的运动并保存状态
-   * Chunk 卸载时调用，确保矿车状态被持久化
-   * @param {number} cx - Chunk X
-   * @param {number} cz - Chunk Z
+   * 停止指定 Chunk 内所有矿车的运动
+   * Chunk 卸载时调用，确保矿车状态被保存
    */
   stopMinecartsForChunk(cx, cz) {
     const chunkKey = `${cx},${cz}`;
     const minecartsToStop = [];
 
-    // 找出属于该 Chunk 的所有矿车
-    for (const minecart of this.minecarts.values()) {
+    for (const minecart of this.activeMinecarts.values()) {
       if (minecart.chunkKey === chunkKey) {
         minecartsToStop.push(minecart);
       }
@@ -404,17 +335,18 @@ export class MinecartManager {
 
     if (minecartsToStop.length === 0) return;
 
-    // 停止每个矿车的运动并保存状态
     for (const minecart of minecartsToStop) {
-      // 如果矿车正在运动，停止它
       if (minecart.movementState !== 'IDLE') {
         minecart.movementState = 'IDLE';
         minecart.velocity = { x: 0, z: 0 };
         console.log(`[MinecartManager] 停止矿车 ${minecart.id} 运动，Chunk ${chunkKey} 卸载`);
       }
 
-      // 确保矿车状态被保存到快照
-      this.saveMinecartToSnapshot(minecart);
+      // 更新 ShadowStore 中的状态
+      if (this.shadowStore) {
+        this.shadowStore.addEntity('minecart', cx, cz, minecart.id, minecart.toJSON());
+        if (this.dispatcher) this.dispatcher.markDirty(cx, cz);
+      }
     }
 
     console.log(`[MinecartManager] Chunk ${chunkKey} 卸载，已停止 ${minecartsToStop.length} 个矿车`);
@@ -427,56 +359,28 @@ export class MinecartManager {
    * @param {Player} player - 玩家对象（用于碰撞检测）
    */
   update(deltaTime, getRotationAngle, player = null) {
-    // 更新移动系统
     if (this.movementSystem) {
-      this.movementSystem.updateAll(this.minecarts, deltaTime, this, player);
+      this.movementSystem.updateAll(this.activeMinecarts, deltaTime, this, player);
     }
 
-    // 更新所有矿车状态
-    for (const minecart of this.minecarts.values()) {
+    for (const minecart of this.activeMinecarts.values()) {
       minecart.update(deltaTime);
     }
 
-    // 更新渲染器
     if (this.renderer && getRotationAngle) {
-      this.renderer.update(this.minecarts, getRotationAngle);
+      this.renderer.update(this.activeMinecarts, getRotationAngle);
     }
   }
 
-  /**
-   * 收集指定 chunk 内的所有矿车快照数据。
-   * @param {number} cx - chunk X 坐标
-   * @param {number} cz - chunk Z 坐标
-   * @returns {Array<object>} — minecart.toJSON() 返回的完整序列化数据
-   */
-  getEntitiesForChunk(cx, cz) {
-    const result = [];
-    for (const minecart of this.minecarts.values()) {
-      const mcx = Math.floor(minecart.position.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
-      const mcz = Math.floor(minecart.position.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
-      if (mcx === cx && mcz === cz) {
-        result.push(minecart.toJSON());
-      }
-    }
-    return result;
-  }
-
-  /**
-   * 销毁所有矿车
-   */
   destroyAll() {
-    for (const minecart of this.minecarts.values()) {
+    for (const minecart of this.activeMinecarts.values()) {
       minecart.destroy();
     }
-    this.minecarts.clear();
+    this.activeMinecarts.clear();
     this.positionIndex.clear();
   }
 
-  /**
-   * 获取矿车数量
-   * @returns {number}
-   */
   getCount() {
-    return this.minecarts.size;
+    return this.activeMinecarts.size;
   }
 }

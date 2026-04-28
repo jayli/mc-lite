@@ -17,6 +17,7 @@
 import { RegionCache } from './RegionCache.js';
 import { worldStore } from './WorldStore.js';
 import { persistenceService } from '../services/PersistenceService.js';
+import { specialEntitiesShadowStore } from './SpecialEntitiesShadowStore.js';
 
 // --- 依赖注入 ---
 const getWorldStore = () => globalThis._worldStore || worldStore;
@@ -298,17 +299,10 @@ export class WorldRuntime {
   }
 
   /**
-   * 从三个特殊实体 manager 收集指定 chunk 的实体快照。
+   * 从 ShadowStore 读取指定 chunk 的实体快照。
    */
   _collectEntitiesForChunk(cx, cz) {
-    const game = this._game;
-    if (!game) return { turrets: [], zombieNests: [], minecarts: [] };
-
-    return {
-      turrets: game.turretManager?.getEntitiesForChunk?.(cx, cz) || [],
-      zombieNests: game.zombieNestManager?.getEntitiesForChunk?.(cx, cz) || [],
-      minecarts: game.minecartManager?.getEntitiesForChunk?.(cx, cz) || []
-    };
+    return specialEntitiesShadowStore.getAllEntitiesInChunk(cx, cz);
   }
 
   /**

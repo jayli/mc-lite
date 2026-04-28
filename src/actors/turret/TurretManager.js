@@ -1,6 +1,6 @@
 /**
  * TurretManager.js
- * 炮塔管理器 - 管理所有炮塔的创建、更新和销毁
+ * 炮塔管理器 — 纯行为层（数据由 SpecialEntitiesShadowStore 管理）
  */
 
 import { Turret, preloadTurretTextures as preloadTextures } from './Turret.js';
@@ -17,17 +17,21 @@ export class TurretManager {
    * @param {THREE.Scene} scene - Three.js 场景
    * @param {World} world - 世界引用
    * @param {EnemyManager} enemyManager - 敌人管理器
+   * @param {SpecialEntitiesShadowStore} shadowStore - 特殊实体影子存储
+   * @param {ShadowSyncDispatcher} dispatcher - 异步同步调度器
    */
-  constructor(scene, world, enemyManager) {
+  constructor(scene, world, enemyManager, shadowStore, dispatcher) {
     this.scene = scene;
     this.world = world;
     this.enemyManager = enemyManager;
+    this.shadowStore = shadowStore;
+    this.dispatcher = dispatcher;
 
     // 预加载纹理（仅首次）
     preloadTurretTextures();
 
-    // 存储所有炮塔 Map<id, Turret>
-    this.turrets = new Map();
+    // 活跃的炮塔行为实例 Map<id, Turret>（仅用于 update 循环）
+    this.activeTurrets = new Map();
 
     // 位置索引：key: "x,y,z" -> turretId
     this.turretPositionIndex = new Map();
@@ -36,15 +40,7 @@ export class TurretManager {
     this.projectilePool = new ProjectilePool(scene, 100);
 
     // 配置
-    this.maxTurrets = 20; // 最大炮塔数量
-  }
-
-  /**
-   * 获取持久化服务（优先测试注入）
-   * @returns {object|null}
-   */
-  getPersistenceService() {
-    return globalThis._persistenceService || this.world?.persistenceService || null;
+    this.maxTurrets = 20;
   }
 
   /**
@@ -83,93 +79,6 @@ export class TurretManager {
   }
 
   /**
-   * 确保持久化快照中存在炮塔列表
-   * @param {string} chunkKey
-   * @returns {object}
-   */
-  ensureChunkSnapshot(chunkKey) {
-    const persistence = this.getPersistenceService();
-    if (!persistence?.cache) return null;
-
-    let chunkData = persistence.cache.get(chunkKey);
-    if (!chunkData) {
-      chunkData = { blocks: {}, entities: {} };
-      persistence.cache.set(chunkKey, chunkData);
-    }
-    if (!chunkData.entities) chunkData.entities = {};
-    if (!Array.isArray(chunkData.entities.turrets)) {
-      chunkData.entities.turrets = [];
-    }
-    return chunkData;
-  }
-
-  /**
-   * 炮塔序列化记录
-   * @param {Turret} turret
-   * @returns {{id:string,position:{x:number,y:number,z:number},rotation:number}|null}
-   */
-  toTurretSnapshot(turret) {
-    if (!turret || !turret.position) return null;
-    const position = this.normalizePosition(turret.position);
-    return {
-      id: turret.id,
-      position,
-      rotation: turret.currentRotation || 0
-    };
-  }
-
-  /**
-   * 将炮塔写入归属 Chunk 快照
-   * @param {Turret} turret
-   * @returns {void}
-   */
-  saveTurretToSnapshot(turret) {
-    const persistence = this.getPersistenceService();
-    if (!persistence) return;
-    const entry = this.toTurretSnapshot(turret);
-    if (!entry) return;
-    const chunkKey = this.getChunkKeyByPosition(entry.position);
-    const chunkData = this.ensureChunkSnapshot(chunkKey);
-    if (!chunkData) return;
-    const list = chunkData.entities.turrets;
-    // 优先用 id 去重，position 作为兼容保护
-    const idx = list.findIndex(item => item.id === entry.id);
-    if (idx >= 0) {
-      list[idx] = entry;
-    } else {
-      const posKey = this.getPositionKey(entry.position);
-      const posIdx = list.findIndex(item => this.getPositionKey(item.position) === posKey);
-      if (posIdx >= 0) list[posIdx] = entry;
-      else list.push(entry);
-    }
-
-    const [cx, cz] = chunkKey.split(',').map(Number);
-    persistence.saveChunkData?.(cx, cz, chunkData);
-  }
-
-  /**
-   * 从归属 Chunk 快照中移除炮塔
-   * @param {Turret} turret
-   * @returns {void}
-   */
-  removeTurretFromSnapshot(turret) {
-    const persistence = this.getPersistenceService();
-    if (!persistence) return;
-    const entry = this.toTurretSnapshot(turret);
-    if (!entry) return;
-    const chunkKey = this.getChunkKeyByPosition(entry.position);
-    const chunkData = this.ensureChunkSnapshot(chunkKey);
-    if (!chunkData) return;
-    const list = chunkData.entities.turrets;
-    // 优先用 id 匹配
-    const next = list.filter(item => item.id !== entry.id);
-    chunkData.entities.turrets = next;
-
-    const [cx, cz] = chunkKey.split(',').map(Number);
-    persistence.saveChunkData?.(cx, cz, chunkData);
-  }
-
-  /**
    * 创建新炮塔
    * @param {THREE.Vector3|Object} position - 炮塔位置 (可以是 THREE.Vector3 或 {x,y,z} 对象)
    * @param {number} initialRotation - 初始朝向（弧度，可选，默认为0）
@@ -180,29 +89,22 @@ export class TurretManager {
     const skipLimit = options.skipLimit === true;
     const shouldPersist = options.persist !== false;
 
-    // 检查是否超过最大数量
-    if (!skipLimit && this.turrets.size >= this.maxTurrets) {
+    if (!skipLimit && this.activeTurrets.size >= this.maxTurrets) {
       console.warn('[TurretManager] 已达到最大炮塔数量限制');
       return null;
     }
 
-    // 规范化位置 - 将普通对象转换为 {x,y,z}
     const normalizedPos = this.normalizePosition(position);
     const positionKey = this.getPositionKey(normalizedPos);
 
-    // 检查该位置是否已有炮塔
     const existingId = this.turretPositionIndex.get(positionKey);
     if (existingId) {
-      return this.turrets.get(existingId) || null;
+      return this.activeTurrets.get(existingId) || null;
     }
 
-    // 生成唯一ID，优先复用快照 id
     const id = options.restoredId || `turret_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    // 将普通对象转换为 THREE.Vector3 传给 Turret 构造函数
     const positionVec3 = new THREE.Vector3(normalizedPos.x, normalizedPos.y, normalizedPos.z);
 
-    // 创建炮塔
     const turret = new Turret({
       id,
       position: positionVec3,
@@ -210,16 +112,24 @@ export class TurretManager {
       scene: this.scene,
       onFire: (fireData) => this.handleTurretFire(fireData),
       onDestroy: (turretId) => this.handleTurretDestroy(turretId),
-      initialRotation  // 传递初始朝向
+      initialRotation
     });
 
-    // 存储
-    this.turrets.set(id, turret);
+    this.activeTurrets.set(id, turret);
     this.turretPositionIndex.set(positionKey, id);
 
-    // 保存到快照
-    if (shouldPersist) {
-      this.saveTurretToSnapshot(turret);
+    // 写入 ShadowStore
+    if (this.shadowStore) {
+      const cx = Math.floor(normalizedPos.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      const cz = Math.floor(normalizedPos.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      this.shadowStore.addEntity('turret', cx, cz, id, {
+        position: normalizedPos,
+        rotation: initialRotation
+      });
+
+      if (shouldPersist && this.dispatcher) {
+        this.dispatcher.markDirty(cx, cz);
+      }
     }
 
     console.log(`[TurretManager] 创建炮塔: ${id} 位置: (${normalizedPos.x}, ${normalizedPos.y}, ${normalizedPos.z})`);
@@ -257,38 +167,66 @@ export class TurretManager {
    * @param {string} turretId - 被销毁的炮塔 ID
    */
   handleTurretDestroy(turretId) {
-    const turret = this.turrets.get(turretId);
+    const turret = this.activeTurrets.get(turretId);
     if (turret) {
+      const pos = this.normalizePosition(turret.position);
+      const cx = Math.floor(pos.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      const cz = Math.floor(pos.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
+
+      // 从 ShadowStore 移除
+      if (this.shadowStore) {
+        this.shadowStore.removeEntity('turret', cx, cz, turretId);
+      }
+      if (this.dispatcher) {
+        this.dispatcher.markDirty(cx, cz);
+      }
+
       this.turretPositionIndex.delete(this.getPositionKey(turret.position));
-      this.removeTurretFromSnapshot(turret);
     }
-    this.turrets.delete(turretId);
+    this.activeTurrets.delete(turretId);
     console.log(`[TurretManager] 炮塔被销毁：${turretId}`);
-    console.log(`[TurretManager] 当前炮塔数量：${this.turrets.size}/${this.maxTurrets}`);
+    console.log(`[TurretManager] 当前炮塔数量：${this.activeTurrets.size}/${this.maxTurrets}`);
   }
 
   /**
-   * 从 Chunk 快照恢复炮塔实例（直接按记录重建）
+   * 从 ShadowStore 恢复炮塔实例（支持分帧）
    * @param {number} cx - Chunk X
    * @param {number} cz - Chunk Z
-   * @param {Array} turrets - 快照中的炮塔列表
-   * @returns {void}
+   * @param {number} [startIndex=0] - 起始索引
+   * @param {number} [maxCount=3] - 本帧最多恢复数量
+   * @returns {boolean} 是否还有更多炮塔待恢复
    */
-  restoreTurretsForChunk(cx, cz, turrets) {
-    if (!Array.isArray(turrets) || turrets.length === 0) return;
-    const currentChunkKey = `${cx},${cz}`;
+  restoreTurretsForChunk(cx, cz, startIndex = 0, maxCount = 3) {
+    if (!this.shadowStore) return false;
+    const turrets = this.shadowStore.getAllEntities('turret', cx, cz);
+    if (turrets.length === 0) return false;
 
-    for (const item of turrets) {
+    const currentChunkKey = `${cx},${cz}`;
+    let restored = 0;
+    let i = startIndex;
+
+    for (; i < turrets.length && restored < maxCount; i++) {
+      const item = turrets[i];
       if (!item?.position) continue;
       if (this.getChunkKeyByPosition(item.position) !== currentChunkKey) continue;
-      // 优先复用快照 id
-      const restoredId = item.id || null;
+
       this.createTurret(
         item.position,
         item.rotation || 0,
-        { skipLimit: true, persist: false, restoredId }
+        { skipLimit: true, persist: false, restoredId: item.id }
       );
+      restored++;
     }
+
+    // 跳过剩余不匹配 entry 找到下一个有效索引
+    while (i < turrets.length) {
+      const item = turrets[i];
+      if (item?.position && this.getChunkKeyByPosition(item.position) === currentChunkKey) {
+        return true; // 还有待恢复
+      }
+      i++;
+    }
+    return false;
   }
 
   /**
@@ -367,15 +305,12 @@ export class TurretManager {
    * @param {number} deltaTime - 时间增量（秒）
    */
   update(deltaTime) {
-    // 获取活跃丧尸列表
     const enemies = this.getActiveEnemies();
 
-    // 更新所有炮塔
-    for (const turret of this.turrets.values()) {
+    for (const turret of this.activeTurrets.values()) {
       turret.update(deltaTime, enemies);
     }
 
-    // 更新炮弹池（传入 world 用于方块碰撞检测）
     this.projectilePool.update(deltaTime, enemies, this.world);
   }
 
@@ -407,55 +342,25 @@ export class TurretManager {
    * @param {string} id - 炮塔ID
    */
   removeTurret(id) {
-    const turret = this.turrets.get(id);
+    const turret = this.activeTurrets.get(id);
     if (turret) {
       turret.destroy();
     }
   }
 
-  /**
-   * 获取所有活跃炮塔
-   * @returns {Array<Turret>}
-   */
   getActiveTurrets() {
-    return Array.from(this.turrets.values()).filter(t => t.state === 'ACTIVE');
+    return Array.from(this.activeTurrets.values()).filter(t => t.state === 'ACTIVE');
   }
 
-  /**
-   * 获取特定炮塔
-   * @param {string} id - 炮塔ID
-   * @returns {Turret|undefined}
-   */
   getTurret(id) {
-    return this.turrets.get(id);
+    return this.activeTurrets.get(id);
   }
 
-  /**
-   * 收集指定 chunk 内的所有炮塔快照数据。
-   * @param {number} cx - chunk X 坐标
-   * @param {number} cz - chunk Z 坐标
-   * @returns {Array<{id: string, position: {x:number,y:number,z:number}, rotation: number}>}
-   */
-  getEntitiesForChunk(cx, cz) {
-    const result = [];
-    for (const turret of this.turrets.values()) {
-      const tcx = Math.floor(turret.position.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
-      const tcz = Math.floor(turret.position.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
-      if (tcx === cx && tcz === cz) {
-        result.push(this.toTurretSnapshot(turret));
-      }
-    }
-    return result;
-  }
-
-  /**
-   * 清除所有炮塔
-   */
   clearAll() {
-    for (const turret of this.turrets.values()) {
+    for (const turret of this.activeTurrets.values()) {
       turret.destroy();
     }
-    this.turrets.clear();
+    this.activeTurrets.clear();
     this.turretPositionIndex.clear();
     this.projectilePool.clear();
     console.log('[TurretManager] 清除所有炮塔');

@@ -8,6 +8,7 @@ import { encodeCoord, decodeCoord, normalizeBlocksToNumberKeys, coordKeyToCode }
 import { aoBridge } from '../core/AOBridge.js';
 import { materials } from '../core/MaterialManager.js';
 import { persistenceService } from '../services/PersistenceService.js';
+import { specialEntitiesShadowStore } from './SpecialEntitiesShadowStore.js';
 import { faceCullingSystem } from '../core/FaceCullingSystem.js';
 import { getBlockProperties, createBlockPropsResolver } from '../constants/BlockData.js';
 import { getRotationAngle, parseBlockEntry } from '../utils/OrientationUtils.js';
@@ -326,34 +327,21 @@ export class Chunk {
     // 标记这是纯加载路径，assembleEntityPhase 不应触发持久化刷写
     this._isPureLoadPath = true;
 
-    // 7. 恢复运行时实体数据
-    this.pendingRuntimeEntities = {
-      zombieNests: [],
-      turrets: [],
-      minecarts: []
-    };
+    // 7. 恢复运行时实体数据 — 从 ShadowStore 读取
+    // 如果 ShadowStore 为空但 chunkRecord 有数据，先回填到 ShadowStore
+    const existing = specialEntitiesShadowStore.getAllEntitiesInChunk(this.cx, this.cz);
+    const hasShadowData = (
+      existing.turrets.length > 0 ||
+      existing.zombieNests.length > 0 ||
+      existing.minecarts.length > 0
+    );
 
-    this._needsEntityMigration = false;
-
-    if (chunkRecord.runtimeEntities) {
-      // 新格式：直接从 chunkRecord 读取
-      this.pendingRuntimeEntities = {
-        zombieNests: chunkRecord.runtimeEntities.zombieNests || [],
-        turrets: chunkRecord.runtimeEntities.turrets || [],
-        minecarts: chunkRecord.runtimeEntities.minecarts || []
-      };
-    } else {
-      // 旧格式兼容：从 cache.entities 读取，标记需要渐进迁移
-      const persistence = getPersistenceService();
-      const cacheEntry = persistence?.cache?.get?.(chunkKey);
-      const entities = cacheEntry?.entities || {};
-      this.pendingRuntimeEntities = {
-        zombieNests: entities.zombieNests || [],
-        turrets: entities.turrets || [],
-        minecarts: entities.minecarts || []
-      };
-      this._needsEntityMigration = true;
+    if (!hasShadowData && chunkRecord.runtimeEntities) {
+      // 首次加载：将 chunkRecord 中的实体数据回填到 ShadowStore
+      specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, chunkRecord.runtimeEntities);
     }
+
+    this.pendingRuntimeEntities = specialEntitiesShadowStore.getAllEntitiesInChunk(this.cx, this.cz);
 
     // 5. 直接从 blockData 构建 mesh（跳过 scatter，预生成阶段已完成打散）
     this.loadState = 'terrain-built';
@@ -1834,34 +1822,6 @@ export class Chunk {
   async finalizeNonDeferredPhase() {
     if (this.loadState === 'finalized' || this.disposed) return true;
 
-    // 渐进迁移：如果检测到旧格式数据，触发迁移
-    if (this._needsEntityMigration) {
-      const worldRuntime = this.world?.worldRuntime;
-      if (worldRuntime) {
-        const chunkRecord = {
-          blockData: {},
-          staticEntities: [],
-          runtimeSeedData: { structureCenters: [] },
-          runtimeEntities: null
-        };
-        await worldRuntime._ensureChunkEntitiesMigrated(this.cx, this.cz, chunkRecord);
-        if (chunkRecord.runtimeEntities) {
-          this.pendingRuntimeEntities = {
-            zombieNests: chunkRecord.runtimeEntities.zombieNests || [],
-            turrets: chunkRecord.runtimeEntities.turrets || [],
-            minecarts: chunkRecord.runtimeEntities.minecarts || []
-          };
-        }
-      }
-      this._needsEntityMigration = false;
-    }
-
-    // 持久化刷写
-    if (this._pendingPersistenceFlush) {
-      this._pendingPersistenceFlush = false;
-      getPersistenceService()?.saveChunkData?.(this.cx, this.cz, this.pendingSnapshot);
-    }
-
     // 运行时实体恢复 — 延迟到 runDeferredFinalizePhase 中异步执行
     // 避免在 chunk 加载关键路径上同步创建大量 mesh/纹理导致卡顿
     const zombieNests = this.pendingRuntimeEntities?.zombieNests;
@@ -1895,27 +1855,45 @@ export class Chunk {
   runDeferredFinalizePhase() {
     if (this.disposed || !this.hasDeferredFinalizeWork) return true;
 
-    if (this._needsDeferredPersistenceFlush) {
-      this._needsDeferredPersistenceFlush = false;
-      this._pendingPersistenceFlush = false;
-      getPersistenceService()?.saveChunkData?.(this.cx, this.cz);
-    }
-
+    // 分帧恢复运行时实体：每帧最多恢复 MAX_ENTITIES_PER_FRAME 个
     if (this._needsDeferredRuntimeEntityRestore) {
-      const zombieNests = this.pendingRuntimeEntities?.zombieNests;
-      if (Array.isArray(zombieNests) && zombieNests.length > 0) {
-        this.world?.zombieNestManager?.restoreNestsForChunk?.(this.cx, this.cz, zombieNests);
+      const MAX_ENTITIES_PER_FRAME = 3;
+
+      if (!this._entityRestoreProgress) {
+        this._entityRestoreProgress = {
+          nestIndex: 0, nestDone: false,
+          turretIndex: 0, turretDone: false,
+          minecartIndex: 0, minecartDone: false
+        };
       }
-      const turrets = this.pendingRuntimeEntities?.turrets;
-      if (Array.isArray(turrets) && turrets.length > 0) {
-        this.world?.turretManager?.restoreTurretsForChunk?.(this.cx, this.cz, turrets);
+
+      const p = this._entityRestoreProgress;
+      let restoredThisFrame = 0;
+
+      if (!p.nestDone && this.world?.zombieNestManager?.restoreNestsForChunk) {
+        p.nestDone = !this.world.zombieNestManager.restoreNestsForChunk(this.cx, this.cz, p.nestIndex, MAX_ENTITIES_PER_FRAME - restoredThisFrame);
+        restoredThisFrame += MAX_ENTITIES_PER_FRAME;
       }
-      const minecarts = this.pendingRuntimeEntities?.minecarts;
-      if (Array.isArray(minecarts) && minecarts.length > 0) {
-        this.world?.minecartManager?.restoreMinecartsForChunk?.(this.cx, this.cz, minecarts);
+
+      if (!p.turretDone && this.world?.turretManager?.restoreTurretsForChunk && restoredThisFrame < MAX_ENTITIES_PER_FRAME) {
+        p.turretDone = !this.world.turretManager.restoreTurretsForChunk(this.cx, this.cz, p.turretIndex, MAX_ENTITIES_PER_FRAME - restoredThisFrame);
+        restoredThisFrame += MAX_ENTITIES_PER_FRAME;
       }
-      this._needsDeferredRuntimeEntityRestore = false;
-      this.pendingRuntimeEntities = null;
+
+      if (!p.minecartDone && this.world?.minecartManager?.restoreMinecartsForChunk && restoredThisFrame < MAX_ENTITIES_PER_FRAME) {
+        p.minecartDone = !this.world.minecartManager.restoreMinecartsForChunk(this.cx, this.cz, p.minecartIndex, MAX_ENTITIES_PER_FRAME - restoredThisFrame);
+      }
+
+      // 更新索引（简化处理：每次调用递增，即使有跳过也会前进）
+      p.nestIndex += MAX_ENTITIES_PER_FRAME;
+      p.turretIndex += MAX_ENTITIES_PER_FRAME;
+      p.minecartIndex += MAX_ENTITIES_PER_FRAME;
+
+      if (p.nestDone && p.turretDone && p.minecartDone) {
+        this._needsDeferredRuntimeEntityRestore = false;
+        this.pendingRuntimeEntities = null;
+        this._entityRestoreProgress = null;
+      }
     } else if (this.pendingRuntimeEntities) {
       this.pendingRuntimeEntities = null;
     }
@@ -1926,7 +1904,6 @@ export class Chunk {
     }
 
     this.hasDeferredFinalizeWork = (
-      this._needsDeferredPersistenceFlush ||
       this._needsDeferredRuntimeEntityRestore ||
       this._needsDeferredLightRegistration
     );

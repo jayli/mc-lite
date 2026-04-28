@@ -42,7 +42,7 @@ export class TurretPlacementHandler extends EntityPlacementHandler {
     }
 
     // 检查炮塔数量限制
-    if (this.turretManager.turrets.size >= this.turretManager.maxTurrets) {
+    if (this.turretManager.activeTurrets.size >= this.turretManager.maxTurrets) {
       console.warn('[TurretPlacementHandler] 已达到最大炮塔数量限制，无法放置');
       return false;
     }

@@ -643,7 +643,7 @@ export class PlayerInteraction {
         const explosionRadius = 4; // 爆炸范围（方块单位）
 
         const minecartsToDestroy = [];
-        for (const minecart of this.player.game.minecartManager.minecarts.values()) {
+        for (const minecart of this.player.game.minecartManager.activeMinecarts.values()) {
           const minecartPos = new THREE.Vector3(
             minecart.position.x + 0.5,
             minecart.position.y + 0.3,

@@ -3,6 +3,8 @@
 
 import { manualSaveService } from '../services/ManualSaveService.js';
 import { persistenceService } from '../services/PersistenceService.js';
+import { specialEntitiesShadowStore } from '../world/SpecialEntitiesShadowStore.js';
+import { shadowSyncDispatcher } from '../world/ShadowSyncDispatcher.js';
 import { Engine, VISUAL_STYLE_KEYS } from './Engine.js';
 import { World } from '../world/World.js';
 import { UIManager } from '../ui/UIManager.js';
@@ -57,18 +59,22 @@ export class Game {
     this.enemyManager = new EnemyManager(this.engine.scene, this.world);
 
     // 初始化炮塔管理器
-    this.turretManager = new TurretManager(this.engine.scene, this.world, this.enemyManager);
-    this.zombieNestManager = new ZombieNestManager(this.engine.scene, this.world, this.enemyManager);
+    this.turretManager = new TurretManager(this.engine.scene, this.world, this.enemyManager, specialEntitiesShadowStore, shadowSyncDispatcher);
+    this.zombieNestManager = new ZombieNestManager(this.engine.scene, this.world, this.enemyManager, specialEntitiesShadowStore, shadowSyncDispatcher);
     // 让 Chunk 生成回调可直接恢复该 Chunk 的巢穴和炮塔运行时实例
     this.world.zombieNestManager = this.zombieNestManager;
     this.world.turretManager = this.turretManager;
 
     // 初始化矿车管理器
     this.minecartRenderer = new MinecartInstancedRenderer(this.engine.scene);
-    this.minecartManager = new MinecartManager(this.engine.scene, this.world, this.minecartRenderer);
+    this.minecartManager = new MinecartManager(this.engine.scene, this.world, this.minecartRenderer, specialEntitiesShadowStore, shadowSyncDispatcher);
     this.world.minecartManager = this.minecartManager;
     // 将 Game 实例注入 worldRuntime，用于实体收集
     this.world.worldRuntime.setWorld(this.world, this);
+
+    // 注入 ShadowStore 到 game 实例
+    this.specialEntitiesShadowStore = specialEntitiesShadowStore;
+    this.shadowSyncDispatcher = shadowSyncDispatcher;
 
     // 初始化实体注册表
     this.entityRegistry = new EntityRegistry();
@@ -360,6 +366,12 @@ export class Game {
     if (this.isRunning) return;
     this.isRunning = true;
     this.lastTime = performance.now();
+
+    // 异步启动特殊实体迁移（不阻塞游戏）
+    this.shadowSyncDispatcher.startMigration().catch((err) => {
+      console.error('[Game] Shadow entity migration failed:', err);
+    });
+
     this.loop();
   }
 
@@ -815,7 +827,7 @@ export class Game {
       this.setRenderDistance(renderDistance);
     }
 
-    // 4. 从存档恢复丧尸巢穴和炮塔实例
+    // 4. 从存档恢复特殊实体（先写入 ShadowStore，再恢复行为实例）
     if (saveData.worldDeltas) {
       console.log('[Save] 开始恢复实体，区块数量:', saveData.worldDeltas.length);
       for (const chunk of saveData.worldDeltas) {
@@ -823,23 +835,28 @@ export class Game {
         if (!entities) continue;
         const [cx, cz] = key.split(',').map(Number);
 
-        // 恢复丧尸巢穴
-        if (Array.isArray(entities.zombieNests) && entities.zombieNests.length > 0) {
-          console.log(`[Save] 恢复丧尸巢穴: chunk ${key}, 数量:`, entities.zombieNests.length);
-          this.zombieNestManager.restoreNestsForChunk(cx, cz, entities.zombieNests);
-        }
+        // 写入 ShadowStore
+        this.specialEntitiesShadowStore.deserializeAndMerge(cx, cz, {
+          turrets: entities.turrets || [],
+          zombieNests: entities.zombieNests || [],
+          minecarts: entities.minecarts || []
+        });
 
-        // 恢复炮塔
-        if (Array.isArray(entities.turrets) && entities.turrets.length > 0) {
-          console.log(`[Save] 恢复炮塔: chunk ${key}, 数量:`, entities.turrets.length);
-          this.turretManager.restoreTurretsForChunk(cx, cz, entities.turrets);
+        const count = (entities.turrets?.length || 0) +
+          (entities.zombieNests?.length || 0) +
+          (entities.minecarts?.length || 0);
+        if (count > 0) {
+          console.log(`[Save] 恢复实体: chunk ${key}, 数量:`, count);
         }
+      }
 
-        // 恢复矿车
-        if (Array.isArray(entities.minecarts) && entities.minecarts.length > 0) {
-          console.log(`[Save] 恢复矿车: chunk ${key}, 数量:`, entities.minecarts.length);
-          this.minecartManager.restoreMinecartsForChunk(cx, cz, entities.minecarts);
-        }
+      // 所有实体写入 ShadowStore 后，恢复行为实例
+      for (const chunk of saveData.worldDeltas) {
+        const { key } = chunk;
+        const [cx, cz] = key.split(',').map(Number);
+        this.zombieNestManager.restoreNestsForChunk(cx, cz);
+        this.turretManager.restoreTurretsForChunk(cx, cz);
+        this.minecartManager.restoreMinecartsForChunk(cx, cz);
       }
     }
 

@@ -34,6 +34,50 @@ export function preloadTurretTextures() {
   loadTurretTexturesCached();
 }
 
+/**
+ * 共享 Geometry/Material 缓存，避免每个炮塔重复创建相同资源。
+ * 延迟到 getTurretResources() 首次调用时才创建，确保纹理已就绪。
+ */
+let _turretResourceCache = null;
+
+function getTurretResources() {
+  if (_turretResourceCache) return _turretResourceCache;
+
+  const textures = loadTurretTexturesCached();
+  const S = TURRET_CONFIG.TURRET_TOWER_SIZE;
+  const G = TURRET_CONFIG.GUN_BARREL_SIZE;
+  const C = TURRET_CONFIG.GUN_COLOR;
+
+  const geometries = [
+    new THREE.BoxGeometry(...S.FRONT),
+    new THREE.BoxGeometry(...S.SIDE),
+    new THREE.BoxGeometry(...S.SIDE),
+    new THREE.BoxGeometry(...S.TOP),
+    new THREE.BoxGeometry(...S.BACK),
+    (() => {
+      const g = new THREE.CylinderGeometry(G.DIAMETER / 2, G.DIAMETER / 2, G.LENGTH, 12);
+      g.rotateX(Math.PI / 2);
+      return g;
+    })(),
+    new THREE.BoxGeometry(...TURRET_CONFIG.GUN_ROOT_SIZE),
+    new THREE.BoxGeometry(...TURRET_CONFIG.GUN_SIGHT_SIZE),
+  ];
+
+  const materials = [
+    new THREE.MeshLambertMaterial({ map: textures.front }),
+    new THREE.MeshLambertMaterial({ map: textures.side }),
+    new THREE.MeshLambertMaterial({ map: textures.side }),
+    new THREE.MeshLambertMaterial({ map: textures.top }),
+    new THREE.MeshLambertMaterial({ map: textures.back }),
+    new THREE.MeshLambertMaterial({ color: C.BARREL }),
+    new THREE.MeshLambertMaterial({ color: C.ROOT }),
+    new THREE.MeshLambertMaterial({ color: C.SIGHT }),
+  ];
+
+  _turretResourceCache = { geometries, materials };
+  return _turretResourceCache;
+}
+
 // 炮塔配置常量
 export const TURRET_CONFIG = {
   // --- 检测与瞄准 ---
@@ -203,8 +247,6 @@ export class Turret {
    * 创建炮塔的视觉表现
    */
   createVisuals() {
-    console.log(`[Turret ${this.id}] 创建视觉表现，pivot位置:`, this.pivotPosition);
-
     // 创建外部旋转节点（pivot）- 负责 Y 轴偏航角旋转
     this.pivotObject = new THREE.Object3D();
     this.pivotObject.position.copy(this.pivotPosition);
@@ -216,8 +258,6 @@ export class Turret {
 
     // 创建炮塔顶部的枪
     this.createTurretTopBlocks();
-
-    console.log(`[Turret ${this.id}] 视觉表现创建完成，mesh数量:`, this.turretMeshes.length);
   }
 
   /**
@@ -225,90 +265,36 @@ export class Turret {
    * 现代化海军炮塔风格：楔形主体 + 细长炮管 + 蓝色瞄准器
    */
   createTurretTopBlocks() {
-    console.log(`[Turret ${this.id}] 创建现代化楔形炮塔...`);
+    const { geometries, materials } = getTurretResources();
+    const P = TURRET_CONFIG.TURRET_TOWER_POS;
+    const GP = TURRET_CONFIG.GUN_POS;
 
-    // 使用预加载纹理或从全局缓存加载
-    const textures = this.textures || loadTurretTexturesCached();
-    if (!textures) return; // 纹理未就绪时跳过（恢复路径不应触发）
+    const blocks = [
+      // 前装甲板（倾斜前表面）
+      { geo: 0, mat: 0, pos: P.FRONT, rotX: -Math.PI / 8 },
+      // 左侧装甲板
+      { geo: 1, mat: 1, pos: P.LEFT },
+      // 右侧装甲板
+      { geo: 2, mat: 2, pos: P.RIGHT },
+      // 顶部装甲板
+      { geo: 3, mat: 3, pos: P.TOP },
+      // 后装甲板
+      { geo: 4, mat: 4, pos: P.BACK },
+      // 炮管
+      { geo: 5, mat: 5, pos: [0, 0, GP.BARREL_Z] },
+      // 炮管根部
+      { geo: 6, mat: 6, pos: [0, 0, GP.ROOT_Z] },
+      // 瞄准器
+      { geo: 7, mat: 7, pos: [0, GP.SIGHT_Y, GP.SIGHT_Z] },
+    ];
 
-    // === 创建炮塔主体（楔形结构） ===
-
-    // 1. 前装甲板（倾斜前表面 - 向后倾斜约22度，类似坦克前装甲）
-    const frontGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.FRONT);
-    const frontMaterial = new THREE.MeshLambertMaterial({ map: textures.front });
-    const front = new THREE.Mesh(frontGeometry, frontMaterial);
-    // 向后倾斜，使前装甲有斜度（坦克风格）
-    front.rotation.x = -Math.PI / 8; // -22.5度
-    front.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.FRONT);
-    this.pitchObject.add(front);
-    this.turretMeshes.push(front);
-
-    // 2. 左侧装甲板
-    const leftGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.SIDE);
-    const leftMaterial = new THREE.MeshLambertMaterial({ map: textures.side });
-    const left = new THREE.Mesh(leftGeometry, leftMaterial);
-    left.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.LEFT);
-    this.pitchObject.add(left);
-    this.turretMeshes.push(left);
-
-    // 3. 右侧装甲板
-    const rightGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.SIDE);
-    const rightMaterial = new THREE.MeshLambertMaterial({ map: textures.side });
-    const right = new THREE.Mesh(rightGeometry, rightMaterial);
-    right.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.RIGHT);
-    this.pitchObject.add(right);
-    this.turretMeshes.push(right);
-
-    // 4. 顶部装甲板
-    const topGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.TOP);
-    const topMaterial = new THREE.MeshLambertMaterial({ map: textures.top });
-    const top = new THREE.Mesh(topGeometry, topMaterial);
-    top.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.TOP);
-    this.pitchObject.add(top);
-    this.turretMeshes.push(top);
-
-    // 5. 后装甲板（深色）
-    const backGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.TURRET_TOWER_SIZE.BACK);
-    const backMaterial = new THREE.MeshLambertMaterial({ map: textures.back });
-    const back = new THREE.Mesh(backGeometry, backMaterial);
-    back.position.set(...TURRET_CONFIG.TURRET_TOWER_POS.BACK);
-    this.pitchObject.add(back);
-    this.turretMeshes.push(back);
-
-    // === 创建炮管系统 ===
-
-    // 6. 炮管（细长圆柱）
-    const barrelGeometry = new THREE.CylinderGeometry(
-      TURRET_CONFIG.GUN_BARREL_SIZE.DIAMETER / 2,
-      TURRET_CONFIG.GUN_BARREL_SIZE.DIAMETER / 2,
-      TURRET_CONFIG.GUN_BARREL_SIZE.LENGTH,
-      12
-    );
-    // 旋转圆柱使其沿 Z 轴延伸
-    barrelGeometry.rotateX(Math.PI / 2);
-    const barrelMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.GUN_COLOR.BARREL });
-    const barrel = new THREE.Mesh(barrelGeometry, barrelMaterial);
-    barrel.position.set(0, 0, TURRET_CONFIG.GUN_POS.BARREL_Z);
-    this.pitchObject.add(barrel);
-    this.turretMeshes.push(barrel);
-
-    // 7. 炮管根部（白色连接机构）
-    const rootGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.GUN_ROOT_SIZE);
-    const rootMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.GUN_COLOR.ROOT });
-    const root = new THREE.Mesh(rootGeometry, rootMaterial);
-    root.position.set(0, 0, TURRET_CONFIG.GUN_POS.ROOT_Z);
-    this.pitchObject.add(root);
-    this.turretMeshes.push(root);
-
-    // 8. 蓝色瞄准器（光学传感器）
-    const sightGeometry = new THREE.BoxGeometry(...TURRET_CONFIG.GUN_SIGHT_SIZE);
-    const sightMaterial = new THREE.MeshLambertMaterial({ color: TURRET_CONFIG.GUN_COLOR.SIGHT });
-    const sight = new THREE.Mesh(sightGeometry, sightMaterial);
-    sight.position.set(0, TURRET_CONFIG.GUN_POS.SIGHT_Y, TURRET_CONFIG.GUN_POS.SIGHT_Z);
-    this.pitchObject.add(sight);
-    this.turretMeshes.push(sight);
-
-    console.log(`[Turret ${this.id}] 炮塔创建完成: 5个主体部件 + 3个炮管部件`);
+    for (const b of blocks) {
+      const mesh = new THREE.Mesh(geometries[b.geo], materials[b.mat]);
+      mesh.position.set(...b.pos);
+      if (b.rotX !== undefined) mesh.rotation.x = b.rotX;
+      this.pitchObject.add(mesh);
+      this.turretMeshes.push(mesh);
+    }
   }
 
   /**
@@ -753,10 +739,7 @@ export class Turret {
     // 清理视觉表现
     if (this.pivotObject) {
       this.scene.remove(this.pivotObject);
-      this.turretMeshes.forEach(mesh => {
-        if (mesh.geometry) mesh.geometry.dispose();
-        if (mesh.material) mesh.material.dispose();
-      });
+      // 共享资源不 dispose，只清空引用
       this.turretMeshes = [];
       this.pitchObject = null;
       this.pivotObject = null;

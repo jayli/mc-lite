@@ -86,7 +86,7 @@ export class MinecartLinkDetector {
     for (const linkedId of links) {
       if (visited.size >= MAX_LINKED_MINECARTS) break;
 
-      const linkedMinecart = manager.minecarts.get(linkedId);
+      const linkedMinecart = manager.activeMinecarts.get(linkedId);
       if (linkedMinecart && !visited.has(linkedId)) {
         const subResult = this.findAllLinked(linkedMinecart, manager, visited);
         result.push(...subResult);
@@ -170,7 +170,7 @@ export class MinecartLinkDetector {
 
     // 通知链接的矿车停止
     for (const linkedId of minecart.linkedMinecarts) {
-      const linked = manager.minecarts.get(linkedId);
+      const linked = manager.activeMinecarts.get(linkedId);
       if (linked) {
         linked.movementState = 'IDLE';
         linked.velocity = { x: 0, z: 0 };
