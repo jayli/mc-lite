@@ -1,443 +1,383 @@
-# Runtime Entities Persistence Design
+# Runtime Special Entities Session Persistence Design
 
 **日期**: 2026-04-28  
-**状态**: 修订版  
-**范围**: `turret`、`minecart`、`zombieNest` 在 `worldStore / IndexedDB` 权威存储机制下的持久化、恢复、卸载与渲染协同
-
-## 1. 这次失败暴露出的根因
-
-上一次方案失败，不是因为少改了几行，而是因为设计抽象层级错了。它把三类“特殊实体”都当成了同一种 `runtimeEntities` 数据迁移问题，但真实代码里三者的渲染形态、与 `blockData` 的关系、卸载语义、恢复入口都不同。
-
-失败点主要有四类：
-
-1. **把特殊实体错误地视为纯元数据对象**
-   - `zombieNest` 没有独立视觉模型，视觉主体是结构方块，实体实例只负责刷怪与完整性检查。
-   - `minecart` 没有落地到 `blockData`，完全是运行时对象，由独立 Instanced Renderer 渲染。
-   - `turret` 是混合体：底座/柱子是方块，炮塔头部是独立 Three.js 对象。
-
-2. **只考虑了 `Chunk.loadFromRecord()`，没考虑另一条真实装载链路**
-   - 当前项目至少有两条恢复路径：
-     - `WorldRuntime.ensureChunkData()` -> `Chunk.loadFromRecord()`
-     - `Chunk.gen()` / `assembleEntityPhase()` 通过 `persistenceService.cache` 合并快照
-   - 只改第一条路径，第二条路径仍然读旧数据，会导致行为不一致。
-
-3. **直接让各 Manager 自己 `getChunkRecord -> 改对象 -> putChunkRecord`，没有解决并发覆盖**
-   - `WorldRuntime.flushChunk()`、`flushAllDirty()`、Manager 写入、chunk 卸载前写回，都会碰同一个 `chunkRecord`。
-   - 没有一个“按 chunk 串行化”的更新接口，读改写天然存在竞态。
-
-4. **没有定义实体“激活态”和“持久态”的边界**
-   - 当前代码里，特殊实体大多是全局 manager 持有的活动实例；chunk 卸载并不天然等于实体实例销毁。
-   - 方案没有明确：远离后是“继续活着但不可见”，还是“按 chunk 停用，靠近再恢复”。
-
-本次修订要先把这四个问题讲清楚，再谈实现计划。
+**状态**: 修订版 v2  
+**本阶段目标**: 先修复 runtime 会话期内的特殊实体与相关结构方块在 chunk 卸载/重载后的正确性；暂不把特殊实体正式纳入 `worldStore / IndexedDB` 权威链路。
 
 ---
 
-## 2. 现状澄清：三类特殊实体并不等价
+## 1. 结论先行
 
-### 2.1 `turret`
+这次失败，核心不是“特殊实体恢复代码少写了几行”，而是阶段目标和真实架构被混淆了。
 
-代码事实：
-- 放置时先往世界写入底座与柱子方块，再创建 `Turret` 实例。见 [TurretPlacementHandler.js](/Users/bachi/jaylli/mc-lite/src/actors/turret/TurretPlacementHandler.js) 。
-- `Turret` 自己再创建炮塔头部、炮管等独立 `Three.js` 对象，直接挂到 `scene`，不属于 chunk mesh。见 [Turret.js](/Users/bachi/jaylli/mc-lite/src/actors/turret/Turret.js) 。
-- 完整性校验依赖世界中的关键方块是否仍存在。
+当前分支里，特殊实体并没有真正迁移到 `worldStore`：
 
-结论：
-- `turret` 不是“只要恢复一条 runtimeEntities 记录就够了”。
-- 它同时依赖两套数据：
-  - `blockData`：底座/柱子，是视觉与物理的一部分
-  - `runtimeEntities`：炮塔头部逻辑、朝向、生命周期
+1. `worldStore / WorldRuntime` 当前只承接 `blockData / staticEntities / runtimeSeedData`
+2. 炮塔、丧尸巢穴、矿车的 runtime 快照仍然主要保存在 `persistenceService.cache.get(chunkKey).entities`
+3. `Chunk.loadFromRecord()` 恢复运行时实体时，实际仍然要去合并 `persistenceService.cache.entities`
 
-### 2.2 `zombieNest`
+因此，第一阶段不应该继续硬推“特殊实体 -> IndexedDB 权威化”。正确收敛方式是：
 
-代码事实：
-- 放置时先生成并落地方块结构，再创建 `ZombieNest` 实例。见 [ZombieNestPlacementHandler.js](/Users/bachi/jaylli/mc-lite/src/actors/zombie-nest/ZombieNestPlacementHandler.js) 。
-- `ZombieNest` 本身没有独立 mesh；它只是逻辑体，依赖 `criticalBlock` 做完整性校验，并定时刷怪。见 [ZombieNest.js](/Users/bachi/jaylli/mc-lite/src/actors/zombie-nest/ZombieNest.js) 。
-
-结论：
-- `zombieNest` 的“渲染恢复”主要是结构方块通过 chunk 正常加载、consolidation、AO 刷新后重新显示。
-- `runtimeEntities` 里保存的是逻辑实体，而不是视觉主体。
-
-### 2.3 `minecart`
-
-代码事实：
-- 矿车不写结构方块，只依赖轨道方块存在。
-- 渲染完全由 `MinecartInstancedRenderer` 负责；`Minecart` 只是数据对象。见 [Minecart.js](/Users/bachi/jaylli/mc-lite/src/actors/minecart/Minecart.js) 与 [MinecartManager.js](/Users/bachi/jaylli/mc-lite/src/actors/minecart/MinecartManager.js) 。
-- 卸载 chunk 前已有 `stopMinecartsForChunk()` 逻辑，会停止运动并写快照。
-
-结论：
-- `minecart` 是最接近“纯 runtime entity”的对象。
-- 但它又依赖轨道方块这一外部支撑条件，不能脱离 `blockData` 单独看。
+1. `worldStore` 继续负责普通方块和结构方块的持久化镜像
+2. 特殊实体 runtime 数据先继续以 **内存会话级快照** 为权威
+3. 先把 chunk 卸载/重载期间的内存正确性、方块正确性、交互正确性修通
+4. 后续再单独做“特殊实体正式入库”的第二阶段设计
 
 ---
 
-## 3. 修订后的权威模型
+## 2. 本次失败的真实根因
 
-### 3.1 三层真相来源
+### 2.1 方块侧状态在 chunk 卸载时丢失
 
-在新的 `worldStore` 机制下，必须严格区分三层：
+你复现里“铁轨方块消失、炮塔底座/巢穴结构不回来、矿车还在”这一组现象，已经说明第一根因在 **结构方块没有正确保住**。
 
-1. **IndexedDB / RegionRecord**
-   - 唯一权威持久化数据源
-   - 保存 `blockData`、`staticEntities`、`runtimeSeedData`、`runtimeEntities`
+当前 `runtime-streaming` 路径里：
 
-2. **Chunk runtime working set**
-   - 当前已加载 chunk 的内存工作集
-   - `blockData Map`、可见面、AO、consolidation 状态属于这一层
-   - 不是权威，只是权威数据的活动投影
+1. 玩家放置/删除方块时，`World.setBlock()` / `World.removeBlock()` 只标记 `worldRuntime.markChunkDirty()`
+2. 真正写回 `worldStore` 依赖 `WorldRuntime.flushChunk()`
+3. chunk 卸载时，`World.update()` 里调用了 `this.worldRuntime.flushBeforeUnload(chunk.cx, chunk.cz).catch(() => {})`
+4. 但这一步 **没有 await**
+5. 紧接着就 `scene.remove(chunk.group)`、`chunk.dispose()`、`this.chunks.delete(key)`
+6. `flushChunk()` 内部又要从 `this._world.chunks.get(key)` 重新取活动 chunk
 
-3. **Manager active instances**
-   - `turretManager.turrets`
-   - `minecartManager.minecarts`
-   - `zombieNestManager.nests`
-   - 这些实例是“活动态对象”，不是权威数据源
+结果就是：
 
-### 3.2 `persistenceService.cache` 的新定位
+1. 卸载流程先把活动 chunk 销毁了
+2. 异步 flush 再执行时，活动 chunk 可能已经不存在
+3. `blockData` 没有成功写回
+4. 重新回来时，铁轨、炮塔底座、巢穴结构方块丢失
 
-`persistenceService.cache` 不能再被视为权威来源。
+这正好解释了为什么：
 
-修订后它只能有两个用途：
+1. `minecart` 还能出现，因为它走的是独立 runtime 快照
+2. `sand_train_track`、`turret` 底座、`zombieNest` 结构没回来，因为它们本质上是方块侧状态
 
-1. **旧装载路径兼容桥**
-   - 仍在 `Chunk.gen()` / `assembleEntityPhase()` 中存在时，可作为临时桥接层
+### 2.2 炮塔/巢穴“看起来像恢复失败”，实际上是结构先丢，再自毁
 
-2. **会话级工作缓存**
-   - 用于旧代码尚未清理前避免大范围重构
+当前炮塔和丧尸巢穴都还是旧模型：
 
-必须禁止的事情：
-- 新业务状态继续只写 `cache` 不写 `worldStore`
-- `cache` 覆盖 `worldStore` 权威值
-- 不经统一合并策略直接从多个入口并发写 `cache` 和 `worldStore`
+1. manager 全局持有活动实例
+2. chunk 卸载时并不会显式停用它们
+3. 远离时完整性检查会跳过未加载 chunk，避免误杀
+4. 玩家跑回来后，如果结构方块不存在，它们会在完整性检查中判定失效并自毁
 
----
+所以现象不是“恢复入口单点失效”，而是：
 
-## 4. 新的数据模型
+1. 结构方块先丢
+2. chunk 重新加载后可查询
+3. 炮塔/巢穴发现关键方块没了
+4. 实例自毁
 
-### 4.1 `ChunkRecord.runtimeEntities`
+### 2.3 计划边界错了：第一阶段不该把特殊实体权威源直接切到 IndexedDB
 
-不再继续沿用“若干松散数组 + Manager 自己拼字段”的做法。修订后统一成带版本号的结构。
+当前代码现实是：
 
-```js
-chunkRecord.runtimeEntities = {
-  version: 1,
-  byType: {
-    turrets: [
-      {
-        id: 'turret_xxx',
-        ownerChunk: 'cx,cz',
-        anchor: { x, y, z },
-        renderState: {
-          yaw: number,
-          pitch: number
-        },
-        support: {
-          kind: 'turret_base',
-          criticalBlocks: [
-            { x, y, z, type: 'obsidian' },
-            { x, y, z, type: 'obsidian' }
-          ]
-        }
-      }
-    ],
-    minecarts: [
-      {
-        id: 'minecart_xxx',
-        ownerChunk: 'cx,cz',
-        anchor: { x, y, z },
-        motionState: {
-          orientation: number,
-          movementState: 'IDLE' | 'MOVING_FORWARD' | 'MOVING_BACKWARD',
-          lastTrackPosition: { x, y, z } | null
-        },
-        linkState: {
-          linkedMinecartIds: []
-        },
-        support: {
-          kind: 'track',
-          trackBlock: { x, y, z }
-        }
-      }
-    ],
-    zombieNests: [
-      {
-        id: 'zombie_nest_xxx',
-        ownerChunk: 'cx,cz',
-        anchor: { x, y, z },
-        criticalBlock: { x, y, z, type },
-        spawnState: {
-          lastSpawnAt: number
-        }
-      }
-    ]
-  }
-}
-```
+1. `WorldStore.getChunkRecord()` 不返回 `runtimeEntities`
+2. `WorldStore.putChunkRecord()` 也不处理 `runtimeEntities`
+3. `WorldRuntime.ensureChunkData()` 只返回 `blockData / staticEntities / runtimeSeedData`
+4. `Chunk.loadFromRecord()` 仍然要回头去看 `persistenceService.cache.entities`
 
-### 4.2 为什么需要 `id`
+这说明“特殊实体已迁入 worldStore”并不成立。
 
-旧方案里 `turret` / `zombieNest` 用位置去重，`minecart` 才有稳定 `id`。这不够。
-
-必须统一要求三类实体都有稳定 `id`，原因：
-- 支持 chunk 卸载/恢复时识别“同一个实体”
-- 避免位置微调、朝向变化、特殊交互导致误判为新对象
-- 为未来支持跨 chunk 迁移、调试追踪、链路日志打基础
-
-### 4.3 为什么要保存比“位置+朝向”更多的状态
-
-上次设计要求“只保存基础属性（位置+朝向）”，这个结论对当前系统不成立。
-
-至少要保留：
-- `minecart.lastTrackPosition`：否则回弹与停止位置会漂
-- `minecart.linkedMinecartIds`：否则重载后联动车组关系丢失
-- `zombieNest.lastSpawnAt`：否则玩家可以通过卸载/加载重置刷怪节奏
-- `turret.yaw / pitch`：否则恢复时炮塔头部突兀跳回默认朝向
-
-不必保存的状态：
-- `turret` 炮弹对象
-- `zombieNest` 当前已生成的敌人引用
-- `minecart` 临时速度向量（可选，第一期可以不保）
+如果在这个基础上继续设计 `RuntimeEntityRepository + IndexedDB authority`，会把第一阶段问题复杂化，甚至把真正 bug 淹没掉。
 
 ---
 
-## 5. 统一生命周期设计
+## 3. 现状下，特殊实体到底怎么存、怎么取
 
-### 5.1 持久态 vs 激活态
+这一节只描述当前代码事实。
 
-修订后，所有特殊实体都遵循同一个生命周期：
+### 3.1 炮塔 `turret`
 
-1. **持久态记录存在于 `worldStore`**
-2. **chunk 进入激活范围后，Manager 基于记录创建活动实例**
-3. **chunk 卸载时，活动实例被停用/销毁，但持久态记录保留**
-4. **再次进入范围时，再从持久态记录恢复活动实例**
+**存储方式**
 
-这意味着：
-- 不能再依赖“实例一直挂在 manager 里，远离也不回收”的隐式行为
-- 必须把“按 chunk 激活/停用”设计成显式 API
+1. 放置时，`TurretPlacementHandler.place()` 先调用 `world.setBlock()` 放置 3x3 `iron_ore` 底座和 2 格 `obsidian` 柱子
+2. 然后调用 `turretManager.createTurret()`
+3. `TurretManager.saveTurretToSnapshot()` 把炮塔快照写进 `persistenceService.cache.get(chunkKey).entities.turrets`
 
-### 5.2 放置流程
+**取回方式**
 
-#### `turret`
-1. 通过 `world.setBlock()` 写入底座与柱子到 `blockData`
-2. 写入或更新 `runtimeEntities.byType.turrets`
-3. 若 owner chunk 当前已激活，则创建 `Turret` 实例并挂 scene
+1. chunk 重载时，`Chunk.loadFromRecord()` 先从 `worldStore` 读回 `blockData`
+2. 然后再从 `persistenceService.cache.get(chunkKey).entities` 合并 `turrets`
+3. `finalizeNonDeferredPhase()` 调 `turretManager.restoreTurretsForChunk()`
+4. manager 直接重新 `createTurret(..., persist:false)`
 
-#### `zombieNest`
-1. 通过结构 loader 落地巢穴方块到 `blockData`
-2. 写入 `runtimeEntities.byType.zombieNests`
-3. 若 owner chunk 已激活，则创建 `ZombieNest` 逻辑实例
+**关键事实**
 
-#### `minecart`
-1. 校验轨道方块存在
-2. 写入 `runtimeEntities.byType.minecarts`
-3. 若 owner chunk 已激活，则创建 `Minecart` 实例并让 instanced renderer 纳入渲染
+1. 炮塔头部渲染是独立 Three.js 对象，不属于 chunk mesh
+2. 炮塔完整性依赖 `obsidian` 柱子仍然存在
+3. 结构方块丢失时，炮塔会在完整性检查中销毁自己
 
-### 5.3 chunk 卸载流程
+### 3.2 丧尸巢穴 `zombieNest`
 
-这是上次方案完全没定义清楚的部分。
+**存储方式**
 
-修订后要求：
+1. `ZombieNestPlacementHandler.place()` 先把整套结构方块写进世界
+2. 然后 `zombieNestManager.createNest()`
+3. `ZombieNestManager.saveNestToSnapshot()` 把逻辑快照写进 `persistenceService.cache.get(chunkKey).entities.zombieNests`
 
-#### `turret`
-- 卸载 owner chunk 前，销毁炮塔活动实例的独立视觉对象
-- **不得删除 `runtimeEntities` 记录**
-- **不得删除底座/柱子 `blockData`**
+**取回方式**
 
-#### `zombieNest`
-- 卸载 owner chunk 前，销毁逻辑实例
-- 结构方块会随着 chunk 自身卸载而消失，无需额外清理
-- **不得删除 `runtimeEntities` 记录**
+1. chunk 重载时，结构方块先从 `blockData` 恢复
+2. `Chunk.loadFromRecord()` 再从 `persistenceService.cache.entities` 提取 `zombieNests`
+3. `finalizeNonDeferredPhase()` 调 `zombieNestManager.restoreNestsForChunk()`
 
-#### `minecart`
-- 先停止运动、落盘最新状态
-- 再销毁活动实例
-- **不得删除 `runtimeEntities` 记录**
+**关键事实**
 
-### 5.4 chunk 恢复流程
+1. 巢穴没有独立 mesh
+2. 真正“看得见”的部分是结构方块
+3. runtime 快照只保存逻辑实体
+4. 关键方块缺失时，巢穴会在完整性检查中自毁
 
-恢复必须放在 chunk 地形/方块准备完成之后，否则完整性检查和依赖方块查询会读到不完整状态。
+### 3.3 矿车 `minecart`
 
-统一顺序：
-1. `blockData` 注入
-2. 普通方块 mesh / consolidation 基础准备完成
-3. `runtimeEntities` 进入 `pendingRuntimeEntities`
-4. `finalizeNonDeferredPhase()` 或等价阶段调用 manager 的 `restoreForChunk()`
+**存储方式**
 
-### 5.5 交互删除 / 结构损坏流程
+1. 矿车本身不写结构方块
+2. `MinecartManager.saveMinecartToSnapshot()` 把矿车数据写进 `persistenceService.cache.get(chunkKey).entities.minecarts`
+3. chunk 卸载前 `stopMinecartsForChunk()` 会停止运动并再次保存
 
-#### `turret`
-- 若关键柱子被破坏，活动实例销毁
-- 同步删除其 `runtimeEntities` 记录
-- 底座/残余方块是否保留，按当前玩法决定；第一期保持现状，只删除逻辑实体记录
+**取回方式**
 
-#### `zombieNest`
-- 若 `criticalBlock` 被破坏，活动实例销毁
-- 同步删除 `runtimeEntities` 记录
-- 结构残骸是否自动清理，不属于本次持久化改造范围
+1. chunk 重载时，`Chunk.loadFromRecord()` 从 `persistenceService.cache.entities.minecarts` 取出快照
+2. `finalizeNonDeferredPhase()` 调 `minecartManager.restoreMinecartsForChunk()`
 
-#### `minecart`
-- 拾取/爆炸/碰撞销毁时，删除 `runtimeEntities` 记录
-- 轨道方块仍由普通 `blockData` 自己管理
+**关键事实**
+
+1. 矿车是独立 runtime 对象
+2. 它依赖轨道存在，但当前没有像炮塔/巢穴那样的完整性自毁链路
+3. 所以轨道丢失时，矿车仍可能“还在”
 
 ---
 
-## 6. 渲染与 consolidation 的正确关系
+## 4. 第一阶段修正后的权威模型
 
-这是本次设计里最容易被说混的一段，必须明确。
+### 4.1 本阶段明确放弃的目标
 
-### 6.1 哪些进入 chunk consolidation
+以下内容全部推迟到第二阶段，不纳入当前方案：
 
-进入 chunk consolidation / AO / face culling 体系的只有：
-- 普通方块
-- `turret` 的底座和柱子
-- `zombieNest` 的结构方块
-- 轨道方块
+1. 把 `turret / zombieNest / minecart` 正式持久化进 IndexedDB
+2. 为特殊实体新建 `worldStore.runtimeEntities`
+3. 用 `RuntimeEntityRepository` 统一所有持久态实体读写
+4. 把所有特殊实体都改成“按 chunk 激活/停用”的新生命周期
 
-### 6.2 哪些不进入 chunk consolidation
+这些都不是当前 bug 的最短修复路径。
 
-不进入 chunk consolidation 的有：
-- `turret` 的炮塔头、炮管、瞄准器
-- `minecart` 整体
-- `zombieNest` 的逻辑实体本身
+### 4.2 本阶段的三层数据职责
 
-### 6.3 结论
+修正后，本阶段应该采用下面这套职责边界：
 
-因此，`runtimeEntities` 不负责“把特殊形状塞回 blockData”。
+1. **活动 chunk 内方块权威**
+   - `chunk.blockData`
+   - 玩家放置、删除、结构生成、consolidation、AO 都围绕它工作
 
-它负责的是：
-- 哪些逻辑/运行时实体应该存在
-- 这些实体恢复时需要哪些最小状态
-- 它们和 `blockData` 的依赖关系是什么
+2. **会话级 chunk 快照权威**
+   - `persistenceService.cache`
+   - `cache.blocks` 保存运行期内存中的 chunk 方块快照
+   - `cache.entities` 保存特殊实体 runtime 快照
+   - 这是“chunk 卸载后，再回来还能恢复”的第一权威
 
-而真正的视觉落地方式分三类：
-- **纯 blockData 渲染**：`zombieNest` 结构
-- **纯 runtime renderer 渲染**：`minecart`
-- **混合渲染**：`turret`
+3. **worldStore / IndexedDB**
+   - 本阶段只作为普通方块和结构方块的异步镜像
+   - 它很重要，但不能成为 runtime 卸载/回流的唯一立即依赖
 
----
+### 4.3 第一阶段的关键原则
 
-## 7. 必须新增的基础设施
+#### 原则 A：特殊实体 runtime 权威仍然是 `persistenceService.cache.entities`
 
-### 7.1 不能再让 Manager 直接操作 `WorldStore`
+也就是继续复用旧机制，只做兼容修补，不做架构跳跃。
 
-修订后需要一个统一仓储层，例如：
-- `src/world/runtime-entities/RuntimeEntityRepository.js`
+#### 原则 B：chunk 卸载前必须先把当前 `blockData` 同步成会话快照
 
-它负责：
-- `loadChunkRuntimeEntities(cx, cz)`
-- `upsertEntity(ownerCx, ownerCz, entityRecord)`
-- `removeEntity(ownerCx, ownerCz, type, id)`
-- `moveEntity(fromCx, fromCz, toCx, toCz, entityRecord)`
-- `migrateLegacyEntitiesIfNeeded(cx, cz, legacySnapshot)`
+哪怕 `worldStore` 异步 flush 失败，只要内存会话还活着，重新回来也必须能从快照恢复。
 
-### 7.2 仓储层必须提供“按 chunk 串行化更新”
+#### 原则 C：`worldStore` 在本阶段只负责“块级镜像”，不是特殊实体的立即权威源
 
-必须新增类似接口：
+特殊实体后续是否持久化到 IndexedDB，可以下一阶段再决定。
 
-```js
-await runtimeEntityRepository.updateChunkRuntimeEntities(cx, cz, updater)
-```
+#### 原则 D：第一阶段不强行改炮塔/巢穴生命周期
 
-要求：
-- 同一 chunk 的更新在仓储层串行化
-- `updater` 以最新 `runtimeEntities` 为输入
-- 返回新的 `runtimeEntities`
-- 避免 Manager 自己读改写造成覆盖
+保持旧行为：
 
-### 7.3 必须新增活动实例生命周期 API
+1. 炮塔、巢穴实例仍由 manager 全局持有
+2. 远离 chunk 时不主动销毁
+3. 近处 chunk 恢复后依靠结构方块继续保持正确性
 
-三个 manager 都要补齐：
-- `activateChunkEntities(cx, cz, records)`
-- `deactivateChunkEntities(cx, cz, options)`
-- `serializeActiveEntity(instance)`
-- `deserializeEntity(record)`
-
-当前 `restoreXxxForChunk()` 只覆盖了“恢复”，没有对称的“卸载停用”语义，不够。
+只有矿车保留现有 `stopMinecartsForChunk()` 行为。
 
 ---
 
-## 8. 旧机制兼容与迁移策略
+## 5. 第一阶段推荐设计
 
-### 8.1 为什么不能直接删掉旧 `cache.entities`
+### 5.1 引入“会话快照桥”，而不是“runtimeEntities 入库”
 
-因为当前项目还存在 `Chunk.gen()` / `assembleEntityPhase()` 这条旧快照路径。只动 runtime-streaming 路径会导致：
-- 新生成 chunk 与纯加载 chunk 行为不一致
-- 旧存档、旧会话缓存无法被一次性迁移
+需要新增一个很轻量的会话桥接层，职责只有两件事：
 
-### 8.2 兼容原则
+1. 把 `worldStore` 读出的 `blockData` 注入到 `persistenceService.cache.blocks`
+2. 把活动 chunk 当前的 `blockData` 回写到 `persistenceService.cache.blocks`
 
-第一阶段采取“双读单写”兼容：
-- **写入**：只写 `worldStore.runtimeEntities`
-- **读取**：优先读 `worldStore.runtimeEntities`，若为空，再读旧 `snapshot.entities` / `cache.entities` 做一次迁移
+它不应该承担：
 
-### 8.3 迁移落点
+1. 新的实体仓储抽象
+2. region 级并发调度
+3. IndexedDB 事务性 runtime entity 写入
 
-迁移动作必须集中在一个位置，不能散落在三个 manager 里。
+### 5.2 `persistenceService.cache` 需要重新被视为“runtime session overlay”
 
-推荐：
-- 在 `RuntimeEntityRepository.migrateLegacyEntitiesIfNeeded()` 内完成
-- 完成后回写 `worldStore`
-- 再把旧 `cache.entities` 标记为已迁移或清空对应字段
+本阶段要明确：
+
+1. `cache.blocks` 不再只是旧时代遗留
+2. 它是 runtime-streaming 阶段 **chunk 卸载后再恢复** 的会话级数据源
+3. `cache.entities` 继续承担炮塔、巢穴、矿车的 runtime 快照
+
+### 5.3 `Chunk.loadFromRecord()` 的正确行为
+
+从现在起，`Chunk.loadFromRecord()` 的职责应该变成：
+
+1. 先拿 `worldStore` 提供的基础 `chunkRecord`
+2. 立即确保 `persistenceService.cache[chunkKey]` 存在
+3. 若 cache 里已经有更新过的 `blocks`，则以 cache 为准覆盖基础 `blockData`
+4. `entities` 仍然只从 cache 读取
+5. 把最终结果注入 chunk，再走现有 finalize 恢复逻辑
+
+这一步的关键不是“把特殊实体搬到 worldStore”，而是“让旧的 session 快照机制在新 worldStore 路径上继续工作”。
+
+### 5.4 chunk 卸载的正确顺序
+
+当前顺序不安全，应该改成：
+
+1. 先把当前 `chunk.blockData` 同步到 `persistenceService.cache.blocks`
+2. 再处理矿车 `stopMinecartsForChunk()`
+3. 再触发 `worldRuntime.flushBeforeUnload()` 或等价 flush
+4. flush 至少要保证“内存会话快照已完成”
+5. 然后才允许 `chunk.dispose()` 和 `this.chunks.delete(key)`
+
+如果需要继续异步写 `worldStore`，也必须在“会话快照已完成”之后。
+
+### 5.5 特殊实体恢复仍然沿用旧入口
+
+本阶段不改恢复总线：
+
+1. `Chunk.finalizeNonDeferredPhase()`
+2. `restoreNestsForChunk()`
+3. `restoreTurretsForChunk()`
+4. `restoreMinecartsForChunk()`
+
+真正要修的是：
+
+1. 它们读到的结构方块必须还在
+2. 它们读到的 `cache.entities` 必须没丢
+
+### 5.6 结构方块与特殊形状的边界
+
+这次必须明确：
+
+1. 炮塔底座、柱子、巢穴结构、铁轨，都是 **普通方块侧数据**
+2. 它们应该继续走 `blockData`
+3. consolidation、AO、面剔除也继续只围绕 `blockData`
+4. 不要为这些结构额外再造一套“特殊形状权威”
+
+也就是说：
+
+1. 特殊实体的“特殊”主要体现在 **逻辑实例**
+2. 它们的结构主体依旧是块世界的一部分
 
 ---
 
-## 9. WorldRuntime / WorldStore 协同规则
+## 6. 第一阶段需要补齐的数据契约
 
-### 9.1 `putChunkRecord` 必须改成字段级合并语义
+虽然本阶段不做正式入库，但 runtime snapshot 仍然应该增强，避免后续再次返工。
 
-旧的全对象覆盖语义不再可接受。必须支持：
-- `blockData` 只更新 `blockData`
-- `runtimeEntities` 只更新 `runtimeEntities`
-- 两者互不覆盖
+### 6.1 `turret`
 
-### 9.2 `flushChunk` 只负责块工作集，不负责拼装实体状态
+建议把快照从：
 
-`WorldRuntime.flushChunk()` 的职责应收敛为：
-- 把当前 chunk 的 `blockData / staticEntities / runtimeSeedData` 写回
-- 不直接拼接特殊实体运行时数据
+1. `position`
+2. `rotation`
 
-特殊实体状态由各自 manager 在以下时机独立更新：
-- 创建
-- 销毁
-- 跨 chunk 移动
-- 卸载前停用
+增强为：
 
-### 9.3 chunk 卸载前的顺序
+1. `id`
+2. `position`
+3. `rotation`
 
-必须固定顺序：
-1. `minecartManager.deactivateChunkEntities()` 先停止并落盘
-2. 其他特殊实体 manager 执行停用
-3. `worldRuntime.flushBeforeUnload()` 写回方块工作集
-4. `chunk.dispose()`
+本阶段不强制保存 pitch，因为当前炮塔默认会重新瞄准；但 `id` 最好补上，后续调试和去重都会更稳。
 
-如果顺序反过来，就会再次出现“chunk 已经删了，flush 才开始读”的问题。
+### 6.2 `zombieNest`
 
----
+建议把快照从：
 
-## 10. 本次设计的推荐边界
+1. `position`
+2. `criticalBlock`
 
-### 10.1 本次必须完成
+增强为：
 
-1. 三类实体统一迁移到 `worldStore.runtimeEntities`
-2. 新增统一仓储层，避免 Manager 直接改 `WorldStore`
-3. 明确激活/停用语义，补齐 chunk 卸载回收与恢复
-4. 打通 runtime-streaming 与旧 snapshot 路径的兼容桥
-5. 明确 `blockData` 与 `runtimeEntities` 的职责边界
+1. `id`
+2. `position`
+3. `criticalBlock`
+4. `lastSpawnTime`
 
-### 10.2 本次不做
+否则玩家可以靠卸载/加载刷新刷怪节奏。
 
-1. 把所有特殊实体都抽成通用 ECS
-2. 完全删除 `persistenceService.cache`
-3. 重写 `Chunk.gen()` 整条旧路径
-4. 把敌人、炮弹、掉落物也一起迁移到 runtimeEntities
+### 6.3 `minecart`
+
+矿车当前快照已经最接近可用状态，但仍要确认：
+
+1. `id`
+2. `position`
+3. `orientation`
+4. `movementState`
+5. `linkedMinecartIds`
+6. `chunkKey`
+
+是否都能稳定 round-trip。
 
 ---
 
-## 11. 设计结论
+## 7. 为什么这次不建议直接上 `RuntimeEntityRepository`
 
-修订后的核心原则只有三条：
+不是说这个方向永远不对，而是它不适合作为当前修复的第一步。
 
-1. **`IndexedDB / worldStore` 是唯一权威源，Manager 活动实例只是投影。**
-2. **特殊实体不能再按一种类型统一对待，必须区分“纯逻辑、纯渲染、混合渲染”。**
-3. **这个改造不是只改保存位置，而是要补齐 lifecycle、merge 语义、兼容桥和卸载恢复机制。**
+当前最短闭环是：
 
-如果不先补这四个基础能力，继续按上一次的计划去 patch，只会反复掉进“局部看起来对，跑起来还是错”的循环。
+1. 先修 `blockData` 卸载竞态
+2. 让 `cache.blocks + cache.entities` 在 `worldStore` 路径上重新闭环
+3. 验证炮塔、巢穴、铁轨、矿车在 runtime 会话内的卸载/重载全部正常
+4. 再评估特殊实体是否真的要入 `worldStore`
+
+如果跳过这一步，继续推大仓储抽象，会有三个问题：
+
+1. 先修错层，定位更乱
+2. 把当前还能工作的旧机制一起推翻
+3. 测试面会瞬间放大
+
+---
+
+## 8. 本阶段完成标准
+
+### 必须成立
+
+1. 放置铁轨后，玩家跑远卸载 chunk，再回来，铁轨仍正确渲染
+2. 放置炮塔后，玩家跑远再回来，底座、柱子、炮塔头部都存在，炮塔仍能射击
+3. 放置丧尸巢穴后，玩家跑远再回来，结构仍存在，巢穴仍能继续刷怪
+4. 放置矿车后，玩家跑远再回来，矿车仍在正确位置
+5. 以上能力在 **不依赖重新启动游戏** 的单次 runtime 会话里成立
+
+### 本阶段不要求
+
+1. 关闭页面后特殊实体从 IndexedDB 恢复
+2. `worldStore` 持有特殊实体正式权威数据
+3. 特殊实体 chunk 级生命周期彻底重写
+
+---
+
+## 9. 第二阶段再做什么
+
+等第一阶段跑稳以后，再单独开第二阶段设计：
+
+1. 是否把 `cache.entities` 正式搬入 `worldStore`
+2. 是否需要 `RuntimeEntityRepository`
+3. 是否要为炮塔/巢穴改成显式 chunk 激活/停用
+4. 保存/读档与 IndexedDB 的统一协议
+
+在那之前，不应该再把当前 bug 修复目标继续扩张。

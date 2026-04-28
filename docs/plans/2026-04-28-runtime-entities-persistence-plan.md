@@ -1,165 +1,128 @@
-# Runtime Entities Persistence Implementation Plan
+# Runtime Special Entities Session Persistence Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 将 `turret`、`minecart`、`zombieNest` 从旧的 `persistenceService.cache.entities` 机制迁移到 `worldStore / IndexedDB` 权威模型，并补齐 chunk 卸载/恢复、渲染恢复、旧路径兼容、并发写入保护。
+**Goal:** 修复炮塔、丧尸巢穴、铁轨和矿车在单次 runtime 会话内的 chunk 卸载/重载正确性，先恢复旧机制在新 `worldStore` 架构下的可用性。
 
-**Architecture:** 不再让各 Manager 直接 `getChunkRecord -> 改对象 -> putChunkRecord`。新增统一的 `RuntimeEntityRepository` 作为 `runtimeEntities` 的唯一写入入口；`blockData` 与 `runtimeEntities` 分层管理；活动实例采用“按 chunk 激活/停用”的显式生命周期。
+**Architecture:** 本阶段不把特殊实体正式迁入 `worldStore / IndexedDB`。继续使用 `persistenceService.cache.entities` 作为特殊实体 runtime 权威快照，并把 `cache.blocks` 重新接回 `worldStore` 读取路径，形成“活动 chunk.blockData + 会话级 cache overlay + worldStore 异步镜像”的三层闭环。
 
-**Tech Stack:** JavaScript (ES Modules), `WorldStore`, `WorldRuntime`, IndexedDB Worker RPC, Three.js, 现有 Chunk 装配与 Instanced 渲染体系
+**Tech Stack:** JavaScript (ES Modules), Three.js, `World`, `Chunk`, `WorldRuntime`, `PersistenceService`, 现有炮塔/丧尸巢穴/矿车 manager
 
 ---
 
 ## 先决原则
 
-### 必须遵守
-- `worldStore / IndexedDB` 是权威源，`persistenceService.cache` 只是兼容桥和工作缓存。
-- 任何新逻辑不得只写旧 `cache.entities`。
-- 不能直接在三个 Manager 内部分散实现 chunkRecord 读改写。
-- 必须同时验证两条装载链路：
-  - `WorldRuntime.ensureChunkData()` -> `Chunk.loadFromRecord()`
-  - `Chunk.gen()` / `assembleEntityPhase()` 的旧快照路径
+### 本阶段必须坚持
 
-### 本计划不接受的“伪完成”
-- 仅修改 `Chunk.loadFromRecord()`
-- 仅给 `WorldStore.getChunkRecord()` 加字段
-- 只让实体“刷新页面能恢复”，但 chunk 卸载/恢复仍异常
-- 只验证 minecart，不验证 turret / zombieNest
+1. 不新建 `worldStore.runtimeEntities`
+2. 不引入 `RuntimeEntityRepository`
+3. 不重写炮塔/丧尸巢穴为“按 chunk 激活/停用”的新生命周期
+4. 先修通 runtime 会话内存期正确性，再谈 IndexedDB 权威化
+
+### 本阶段真正的修复目标
+
+1. 结构方块不能在 chunk 卸载时丢失
+2. `persistenceService.cache.entities` 不能在新读取链路里失联
+3. chunk 回来后要能重新看到铁轨、炮塔结构、巢穴结构
+4. 炮塔和巢穴不能因为结构方块丢失而误自毁
+
+### 本计划明确不接受的“伪完成”
+
+1. 只修 `turretManager` / `zombieNestManager` 恢复入口
+2. 只给 `worldStore` 加 `runtimeEntities`
+3. 不修卸载写回竞态
+4. 手工验证只看矿车，不看铁轨/炮塔/巢穴结构
 
 ---
 
-### Task 1: 代码路径盘点与契约冻结
+### Task 1: 写出最小失败用例，锁定根因
 
 **Files:**
-- Modify: `docs/plans/2026-04-28-runtime-entities-persistence-design.md`
-- Modify: `docs/plans/2026-04-28-runtime-entities-persistence-plan.md`
-- Reference: `src/world/Chunk.js`
+- Create: `src/tests/test-runtime-session-persistence.js`
+- Modify: `src/tests/index.html`
+- Reference: `src/world/World.js`
 - Reference: `src/world/WorldRuntime.js`
-- Reference: `src/world/WorldStore.js`
-- Reference: `src/actors/turret/TurretManager.js`
-- Reference: `src/actors/minecart/MinecartManager.js`
-- Reference: `src/actors/zombie-nest/ZombieNestManager.js`
+- Reference: `src/world/Chunk.js`
 
-- [ ] **Step 1: 冻结数据职责边界**
+- [ ] **Step 1: 为“chunk 卸载前 blockData 丢失”写失败测试**
 
-确认并记录：
-- `blockData` 管结构方块、普通方块、轨道、consolidation、AO
-- `runtimeEntities` 管逻辑实体元数据与最小行为状态
-- manager 活动实例不是权威持久化数据
+测试目标：
 
-- [ ] **Step 2: 冻结三类实体的最小持久化字段**
+1. 构造一个 runtime-streaming chunk
+2. 修改 `chunk.blockData`
+3. 标记 dirty
+4. 触发 unload 路径
+5. 断言卸载后仍能从会话快照读回这些 block
 
-整理为最终契约：
-- `turret`: `id`、`ownerChunk`、`anchor`、`renderState.yaw/pitch`、关键支撑块
-- `minecart`: `id`、`ownerChunk`、`anchor`、`orientation`、`movementState`、`lastTrackPosition`、`linkedMinecartIds`
-- `zombieNest`: `id`、`ownerChunk`、`anchor`、`criticalBlock`、`lastSpawnAt`
+- [ ] **Step 2: 为“loadFromRecord 需要合并 cache.entities”写失败测试**
 
-- [ ] **Step 3: 明确本次兼容策略**
+测试目标：
 
-确认采用：
-- 写：只写 `worldStore.runtimeEntities`
-- 读：优先 `worldStore.runtimeEntities`，必要时迁移旧 `cache.entities`
+1. 预置 `persistenceService.cache[chunkKey].entities`
+2. 用只含 `blockData` 的 `chunkRecord` 调 `chunk.loadFromRecord()`
+3. 断言 `pendingRuntimeEntities` 被正确提取
 
-- [ ] **Step 4: 人工检查设计文档与计划文档是否一致**
+- [ ] **Step 3: 为“炮塔/巢穴因结构丢失而自毁”写失败测试**
 
-检查目标、边界、字段与生命周期是否完全一致，不允许文档内部互相矛盾。
+测试目标：
 
----
+1. 模拟炮塔/巢穴已存在于 manager
+2. 模拟 chunk 卸载后再加载
+3. 若结构方块恢复正常，则实例不应被误销毁
 
-### Task 2: 建立统一仓储层，禁止 Manager 直接改 WorldStore
+- [ ] **Step 4: 运行浏览器测试，确认至少一项失败**
 
-**Files:**
-- Create: `src/world/runtime-entities/RuntimeEntityRepository.js`
-- Modify: `src/world/WorldStore.js`
-- Modify: `src/world/WorldRuntime.js`
-
-- [ ] **Step 1: 新建 `RuntimeEntityRepository` 骨架**
-
-提供最少接口：
-
-```js
-loadChunkRuntimeEntities(cx, cz)
-updateChunkRuntimeEntities(cx, cz, updater)
-upsertEntity(cx, cz, type, entityRecord)
-removeEntity(cx, cz, type, entityId)
-moveEntity(fromCx, fromCz, toCx, toCz, type, entityRecord)
-migrateLegacyEntitiesIfNeeded(cx, cz, legacyEntities)
-```
-
-- [ ] **Step 2: 给仓储层实现按 chunk 串行化更新**
-
-要求：
-- 内部维护 `Map<chunkKey, Promise>` 或等价队列
-- 同一 chunk 的 `updateChunkRuntimeEntities()` 串行执行
-- `updater` 总是基于最新值生成新值
-
-- [ ] **Step 3: 统一 `runtimeEntities` 的默认结构**
-
-保证仓储层输出始终是：
-
-```js
-{ version: 1, byType: { turrets: [], minecarts: [], zombieNests: [] } }
-```
-
-避免调用方自己判空和拼结构。
-
-- [ ] **Step 4: 扩展 `WorldStore` 的投影与合并能力**
-
-修改要求：
-- `getChunkRecord()` / `getChunkRecordsInRegion()` 投影出 `runtimeEntities`
-- `putChunkRecord()` 明确为字段级合并，而不是全对象覆盖
-- 对 `runtimeEntities` 支持“缺省保留、显式覆盖”语义
-
-- [ ] **Step 5: 给 `WorldRuntime.flushChunk()` 留出只写 block 工作集的清晰边界**
-
-确认 `flushChunk()` 只写：
-- `blockData`
-- `staticEntities`
-- `runtimeSeedData`
-
-不得在这里拼装 `runtimeEntities`。
-
-- [ ] **Step 6: Run lint**
-
-Run: `npm run lint`  
-Expected: PASS
+Run: 启动 `npm run start`，打开 `http://localhost:8080/src/tests/index.html`，点击“运行所有测试”  
+Expected: 新增测试先失败，证明问题被准确捕获
 
 ---
 
-### Task 3: 打通读取链路，统一从 runtimeEntities 恢复
+### Task 2: 把 `persistenceService.cache` 明确恢复为 session overlay
 
 **Files:**
-- Modify: `src/world/Chunk.js`
-- Modify: `src/world/WorldRuntime.js`
-- Create: `src/world/runtime-entities/RuntimeEntityLoadBridge.js`（如有必要）
+- Modify: `src/services/PersistenceService.js`
 
-- [ ] **Step 1: 修正 `Chunk.loadFromRecord()`**
+- [ ] **Step 1: 增加“确保 chunk 快照存在”的公共方法**
 
-从 `chunkRecord.runtimeEntities` 读取，并填充 `pendingRuntimeEntities`。
+建议新增：
+
+```js
+ensureChunkSnapshot(chunkKey, seed = {})
+```
+
+职责：
+
+1. 保证 `cache.get(chunkKey)` 一定有 `{ blocks, entities }`
+2. 不再让调用方自己散落地拼空对象
+
+- [ ] **Step 2: 增加“用外部记录填充/合并 blocks”的公共方法**
+
+建议新增：
+
+```js
+hydrateChunkBlocks(chunkKey, blockData)
+replaceChunkBlocks(chunkKey, blockData)
+snapshotChunkBlocks(chunkKey, blockData)
+```
+
+至少需要一个统一入口，避免 `Chunk` / `WorldRuntime` / manager 各自手写。
+
+- [ ] **Step 3: 修正 `recordChangeForChunk()` 的缺口**
+
+当前行为是：cache 不存在就直接 return。  
+这会让 runtime-streaming 下很多块修改根本进不了会话快照。
+
+修正要求：
+
+1. cache 缺失时自动创建快照
+2. 后续方块增量必须写入 `cache.blocks`
+
+- [ ] **Step 4: 保持 `entities` 结构不被覆盖**
 
 要求：
-- 不再依赖旧 `cache.entities` 作为主来源
-- 兼容 `runtimeEntities.version` 与 `byType` 结构
 
-- [ ] **Step 2: 修正 `assembleEntityPhase()` 的旧快照逻辑**
-
-这里不能简单删除旧逻辑；要改成兼容桥：
-- 若 `pendingRuntimeEntities` 已有 `worldStore` 数据，则直接使用
-- 若 `worldStore` 为空但旧 `snapshot.entities` / `cache.entities` 有值，则走迁移流程
-
-- [ ] **Step 3: 提炼统一的 runtime entity hydration 逻辑**
-
-避免 `loadFromRecord()` 和 `assembleEntityPhase()` 各自拷一套解析代码。
-
-推荐：
-- 提炼 `extractPendingRuntimeEntities(recordOrLegacySnapshot)`
-- 或创建 `RuntimeEntityLoadBridge`
-
-- [ ] **Step 4: 保留旧路径的最小兼容性，不让旧 cache 反向覆盖新权威值**
-
-必须保证：
-- 旧 `cache.entities` 只能在 `worldStore.runtimeEntities` 缺失时参与迁移
-- 不能再无条件 merge 到新权威值上面
+1. 更新 `blocks` 时不能把已有 `entities` 抹掉
+2. 更新 `entities` 时不能把已有 `blocks` 抹掉
 
 - [ ] **Step 5: Run lint**
 
@@ -168,58 +131,149 @@ Expected: PASS
 
 ---
 
-### Task 4: 为三个 Manager 补齐激活/停用生命周期
+### Task 3: 修正 `Chunk.loadFromRecord()` 的装载职责
 
 **Files:**
-- Modify: `src/actors/turret/TurretManager.js`
-- Modify: `src/actors/minecart/MinecartManager.js`
-- Modify: `src/actors/zombie-nest/ZombieNestManager.js`
-- Modify: `src/world/World.js`
+- Modify: `src/world/Chunk.js`
 
-- [ ] **Step 1: 为三个 Manager 注入统一仓储层访问**
-
-不要再保留“Manager 自己直接操纵 `worldStore`”的实现。统一改为依赖 `RuntimeEntityRepository`。
-
-- [ ] **Step 2: 新增按 chunk 激活接口**
-
-接口示例：
-
-```js
-activateChunkEntities(cx, cz, records)
-```
+- [ ] **Step 1: 把 `worldStore` 读到的 `blockData` 注入 session cache**
 
 要求：
-- `restoreXxxForChunk()` 可保留为兼容入口，但内部统一委托到新接口
-- 激活时只创建活动实例，不再重复写回持久层
 
-- [ ] **Step 3: 新增按 chunk 停用接口**
+1. `loadFromRecord()` 一进入就确保 `persistenceService.cache[chunkKey]` 存在
+2. 若 cache 还没有 `blocks`，用 `chunkRecord.blockData` 种进去
 
-接口示例：
+- [ ] **Step 2: 明确 block 读取优先级**
 
-```js
-deactivateChunkEntities(cx, cz, { persist: true, reason: 'chunk-unload' })
-```
+本阶段建议优先级：
 
-要求：
-- `turret`：销毁独立视觉对象，但不删除持久记录
-- `zombieNest`：销毁逻辑实例，但不删除持久记录
-- `minecart`：先停止运动并保存，再销毁实例
-
-- [ ] **Step 4: 修改 `World.update()` 中的 chunk 卸载顺序**
-
-固定顺序：
-1. 各 manager 先停用 owner chunk 内活动实例
-2. `worldRuntime.flushBeforeUnload()` 落地方块工作集
-3. `chunk.dispose()`
-
-- [ ] **Step 5: 给 manager 增加按 chunk 索引**
-
-需要维护例如：
-- `Map<chunkKey, Set<entityId>>`
+1. `cache.blocks` 有值时，用 `cache.blocks`
+2. 否则用 `chunkRecord.blockData`
 
 原因：
-- 卸载时快速找到归属该 chunk 的活动实体
-- 避免全量扫描 manager map
+
+1. runtime 会话内用户最新修改可能只存在于 session overlay
+2. 不能要求每次重新进可见范围都依赖 `worldStore` 已成功 flush
+
+- [ ] **Step 3: 保留 runtime entities 仅从 `cache.entities` 恢复**
+
+要求：
+
+1. `pendingRuntimeEntities` 继续从 `cache.entities` 提取
+2. 不要引入 `chunkRecord.runtimeEntities`
+3. 不要在这里尝试 IndexedDB 特殊实体迁移
+
+- [ ] **Step 4: 让 finalize 恢复逻辑保持不变**
+
+要求：
+
+1. `finalizeNonDeferredPhase()` 仍然调用三个 manager 的现有 `restoreXxxForChunk()`
+2. 本任务只修数据输入，不改恢复总线
+
+- [ ] **Step 5: Run lint**
+
+Run: `npm run lint`  
+Expected: PASS
+
+---
+
+### Task 4: 修复 chunk 卸载时的 blockData 写回竞态
+
+**Files:**
+- Modify: `src/world/World.js`
+- Modify: `src/world/WorldRuntime.js`
+- Modify: `src/world/Chunk.js`
+- Modify: `src/services/PersistenceService.js`
+
+- [ ] **Step 1: 在卸载前先同步快照当前 `chunk.blockData` 到 `cache.blocks`**
+
+要求：
+
+1. 这一步必须是同步、立刻可见的内存操作
+2. 不能依赖后续异步 flush 成功
+
+- [ ] **Step 2: 调整 `World.update()` 中的卸载顺序**
+
+新的顺序应为：
+
+1. `snapshotChunkBlocks(...)`
+2. `minecartManager.stopMinecartsForChunk(...)`
+3. 触发 `flushBeforeUnload(...)`
+4. 再 `chunk.dispose()`
+5. 再 `this.chunks.delete(key)`
+
+- [ ] **Step 3: 修正 `flushBeforeUnload()` / `flushChunk()` 对活动 chunk 的依赖**
+
+二选一即可，但必须明确：
+
+1. 要么卸载路径里 `await flushBeforeUnload()`
+2. 要么 `flushChunk()` 改成允许传入已抓取的快照，不再回头从 `world.chunks.get(key)` 取活动 chunk
+
+推荐第二种。因为它更不依赖调用时序。
+
+- [ ] **Step 4: 保证 `worldStore` flush 失败不影响会话内 reload**
+
+要求：
+
+1. 就算 IndexedDB 写失败
+2. 只要当前会话没结束
+3. 再回来仍能从 `cache.blocks` 看到结构方块
+
+- [ ] **Step 5: Run lint**
+
+Run: `npm run lint`  
+Expected: PASS
+
+---
+
+### Task 5: 复用旧特殊实体机制，不重写生命周期
+
+**Files:**
+- Modify: `src/actors/turret/TurretManager.js`
+- Modify: `src/actors/zombie-nest/ZombieNestManager.js`
+- Modify: `src/actors/minecart/MinecartManager.js`
+- Modify: `src/actors/zombie-nest/ZombieNest.js`
+- Modify: `src/actors/turret/Turret.js`
+
+- [ ] **Step 1: 明确三个 manager 仍然以 `cache.entities` 为快照源**
+
+要求：
+
+1. 不接入 `worldStore.runtimeEntities`
+2. 不新增 repository
+3. 只把现有快照代码收敛、补齐
+
+- [ ] **Step 2: 给炮塔快照补 `id`**
+
+要求：
+
+1. 新建时生成 `id`
+2. 恢复时优先复用快照 `id`
+3. position 去重保留为兼容保护，但不再是唯一身份
+
+- [ ] **Step 3: 给丧尸巢穴快照补 `id + lastSpawnTime`**
+
+要求：
+
+1. 避免卸载/重载后刷怪节奏重置
+2. 后续如需存档，也能直接沿用
+
+- [ ] **Step 4: 核对矿车 round-trip 字段**
+
+要求：
+
+1. `id`
+2. `position`
+3. `orientation`
+4. `movementState`
+5. `linkedMinecartIds`
+6. `chunkKey`
+
+至少确认恢复后行为不退化。
+
+- [ ] **Step 5: 不在本任务里做 chunk 级 deactivate/activate**
+
+这是边界要求，不是缺陷。
 
 - [ ] **Step 6: Run lint**
 
@@ -228,225 +282,129 @@ Expected: PASS
 
 ---
 
-### Task 5: 分实体完成序列化/反序列化与状态延续
-
-**Files:**
-- Modify: `src/actors/turret/TurretManager.js`
-- Modify: `src/actors/turret/Turret.js`
-- Modify: `src/actors/minecart/MinecartManager.js`
-- Modify: `src/actors/minecart/Minecart.js`
-- Modify: `src/actors/zombie-nest/ZombieNestManager.js`
-- Modify: `src/actors/zombie-nest/ZombieNest.js`
-
-- [ ] **Step 1: `turret` 统一稳定 ID 与序列化结构**
-
-要求：
-- 放置时创建稳定 `id`
-- 恢复时沿用原 `id`
-- 序列化 `yaw/pitch` 与关键支撑块信息
-
-- [ ] **Step 2: `minecart` 补全持久化字段**
-
-要求：
-- 不再只按位置去重
-- 恢复时优先按 `id` 去重
-- 序列化 `movementState`、`lastTrackPosition`、`linkedMinecartIds`
-
-- [ ] **Step 3: `zombieNest` 补全刷怪节奏状态**
-
-要求：
-- 保存 `lastSpawnAt`
-- 恢复时不要把刷怪节奏重置为“刚创建”
-
-- [ ] **Step 4: 明确哪些状态故意不持久化**
-
-代码里加简短注释说明：
-- 炮弹对象不持久化
-- 当前目标引用不持久化
-- 敌人实例不持久化
-
-- [ ] **Step 5: Run lint**
-
-Run: `npm run lint`  
-Expected: PASS
-
----
-
-### Task 6: 处理结构破坏、拾取、跨 chunk 迁移
+### Task 6: 校正保存/读取桥，避免两条路径互相打架
 
 **Files:**
 - Modify: `src/world/Chunk.js`
-- Modify: `src/actors/turret/TurretManager.js`
-- Modify: `src/actors/minecart/MinecartManager.js`
-- Modify: `src/actors/zombie-nest/ZombieNestManager.js`
-- Modify: `src/actors/player/PlayerInteraction.js`（如需要）
+- Modify: `src/core/Game.js`
+- Modify: `src/services/PersistenceService.js`
 
-- [ ] **Step 1: 明确结构破坏时谁负责删除 runtime entity 记录**
+- [ ] **Step 1: 保证 `pendingSnapshot` 和 `cache` 的语义一致**
 
 要求：
-- `turret` 支撑柱被破坏后，删除其权威记录
-- `zombieNest` `criticalBlock` 被破坏后，删除其权威记录
 
-不能只依赖“活动实例自己消失”，否则持久层会残留脏记录。
+1. `pendingSnapshot.blocks` 与 `cache.blocks` 不冲突
+2. `pendingSnapshot.entities` 与 `cache.entities` 不互相抹写
 
-- [ ] **Step 2: 统一 minecart 的拾取/爆炸/碰撞删除路径**
-
-要求：
-- 所有删除路径都通过仓储层移除权威记录
-- 不能出现只删内存实例、不删 `runtimeEntities` 的分叉逻辑
-
-- [ ] **Step 3: 支持 minecart 跨 chunk owner 迁移**
+- [ ] **Step 2: 明确“会话内 chunk 重载”和“整局存档恢复”是两条不同入口**
 
 要求：
-- 以 `moveEntity()` 形式原子化表达“从旧 owner chunk 移除 + 新 owner chunk 添加”
-- 第一版可以内部串行做两次更新，但必须封装在仓储层，不能散落在 manager
 
-- [ ] **Step 4: 检查 `Chunk._handleEntityRemoval()` 与特殊实体逻辑是否有冲突**
+1. chunk runtime reload 走 `Chunk.loadFromRecord() + cache overlay`
+2. 手动读档恢复仍走 `Game` 里 `worldDeltas -> restoreXxxForChunk()`
 
-当前 `_handleEntityRemoval()` 只处理 `collider` 类实体；确认不会误以为它已覆盖 turret / nest / minecart。
+- [ ] **Step 3: 避免 `saveChunkData(data)` 把旧结构覆盖新结构**
 
-- [ ] **Step 5: Run lint**
+如果传入的是部分对象，必须检查是否会覆盖掉已有 `entities` 或 `blocks`。必要时先做合并。
+
+- [ ] **Step 4: Run lint**
 
 Run: `npm run lint`  
 Expected: PASS
 
 ---
 
-### Task 7: 兼容迁移旧 `cache.entities` / 旧存档数据
+### Task 7: 人工回归验证四条主链路
 
 **Files:**
-- Modify: `src/world/runtime-entities/RuntimeEntityRepository.js`
-- Modify: `src/services/PersistenceService.js`（如需要迁移辅助）
-- Modify: `src/world/Chunk.js`
-- Modify: `src/core/Game.js`（若旧手动存档恢复逻辑需要桥接）
+- Reference: `src/actors/turret/*`
+- Reference: `src/actors/zombie-nest/*`
+- Reference: `src/actors/minecart/*`
+- Reference: `src/world/*`
 
-- [ ] **Step 1: 实现旧 `entities` 结构到新 `runtimeEntities` 的转换器**
+- [ ] **Step 1: 铁轨回归**
 
-输入示例：
-```js
-{ turrets: [...], minecarts: [...], zombieNests: [...] }
-```
+手工步骤：
 
-输出示例：
-```js
-{ version: 1, byType: { turrets: [...], minecarts: [...], zombieNests: [...] } }
-```
+1. 放置直轨和弯轨
+2. 跑远卸载 chunk
+3. 返回
+4. 确认轨道方块仍正确渲染，orientation 不错乱
 
-- [ ] **Step 2: 只在新权威记录缺失时触发迁移**
+- [ ] **Step 2: 炮塔回归**
 
-避免旧数据覆盖新数据。
+手工步骤：
 
-- [ ] **Step 3: 完成一次迁移后写回 worldStore**
-
-并考虑清理旧字段，至少避免下一次再次重复迁移。
-
-- [ ] **Step 4: 检查 `Game` 的旧恢复入口**
-
-[Game.js](/Users/bachi/jaylli/mc-lite/src/core/Game.js) 仍有从 `saveData.worldDeltas[].entities` 恢复特殊实体的逻辑；需要决定：
-- 是继续保留为旧存档入口
-- 还是统一先转成新 `runtimeEntities` 再恢复
-
-本次推荐后者，避免运行时再维护两套恢复逻辑。
-
-- [ ] **Step 5: Run lint**
-
-Run: `npm run lint`  
-Expected: PASS
-
----
-
-### Task 8: 回归验证矩阵
-
-**Files:**
-- Test: 浏览器手工验证
-- Test: `src/tests/index.html`（如已有可复用测试）
-- Optional Modify: 新增最小测试入口或 debug 命令
-
-- [ ] **Step 1: 验证 turret 完整链路**
-
-手工验证：
 1. 放置炮塔
-2. 刷新页面后仍存在
-3. 跑远触发 chunk 卸载，再回来恢复
-4. 破坏关键 obsidian 后权威记录被删除
-5. 再次刷新页面不会“复活”幽灵炮塔
+2. 跑远卸载 chunk
+3. 返回
+4. 确认底座、柱子、炮塔头都存在
+5. 引一只丧尸测试炮塔仍能开火
 
-- [ ] **Step 2: 验证 zombieNest 完整链路**
+- [ ] **Step 3: 丧尸巢穴回归**
 
-手工验证：
+手工步骤：
+
 1. 放置巢穴
-2. 结构方块正常进入 chunk 渲染
-3. 跑远卸载后，回来结构方块恢复、逻辑实例恢复
-4. 刷怪节奏不因卸载/恢复被重置
-5. 破坏关键方块后不会残留幽灵记录
+2. 跑远卸载 chunk
+3. 返回
+4. 确认结构还在
+5. 等待刷怪周期，确认巢穴继续工作
 
-- [ ] **Step 3: 验证 minecart 完整链路**
+- [ ] **Step 4: 矿车回归**
 
-手工验证：
-1. 放置轨道和矿车
-2. 运动中跑远卸载，回来后位置和状态合理
-3. 拾取/爆炸后记录删除
-4. 跨 chunk 运动后不重复、不丢失
-5. 联动矿车关系恢复正确
+手工步骤：
 
-- [ ] **Step 4: 验证双装载路径一致性**
+1. 放置铁轨和矿车
+2. 让矿车静止/运动各测试一次
+3. 跑远卸载 chunk
+4. 返回
+5. 确认矿车位置和轨道关系正确
 
-验证以下两种情况下行为一致：
-- 纯 runtime-streaming 从 `worldStore` 读回
-- 仍经 `Chunk.gen()` / 旧快照桥恢复
+- [ ] **Step 5: 全量浏览器测试**
 
-- [ ] **Step 5: 执行 lint**
-
-Run: `npm run lint`  
+Run: 启动 `npm run start`，打开 `http://localhost:8080/src/tests/index.html`，点击“运行所有测试”  
 Expected: PASS
-
-- [ ] **Step 6: 浏览器测试**
-
-Run: `npm run start`  
-Then open: `http://localhost:8080/src/tests/index.html`  
-Expected: 现有测试不回归；若无相关自动测试，至少确认页面可正常加载并进行手工场景验证
 
 ---
 
-### Task 9: 清理与文档收口
+### Task 8: 第二阶段准备项，只记录不实现
 
 **Files:**
 - Modify: `docs/plans/2026-04-28-runtime-entities-persistence-design.md`
 - Modify: `docs/plans/2026-04-28-runtime-entities-persistence-plan.md`
-- Optional Modify: 相关模块顶部注释
 
-- [ ] **Step 1: 删除已经被新仓储层替代的误导性注释**
+- [ ] **Step 1: 在文档尾部补“第二阶段范围”**
 
-特别是：
-- “持久化快照中存在实体列表” 之类只对应旧 `cache` 的描述
-- 暗示 manager 是权威数据源的注释
+列出但不实现：
 
-- [ ] **Step 2: 为关键边界补中文注释**
+1. 特殊实体正式入 `worldStore`
+2. `RuntimeEntityRepository`
+3. chunk 级 activate/deactivate
+4. IndexedDB 存档协议
 
-重点写清：
-- `blockData` vs `runtimeEntities`
-- 激活态 vs 持久态
-- chunk 卸载前的调用顺序
+- [ ] **Step 2: 标记第一阶段完成判据**
 
-- [ ] **Step 3: 最后人工审查一次是否仍残留旧路径单写逻辑**
+要求：
 
-用全文搜索检查：
-- `cache.entities`
-- `saveXxxToSnapshot`
-- `removeXxxFromSnapshot`
-- `restoreXxxForChunk`
-
-确认命名与语义已经收敛。
+1. 明确“runtime 会话正确”已完成
+2. 明确“跨重启持久化”尚未开始
 
 ---
 
-## 完成定义
+## 完成判据
 
-以下条件同时满足，才算这次改造完成：
+### 通过
 
-1. `turret`、`minecart`、`zombieNest` 全部以 `worldStore.runtimeEntities` 为权威持久化源。
-2. chunk 卸载时，特殊实体活动实例会被正确停用；chunk 恢复时会正确重新激活。
-3. `blockData` 与 `runtimeEntities` 的边界清晰，没有互相覆盖。
-4. `WorldRuntime.flushChunk()` 与实体写入不再互相打架。
-5. 旧 `cache.entities` 只作为迁移桥，不再是常规写入路径。
-6. 三类实体都通过“刷新页面 + 跑远卸载 + 返回恢复 + 破坏/拾取删除”的手工回归。
+1. 铁轨在 chunk 卸载/重载后仍存在
+2. 炮塔结构与逻辑都能回来，且不会误自毁
+3. 丧尸巢穴结构与逻辑都能回来，且刷怪节奏不中断
+4. 矿车在轨道场景中继续正确恢复
+5. 浏览器测试通过
+
+### 不算通过
+
+1. 只有矿车恢复了
+2. 炮塔/巢穴实例回来但结构方块丢了
+3. 结构方块回来但炮塔/巢穴误自毁
+4. 继续把第一阶段实现扩展成 IndexedDB 特殊实体权威化
