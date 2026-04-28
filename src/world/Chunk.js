@@ -306,17 +306,43 @@ export class Chunk {
       this.structureCenters = chunkRecord.runtimeSeedData.structureCenters;
     }
 
-    // 4. 标记快照已加载
+    // 4. 标记快照已加载，合并持久化缓存中的实体数据
     this.pendingSnapshot = {
       blocks: { ...chunkRecord.blockData },
       entities: { modGunMan: [], rovers: [] }
     };
+
+    // 从持久化缓存中恢复运行时实体数据（炮塔、矿车、丧尸巢穴）
+    const persistence = getPersistenceService();
+    const chunkKey = `${this.cx},${this.cz}`;
+    const existingData = persistence?.cache?.get?.(chunkKey);
+    if (existingData?.entities) {
+      this.pendingSnapshot.entities = {
+        ...this.pendingSnapshot.entities,
+        ...existingData.entities
+      };
+      const entities = this.pendingSnapshot.entities;
+      if (
+        (Array.isArray(entities.zombieNests) && entities.zombieNests.length > 0) ||
+        (Array.isArray(entities.turrets) && entities.turrets.length > 0) ||
+        (Array.isArray(entities.minecarts) && entities.minecarts.length > 0)
+      ) {
+        this.pendingRuntimeEntities = {
+          zombieNests: entities.zombieNests || [],
+          turrets: entities.turrets || [],
+          minecarts: entities.minecarts || []
+        };
+      }
+    }
 
     // 5. 直接从 blockData 构建 mesh（跳过 scatter，预生成阶段已完成打散）
     this.loadState = 'terrain-built';
     this._buildMeshFromExistingBlockData();
     this.isReady = true;
     this.world?.onChunkWorkerReady?.(this);
+
+    // 6. 恢复运行时实体（从 pendingRuntimeEntities 读取）
+    this.finalizeNonDeferredPhase();
   }
 
   /**
@@ -1712,7 +1738,8 @@ export class Chunk {
         snapshot.entities = {
           ...existingData.entities,
           ...snapshot.entities,
-          turrets: existingData.entities.turrets || snapshot.entities?.turrets || []
+          turrets: existingData.entities.turrets || snapshot.entities?.turrets || [],
+          minecarts: existingData.entities.minecarts || snapshot.entities?.minecarts || []
         };
       }
       // 确保 snapshot.blocks 使用数字编码格式（与 Chunk.blockData 一致）
@@ -1724,6 +1751,20 @@ export class Chunk {
         persistence.cache.set(chunkKey, snapshot);
       }
       this._pendingPersistenceFlush = true;
+
+      // 从合并后的 snapshot 中提取运行时实体数据，供 finalize 阶段恢复
+      const entities = snapshot.entities || {};
+      if (
+        (Array.isArray(entities.zombieNests) && entities.zombieNests.length > 0) ||
+        (Array.isArray(entities.turrets) && entities.turrets.length > 0) ||
+        (Array.isArray(entities.minecarts) && entities.minecarts.length > 0)
+      ) {
+        this.pendingRuntimeEntities = {
+          zombieNests: entities.zombieNests || [],
+          turrets: entities.turrets || [],
+          minecarts: entities.minecarts || []
+        };
+      }
     }
 
     this.loadState = 'entities-built';
