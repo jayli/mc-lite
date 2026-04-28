@@ -92,11 +92,12 @@ export class WorldRuntime {
       cz,
       blockData: chunkData.blockData || {},
       staticEntities: chunkData.staticEntities || [],
-      runtimeSeedData: chunkData.runtimeSeedData || {}
+      runtimeSeedData: chunkData.runtimeSeedData || {},
+      runtimeEntities: chunkData.runtimeEntities || { turrets: [], zombieNests: [], minecarts: [] }
     };
 
-    // 渐进式迁移：如果 chunkRecord 不含 runtimeEntities，尝试从 world_deltas 迁移
-    if (!chunkRecord.runtimeEntities) {
+    // 渐进式迁移：如果 region record 中不含 runtimeEntities，尝试从 world_deltas 迁移
+    if (!chunkData.runtimeEntities) {
       await this._ensureChunkEntitiesMigrated(cx, cz, chunkRecord);
     }
 
@@ -188,10 +189,12 @@ export class WorldRuntime {
 
     try {
       dirtyEntry.pendingFlush = true;
+      const entities = this._game ? this._collectEntitiesForChunk(cx, cz) : { turrets: [], zombieNests: [], minecarts: [] };
       await this._worldStore.putChunkRecord(cx, cz, {
         blockData: this._serializeBlockData(blockData),
         staticEntities,
-        runtimeSeedData
+        runtimeSeedData,
+        runtimeEntities: entities
       });
       dirtyEntry.dirty = false;
       dirtyEntry.pendingFlush = false;
@@ -223,10 +226,12 @@ export class WorldRuntime {
       const group = regionGroups.get(rKey);
       const chunk = this._world?.chunks?.get(key);
       if (chunk && chunk.blockData) {
+        const entities = this._game ? this._collectEntitiesForChunk(cx, cz) : { turrets: [], zombieNests: [], minecarts: [] };
         group.chunks.set(key, {
           blockData: this._serializeBlockData(chunk.blockData),
           staticEntities: chunk.staticEntities || [],
-          runtimeSeedData: chunk.runtimeSeedData || {}
+          runtimeSeedData: chunk.runtimeSeedData || {},
+          runtimeEntities: entities
         });
       }
     }
@@ -280,7 +285,7 @@ export class WorldRuntime {
       || { turrets: [], zombieNests: [], minecarts: [] };
 
     const record = {
-      blockData: blockDataSnapshot || (chunk ? this._serializeBlockData(chunk.blockData) : {}),
+      blockData: blockDataSnapshot ? this._serializeBlockData(blockDataSnapshot) : (chunk ? this._serializeBlockData(chunk.blockData) : {}),
       staticEntities: chunk?.staticEntities ? [...chunk.staticEntities] : [],
       runtimeSeedData: chunk?.structureCenters
         ? { structureCenters: chunk.structureCenters }

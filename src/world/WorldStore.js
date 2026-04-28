@@ -133,7 +133,8 @@ export class WorldStore {
       cz,
       blockData: chunkData.blockData || {},
       staticEntities: chunkData.staticEntities || [],
-      runtimeSeedData: chunkData.runtimeSeedData || {}
+      runtimeSeedData: chunkData.runtimeSeedData || {},
+      runtimeEntities: chunkData.runtimeEntities || { turrets: [], zombieNests: [], minecarts: [] }
     };
   }
 
@@ -157,7 +158,8 @@ export class WorldStore {
           cz,
           blockData: chunkData.blockData || {},
           staticEntities: chunkData.staticEntities || [],
-          runtimeSeedData: chunkData.runtimeSeedData || {}
+          runtimeSeedData: chunkData.runtimeSeedData || {},
+          runtimeEntities: chunkData.runtimeEntities || { turrets: [], zombieNests: [], minecarts: [] }
         });
       }
     }
