@@ -372,6 +372,89 @@ describe('渐进式迁移: chunkRecord 不含 runtimeEntities 时从 world_delta
     }
   });
 
+  test('loadFromRecord 在真实 world 场景下应只入装配队列，不同步 finalize', async () => {
+    const service = createTestService();
+    globalThis._persistenceService = service;
+    try {
+      const world = {
+        bootstrapState: { phase: 'runtime-streaming' },
+        onChunkWorkerReadyCalls: 0,
+        onChunkWorkerReady(chunk) {
+          this.onChunkWorkerReadyCalls++;
+          this.lastChunk = chunk;
+        }
+      };
+      const chunk = new Chunk(0, 0, world);
+      let finalized = false;
+      chunk.finalizeNonDeferredPhase = async () => {
+        finalized = true;
+        return true;
+      };
+
+      await chunk.loadFromRecord({
+        blockData: {},
+        staticEntities: [],
+        runtimeSeedData: { structureCenters: [] },
+        runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
+      });
+
+      assertTrue(world.onChunkWorkerReadyCalls === 1, '应把纯装载 chunk 交给装配调度器');
+      assertTrue(world.lastChunk === chunk, '应把当前 chunk 交给 world');
+      assertTrue(!finalized, '真实 world 场景下不应同步 finalize');
+      assertTrue(chunk.isReady === false, '进入装配队列前不应提前标记 ready');
+    } finally {
+      globalThis._persistenceService = null;
+    }
+  });
+
+  test('finalizeNonDeferredPhase - runtime-streaming 下应延迟光源注册', async () => {
+    const lightCalls = [];
+    const world = {
+      bootstrapState: { phase: 'runtime-streaming' },
+      lightSourceManager: {
+        addLight(x, y, z, type) {
+          lightCalls.push({ x, y, z, type });
+        }
+      },
+      onChunkFinalized() {},
+      onChunkAOSourceStable() {}
+    };
+    const chunk = new Chunk(0, 0, world);
+    const code = Chunk.encodeCoord(1, 2, 3);
+    chunk.lightSourceCoords.add(code);
+    chunk.blockData.set(code, { type: 'torch', orientation: 0 });
+    chunk.loadState = 'entities-built';
+
+    await chunk.finalizeNonDeferredPhase();
+
+    assertEqual(lightCalls.length, 0, '非延迟阶段不应立即注册光源');
+    assertTrue(chunk.hasDeferredFinalizeWork, '应把光源注册后移到 deferred finalize');
+    assertTrue(chunk._needsDeferredLightRegistration, '应标记待延迟注册光源');
+
+    chunk.runDeferredFinalizePhase();
+    assertEqual(lightCalls.length, 1, 'deferred finalize 应完成光源注册');
+  });
+
+  test('finalizeNonDeferredPhase - runtime-streaming 下应把 AO 稳定源刷新后移到 deferred finalize', async () => {
+    let finalizedCalls = 0;
+    const world = {
+      bootstrapState: { phase: 'runtime-streaming' },
+      onChunkFinalized(_chunk, options = {}) {
+        finalizedCalls++;
+        world.lastFinalizeOptions = options;
+      }
+    };
+    const chunk = new Chunk(0, 0, world);
+    chunk.loadState = 'entities-built';
+
+    await chunk.finalizeNonDeferredPhase();
+
+    assertTrue(chunk._needsDeferredAOStabilization, '非延迟阶段后应标记待延迟 AO 稳定源刷新');
+    assertTrue(chunk.hasDeferredFinalizeWork, 'AO 稳定源后移后应保留 deferred finalize 工作');
+    assertEqual(finalizedCalls, 1, '仍应通知 world 进入 finalized 链路');
+    assertTrue(world.lastFinalizeOptions?.deferAORefresh === true, '应显式告知 world 延迟 AO 刷新');
+  });
+
   test('chunkRecord.runtimeEntities 应优先于旧 cache.entities 且完全忽略后者', async () => {
     const service = createTestService();
     globalThis._persistenceService = service;

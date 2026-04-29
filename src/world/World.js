@@ -673,15 +673,17 @@ export class World {
     }
   }
 
-  onChunkFinalized(chunk) {
+  onChunkFinalized(chunk, options = {}) {
     if (!chunk) return;
     const key = `${chunk.cx},${chunk.cz}`;
 
-    this.onChunkAOSourceStable(chunk, {
-      fullRefresh: true,
-      markNeighborBoundaries: true,
-      reason: 'finalized'
-    });
+    if (options.deferAORefresh !== true) {
+      this.onChunkAOSourceStable(chunk, {
+        fullRefresh: true,
+        markNeighborBoundaries: true,
+        reason: 'finalized'
+      });
+    }
 
     if (chunk.hasDeferredFinalizeWork) {
       this._pendingDeferredFinalizeChunkKeys.add(key);

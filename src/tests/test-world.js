@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 import { mockFaceCullingSystem, mockMaterials, mockBlockData } from './test-mocks.js';
 import { Chunk } from '../world/Chunk.js';
+import { ChunkAssemblyScheduler } from '../world/ChunkAssemblyScheduler.js';
 
 // ============================================
 // Worker 模拟 - 在导入 World 之前设置
@@ -795,7 +796,7 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
-  test('onChunkFinalized - 纯新 runtime chunk finalized 后应立即刷新 AO，且不进入 deferred finalize 队列', () => {
+  test('onChunkFinalized - pure runtime chunk 在 runtime-streaming 下收到 deferAORefresh 时应延迟 AO 稳定源刷新并进入 deferred finalize 队列', () => {
     setupEnvironment();
 
     scene = new THREE.Scene();
@@ -808,7 +809,8 @@ describe('World 真实类测试', (test) => {
       cz: 5,
       isReady: true,
       isConsolidating: false,
-      hasDeferredFinalizeWork: false,
+      hasDeferredFinalizeWork: true,
+      _needsDeferredAOStabilization: true,
       dirtyAOPositions: new Set(),
       isPureRuntimeStreamingChunk: () => true,
       _refreshAOFromStableSource: () => { aoRefreshCalls++; },
@@ -816,10 +818,10 @@ describe('World 真实类测试', (test) => {
     };
     world.chunks.set('4,5', chunk);
 
-    world.onChunkFinalized(chunk);
+    world.onChunkFinalized(chunk, { deferAORefresh: true });
 
-    assertEqual(aoRefreshCalls, 1, '纯新 runtime chunk finalized 后应立即刷新自身 AO');
-    assertFalse(world._pendingDeferredFinalizeChunkKeys.has('4,5'), '纯新 runtime chunk 不应进入 deferred finalize 队列');
+    assertEqual(aoRefreshCalls, 0, 'runtime-streaming 下不应在 finalized 当帧立即刷新 AO');
+    assertTrue(world._pendingDeferredFinalizeChunkKeys.has('4,5'), '应进入 deferred finalize 队列等待空闲窗口');
 
     teardownEnvironment();
   });
@@ -1045,6 +1047,38 @@ describe('World 真实类测试', (test) => {
     assertFalse(world._pendingDeferredFinalizeChunkKeys.has('0,0'), '纯新 runtime chunk finalize 后不应进入 deferred finalize 队列');
 
     teardownEnvironment();
+  });
+
+  test('ChunkAssemblyScheduler - 同一轮不应继续执行刚刚新入队的后续阶段', async () => {
+    const scheduler = new ChunkAssemblyScheduler({});
+    const calls = [];
+    const chunk = {
+      cx: 0,
+      cz: 0,
+      loadState: 'terrain-built',
+      isReady: false,
+      disposed: false,
+      queuedAssemblyStages: new Set(),
+      assembleRuntimeBuildPhase() {
+        calls.push('runtime-build');
+        return true;
+      },
+      finalizeAssemblyPhase() {
+        calls.push('finalize');
+        return true;
+      },
+      async finalizeNonDeferredPhase() {
+        calls.push('non-deferred-finalize');
+        return true;
+      }
+    };
+
+    scheduler.enqueue(chunk, 'runtime-build', 100);
+    const processed = await scheduler.processWithinBudget({ budgetMs: 100, maxTasks: 10 });
+
+    assertEqual(processed, 1, '首轮只应处理初始队列中的一个任务');
+    assertEqual(calls.join(','), 'runtime-build', '后续阶段应留到下一轮调度');
+    assertEqual(scheduler.getPendingCount(), 1, 'finalize 阶段应继续留在队列中');
   });
 
   // =========== setBlock 测试 ===========

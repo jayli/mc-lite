@@ -47,9 +47,10 @@ export class ChunkAssemblyScheduler {
     const maxTasks = Number.isFinite(options.maxTasks) ? options.maxTasks : 2;
     const start = now();
     const initialQueueLength = this.queue.length;
+    const maxTasksThisPass = Math.min(maxTasks, initialQueueLength);
     let processed = 0;
 
-    while (this.queue.length > 0 && processed < maxTasks && (now() - start) <= budgetMs) {
+    while (this.queue.length > 0 && processed < maxTasksThisPass && (now() - start) <= budgetMs) {
       const task = this._takeNext();
       if (!task) break;
       processed++;

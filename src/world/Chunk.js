@@ -350,13 +350,19 @@ export class Chunk {
 
     this.pendingRuntimeEntities = specialEntitiesShadowStore.getAllEntitiesInChunk(this.cx, this.cz);
 
-    // 5. 直接从 blockData 构建 mesh（跳过 scatter，预生成阶段已完成打散）
+    // 5. 在真实 world 运行路径中，把纯装载装配交给主线程调度器切片执行，
+    // 避免 loadFromRecord 自身同步完成 build + finalize。
+    if (this.world?.onChunkWorkerReady) {
+      this.loadState = 'record-ready';
+      this.isReady = false;
+      this.world.onChunkWorkerReady(this);
+      return;
+    }
+
+    // 无 world 调度器的孤立/测试场景，保留同步路径以保持兼容。
     this.loadState = 'terrain-built';
     this._buildMeshFromExistingBlockData();
     this.isReady = true;
-    this.world?.onChunkWorkerReady?.(this);
-
-    // 6. 恢复运行时实体（从 pendingRuntimeEntities 读取）
     await this.finalizeNonDeferredPhase();
   }
 
@@ -1730,6 +1736,12 @@ export class Chunk {
     // worker-ready 后等待 BlockScatterManager 分发
     if (this.loadState === 'worker-ready') return false;
 
+    if (this.loadState === 'record-ready' || this.loadState === 'loading-from-record') {
+      this._buildMeshFromExistingBlockData();
+      this.loadState = 'terrain-built';
+      this.isReady = true;
+    }
+
     if (this.loadState === 'terrain-built') {
       this.assembleEntityPhase();
     }
@@ -1849,8 +1861,17 @@ export class Chunk {
       this.hasDeferredFinalizeWork = true;
     }
 
-    // 光源注册
-    this._registerLightSources();
+    // runtime-streaming 下将光源注册后移，避免 finalize 热路径产生大峰值。
+    if (this.world?.bootstrapState?.phase === 'runtime-streaming') {
+      if (this.lightSourceCoords.size > 0) {
+        this._needsDeferredLightRegistration = true;
+        this.hasDeferredFinalizeWork = true;
+      }
+      this._needsDeferredAOStabilization = true;
+      this.hasDeferredFinalizeWork = true;
+    } else {
+      this._registerLightSources();
+    }
 
     // 完成
     this.isReady = true;
@@ -1859,7 +1880,9 @@ export class Chunk {
     this.pendingSpecialEntityData = null;
     this.pendingRuntimeEntities = null;
     this.pendingSnapshot = null;
-    this.world?.onChunkFinalized?.(this);
+    this.world?.onChunkFinalized?.(this, {
+      deferAORefresh: this._needsDeferredAOStabilization === true
+    });
     return true;
   }
 
@@ -1914,9 +1937,19 @@ export class Chunk {
       this._needsDeferredLightRegistration = false;
     }
 
+    if (this._needsDeferredAOStabilization) {
+      this.world?.onChunkAOSourceStable?.(this, {
+        fullRefresh: true,
+        markNeighborBoundaries: true,
+        reason: 'deferred-finalize-ao-stable'
+      });
+      this._needsDeferredAOStabilization = false;
+    }
+
     this.hasDeferredFinalizeWork = (
       this._needsDeferredRuntimeEntityRestore ||
-      this._needsDeferredLightRegistration
+      this._needsDeferredLightRegistration ||
+      this._needsDeferredAOStabilization
     );
 
     // 所有延迟工作完成后，触发 AO 刷新
