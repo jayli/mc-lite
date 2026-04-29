@@ -52,10 +52,17 @@ export class ShadowSyncDispatcher {
     });
 
     try {
-      await this._rpc.postMessage('batchSync', { payloads });
+      const result = await this._rpc.postMessage('batchSync', { payloads });
+      const failedKeys = result?.failedKeys || [];
+      if (failedKeys.length > 0) {
+        console.warn(`[ShadowSyncDispatcher] ${failedKeys.length} chunk(s) failed to sync:`, failedKeys);
+        for (const key of failedKeys) {
+          this._pending.add(key);
+        }
+      }
     } catch (error) {
       console.error('[ShadowSyncDispatcher] Flush failed:', error);
-      // 失败则重新标记为脏，下次 flush
+      // RPC 级别失败，所有 key 重入队
       for (const key of keys) {
         this._pending.add(key);
       }
@@ -85,7 +92,11 @@ export class ShadowSyncDispatcher {
     }
 
     try {
-      await this._rpc.postMessage('flushAll', { allData: plainData });
+      const result = await this._rpc.postMessage('flushAll', { allData: plainData });
+      const failedKeys = result?.failedKeys || [];
+      if (failedKeys.length > 0) {
+        console.error(`[ShadowSyncDispatcher] flushAll: ${failedKeys.length} chunk(s) failed to persist:`, failedKeys);
+      }
     } catch (error) {
       console.error('[ShadowSyncDispatcher] flushAll failed:', error);
     }

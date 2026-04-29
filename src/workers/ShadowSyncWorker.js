@@ -61,10 +61,12 @@ async function batchSync(payloads) {
             for (const [chunkKey, data] of chunkMap) {
               if (wrapped.data.chunks[chunkKey]) {
                 wrapped.data.chunks[chunkKey].runtimeEntities = data;
+                successCount++;
+              } else {
+                failedKeys.push(chunkKey);
               }
             }
             store.put(wrapped);
-            successCount += chunkMap.size;
           } else {
             // region record 不存在，记录失败
             for (const [key] of chunkMap) {
@@ -122,10 +124,16 @@ async function flushAll(allData) {
             for (const [chunkKey, data] of chunkMap) {
               if (wrapped.data.chunks[chunkKey]) {
                 wrapped.data.chunks[chunkKey].runtimeEntities = data;
+                successCount++;
+              } else {
+                failedKeys.push(chunkKey);
               }
             }
             store.put(wrapped);
-            successCount += chunkMap.size;
+          } else {
+            for (const [key] of chunkMap) {
+              failedKeys.push(key);
+            }
           }
         };
         getReq.onerror = () => reject(getReq.error);
@@ -135,7 +143,9 @@ async function flushAll(allData) {
       });
     } catch (error) {
       console.error(`[ShadowSyncWorker] Failed to flush region ${rKey}:`, error);
-      failedKeys.push(rKey);
+      for (const [key] of chunkMap) {
+        if (!failedKeys.includes(key)) failedKeys.push(key);
+      }
     }
   }
 

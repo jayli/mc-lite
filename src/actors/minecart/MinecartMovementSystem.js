@@ -635,6 +635,13 @@ export class MinecartMovementSystem {
       if (manager && typeof manager.updateMinecartPositionIndex === 'function') {
         manager.updateMinecartPositionIndex(minecart, oldPos);
       }
+      // 跨 chunk 时更新 chunkKey，确保 stopMinecartsForChunk 能正确过滤
+      const newChunkKey = (manager && typeof manager.getChunkKeyByPosition === 'function')
+        ? manager.getChunkKeyByPosition(minecart.position)
+        : null;
+      if (newChunkKey && newChunkKey !== minecart.chunkKey) {
+        minecart.chunkKey = newChunkKey;
+      }
       minecart.lastTrackPosition = { x: currentX, y: currentY, z: currentZ };
     }
   }
