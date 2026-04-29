@@ -354,6 +354,12 @@ export class Chunk {
         specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, cacheEntities);
         this._needsEntityMigration = true;
       } else {
+        // 空数据也需要清空 ShadowStore，避免已删除实体在 chunk 重载后回流
+        specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, {
+          turrets: [],
+          zombieNests: [],
+          minecarts: []
+        });
         this._needsEntityMigration = false;
       }
     }

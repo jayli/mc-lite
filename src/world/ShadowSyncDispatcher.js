@@ -59,6 +59,7 @@ export class ShadowSyncDispatcher {
         for (const key of failedKeys) {
           this._pending.add(key);
         }
+        this._scheduleFlush();
       }
     } catch (error) {
       console.error('[ShadowSyncDispatcher] Flush failed:', error);
@@ -66,6 +67,7 @@ export class ShadowSyncDispatcher {
       for (const key of keys) {
         this._pending.add(key);
       }
+      this._scheduleFlush();
     }
   }
 
@@ -131,10 +133,14 @@ export class ShadowSyncDispatcher {
     }
   }
 
-  dispose() {
+  async dispose() {
     if (this._flushTimer) {
       clearTimeout(this._flushTimer);
       this._flushTimer = null;
+    }
+    // 退出前全量 flush，确保最后脏数据落盘
+    if (this._pending.size > 0 || this._rpc) {
+      await this.flushAll();
     }
     if (this._rpc) {
       this._rpc.worker?.terminate();

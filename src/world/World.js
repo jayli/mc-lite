@@ -240,10 +240,13 @@ export class World {
     this.worldRuntime.prefetchRegions(playerCx, playerCz, 1);
   }
 
-  dispose() {
+  async dispose() {
     if (this._prefetchTimer) {
       globalThis.clearInterval(this._prefetchTimer);
       this._prefetchTimer = null;
+    }
+    if (this.shadowSyncDispatcher) {
+      await this.shadowSyncDispatcher.dispose();
     }
   }
 
