@@ -27,9 +27,10 @@ Use this skill when the user runs `/commit` or asks to commit changes.
 
      [optional body]
      ```
-   - Types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`.
-   - Scope is optional and should reflect the affected area.
-   - Description should be concise and imperative.
+   - **Type 使用英文**: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`。
+   - Scope 为可选，应反映受影响的功能区域。
+   - **标题示例格式**: `feat(world): WorldStore/RegionCache 架构与 runtime chunk streaming`
+   - **正文尽量使用中文编写**，描述具体变更细节和原因。
 
 4. **Execute Commit**:
    - Run `git commit -m "generated_message"`.
