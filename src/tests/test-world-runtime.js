@@ -1,6 +1,6 @@
 // src/tests/test-world-runtime.js
 import { describe } from './runner.js';
-import { assertDeepEqual, assertEqual, assertFalse, assertTrue } from './assert.js';
+import { assertDeepEqual, assertEqual, assertFalse, assertNotEqual, assertTrue } from './assert.js';
 import { WorldRuntime } from '../world/WorldRuntime.js';
 import { encodeCoord } from '../utils/CoordEncoding.js';
 
@@ -289,7 +289,7 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     globalThis._worldStore = originalWorldStore;
   });
 
-  test('flushBeforeUnload - 不传 live blockData 时也应优先使用 dirty snapshot', async () => {
+  test('flushBeforeUnload - 不传 live blockData 时也应优先使用 dirty snapshot 入队', async () => {
     const originalWorldStore = globalThis._worldStore;
     const baseCode = encodeCoord(1, 2, 3);
     const newCode = encodeCoord(4, 5, 6);
@@ -318,9 +318,168 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
 
     await runtime.flushBeforeUnload(0, 0, null, null);
 
-    assertEqual(flushCalls.length, 1, '应基于 dirty snapshot 成功 flushBeforeUnload');
-    assertDeepEqual(flushCalls[0].record.blockData[baseCode], { type: 'dirt', orientation: 0 }, '应保留初始方块');
-    assertDeepEqual(flushCalls[0].record.blockData[newCode], { type: 'stone', orientation: 1 }, '应写出增量修改方块');
+    assertEqual(flushCalls.length, 0, '卸载热路径不应立即写盘');
+    assertEqual(runtime.pendingUnloadFlushQueue.size, 1, '应基于 dirty snapshot 成功入队');
+    assertDeepEqual(runtime.pendingUnloadFlushQueue.get('0,0').chunkRecord.blockData[baseCode], { type: 'dirt', orientation: 0 }, '应保留初始方块');
+    assertDeepEqual(runtime.pendingUnloadFlushQueue.get('0,0').chunkRecord.blockData[newCode], { type: 'stone', orientation: 1 }, '应写出增量修改方块');
+
+    globalThis._worldStore = originalWorldStore;
+  });
+
+  test('flushBeforeUnload - 应只构造稳定快照并入队，不应立即提交 WorldStore', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    const flushCalls = [];
+    const blockCode = encodeCoord(1, 2, 3);
+    const liveBlockData = new Map([[blockCode, { type: 'stone', orientation: 0 }]]);
+
+    globalThis._worldStore = {
+      commitChunkRecord: async (cx, cz, record) => {
+        flushCalls.push({ cx, cz, record });
+        return true;
+      },
+      putChunkRecord: async (cx, cz, record) => {
+        flushCalls.push({ cx, cz, record });
+        return true;
+      }
+    };
+
+    const runtime = new WorldRuntime();
+    runtime.setWorld({
+      chunks: new Map([
+        ['0,0', {
+          blockData: liveBlockData,
+          staticEntities: [{ type: 'crate', x: 1, y: 2, z: 3 }],
+          runtimeSeedData: { structureCenters: [] }
+        }]
+      ])
+    });
+
+    runtime.markChunkDirty(0, 0);
+    runtime.recordBlockMutation(0, 0, 1, 2, 3, { type: 'stone', orientation: 0 });
+    await runtime.flushBeforeUnload(0, 0, null, {
+      turrets: [],
+      zombieNests: [],
+      minecarts: []
+    });
+
+    assertEqual(flushCalls.length, 0, '卸载热路径不应立即写盘');
+    assertEqual(runtime.pendingUnloadFlushQueue?.size || 0, 1, '应向后台待写队列追加一条记录');
+
+    const queuedRecord = runtime.pendingUnloadFlushQueue.get('0,0');
+    assertTrue(!!queuedRecord, '应可读取到待写记录');
+    assertNotEqual(queuedRecord.chunkRecord.blockData, liveBlockData, '队列中不应保留 live Map 引用');
+    assertDeepEqual(queuedRecord.chunkRecord.blockData, {
+      [blockCode]: { type: 'stone', orientation: 0 }
+    }, '队列中应保存稳定 blockData 快照');
+
+    liveBlockData.set(encodeCoord(4, 5, 6), { type: 'dirt', orientation: 1 });
+    assertDeepEqual(queuedRecord.chunkRecord.blockData, {
+      [blockCode]: { type: 'stone', orientation: 0 }
+    }, 'live chunk 后续变化不应反向污染已入队快照');
+
+    globalThis._worldStore = originalWorldStore;
+  });
+
+  test('flushBeforeUnload - 同一 chunk 重复入队时应只保留最新记录', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    globalThis._worldStore = {
+      commitChunkRecord: async () => true,
+      putChunkRecord: async () => true
+    };
+
+    const runtime = new WorldRuntime();
+    runtime._regionCache.set('0,0', {
+      regionKey: '0,0',
+      rx: 0,
+      rz: 0,
+      chunkKeys: ['0,0'],
+      chunks: {
+        '0,0': {
+          blockData: { [encodeCoord(1, 2, 3)]: { type: 'stone', orientation: 0 } },
+          staticEntities: [],
+          runtimeSeedData: { structureCenters: [] },
+          runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
+        }
+      }
+    });
+
+    await runtime.flushBeforeUnload(0, 0, {
+      [encodeCoord(1, 2, 3)]: { type: 'stone', orientation: 0 }
+    }, {
+      turrets: [],
+      zombieNests: [],
+      minecarts: []
+    });
+
+    const firstRecord = runtime.pendingUnloadFlushQueue.get('0,0');
+    assertTrue(!!firstRecord, '首次调用后应存在待写记录');
+
+    await new Promise((resolve) => setTimeout(resolve, 2));
+    await runtime.flushBeforeUnload(0, 0, {
+      [encodeCoord(4, 5, 6)]: { type: 'dirt', orientation: 1 }
+    }, {
+      turrets: [{ id: 't1' }],
+      zombieNests: [],
+      minecarts: []
+    });
+
+    assertEqual(runtime.pendingUnloadFlushQueue.size, 1, '同一 chunk 重复入队不应膨胀队列');
+
+    const latestRecord = runtime.pendingUnloadFlushQueue.get('0,0');
+    assertTrue(latestRecord.version > firstRecord.version, '覆盖入队时应更新版本号');
+    assertTrue(latestRecord.lastUpdatedAt >= firstRecord.lastUpdatedAt, '覆盖入队时应刷新时间戳');
+    assertDeepEqual(latestRecord.chunkRecord.blockData, {
+      [encodeCoord(4, 5, 6)]: { type: 'dirt', orientation: 1 }
+    }, '应只保留最新 blockData 快照');
+    assertDeepEqual(latestRecord.chunkRecord.runtimeEntities, {
+      turrets: [{ id: 't1' }],
+      zombieNests: [],
+      minecarts: []
+    }, '应只保留最新实体快照');
+
+    globalThis._worldStore = originalWorldStore;
+  });
+
+  test('flushBeforeUnload - 默认禁止回退到 live-chunk 全量序列化', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    const flushCalls = [];
+    const serializeCalls = [];
+
+    globalThis._worldStore = {
+      commitChunkRecord: async (...args) => {
+        flushCalls.push(args);
+        return true;
+      },
+      putChunkRecord: async (...args) => {
+        flushCalls.push(args);
+        return true;
+      }
+    };
+
+    const runtime = new WorldRuntime();
+    runtime.setWorld({
+      chunks: new Map([
+        ['0,0', {
+          blockData: new Map([[encodeCoord(1, 2, 3), { type: 'stone', orientation: 0 }]]),
+          staticEntities: [],
+          runtimeSeedData: {}
+        }]
+      ])
+    });
+    runtime._serializeBlockData = (blockData) => {
+      serializeCalls.push(blockData);
+      return {};
+    };
+
+    await runtime.flushBeforeUnload(0, 0, null, {
+      turrets: [],
+      zombieNests: [],
+      minecarts: []
+    });
+
+    assertEqual(flushCalls.length, 0, '默认不应在卸载热路径直写 worldStore');
+    assertEqual(serializeCalls.length, 0, '默认不应对 live chunk.blockData 做全量序列化');
+    assertEqual(runtime.pendingUnloadFlushQueue?.size || 0, 0, '没有稳定快照来源时应跳过入队');
 
     globalThis._worldStore = originalWorldStore;
   });
@@ -360,13 +519,17 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
         ['0,0', {
           cx: 0,
           cz: 0,
-          blockData: new Map([[freshCode, { type: 'stone', orientation: 1 }]]),
+          blockData: new Map([[staleCode, { type: 'dirt', orientation: 0 }]]),
           staticEntities: [],
           structureCenters: [],
           runtimeSeedData: {}
         }]
       ])
     });
+    runtime.markChunkDirty(0, 0);
+    runtime.recordBlockMutation(0, 0, 1, 2, 3, null);
+    runtime.recordBlockMutation(0, 0, 4, 5, 6, { type: 'stone', orientation: 1 });
+    runtime._world.chunks.get('0,0').blockData = null;
 
     await runtime.flushBeforeUnload(0, 0, null, {
       turrets: [{ id: 't1', position: { x: 4, y: 5, z: 6 }, rotation: 0 }],
@@ -374,7 +537,8 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
       minecarts: []
     });
 
-    assertEqual(savedRecords.length, 1, '应写回 worldStore 一次');
+    assertEqual(savedRecords.length, 0, '卸载阶段不应立即写回 worldStore');
+    assertEqual(runtime.pendingUnloadFlushQueue.size, 1, '应生成一条待写队列记录');
 
     const result = await runtime.ensureChunkData(0, 0);
     assertEqual(result.status, 'ready', 'flush 后应仍可从缓存读取 chunk');
@@ -507,6 +671,193 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
 
     globalThis.CHUNK_PERF_DEBUG = false;
     globalThis.__CHUNK_PERF_EVENTS = originalEvents;
+    globalThis._worldStore = originalWorldStore;
+  });
+
+  test('flushPendingUnloadQueueWithinBudget - 应按 region 合批并保留剩余积压到下一轮', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    const appliedPatches = [];
+
+    globalThis._worldStore = {
+      applyRegionPatch: async (rx, rz, patch) => {
+        appliedPatches.push({ rx, rz, patch });
+        return true;
+      }
+    };
+
+    const runtime = new WorldRuntime();
+    runtime._regionCache.set('0,0', {
+      regionKey: '0,0',
+      rx: 0,
+      rz: 0,
+      chunkKeys: [],
+      chunks: {}
+    });
+    runtime._regionCache.set('1,0', {
+      regionKey: '1,0',
+      rx: 1,
+      rz: 0,
+      chunkKeys: [],
+      chunks: {}
+    });
+
+    runtime.pendingUnloadFlushQueue.set('0,0', {
+      cx: 0,
+      cz: 0,
+      chunkKey: '0,0',
+      version: 1,
+      lastUpdatedAt: 10,
+      chunkRecord: {
+        blockData: { [encodeCoord(1, 2, 3)]: { type: 'stone', orientation: 0 } },
+        staticEntities: [],
+        runtimeSeedData: { structureCenters: [] },
+        runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
+      }
+    });
+    runtime.pendingUnloadFlushQueue.set('1,0', {
+      cx: 1,
+      cz: 0,
+      chunkKey: '1,0',
+      version: 1,
+      lastUpdatedAt: 20,
+      chunkRecord: {
+        blockData: { [encodeCoord(2, 2, 3)]: { type: 'dirt', orientation: 0 } },
+        staticEntities: [],
+        runtimeSeedData: { structureCenters: [] },
+        runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
+      }
+    });
+    runtime.pendingUnloadFlushQueue.set('8,0', {
+      cx: 8,
+      cz: 0,
+      chunkKey: '8,0',
+      version: 1,
+      lastUpdatedAt: 30,
+      chunkRecord: {
+        blockData: { [encodeCoord(3, 2, 3)]: { type: 'grass', orientation: 0 } },
+        staticEntities: [],
+        runtimeSeedData: { structureCenters: [] },
+        runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
+      }
+    });
+
+    const result = await runtime.flushPendingUnloadQueueWithinBudget({
+      maxRegions: 1,
+      maxChunks: 2,
+      maxMs: 100
+    });
+
+    assertEqual(appliedPatches.length, 1, '单轮只应提交一个 region patch');
+    assertEqual(appliedPatches[0].rx, 0, '应优先处理首个 region');
+    assertDeepEqual(appliedPatches[0].patch.chunkPatches.map((entry) => entry.chunkKey).sort(), ['0,0', '1,0'], '应把同 region 的两个 chunk 合批提交到 patch');
+    assertEqual(result.processedRegions, 1, '返回值应记录已处理 region 数');
+    assertEqual(result.processedChunks, 2, '返回值应记录已处理 chunk 数');
+    assertEqual(result.remainingQueueSize, 1, '超出预算的 chunk 应保留到下一轮');
+    assertTrue(runtime.pendingUnloadFlushQueue.has('8,0'), '剩余 region 的待写记录应继续留在队列');
+
+    globalThis._worldStore = originalWorldStore;
+  });
+
+  test('flushBeforeUnload - region-cache 来源时应复用已缓存 blockData，不在队列中复制整块数据', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    const cachedBlockCode = encodeCoord(1, 2, 3);
+    const cachedBlockData = {
+      [cachedBlockCode]: { type: 'stone', orientation: 0 }
+    };
+
+    globalThis._worldStore = {
+      applyRegionPatch: async () => true
+    };
+
+    const runtime = new WorldRuntime();
+    runtime._regionCache.set('0,0', {
+      regionKey: '0,0',
+      rx: 0,
+      rz: 0,
+      chunkKeys: ['0,0'],
+      chunks: {
+        '0,0': {
+          blockData: cachedBlockData,
+          staticEntities: [],
+          runtimeSeedData: { structureCenters: [] },
+          runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
+        }
+      }
+    });
+
+    await runtime.flushBeforeUnload(0, 0, null, {
+      turrets: [{ id: 't1' }],
+      zombieNests: [],
+      minecarts: []
+    });
+
+    const queuedRecord = runtime.pendingUnloadFlushQueue.get('0,0');
+    assertTrue(!!queuedRecord, '应生成 unload queue 记录');
+    assertEqual(queuedRecord.preserveStoredBlockData, true, 'region-cache 来源时应标记复用已存 blockData');
+    assertEqual(queuedRecord.chunkRecord.blockData, null, '队列里不应再复制整块 blockData');
+    assertEqual(runtime._regionCache.get('0,0').chunks['0,0'].blockData, cachedBlockData, 'region cache 仍应继续复用原 blockData 引用');
+
+    globalThis._worldStore = originalWorldStore;
+  });
+
+  test('flushAllDirty - 退出路径应同时处理 dirtyChunks 与 pendingUnloadFlushQueue', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    const savedRegions = [];
+
+    globalThis._worldStore = {
+      saveRegionRecord: async (rx, rz, region) => {
+        savedRegions.push({ rx, rz, region });
+        return true;
+      }
+    };
+
+    const runtime = new WorldRuntime();
+    runtime._regionCache.set('0,0', {
+      regionKey: '0,0',
+      rx: 0,
+      rz: 0,
+      chunkKeys: ['0,0'],
+      chunks: {
+        '0,0': {
+          blockData: { [encodeCoord(1, 1, 1)]: { type: 'stone', orientation: 0 } },
+          staticEntities: [],
+          runtimeSeedData: { structureCenters: [] },
+          runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
+        }
+      }
+    });
+    runtime.setWorld({
+      chunks: new Map([
+        ['0,0', {
+          blockData: new Map([[encodeCoord(1, 1, 1), { type: 'stone', orientation: 0 }]]),
+          staticEntities: [],
+          runtimeSeedData: {}
+        }]
+      ])
+    });
+
+    runtime.markChunkDirty(0, 0);
+    runtime.pendingUnloadFlushQueue.set('1,0', {
+      cx: 1,
+      cz: 0,
+      chunkKey: '1,0',
+      version: 1,
+      lastUpdatedAt: 10,
+      chunkRecord: {
+        blockData: { [encodeCoord(2, 2, 2)]: { type: 'dirt', orientation: 1 } },
+        staticEntities: [],
+        runtimeSeedData: { structureCenters: [] },
+        runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
+      }
+    });
+
+    await runtime.flushAllDirty();
+
+    assertEqual(savedRegions.length, 1, '同 region 的 dirty 与 unload queue 应合并写盘一次');
+    assertTrue(!!savedRegions[0].region.chunks['0,0'], '应包含 dirty chunk 的结果');
+    assertTrue(!!savedRegions[0].region.chunks['1,0'], '应包含 pending unload chunk 的结果');
+    assertEqual(runtime.pendingUnloadFlushQueue.size, 0, '退出 flush 后应清空 unload 队列');
+
     globalThis._worldStore = originalWorldStore;
   });
 });

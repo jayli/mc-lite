@@ -92,6 +92,22 @@ export class WorldStore {
   }
 
   /**
+   * 在 Worker 内对指定 region 应用 chunk patch，避免主线程构造整包 region record。
+   * @param {number} rx
+   * @param {number} rz
+   * @param {object} patch
+   */
+  async applyRegionPatch(rx, rz, patch) {
+    const key = this.regionKey(rx, rz);
+    return getPersistenceService().postMessage('applyRegionPatch', {
+      regionKey: key,
+      rx,
+      rz,
+      patch
+    });
+  }
+
+  /**
    * 批量保存多个 RegionRecord
    * @param {Array<{rx: number, rz: number, record: object}>} items
    */

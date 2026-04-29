@@ -243,6 +243,9 @@ export class World {
       globalThis.clearInterval(this._prefetchTimer);
       this._prefetchTimer = null;
     }
+    if (this.worldRuntime?.flushAllPendingWork) {
+      await this.worldRuntime.flushAllPendingWork();
+    }
     if (this.shadowSyncDispatcher) {
       await this.shadowSyncDispatcher.dispose();
     }
@@ -344,7 +347,12 @@ export class World {
   }
 
   getRuntimeIdleStats() {
-    return this.runtimeIdleScheduler?.getStats?.() || null;
+    const idleStats = this.runtimeIdleScheduler?.getStats?.() || {};
+    const unloadFlushStats = this.worldRuntime?.getPendingUnloadFlushStats?.() || {};
+    return {
+      ...idleStats,
+      ...unloadFlushStats
+    };
   }
 
   _recordStreamingPerfFlush(result = {}, budget = {}) {
@@ -408,6 +416,10 @@ export class World {
       flushLastMs: Number.isFinite(globalStats.lastFlushMs) ? globalStats.lastFlushMs : 0,
       flushBudgetOps: this._streamingPerfTelemetry.lastBudgetOps,
       flushBudgetMs: this._streamingPerfTelemetry.lastBudgetMs,
+      pendingUnloadFlushQueueSize: Number.isFinite(idleStats.pendingUnloadFlushQueueSize) ? idleStats.pendingUnloadFlushQueueSize : 0,
+      pendingUnloadFlushLastProcessedChunks: Number.isFinite(idleStats.pendingUnloadFlushLastProcessedChunks) ? idleStats.pendingUnloadFlushLastProcessedChunks : 0,
+      pendingUnloadFlushLastProcessedRegions: Number.isFinite(idleStats.pendingUnloadFlushLastProcessedRegions) ? idleStats.pendingUnloadFlushLastProcessedRegions : 0,
+      pendingUnloadFlushLastElapsedMs: Number.isFinite(idleStats.pendingUnloadFlushLastElapsedMs) ? idleStats.pendingUnloadFlushLastElapsedMs : 0,
       deferredPatchChunks: Number.isFinite(deferredPatchStats.chunks) ? deferredPatchStats.chunks : 0,
       deferredPatchBlocks: Number.isFinite(deferredPatchStats.blocks) ? deferredPatchStats.blocks : 0,
       consolidatingChunks,
@@ -578,6 +590,28 @@ export class World {
       run: () => {
         const processed = this._processDeferredConsolidationQueue();
         return { didWork: processed > 0 };
+      }
+    });
+
+    this.runtimeIdleScheduler.registerTask({
+      id: 'unload-flush-queue',
+      priority: 40,
+      minIdleMs: RUNTIME_IDLE_GRACE_MS,
+      run: () => {
+        if (!this.worldRuntime?.pendingUnloadFlushQueue?.size) {
+          return { didWork: false };
+        }
+        if (this.worldRuntime._pendingUnloadFlushInFlight) {
+          return { didWork: false };
+        }
+        this.worldRuntime.flushPendingUnloadQueueWithinBudget({
+          maxRegions: 1,
+          maxChunks: 2,
+          maxMs: 2
+        }).catch((error) => {
+          console.error('[World] Failed to flush pending unload queue within idle budget:', error);
+        });
+        return { didWork: true };
       }
     });
   }

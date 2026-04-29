@@ -140,6 +140,51 @@ function saveRegionRecord(regionKey, record) {
   );
 }
 
+function applyChunkPatchToRegion(region, chunkPatch) {
+  const {
+    chunkKey,
+    preserveStoredBlockData = false,
+    chunkRecord
+  } = chunkPatch;
+
+  if (!region.chunks) region.chunks = {};
+  if (!Array.isArray(region.chunkKeys)) region.chunkKeys = [];
+
+  const currentChunk = region.chunks[chunkKey] || {};
+  const nextChunk = {
+    ...currentChunk,
+    ...chunkRecord
+  };
+
+  if (preserveStoredBlockData) {
+    nextChunk.blockData = currentChunk.blockData || nextChunk.blockData || {};
+  }
+
+  region.chunks[chunkKey] = nextChunk;
+  if (!region.chunkKeys.includes(chunkKey)) {
+    region.chunkKeys.push(chunkKey);
+  }
+}
+
+async function applyRegionPatch(regionKey, rx, rz, patch) {
+  const existingRecord = await getRegionRecord(regionKey);
+  const region = existingRecord || {
+    regionKey,
+    rx,
+    rz,
+    chunkKeys: [],
+    chunks: {},
+    generatedAt: Date.now(),
+    generatorVersion: '1.0'
+  };
+
+  for (const chunkPatch of patch?.chunkPatches || []) {
+    applyChunkPatchToRegion(region, chunkPatch);
+  }
+
+  return saveRegionRecord(regionKey, region);
+}
+
 /**
  * 批量保存多个 RegionRecord（用于预生成场景）
  * @param {Array<{regionKey: string, record: object}>} records
@@ -255,6 +300,10 @@ self.onmessage = async (event) => {
         break;
       case 'saveRegionRecord':
         await saveRegionRecord(payload.regionKey, payload.record);
+        result = true;
+        break;
+      case 'applyRegionPatch':
+        await applyRegionPatch(payload.regionKey, payload.rx, payload.rz, payload.patch);
         result = true;
         break;
       case 'saveRegionRecordsBatch':

@@ -375,7 +375,14 @@ describe('World 真实类测试', (test) => {
       })
     };
     world.getDeferredCrossChunkPatchStats = () => ({ chunks: 3, blocks: 45 });
-    world.getRuntimeIdleStats = () => ({ idleForMs: 160, taskCount: 2 });
+    world.getRuntimeIdleStats = () => ({
+      idleForMs: 160,
+      taskCount: 2,
+      pendingUnloadFlushQueueSize: 5,
+      pendingUnloadFlushLastProcessedChunks: 2,
+      pendingUnloadFlushLastProcessedRegions: 1,
+      pendingUnloadFlushLastElapsedMs: 0.75
+    });
     world.chunks = new Map([
       ['0,0', { isReady: true, isConsolidating: false, loadState: 'finalized' }],
       ['1,0', { isReady: false, isConsolidating: true, loadState: 'terrain-built' }],
@@ -402,6 +409,10 @@ describe('World 真实类测试', (test) => {
     assertEqual(snapshot.flushMaxMs, 2.25, '应记录窗口内最大 flush 耗时');
     assertEqual(snapshot.deferredPatchChunks, 3, '应返回 deferred patch chunk 数');
     assertEqual(snapshot.deferredPatchBlocks, 45, '应返回 deferred patch block 数');
+    assertEqual(snapshot.pendingUnloadFlushQueueSize, 5, '应暴露 unload flush 队列长度');
+    assertEqual(snapshot.pendingUnloadFlushLastProcessedChunks, 2, '应暴露最近一轮消费的 chunk 数');
+    assertEqual(snapshot.pendingUnloadFlushLastProcessedRegions, 1, '应暴露最近一轮消费的 region 数');
+    assertEqual(snapshot.pendingUnloadFlushLastElapsedMs, 0.75, '应暴露最近一轮消费耗时');
     assertEqual(snapshot.consolidatingChunks, 1, '应统计正在 consolidation 的 chunk 数');
     assertEqual(snapshot.loadingChunks, 2, '应统计未 finalized 的 chunk 数');
     assertEqual(snapshot.readyChunks, 1, '应统计 ready chunk 数');
@@ -1399,6 +1410,75 @@ describe('World 真实类测试', (test) => {
 
     assertTrue(unloadCalls.length > 0, '应触发 flushBeforeUnload');
     assertEqual(unloadCalls[0].blockDataSnapshot, null, '卸载时不应再显式传 live blockData');
+
+    teardownEnvironment();
+  });
+
+  test('runtime-streaming 区块卸载时不应等待写盘完成，应先完成回收与删除', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.bootstrapState.phase = 'runtime-streaming';
+    const chunk = world.chunks.get('0,0');
+    let pendingResolve = null;
+    let disposeCalled = false;
+    const unloadCalls = [];
+
+    chunk.dispose = () => {
+      disposeCalled = true;
+      chunk.disposed = true;
+    };
+
+    world.worldRuntime = {
+      ensureChunkData() {
+        return Promise.resolve({ status: 'missing-region' });
+      },
+      flushBeforeUnload(cx, cz, blockDataSnapshot, entities) {
+        unloadCalls.push({ cx, cz, blockDataSnapshot, entities });
+        return new Promise((resolve) => {
+          pendingResolve = resolve;
+        });
+      },
+      prefetchRegions() {},
+      flushPendingUnloadQueueWithinBudget() {
+        return Promise.resolve({ processedChunks: 0, processedRegions: 0, remainingQueueSize: 0, elapsedMs: 0 });
+      }
+    };
+
+    world.update(new THREE.Vector3(200, 10, 200), 0.016);
+
+    assertTrue(unloadCalls.length > 0, '应触发卸载入队');
+    assertFalse(world.chunks.has('0,0'), '卸载当帧应直接从活动 chunk 集合删除');
+    assertTrue(disposeCalled, '卸载当帧应直接调用 chunk.dispose');
+    assertTrue(typeof pendingResolve === 'function', 'flushBeforeUnload promise 此时仍应处于未完成状态');
+
+    pendingResolve();
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    teardownEnvironment();
+  });
+
+  test('dispose - 应尽力 flush WorldRuntime 的待处理写回工作', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    let flushAllPendingWorkCalls = 0;
+    world.worldRuntime = {
+      async flushAllPendingWork() {
+        flushAllPendingWorkCalls++;
+      }
+    };
+
+    await world.dispose();
+
+    assertEqual(flushAllPendingWorkCalls, 1, 'World.dispose 应触发 runtime 待处理写回收口');
 
     teardownEnvironment();
   });
