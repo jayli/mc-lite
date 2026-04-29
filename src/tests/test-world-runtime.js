@@ -305,4 +305,124 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
 
     globalThis._worldStore = originalWorldStore;
   });
+
+  test('flushChunk - 仅实体脏化时应优先复用 region cache 中已序列化的 blockData', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    const cachedCode = encodeCoord(1, 2, 3);
+    const cachedBlockData = {
+      [cachedCode]: { type: 'dirt', orientation: 0 }
+    };
+    const flushCalls = [];
+
+    globalThis._worldStore = {
+      putChunkRecord: async (cx, cz, record) => {
+        flushCalls.push({ cx, cz, record });
+        return true;
+      }
+    };
+
+    const runtime = new WorldRuntime();
+    runtime._regionCache.set('0,0', {
+      regionKey: '0,0',
+      rx: 0,
+      rz: 0,
+      chunkKeys: ['0,0'],
+      chunks: {
+        '0,0': {
+          blockData: cachedBlockData,
+          staticEntities: [],
+          runtimeSeedData: { structureCenters: [] },
+          runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
+        }
+      }
+    });
+    runtime.setWorld({
+      chunks: new Map([
+        ['0,0', {
+          blockData: new Map([[cachedCode, { type: 'stone', orientation: 1 }]]),
+          staticEntities: [],
+          runtimeSeedData: {}
+        }]
+      ])
+    });
+    runtime._serializeBlockData = (blockData) => {
+      if (blockData instanceof Map) {
+        throw new Error('不应回退到 live blockData Map 序列化');
+      }
+      return blockData;
+    };
+
+    runtime.markChunkDirty(0, 0);
+    await runtime.flushChunk(0, 0);
+
+    assertEqual(flushCalls.length, 1, '应成功 flush 一次');
+    assertEqual(flushCalls[0].record.blockData, cachedBlockData, '应直接复用 region cache 中的已序列化 blockData');
+
+    globalThis._worldStore = originalWorldStore;
+  });
+
+  test('flushAllDirty - 仅实体脏化时应优先复用 region cache 中已序列化的 blockData', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    const originalEvents = globalThis.__CHUNK_PERF_EVENTS;
+    const cachedCode = encodeCoord(7, 8, 9);
+    const cachedBlockData = {
+      [cachedCode]: { type: 'grass', orientation: 0 }
+    };
+    const savedRegions = [];
+
+    globalThis.CHUNK_PERF_DEBUG = { enabled: true, thresholdMs: 0 };
+    globalThis.__CHUNK_PERF_EVENTS = [];
+    globalThis._worldStore = {
+      saveRegionRecord: async (rx, rz, region) => {
+        savedRegions.push({ rx, rz, region });
+        return true;
+      }
+    };
+
+    const runtime = new WorldRuntime();
+    runtime._regionCache.set('0,0', {
+      regionKey: '0,0',
+      rx: 0,
+      rz: 0,
+      chunkKeys: ['0,0'],
+      chunks: {
+        '0,0': {
+          blockData: cachedBlockData,
+          staticEntities: [],
+          runtimeSeedData: { structureCenters: [] },
+          runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
+        }
+      }
+    });
+    runtime.setWorld({
+      chunks: new Map([
+        ['0,0', {
+          blockData: new Map([[cachedCode, { type: 'stone', orientation: 1 }]]),
+          staticEntities: [],
+          runtimeSeedData: {}
+        }]
+      ])
+    });
+    runtime._serializeBlockData = (blockData) => {
+      if (blockData instanceof Map) {
+        throw new Error('flushAllDirty 不应回退到 live blockData Map 序列化');
+      }
+      return blockData;
+    };
+
+    runtime.markChunkDirty(0, 0);
+    await runtime.flushAllDirty();
+
+    assertEqual(savedRegions.length, 1, '应写回所属 region 一次');
+    assertEqual(savedRegions[0].region.chunks['0,0'].blockData, cachedBlockData, '应直接复用 region cache 中的已序列化 blockData');
+
+    const perfEvent = globalThis.__CHUNK_PERF_EVENTS.find((event) => event.label === 'world-runtime.flush-all-dirty');
+    assertTrue(!!perfEvent, '应记录 flushAllDirty perf 事件');
+    assertEqual(perfEvent.details.blockCount, 1, 'perf 事件应记录 block 数量');
+    assertTrue(typeof perfEvent.details.serializedBytes === 'number', 'perf 事件应记录对象大小');
+
+    globalThis.CHUNK_PERF_DEBUG = false;
+    globalThis.__CHUNK_PERF_EVENTS = originalEvents;
+    globalThis._worldStore = originalWorldStore;
+  });
 });
