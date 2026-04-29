@@ -314,11 +314,8 @@ export class Chunk {
       this.structureCenters = chunkRecord.runtimeSeedData.structureCenters;
     }
 
-    // 6. 构建 pendingSnapshot，block 来源为合并后的 effectiveBlockData
-    this.pendingSnapshot = {
-      blocks: { ...effectiveBlockData },
-      entities: { modGunMan: [], rovers: [] }
-    };
+    // 6. 纯加载路径不再额外构建 pendingSnapshot.blocks，避免重复复制整块 blockData
+    this.pendingSnapshot = null;
 
     // 标记这是纯加载路径，assembleEntityPhase 不应触发持久化刷写
     this._isPureLoadPath = true;

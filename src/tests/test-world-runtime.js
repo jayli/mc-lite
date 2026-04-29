@@ -204,4 +204,40 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
 
     globalThis._worldStore = originalWorldStore;
   });
+
+  test('flushBeforeUnload - 不传 live blockData 时也应优先使用 dirty snapshot', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    const baseCode = encodeCoord(1, 2, 3);
+    const newCode = encodeCoord(4, 5, 6);
+    const flushCalls = [];
+    globalThis._worldStore = {
+      putChunkRecord: async (cx, cz, record) => {
+        flushCalls.push({ cx, cz, record });
+        return true;
+      }
+    };
+
+    const runtime = new WorldRuntime();
+    runtime.setWorld({
+      chunks: new Map([
+        ['0,0', {
+          blockData: new Map([[baseCode, { type: 'dirt', orientation: 0 }]]),
+          staticEntities: [],
+          structureCenters: []
+        }]
+      ])
+    });
+
+    runtime.markChunkDirty(0, 0);
+    runtime.recordBlockMutation(0, 0, 4, 5, 6, { type: 'stone', orientation: 1 });
+    runtime._world.chunks.get('0,0').blockData = null;
+
+    await runtime.flushBeforeUnload(0, 0, null, null);
+
+    assertEqual(flushCalls.length, 1, '应基于 dirty snapshot 成功 flushBeforeUnload');
+    assertDeepEqual(flushCalls[0].record.blockData[baseCode], { type: 'dirt', orientation: 0 }, '应保留初始方块');
+    assertDeepEqual(flushCalls[0].record.blockData[newCode], { type: 'stone', orientation: 1 }, '应写出增量修改方块');
+
+    globalThis._worldStore = originalWorldStore;
+  });
 });

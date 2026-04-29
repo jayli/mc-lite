@@ -1372,6 +1372,37 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('runtime-streaming 区块卸载时 flushBeforeUnload 不应再显式传 live blockData', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.bootstrapState.phase = 'runtime-streaming';
+    const unloadCalls = [];
+    world.worldRuntime = {
+      ensureChunkData() {
+        return Promise.resolve({ status: 'missing-region' });
+      },
+      flushBeforeUnload(cx, cz, blockDataSnapshot, entities) {
+        unloadCalls.push({ cx, cz, blockDataSnapshot, entities });
+        return Promise.resolve();
+      },
+      prefetchRegions() {}
+    };
+
+    world.update(new THREE.Vector3(200, 10, 200), 0.016);
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    assertTrue(unloadCalls.length > 0, '应触发 flushBeforeUnload');
+    assertEqual(unloadCalls[0].blockDataSnapshot, null, '卸载时不应再显式传 live blockData');
+
+    teardownEnvironment();
+  });
+
   // =========== 坐标到区块转换测试 ===========
   test('区块坐标计算正确', () => {
     const CHUNK_SIZE = PERSISTENCE_CONFIG.CHUNK_SIZE;

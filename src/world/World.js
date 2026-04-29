@@ -814,7 +814,7 @@ export class World {
         // 2. 收集 runtime entities 快照并触发异步 worldStore flush
         if (this.bootstrapState.phase === 'runtime-streaming' && this.worldRuntime) {
           const entities = this._collectRuntimeEntitiesForChunk(chunk);
-          this.worldRuntime.flushBeforeUnload(chunk.cx, chunk.cz, chunk.blockData, entities).catch(() => {});
+          this.worldRuntime.flushBeforeUnload(chunk.cx, chunk.cz, null, entities).catch(() => {});
         } else {
           persistence?.saveChunkData?.(chunk.cx, chunk.cz);
         }

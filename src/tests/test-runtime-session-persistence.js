@@ -279,6 +279,33 @@ describe('渐进式迁移: chunkRecord 不含 runtimeEntities 时从 world_delta
     }
   });
 
+  test('loadFromRecord 纯加载路径不应再复制 pendingSnapshot.blocks', async () => {
+    const service = createTestService();
+    globalThis._persistenceService = service;
+    try {
+      const code = Chunk.encodeCoord(8, 4, 8);
+      const chunk = new Chunk(0, 0);
+      let capturedPendingSnapshot = 'unset';
+      chunk.finalizeNonDeferredPhase = async () => {
+        capturedPendingSnapshot = chunk.pendingSnapshot;
+        return true;
+      };
+
+      await chunk.loadFromRecord({
+        blockData: {
+          [code]: { type: 'stone', orientation: 0 }
+        },
+        staticEntities: [],
+        runtimeSeedData: { structureCenters: [] },
+        runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
+      });
+
+      assertEqual(capturedPendingSnapshot, null, '纯加载路径不应再额外构造 pendingSnapshot.blocks');
+    } finally {
+      globalThis._persistenceService = null;
+    }
+  });
+
   test('loadFromRecord 应回退到 cache.entities 并标记迁移', async () => {
     const service = createTestService();
     globalThis._persistenceService = service;
