@@ -345,12 +345,21 @@ export class Chunk {
         specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, cacheEntities);
         this._needsEntityMigration = true;
       } else {
-        // 空数据也需要清空 ShadowStore，避免已删除实体在 chunk 重载后回流
-        specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, {
-          turrets: [],
-          zombieNests: [],
-          minecarts: []
-        });
+        const liveShadowEntities = specialEntitiesShadowStore.getAllEntitiesInChunk(this.cx, this.cz);
+        const hasLiveShadowEntities = (
+          liveShadowEntities.turrets?.length > 0 ||
+          liveShadowEntities.zombieNests?.length > 0 ||
+          liveShadowEntities.minecarts?.length > 0
+        );
+
+        if (!hasLiveShadowEntities) {
+          // 确认当前会话内也没有 live 数据时，才清空 ShadowStore，避免已删除实体回流。
+          specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, {
+            turrets: [],
+            zombieNests: [],
+            minecarts: []
+          });
+        }
         this._needsEntityMigration = false;
       }
     }

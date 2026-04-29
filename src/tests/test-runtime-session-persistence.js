@@ -7,6 +7,7 @@ import { describe, test } from './runner.js';
 import { assertEqual, assertTrue, assertNotNull } from './assert.js';
 import { PersistenceService } from '../services/PersistenceService.js';
 import { Chunk } from '../world/Chunk.js';
+import { specialEntitiesShadowStore } from '../world/SpecialEntitiesShadowStore.js';
 
 // 模拟 PersistenceWorker
 class MockPersistenceWorker {
@@ -336,6 +337,39 @@ describe('渐进式迁移: chunkRecord 不含 runtimeEntities 时从 world_delta
       assertTrue(chunk._needsEntityMigration, '应标记需要迁移');
       assertTrue(finalized, 'finalizeNonDeferredPhase 应被调用');
     } finally {
+      globalThis._persistenceService = null;
+    }
+  });
+
+  test('loadFromRecord 在 worldStore 尚未刷入前不应清空同会话 ShadowStore 中的炮塔', async () => {
+    const service = createTestService();
+    globalThis._persistenceService = service;
+    specialEntitiesShadowStore.destroyAll();
+
+    try {
+      specialEntitiesShadowStore.addEntity('turret', 0, 0, 'shadow-turret', {
+        position: { x: 8, y: 4, z: 8 },
+        rotation: { yaw: 0, pitch: 0 }
+      });
+
+      const chunk = new Chunk(0, 0);
+      let finalized = false;
+      chunk.finalizeNonDeferredPhase = async () => { finalized = true; return true; };
+
+      await chunk.loadFromRecord({
+        blockData: {},
+        staticEntities: [],
+        runtimeSeedData: { structureCenters: [] },
+        runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
+      });
+
+      assertTrue(finalized, 'finalizeNonDeferredPhase 应被调用');
+      assertTrue(chunk.pendingRuntimeEntities.turrets.length === 1, '应保留 ShadowStore 中的炮塔用于同会话 reload');
+      assertTrue(chunk.pendingRuntimeEntities.turrets[0].id === 'shadow-turret', '应恢复 ShadowStore 中的炮塔');
+      assertTrue(specialEntitiesShadowStore.getAllEntities('turret', 0, 0).length === 1, '不应把 ShadowStore 中的炮塔清空');
+      assertTrue(!chunk._needsEntityMigration, 'ShadowStore 回退不属于旧 world_deltas 迁移路径');
+    } finally {
+      specialEntitiesShadowStore.destroyAll();
       globalThis._persistenceService = null;
     }
   });

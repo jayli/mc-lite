@@ -240,4 +240,69 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
 
     globalThis._worldStore = originalWorldStore;
   });
+
+  test('flushBeforeUnload - 应同步更新已加载 region cache，避免同会话 reload 读到旧 chunkRecord', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    const staleCode = encodeCoord(1, 2, 3);
+    const freshCode = encodeCoord(4, 5, 6);
+    const savedRecords = [];
+
+    globalThis._worldStore = {
+      putChunkRecord: async (cx, cz, record) => {
+        savedRecords.push({ cx, cz, record });
+        return true;
+      },
+      getRegionRecord: async () => null
+    };
+
+    const runtime = new WorldRuntime();
+    runtime._regionCache.set('0,0', {
+      regionKey: '0,0',
+      rx: 0,
+      rz: 0,
+      chunkKeys: ['0,0'],
+      chunks: {
+        '0,0': {
+          blockData: { [staleCode]: { type: 'dirt', orientation: 0 } },
+          staticEntities: [],
+          runtimeSeedData: { structureCenters: [] },
+          runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
+        }
+      }
+    });
+
+    runtime.setWorld({
+      chunks: new Map([
+        ['0,0', {
+          cx: 0,
+          cz: 0,
+          blockData: new Map([[freshCode, { type: 'stone', orientation: 1 }]]),
+          staticEntities: [],
+          structureCenters: [],
+          runtimeSeedData: {}
+        }]
+      ])
+    });
+
+    await runtime.flushBeforeUnload(0, 0, null, {
+      turrets: [{ id: 't1', position: { x: 4, y: 5, z: 6 }, rotation: 0 }],
+      zombieNests: [],
+      minecarts: []
+    });
+
+    assertEqual(savedRecords.length, 1, '应写回 worldStore 一次');
+
+    const result = await runtime.ensureChunkData(0, 0);
+    assertEqual(result.status, 'ready', 'flush 后应仍可从缓存读取 chunk');
+    assertDeepEqual(result.chunkRecord.blockData, {
+      [freshCode]: { type: 'stone', orientation: 1 }
+    }, '同会话 reload 应读到最新 blockData，而不是旧 region cache');
+    assertDeepEqual(result.chunkRecord.runtimeEntities, {
+      turrets: [{ id: 't1', position: { x: 4, y: 5, z: 6 }, rotation: 0 }],
+      zombieNests: [],
+      minecarts: []
+    }, '同会话 reload 应读到最新 runtimeEntities');
+
+    globalThis._worldStore = originalWorldStore;
+  });
 });

@@ -214,12 +214,14 @@ export class WorldRuntime {
     try {
       dirtyEntry.pendingFlush = true;
       const entities = this._game ? this._collectEntitiesForChunk(cx, cz) : { turrets: [], zombieNests: [], minecarts: [] };
-      await this._worldStore.putChunkRecord(cx, cz, {
+      const chunkRecord = {
         blockData: this._serializeBlockData(blockData),
         staticEntities,
         runtimeSeedData,
         runtimeEntities: entities
-      });
+      };
+      await this._worldStore.putChunkRecord(cx, cz, chunkRecord);
+      this._updateRegionCacheChunkRecord(cx, cz, chunkRecord);
       dirtyEntry.dirty = false;
       dirtyEntry.pendingFlush = false;
       this._dirtyChunks.delete(key);
@@ -271,6 +273,7 @@ export class WorldRuntime {
             region.chunks[chunkKey] = chunkRecord;
           }
           await this._worldStore.saveRegionRecord(group.rx, group.rz, region);
+          this._regionCache.set(rKey, region);
         } else {
           // 创建新 region（不应该发生，因为脏 chunk 必然有 region）
           const newRegion = {
@@ -283,6 +286,7 @@ export class WorldRuntime {
             generatorVersion: '1.0'
           };
           await this._worldStore.saveRegionRecord(group.rx, group.rz, newRegion);
+          this._regionCache.set(rKey, newRegion);
         }
 
         // 清除已写回的脏标记
@@ -326,7 +330,29 @@ export class WorldRuntime {
     };
 
     await this._worldStore.putChunkRecord(cx, cz, record);
+    this._updateRegionCacheChunkRecord(cx, cz, record);
     this._dirtyChunks.delete(key);
+  }
+
+  _updateRegionCacheChunkRecord(cx, cz, chunkRecord) {
+    const { rx, rz } = this._chunkToRegion(cx, cz);
+    const regionKey = this._regionKey(rx, rz);
+    const cachedRegion = this._regionCache.get(regionKey);
+    if (!cachedRegion) return;
+
+    if (!cachedRegion.chunks) {
+      cachedRegion.chunks = {};
+    }
+
+    const key = this._chunkKey(cx, cz);
+    cachedRegion.chunks[key] = chunkRecord;
+
+    if (!Array.isArray(cachedRegion.chunkKeys)) {
+      cachedRegion.chunkKeys = [];
+    }
+    if (!cachedRegion.chunkKeys.includes(key)) {
+      cachedRegion.chunkKeys.push(key);
+    }
   }
 
   /**
@@ -352,7 +378,9 @@ export class WorldRuntime {
     if (legacyData?.entities) {
       chunkRecord.runtimeEntities = legacyData.entities;
       // 异步回填到 worldStore（不阻塞 chunk 加载）
-      this._worldStore.putChunkRecord(cx, cz, chunkRecord).catch((err) => {
+      this._worldStore.putChunkRecord(cx, cz, chunkRecord).then(() => {
+        this._updateRegionCacheChunkRecord(cx, cz, chunkRecord);
+      }).catch((err) => {
         console.warn(`[WorldRuntime] Failed to backfill migrated entities for chunk ${cx},${cz}:`, err);
       });
       console.log(`[WorldRuntime] migrated runtime entities for chunk ${cx},${cz}`);
