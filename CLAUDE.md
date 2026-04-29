@@ -24,12 +24,31 @@ npm run lint
 
 ## 开发命令
 - **启动开发服务器**: `npm run start` (端口 8080)
-- **运行测试**: 浏览器内测试，启动服务器后访问 http://localhost:8080/src/tests/index.html，点击"运行所有测试"（无 CLI 测试命令）
+- **运行测试**: `node command/run-tests.js` (使用 Playwright headless 浏览器运行全部测试)
+  - `--verbose`: 显示失败用例的详细错误信息
+  - `--port 3000`: 指定开发服务器端口（默认 8080）
 - **代码检查**: `npm run lint` (ESLint 检查代码规范)
 - **自动修复**: `npm run lint:fix` (自动修复可修复的 ESLint 问题)
-- **规格驱动开发**: 使用 `Skill("speckit.specify")`、`Skill("speckit.tasks")`、`Skill("speckit.implement")`
 
 > 开发服务器会自动提供热加载能力。
+
+## TDD 工作流
+使用 `superpowers:test-driven-development` 技能进行开发时，遵循 Red-Green-Refactor 循环：
+
+1. **RED（飘红）**: 先写一个失败的测试，证明功能是缺失的
+2. **验证 RED**: 运行 `node command/run-tests.js` 确认测试失败（飘红）
+3. **GREEN（飘绿）**: 写最少量的代码让测试通过
+4. **验证 GREEN**: 运行 `node command/run-tests.js` 确认所有测试通过（飘绿）
+5. **REFACTOR**: 重构代码，保持测试通过
+6. **重复**: 写下一个失败测试
+
+**运行测试的时机**:
+- 刚写好测试用例后 → `node command/run-tests.js` 验证是否按预期失败（飘红）
+- 实现功能代码后 → `node command/run-tests.js` 验证是否通过（飘绿）
+- 重构完成后 → `node command/run-tests.js` 确认没有引入回归
+- 修复 bug 后 → `node command/run-tests.js --verbose` 回归验证
+
+**注意**: 测试必须先失败再实现。如果测试一开始就通过，说明测试写错了或者在测试已有行为。
 
 ## 调试
 - 入口文件: `index.html` — 通过 `<script type="module">` 加载 `src/core/Game.js` 并启动游戏
@@ -38,7 +57,6 @@ npm run lint
 ## 代码规范
 - **材质统一管理**: `src/core/MaterialManager.js`
 - **方块属性集中配置**: `src/constants/BlockData.js`
-- **ESLint 配置**: `eslint.config.mjs`
 
 ## 核心架构
 ### 三层架构
