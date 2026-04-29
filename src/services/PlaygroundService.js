@@ -4,7 +4,6 @@
  * 负责创建、管理创造台平台和导入/导出模型数据
  */
 
-import { persistenceService } from './PersistenceService.js';
 import { getBlockProperties } from '../constants/BlockData.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { worldWorker, workerCallbacks } from '../world/ChunkConsolidation.js';
@@ -87,48 +86,6 @@ export class PlaygroundService {
               console.log(`[PlaygroundService] 检测到已存在的创造台 at (${originX}, ${y}, ${originZ})`);
               return true;
             }
-          }
-        }
-      }
-    }
-
-    // 如果没找到中心方块，尝试通过 persistenceService 的缓存查找
-    // 注意：persistenceService.cache 的键是区块坐标 "cx,cz"，值是 { blocks: {number: entry}, entities: {} }
-    if (persistenceService && persistenceService.cache) {
-      for (const [, chunkData] of persistenceService.cache) {
-        if (!chunkData || !chunkData.blocks) continue;
-        for (const [blockKey, blockData] of Object.entries(chunkData.blocks)) {
-          if (!blockData) continue;
-          const entryType = typeof blockData === 'string' ? blockData : blockData?.type;
-          if (entryType === 'playground_center_block') {
-            // 解析坐标：兼容数字编码 key 和旧字符串 "x,y,z" 格式
-            let x, y, z;
-            if (blockKey.includes(',')) {
-              // 旧格式 "x,y,z"
-              [x, y, z] = blockKey.split(',').map(Number);
-            } else {
-              // 新格式：数字编码 key
-              ({ x, y, z } = Chunk.decodeCoord(Number(blockKey)));
-            }
-            this.playgroundOrigin = { x, y, z };
-            this.isPlaygroundActive = true;
-
-            // 重新构建 playgroundBlocks 集合
-            this.playgroundBlocks.clear();
-            const halfSize = this.playgroundSize / 2;
-            const originX = x - halfSize;
-            const originZ = z - halfSize;
-
-            for (let dx = 0; dx < this.playgroundSize; dx++) {
-              for (let dz = 0; dz < this.playgroundSize; dz++) {
-                const px = Math.floor(originX + dx);
-                const pz = Math.floor(originZ + dz);
-                this.playgroundBlocks.add(`${px},${y},${pz}`);
-              }
-            }
-
-            console.log(`[PlaygroundService] 从缓存检测到已存在的创造台 at (${originX}, ${y}, ${originZ})`);
-            return true;
           }
         }
       }

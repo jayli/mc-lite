@@ -4,16 +4,15 @@
  */
 import * as THREE from 'three';
 import { getBlockProperties, createBlockPropsResolver } from '../constants/BlockData.js';
-import { getRotationAngle } from '../utils/OrientationUtils.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
-import { persistenceService } from '../services/PersistenceService.js';
 import { materials } from '../core/MaterialManager.js';
 import { geomMap, worldWorker, workerCallbacks } from './ChunkConsolidation.js';
 import { recordChunkPerf } from '../utils/ChunkPerfMonitor.js';
+import { worldStore } from './WorldStore.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
-const getPersistenceService = () => globalThis._persistenceService || persistenceService;
 const getMaterials = () => globalThis._materials || materials;
+const getWorldStore = (chunk) => chunk?.world?.worldStore || globalThis._worldStore || worldStore;
 
 // 获取方块属性函数 - 优先使用测试环境的模拟
 const getBlockProps = createBlockPropsResolver(getBlockProperties);
@@ -22,13 +21,33 @@ const isSolidShadowCaster = (props) => props.isSolid && props.isRendered !== fal
 const isGlassType = (type) => typeof type === 'string' && type.includes('glass');
 
 export function extendChunk(Chunk) {
+  function buildSnapshotFromChunkRecord(chunkRecord) {
+    if (!chunkRecord) return null;
+    const staticTrees = Array.isArray(chunkRecord.staticEntities)
+      ? chunkRecord.staticEntities
+        .filter(entity => entity?.type === 'static_tree')
+        .map(entity => ({ x: entity.x, y: entity.y, z: entity.z }))
+      : [];
+    return {
+      blocks: chunkRecord.blockData || {},
+      meta: {},
+      entities: {
+        modGunMan: [],
+        rovers: [],
+        zombieNests: chunkRecord.runtimeEntities?.zombieNests || [],
+        staticTrees
+      }
+    };
+  }
+
   /**
    * 生成区块内容
    * 将计算压力较大的地形和结构生成逻辑分解到 Worker 线程中执行
    */
   Chunk.prototype.gen = async function() {
-    // 0. 加载持久化全量数据 (快照)
-    const snapshot = await getPersistenceService().getChunkData(this.cx, this.cz);
+    // 0. 从 WorldStore 读取权威 ChunkRecord，并转换为兼容 Worker 的 snapshot 结构
+    const chunkRecord = await getWorldStore(this).loadChunkRecord?.(this.cx, this.cz);
+    const snapshot = buildSnapshotFromChunkRecord(chunkRecord);
 
     // 收集相邻已加载 chunk 的 structureCenters，用于跨 Chunk 空岛/云朵渲染
     const neighborStructureCenters = [];

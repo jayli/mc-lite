@@ -15,7 +15,7 @@ import { describe, test } from './runner.js';
 import { assertEqual, assertTrue, assertFalse, assertNotNull } from './assert.js';
 import * as THREE from 'three';
 import { Chunk } from '../world/Chunk.js';
-import { worldWorker } from '../world/ChunkConsolidation.js';
+import { worldWorker, workerCallbacks } from '../world/ChunkConsolidation.js';
 import { mockFaceCullingSystem, mockMaterials, mockBlockData } from './test-mocks.js';
 
 // 模拟 WorldWorker
@@ -556,6 +556,96 @@ describe('Chunk 真实类测试', (test) => {
 
     assertEqual(saveCall, undefined, 'runtime-streaming 下不应再通过 saveDebounced 写旧持久化通道');
 
+    teardownEnvironment();
+  });
+
+  test('saveDebounced - bootstrapping 下应通过 worldRuntime 写回而不是旧 saveChunkData', async () => {
+    setupEnvironment();
+    await new Promise(resolve => setTimeout(resolve, 650));
+    mockPersistenceService.calls = [];
+
+    const flushCalls = [];
+    const world = createMockWorld();
+    world.bootstrapState = { phase: 'bootstrapping' };
+    world.worldRuntime = {
+      flushChunk: async (cx, cz) => {
+        flushCalls.push({ cx, cz });
+      }
+    };
+    const chunk = new Chunk(0, 0, world);
+
+    chunk.addBlockDynamic(5, 10, 5, 'stone', 0);
+    await new Promise(resolve => setTimeout(resolve, 650));
+
+    const saveCall = mockPersistenceService.calls.find(call =>
+      call.method === 'saveChunkData'
+    );
+
+    assertEqual(saveCall, undefined, 'bootstrapping 下不应再通过旧 saveChunkData 写 world_deltas');
+    assertEqual(flushCalls.length, 1, 'bootstrapping 下应通过 worldRuntime.flushChunk 写回');
+    assertEqual(flushCalls[0].cx, 0, 'flushChunk 应写回正确 cx');
+    assertEqual(flushCalls[0].cz, 0, 'flushChunk 应写回正确 cz');
+
+    teardownEnvironment();
+  });
+
+  test('gen - 应通过 WorldStore 读取 chunkRecord，而不是旧 getChunkData', async () => {
+    setupEnvironment();
+
+    const originalWorldStore = globalThis._worldStore;
+    const originalPostMessage = worldWorker.postMessage;
+    const code = Chunk.encodeCoord(1, 2, 3);
+    const sentMessages = [];
+
+    globalThis._worldStore = {
+      loadChunkRecord: async (cx, cz) => ({
+        cx,
+        cz,
+        blockData: {
+          [code]: { type: 'stone', orientation: 0 }
+        },
+        staticEntities: [],
+        runtimeSeedData: {}
+      })
+    };
+    mockPersistenceService.getChunkData = async () => {
+      throw new Error('gen 不应再直接读取 PersistenceService.getChunkData');
+    };
+
+    worldWorker.postMessage = (message) => {
+      sentMessages.push(message);
+      const callback = workerCallbacks.get(message.taskId);
+      if (callback) {
+        callback({
+          cx: message.cx,
+          cz: message.cz,
+          scatteredBlocks: [],
+          solidBlocks: [],
+          modGunMan: [],
+          rovers: [],
+          allBlockTypes: {},
+          visibleKeys: [],
+          snapshot: message.snapshot || null,
+          structureCenters: [],
+          entities: { modGunMan: [], rovers: [] }
+        });
+      }
+    };
+
+    const world = createMockWorld();
+    world.bootstrapState = { phase: 'runtime-streaming' };
+    const chunk = new Chunk(0, 0, world);
+
+    await chunk.gen();
+
+    assertEqual(sentMessages.length, 1, 'gen 应发送一次 worker 请求');
+    assertTrue(!!sentMessages[0].snapshot, 'gen 应把 WorldStore 的 chunkRecord 转成 snapshot');
+    assertNotNull(sentMessages[0].snapshot.blocks[code], 'snapshot.blocks 应包含 WorldStore 返回的 blockData');
+    assertEqual(sentMessages[0].skipTerrainGeneration, true, '有权威 blockData 时应跳过地形生成');
+
+    worldWorker.postMessage = originalPostMessage;
+    globalThis._worldStore = originalWorldStore;
+    mockPersistenceService.getChunkData = () => Promise.resolve(null);
     teardownEnvironment();
   });
 

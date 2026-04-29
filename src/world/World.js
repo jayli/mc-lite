@@ -5,7 +5,6 @@ import * as THREE from 'three';
 import { Chunk } from './Chunk.js';
 import { BlockScatterManager } from './BlockScatterManager.js';
 import { chestManager } from './entities/Chest.js';
-import { persistenceService } from '../services/PersistenceService.js';
 import { noise } from '../utils/MathUtils.js';
 import { ParticleSystem } from './effects/ParticleSystem.js';
 import { parseBlockEntry } from '../utils/OrientationUtils.js';
@@ -23,7 +22,6 @@ import { worldStore } from './WorldStore.js';
 import { specialEntitiesShadowStore } from './SpecialEntitiesShadowStore.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
-const getPersistenceService = () => globalThis._persistenceService || persistenceService;
 const getChestManager = () => globalThis._chestManager || chestManager;
 const getParticleSystem = () => globalThis._ParticleSystem || ParticleSystem;
 
@@ -804,19 +802,15 @@ export class World {
     // 遍历已加载区块，卸载超出渲染距离（额外加1作为缓冲）的区块
     for (const [key, chunk] of this.chunks) {
       if (Math.abs(chunk.cx - cx) > this.renderDistance + 1 || Math.abs(chunk.cz - cz) > this.renderDistance + 1) {
-        const persistence = getPersistenceService();
-
         // 1. 通知 MinecartManager 停止该 Chunk 内的矿车运动并保存状态
         if (this.minecartManager) {
           this.minecartManager.stopMinecartsForChunk(chunk.cx, chunk.cz);
         }
 
-        // 2. 收集 runtime entities 快照并触发异步 worldStore flush
-        if (this.bootstrapState.phase === 'runtime-streaming' && this.worldRuntime) {
+        // 2. 收集 runtime entities 快照并统一通过 WorldRuntime 写回 WorldStore
+        if (this.worldRuntime) {
           const entities = this._collectRuntimeEntitiesForChunk(chunk);
           this.worldRuntime.flushBeforeUnload(chunk.cx, chunk.cz, null, entities).catch(() => {});
-        } else {
-          persistence?.saveChunkData?.(chunk.cx, chunk.cz);
         }
 
         // 3. 清理方块分发 buffer
