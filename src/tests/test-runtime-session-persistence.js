@@ -307,7 +307,8 @@ describe('渐进式迁移: chunkRecord 不含 runtimeEntities 时从 world_delta
     }
   });
 
-  test('loadFromRecord 应回退到 cache.entities 并标记迁移', async () => {
+  test('loadFromRecord 不应再回退到 cache.entities', async () => {
+    specialEntitiesShadowStore.destroyAll();
     const service = createTestService();
     globalThis._persistenceService = service;
     try {
@@ -315,7 +316,6 @@ describe('渐进式迁移: chunkRecord 不含 runtimeEntities 时从 world_delta
       let finalized = false;
       chunk.finalizeNonDeferredPhase = async () => { finalized = true; return true; };
 
-      // 确保 cache 中有 entities 数据
       service.ensureChunkSnapshot('0,0');
       service.cache.get('0,0').entities = {
         turrets: [{ id: 't2', position: { x: 5, y: 3, z: 5 }, rotation: { yaw: 1, pitch: 0 } }],
@@ -323,7 +323,6 @@ describe('渐进式迁移: chunkRecord 不含 runtimeEntities 时从 world_delta
         minecarts: []
       };
 
-      // chunkRecord 不含 runtimeEntities（旧格式）
       const chunkRecord = {
         blockData: {},
         staticEntities: [],
@@ -332,9 +331,8 @@ describe('渐进式迁移: chunkRecord 不含 runtimeEntities 时从 world_delta
 
       await chunk.loadFromRecord(chunkRecord);
 
-      assertTrue(chunk.pendingRuntimeEntities.turrets.length === 1, '应从 cache.entities 读取炮塔');
-      assertTrue(chunk.pendingRuntimeEntities.turrets[0].id === 't2', '炮塔 id 应正确');
-      assertTrue(chunk._needsEntityMigration, '应标记需要迁移');
+      assertTrue(chunk.pendingRuntimeEntities.turrets.length === 0, '不应再从 cache.entities 回退读取炮塔');
+      assertTrue(!chunk._needsEntityMigration, '不应再标记旧 world_deltas 迁移');
       assertTrue(finalized, 'finalizeNonDeferredPhase 应被调用');
     } finally {
       globalThis._persistenceService = null;
@@ -374,7 +372,7 @@ describe('渐进式迁移: chunkRecord 不含 runtimeEntities 时从 world_delta
     }
   });
 
-  test('chunkRecord.runtimeEntities 应优先于 cache.entities', async () => {
+  test('chunkRecord.runtimeEntities 应优先于旧 cache.entities 且完全忽略后者', async () => {
     const service = createTestService();
     globalThis._persistenceService = service;
     try {

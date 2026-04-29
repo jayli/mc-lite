@@ -60,6 +60,90 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     globalThis._worldStore = originalWorldStore;
   });
 
+  test('ensureChunkData - 缺失 runtimeEntities 时应仅通过 WorldStore 迁移旧档实体', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    const migratedEntities = {
+      turrets: [{ id: 'legacy-turret', position: { x: 8, y: 4, z: 8 }, rotation: { yaw: 0, pitch: 0 } }],
+      zombieNests: [],
+      minecarts: []
+    };
+    const putCalls = [];
+
+    globalThis._worldStore = {
+      getRegionRecord: async () => ({
+        regionKey: '0,0',
+        rx: 0,
+        rz: 0,
+        chunkKeys: ['0,0'],
+        chunks: {
+          '0,0': {
+            blockData: {},
+            staticEntities: [],
+            runtimeSeedData: {}
+          }
+        }
+      }),
+      getLegacyChunkDelta: async (cx, cz) => {
+        assertEqual(cx, 0, '应查询正确的 legacy cx');
+        assertEqual(cz, 0, '应查询正确的 legacy cz');
+        return { entities: migratedEntities };
+      },
+      commitChunkRecord: async (cx, cz, record) => {
+        putCalls.push({ cx, cz, record });
+        return true;
+      }
+    };
+
+    const runtime = new WorldRuntime();
+    const result = await runtime.ensureChunkData(0, 0);
+
+    assertEqual(result.status, 'ready', '迁移后仍应返回 ready');
+    assertDeepEqual(result.chunkRecord.runtimeEntities, migratedEntities, '应通过 WorldStore 迁移旧档 runtimeEntities');
+    assertEqual(putCalls.length, 1, '迁移完成后应回填 worldStore 一次');
+    assertDeepEqual(putCalls[0].record.runtimeEntities, migratedEntities, '回填内容应与迁移实体一致');
+
+    globalThis._worldStore = originalWorldStore;
+  });
+
+  test('ensureChunkData - 缺失 runtimeEntities 且无旧档时应补空结构且不回写', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    const putCalls = [];
+
+    globalThis._worldStore = {
+      getRegionRecord: async () => ({
+        regionKey: '0,0',
+        rx: 0,
+        rz: 0,
+        chunkKeys: ['0,0'],
+        chunks: {
+          '0,0': {
+            blockData: {},
+            staticEntities: [],
+            runtimeSeedData: {}
+          }
+        }
+      }),
+      getLegacyChunkDelta: async () => null,
+      commitChunkRecord: async (...args) => {
+        putCalls.push(args);
+        return true;
+      }
+    };
+
+    const runtime = new WorldRuntime();
+    const result = await runtime.ensureChunkData(0, 0);
+
+    assertEqual(result.status, 'ready', '无旧档时仍应返回 ready');
+    assertDeepEqual(result.chunkRecord.runtimeEntities, {
+      turrets: [],
+      zombieNests: [],
+      minecarts: []
+    }, '应补齐空的 runtimeEntities 结构');
+    assertEqual(putCalls.length, 0, '无旧档数据时不应发生回填');
+
+    globalThis._worldStore = originalWorldStore;
+  });
+
   test('markChunkDirty - 应触发防抖 flush 并清除脏标记', async () => {
     const originalWorldStore = globalThis._worldStore;
     const flushCalls = [];

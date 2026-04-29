@@ -16,7 +16,6 @@
  */
 import { RegionCache } from './RegionCache.js';
 import { worldStore } from './WorldStore.js';
-import { persistenceService } from '../services/PersistenceService.js';
 import { specialEntitiesShadowStore } from './SpecialEntitiesShadowStore.js';
 import { encodeCoord } from '../utils/CoordEncoding.js';
 import { isChunkPerfDebugEnabled, recordChunkPerf } from '../utils/ChunkPerfMonitor.js';
@@ -99,9 +98,9 @@ export class WorldRuntime {
       runtimeEntities: chunkData.runtimeEntities || { turrets: [], zombieNests: [], minecarts: [] }
     };
 
-    // 渐进式迁移：如果 region record 中不含 runtimeEntities，尝试从 world_deltas 迁移
+    // 渐进式迁移：如果 region record 中不含 runtimeEntities，仅允许通过 WorldStore 读取旧档。
     if (!chunkData.runtimeEntities) {
-      await this._ensureChunkEntitiesMigrated(cx, cz, chunkRecord);
+      await this._hydrateLegacyRuntimeEntities(cx, cz, chunkRecord);
     }
 
     return {
@@ -218,7 +217,7 @@ export class WorldRuntime {
         runtimeSeedData: this._resolveRuntimeSeedData(chunk, cachedChunkRecord),
         runtimeEntities: entities
       };
-      await this._worldStore.putChunkRecord(cx, cz, chunkRecord);
+      await this._commitChunkRecord(cx, cz, chunkRecord);
       this._updateRegionCacheChunkRecord(cx, cz, chunkRecord);
       this._recordFlushPerf('world-runtime.flush-chunk', startedAt, {
         chunkKey: key,
@@ -355,7 +354,7 @@ export class WorldRuntime {
       runtimeEntities: entities
     };
 
-    await this._worldStore.putChunkRecord(cx, cz, record);
+    await this._commitChunkRecord(cx, cz, record);
     this._updateRegionCacheChunkRecord(cx, cz, record);
     this._recordFlushPerf('world-runtime.flush-before-unload', startedAt, {
       chunkKey: key,
@@ -393,32 +392,29 @@ export class WorldRuntime {
     return specialEntitiesShadowStore.getAllEntitiesInChunk(cx, cz);
   }
 
-  /**
-   * 渐进式迁移：当 chunkRecord 不含 runtimeEntities 时，从 world_deltas 表读取
-   * entities 并回填到 worldStore。
-   */
-  async _ensureChunkEntitiesMigrated(cx, cz, chunkRecord) {
-    const persistence = persistenceService;
-    if (!persistence) {
-      chunkRecord.runtimeEntities = { turrets: [], zombieNests: [], minecarts: [] };
+  async _hydrateLegacyRuntimeEntities(cx, cz, chunkRecord) {
+    const legacyData = await this._worldStore.getLegacyChunkDelta?.(cx, cz);
+    const legacyEntities = legacyData?.entities;
+
+    if (legacyEntities) {
+      chunkRecord.runtimeEntities = legacyEntities;
+      try {
+        await this._commitChunkRecord(cx, cz, chunkRecord);
+        this._updateRegionCacheChunkRecord(cx, cz, chunkRecord);
+      } catch (err) {
+        console.warn(`[WorldRuntime] Failed to backfill migrated entities for chunk ${cx},${cz}:`, err);
+      }
       return;
     }
 
-    const legacyData = await persistence.workerGetChunkData(cx, cz);
+    chunkRecord.runtimeEntities = { turrets: [], zombieNests: [], minecarts: [] };
+  }
 
-    if (legacyData?.entities) {
-      chunkRecord.runtimeEntities = legacyData.entities;
-      // 异步回填到 worldStore（不阻塞 chunk 加载）
-      this._worldStore.putChunkRecord(cx, cz, chunkRecord).then(() => {
-        this._updateRegionCacheChunkRecord(cx, cz, chunkRecord);
-      }).catch((err) => {
-        console.warn(`[WorldRuntime] Failed to backfill migrated entities for chunk ${cx},${cz}:`, err);
-      });
-      console.log(`[WorldRuntime] migrated runtime entities for chunk ${cx},${cz}`);
-    } else {
-      // world_deltas 中也没有，创建空结构
-      chunkRecord.runtimeEntities = { turrets: [], zombieNests: [], minecarts: [] };
+  async _commitChunkRecord(cx, cz, chunkRecord) {
+    if (typeof this._worldStore.commitChunkRecord === 'function') {
+      return this._worldStore.commitChunkRecord(cx, cz, chunkRecord);
     }
+    return this._worldStore.putChunkRecord(cx, cz, chunkRecord);
   }
 
   // ============================================================

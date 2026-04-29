@@ -124,18 +124,7 @@ export class WorldStore {
   async getChunkRecord(cx, cz) {
     const { rx, rz } = this.chunkToRegion(cx, cz);
     const region = await this.getRegionRecord(rx, rz);
-    if (!region || !region.chunks) return null;
-    const key = this.chunkKey(cx, cz);
-    const chunkData = region.chunks[key];
-    if (!chunkData) return null;
-    return {
-      cx,
-      cz,
-      blockData: chunkData.blockData || {},
-      staticEntities: chunkData.staticEntities || [],
-      runtimeSeedData: chunkData.runtimeSeedData || {},
-      runtimeEntities: chunkData.runtimeEntities || { turrets: [], zombieNests: [], minecarts: [] }
-    };
+    return this._extractChunkRecord(region, cx, cz);
   }
 
   /**
@@ -153,17 +142,20 @@ export class WorldStore {
       const key = this.chunkKey(cx, cz);
       const chunkData = region.chunks[key];
       if (chunkData) {
-        result.set(key, {
-          cx,
-          cz,
-          blockData: chunkData.blockData || {},
-          staticEntities: chunkData.staticEntities || [],
-          runtimeSeedData: chunkData.runtimeSeedData || {},
-          runtimeEntities: chunkData.runtimeEntities || { turrets: [], zombieNests: [], minecarts: [] }
-        });
+        result.set(key, this._extractChunkRecord(region, cx, cz));
       }
     }
     return result;
+  }
+
+  /**
+   * 业务层专用：加载 chunk 权威记录
+   * @param {number} cx
+   * @param {number} cz
+   * @returns {Promise<object|null>}
+   */
+  async loadChunkRecord(cx, cz) {
+    return this.getChunkRecord(cx, cz);
   }
 
   // ============================================================
@@ -206,6 +198,48 @@ export class WorldStore {
     }
 
     return this.saveRegionRecord(rx, rz, region);
+  }
+
+  /**
+   * 业务层专用：提交 chunk 权威记录
+   * @param {number} cx
+   * @param {number} cz
+   * @param {object} chunkRecord
+   * @returns {Promise<any>}
+   */
+  async commitChunkRecord(cx, cz, chunkRecord) {
+    return this.putChunkRecord(cx, cz, chunkRecord);
+  }
+
+  /**
+   * 业务层专用：仅提交 runtimeEntities，避免业务层自行读改写 region。
+   * @param {number} cx
+   * @param {number} cz
+   * @param {object} runtimeEntities
+   * @returns {Promise<any>}
+   */
+  async commitRuntimeEntities(cx, cz, runtimeEntities) {
+    const chunkRecord = (await this.loadChunkRecord(cx, cz)) || {
+      cx,
+      cz,
+      blockData: {},
+      staticEntities: [],
+      runtimeSeedData: {}
+    };
+    chunkRecord.runtimeEntities = runtimeEntities || { turrets: [], zombieNests: [], minecarts: [] };
+    return this.commitChunkRecord(cx, cz, chunkRecord);
+  }
+
+  /**
+   * 旧档迁移专用：读取 world_deltas 中的旧 chunk 数据。
+   * 新运行时禁止业务层直接调用 PersistenceService。
+   * @param {number} cx
+   * @param {number} cz
+   * @returns {Promise<object|null>}
+   */
+  async getLegacyChunkDelta(cx, cz) {
+    const key = this.chunkKey(cx, cz);
+    return getPersistenceService().postMessage('getChunkData', { key });
   }
 
   /**
@@ -265,6 +299,21 @@ export class WorldStore {
    */
   async clearWorld() {
     return getPersistenceService().postMessage('clearWorld', {});
+  }
+
+  _extractChunkRecord(region, cx, cz) {
+    if (!region || !region.chunks) return null;
+    const key = this.chunkKey(cx, cz);
+    const chunkData = region.chunks[key];
+    if (!chunkData) return null;
+    return {
+      cx,
+      cz,
+      blockData: chunkData.blockData || {},
+      staticEntities: chunkData.staticEntities || [],
+      runtimeSeedData: chunkData.runtimeSeedData || {},
+      runtimeEntities: chunkData.runtimeEntities || { turrets: [], zombieNests: [], minecarts: [] }
+    };
   }
 }
 

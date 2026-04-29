@@ -293,9 +293,6 @@ export class Chunk {
     this.needsStoreRetry = false;
     this.loadState = 'loading-from-record';
 
-    const persistence = getPersistenceService();
-    const chunkKey = `${this.cx},${this.cz}`;
-
     // 1. runtime blockData 只从 WorldStore 读取，不再让旧 session cache 覆盖权威数据
     const effectiveBlockData = chunkRecord.blockData || {};
 
@@ -321,9 +318,8 @@ export class Chunk {
     this._isPureLoadPath = true;
 
     // 7. 恢复运行时实体数据
-    // 优先级: chunkRecord.runtimeEntities > cache.entities (渐进式迁移回退)
-    // 不依赖 ShadowStore 的状态（全局单例可能被其他测试/场景填充），
-    // 仅根据 chunkRecord 中是否有 runtimeEntities 来判断是否走迁移路径。
+    // P2 之后仅允许从 chunkRecord.runtimeEntities 或同会话 ShadowStore 恢复，
+    // 不再回退 world_deltas / persistence cache.entities。
     const hasRuntimeEntities = chunkRecord.runtimeEntities && (
       chunkRecord.runtimeEntities.turrets?.length > 0 ||
       chunkRecord.runtimeEntities.zombieNests?.length > 0 ||
@@ -331,37 +327,25 @@ export class Chunk {
     );
 
     if (hasRuntimeEntities) {
-      // 新格式：直接从 chunkRecord 读取
       specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, chunkRecord.runtimeEntities);
       this._needsEntityMigration = false;
     } else {
-      // 旧格式：回退到 cache.entities（渐进式迁移）
-      const cacheEntities = persistence?.ensureChunkSnapshot?.(chunkKey)?.entities;
-      if (cacheEntities && (
-        cacheEntities.turrets?.length > 0 ||
-        cacheEntities.zombieNests?.length > 0 ||
-        cacheEntities.minecarts?.length > 0
-      )) {
-        specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, cacheEntities);
-        this._needsEntityMigration = true;
-      } else {
-        const liveShadowEntities = specialEntitiesShadowStore.getAllEntitiesInChunk(this.cx, this.cz);
-        const hasLiveShadowEntities = (
-          liveShadowEntities.turrets?.length > 0 ||
-          liveShadowEntities.zombieNests?.length > 0 ||
-          liveShadowEntities.minecarts?.length > 0
-        );
+      const liveShadowEntities = specialEntitiesShadowStore.getAllEntitiesInChunk(this.cx, this.cz);
+      const hasLiveShadowEntities = (
+        liveShadowEntities.turrets?.length > 0 ||
+        liveShadowEntities.zombieNests?.length > 0 ||
+        liveShadowEntities.minecarts?.length > 0
+      );
 
-        if (!hasLiveShadowEntities) {
-          // 确认当前会话内也没有 live 数据时，才清空 ShadowStore，避免已删除实体回流。
-          specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, {
-            turrets: [],
-            zombieNests: [],
-            minecarts: []
-          });
-        }
-        this._needsEntityMigration = false;
+      if (!hasLiveShadowEntities) {
+        // 确认当前会话内也没有 live 数据时，才清空 ShadowStore，避免已删除实体回流。
+        specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, {
+          turrets: [],
+          zombieNests: [],
+          minecarts: []
+        });
       }
+      this._needsEntityMigration = false;
     }
 
     this.pendingRuntimeEntities = specialEntitiesShadowStore.getAllEntitiesInChunk(this.cx, this.cz);
