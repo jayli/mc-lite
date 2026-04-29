@@ -14,6 +14,10 @@ export function extendChunk(Chunk) {
   Chunk.prototype.saveDebounced = function() {
     if (this.saveTimeout) clearTimeout(this.saveTimeout);
     this.saveTimeout = setTimeout(() => {
+      if (this.world?.bootstrapState?.phase === 'runtime-streaming') {
+        this.saveTimeout = null;
+        return;
+      }
       getPersistenceService().saveChunkData(this.cx, this.cz);
       this.saveTimeout = null;
     }, 500);

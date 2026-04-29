@@ -216,9 +216,11 @@ async function runRealWorldWorker(message) {
 const mockPersistenceService = {
   _worldMeta: null,
   _regions: new Map(),
+  calls: [],
   reset() {
     this._worldMeta = null;
     this._regions.clear();
+    this.calls = [];
   },
   async postMessage(action, payload = {}) {
     switch (action) {
@@ -248,7 +250,13 @@ const mockPersistenceService = {
   },
   recordChange: () => {},
   recordChangeForChunk: () => {},
-  saveChunkData: () => Promise.resolve(),
+  saveChunkData: (...args) => {
+    mockPersistenceService.calls.push({ method: 'saveChunkData', args });
+    return Promise.resolve();
+  },
+  snapshotChunkBlocks: (...args) => {
+    mockPersistenceService.calls.push({ method: 'snapshotChunkBlocks', args });
+  },
   saveDebounced: () => {},
   getChunkData: () => Promise.resolve(null)
 };
@@ -1124,6 +1132,7 @@ describe('World 真实类测试', (test) => {
 
     const dirtyCalls = [];
     world.worldRuntime = {
+      recordBlockMutation() {},
       markChunkDirty(cx, cz) {
         dirtyCalls.push(`${cx},${cz}`);
       }
@@ -1335,6 +1344,30 @@ describe('World 真实类测试', (test) => {
 
     // 原区块应该已卸载
     assertFalse(world.chunks.has('0,0'), '区块 0,0 应该已卸载');
+
+    teardownEnvironment();
+  });
+
+  test('runtime-streaming 区块卸载时不应再同步 snapshotChunkBlocks 到旧 cache', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.bootstrapState.phase = 'runtime-streaming';
+    mockPersistenceService.calls = [];
+
+    world.update(new THREE.Vector3(200, 10, 200), 0.016);
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const snapshotCall = mockPersistenceService.calls.find(call =>
+      call.method === 'snapshotChunkBlocks'
+    );
+
+    assertUndefined(snapshotCall, 'runtime-streaming 卸载时不应再回灌旧 session cache');
 
     teardownEnvironment();
   });

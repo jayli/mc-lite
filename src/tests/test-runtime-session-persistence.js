@@ -191,33 +191,33 @@ describe('运行时会话持久化测试', (test) => {
     assertNotNull(afterFailedFlush.blocks[code], 'flush 失败后缓存仍应包含方块');
   });
 
-  test('cache.blocks 应覆盖 chunkRecord.blockData（会话级 overlay）', () => {
+  test('loadFromRecord 不应再让 cache.blocks 覆盖 chunkRecord.blockData', async () => {
     const service = createTestService();
-    const chunkKey = '2,2';
-    const code = Chunk.encodeCoord(8, 10, 8);
+    globalThis._persistenceService = service;
+    try {
+      const chunkKey = '2,2';
+      const code = Chunk.encodeCoord(8, 10, 8);
+      const chunk = new Chunk(2, 2);
+      chunk.finalizeNonDeferredPhase = async () => true;
 
-    // 1. 预置 worldStore 数据（旧数据）
-    const chunkRecord = {
-      blockData: { [code]: { type: 'dirt', orientation: 0 } },
-      staticEntities: [],
-      runtimeSeedData: {}
-    };
+      const chunkRecord = {
+        blockData: { [code]: { type: 'dirt', orientation: 0 } },
+        staticEntities: [],
+        runtimeSeedData: {}
+      };
 
-    // 2. 预置缓存数据（新数据，用户在会话中修改的）
-    service.cache.set(chunkKey, {
-      blocks: { [code]: { type: 'stone', orientation: 1 } },
-      entities: {}
-    });
+      service.cache.set(chunkKey, {
+        blocks: { [code]: { type: 'stone', orientation: 1 } },
+        entities: {}
+      });
 
-    // 3. 模拟 loadFromRecord 的优先级逻辑
-    const cacheBlocks = service.cache.get(chunkKey)?.blocks;
-    const effectiveBlockData = cacheBlocks && Object.keys(cacheBlocks).length > 0
-      ? cacheBlocks
-      : chunkRecord.blockData;
+      await chunk.loadFromRecord(chunkRecord);
 
-    // 4. 验证缓存优先
-    assertEqual(effectiveBlockData[code].type, 'stone', '缓存数据应覆盖 worldStore 数据');
-    assertEqual(effectiveBlockData[code].orientation, 1, '朝向应来自缓存');
+      assertEqual(chunk.blockData.get(code).type, 'dirt', 'runtime load 应只使用 chunkRecord.blockData');
+      assertEqual(chunk.blockData.get(code).orientation, 0, '朝向应来自 chunkRecord.blockData');
+    } finally {
+      globalThis._persistenceService = null;
+    }
   });
 
   test('更新 cache.blocks 时不应覆盖已有 entities', () => {

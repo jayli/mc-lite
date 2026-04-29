@@ -296,13 +296,8 @@ export class Chunk {
     const persistence = getPersistenceService();
     const chunkKey = `${this.cx},${this.cz}`;
 
-    // 1. 确保会话快照存在
-    persistence?.ensureChunkSnapshot?.(chunkKey);
-
-    // 2. 合并 blockData：cache.blocks 优先于 chunkRecord.blockData（overlay 语义）
-    const effectiveBlockData = persistence?.hydrateChunkBlocks?.(chunkKey, chunkRecord.blockData || {}).blocks
-      || chunkRecord.blockData
-      || {};
+    // 1. runtime blockData 只从 WorldStore 读取，不再让旧 session cache 覆盖权威数据
+    const effectiveBlockData = chunkRecord.blockData || {};
 
     // 3. 注入合并后的 blockData
     if (effectiveBlockData && Object.keys(effectiveBlockData).length > 0) {
@@ -344,8 +339,7 @@ export class Chunk {
       this._needsEntityMigration = false;
     } else {
       // 旧格式：回退到 cache.entities（渐进式迁移）
-      const hydrateResult = persistence?.hydrateChunkBlocks?.(chunkKey, {});
-      const cacheEntities = hydrateResult?.entities;
+      const cacheEntities = persistence?.ensureChunkSnapshot?.(chunkKey)?.entities;
       if (cacheEntities && (
         cacheEntities.turrets?.length > 0 ||
         cacheEntities.zombieNests?.length > 0 ||
@@ -2007,10 +2001,11 @@ export class Chunk {
     const oldParsed = parseBlockEntry(oldEntry);
     const oldType = oldParsed.type;
 
-    // 4. 更新持久化记录
-    getPersistenceService().recordChangeForChunk(this.cx, this.cz, x, y, z, entry);
+    if (this.world?.bootstrapState?.phase === 'runtime-streaming' && this.world?.worldRuntime) {
+      this.world.worldRuntime.recordBlockMutation(this.cx, this.cz, x, y, z, entry);
+    }
 
-    // 5. 更新数据状态
+    // 4. 更新数据状态
     this._updateBlockState(x, y, z, type, entry);
     this.saveDebounced();
 
@@ -2147,7 +2142,10 @@ export class Chunk {
         : (Number.isFinite(block.orientation) ? Math.trunc(block.orientation) : 0);
       const entry = { type: nextType, orientation };
 
-      getPersistenceService().recordChangeForChunk(this.cx, this.cz, x, y, z, entry);
+      if (this.world?.bootstrapState?.phase === 'runtime-streaming' && this.world?.worldRuntime) {
+        this.world.worldRuntime.recordBlockMutation(this.cx, this.cz, x, y, z, entry);
+      }
+
       this._updateBlockState(x, y, z, nextType, entry);
       this.dirtyBlocks++;
       hasChanges = true;
@@ -2250,7 +2248,9 @@ export class Chunk {
         this.visibleKeys.delete(code);
         this.solidBlocks.delete(code);
         this.lightSourceCoords.delete(code);
-        getPersistenceService().recordChangeForChunk(this.cx, this.cz, px, py, pz, 'air');
+        if (this.world?.bootstrapState?.phase === 'runtime-streaming' && this.world?.worldRuntime) {
+          this.world.worldRuntime.recordBlockMutation(this.cx, this.cz, px, py, pz, 'air');
+        }
 
         // 记录 AO Worker 副本同步 delta
         aoDeltas.push({ chunkKey, code, op: 'delete', entry: null });

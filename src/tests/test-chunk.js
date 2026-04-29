@@ -89,7 +89,10 @@ const mockPersistenceService = {
   recordChangeForChunk: (...args) => {
     mockPersistenceService.calls.push({ method: 'recordChangeForChunk', args });
   },
-  saveChunkData: () => Promise.resolve(),
+  saveChunkData: (...args) => {
+    mockPersistenceService.calls.push({ method: 'saveChunkData', args });
+    return Promise.resolve();
+  },
   saveDebounced: () => {},
   getChunkData: () => Promise.resolve(null)
 };
@@ -474,6 +477,23 @@ describe('Chunk 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('addBlockDynamic - runtime 路径不应再写入 recordChangeForChunk', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const chunk = new Chunk(0, 0, world);
+
+    chunk.addBlockDynamic(5, 10, 5, 'stone', 0);
+
+    const writeCall = mockPersistenceService.calls.find(call =>
+      call.method === 'recordChangeForChunk'
+    );
+
+    assertEqual(writeCall, undefined, 'runtime addBlockDynamic 不应再直接写旧 session cache');
+
+    teardownEnvironment();
+  });
+
   test('removeBlocksBatch - 越界坐标不应再由当前 chunk 批量写入', () => {
     setupEnvironment();
 
@@ -495,6 +515,46 @@ describe('Chunk 真实类测试', (test) => {
     );
 
     assertEqual(wrongWrite, undefined, '当前 chunk 不应批量写入越界坐标');
+
+    teardownEnvironment();
+  });
+
+  test('removeBlocksBatch - runtime 路径不应再写入 recordChangeForChunk', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const chunk = new Chunk(0, 0, world);
+    chunk.addBlockDynamic(5, 10, 5, 'stone', 0);
+    mockPersistenceService.calls = [];
+
+    chunk.removeBlocksBatch([{ x: 5, y: 10, z: 5 }], false);
+
+    const writeCall = mockPersistenceService.calls.find(call =>
+      call.method === 'recordChangeForChunk'
+    );
+
+    assertEqual(writeCall, undefined, 'runtime removeBlocksBatch 不应再直接写旧 session cache');
+
+    teardownEnvironment();
+  });
+
+  test('saveDebounced - runtime-streaming 下不应再走旧 saveChunkData', async () => {
+    setupEnvironment();
+    await new Promise(resolve => setTimeout(resolve, 650));
+    mockPersistenceService.calls = [];
+
+    const world = createMockWorld();
+    world.bootstrapState = { phase: 'runtime-streaming' };
+    const chunk = new Chunk(0, 0, world);
+
+    chunk.addBlockDynamic(5, 10, 5, 'stone', 0);
+    await new Promise(resolve => setTimeout(resolve, 650));
+
+    const saveCall = mockPersistenceService.calls.find(call =>
+      call.method === 'saveChunkData'
+    );
+
+    assertEqual(saveCall, undefined, 'runtime-streaming 下不应再通过 saveDebounced 写旧持久化通道');
 
     teardownEnvironment();
   });

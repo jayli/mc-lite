@@ -18,6 +18,7 @@ import { RegionCache } from './RegionCache.js';
 import { worldStore } from './WorldStore.js';
 import { persistenceService } from '../services/PersistenceService.js';
 import { specialEntitiesShadowStore } from './SpecialEntitiesShadowStore.js';
+import { encodeCoord } from '../utils/CoordEncoding.js';
 
 // --- 依赖注入 ---
 const getWorldStore = () => globalThis._worldStore || worldStore;
@@ -132,11 +133,33 @@ export class WorldRuntime {
    * @param {number} cz
    */
   markChunkDirty(cx, cz) {
-    const key = this._chunkKey(cx, cz);
-    if (!this._dirtyChunks.has(key)) {
-      this._dirtyChunks.set(key, { cx, cz, dirty: true, pendingFlush: false });
-    }
+    this._ensureDirtyChunkEntry(cx, cz).dirty = true;
     this._scheduleFlush(cx, cz);
+  }
+
+  /**
+   * 记录单个方块变更到 runtime 写回快照。
+   * 首次脏化时从当前 chunk.blockData 建一次序列化快照，之后只做增量更新。
+   * @param {number} cx
+   * @param {number} cz
+   * @param {number} x
+   * @param {number} y
+   * @param {number} z
+   * @param {string|object|null} typeOrEntry
+   */
+  recordBlockMutation(cx, cz, x, y, z, typeOrEntry) {
+    const dirtyEntry = this._ensureDirtyChunkEntry(cx, cz);
+    if (!dirtyEntry.blockDataSnapshot) {
+      dirtyEntry.blockDataSnapshot = this._createChunkSnapshotFromWorld(cx, cz);
+    }
+
+    const code = encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
+    const entry = this._normalizeSerializedEntry(typeOrEntry);
+    if (!entry) {
+      delete dirtyEntry.blockDataSnapshot[code];
+      return;
+    }
+    dirtyEntry.blockDataSnapshot[code] = entry;
   }
 
   /**
@@ -176,7 +199,7 @@ export class WorldRuntime {
     this._clearScheduledFlush(cx, cz);
 
     // 获取 blockData：优先使用传入的快照，其次从活动 chunk 读取
-    let blockData = blockDataSnapshot;
+    let blockData = blockDataSnapshot || dirtyEntry.blockDataSnapshot || null;
     let staticEntities = [];
     let runtimeSeedData = {};
 
@@ -225,11 +248,13 @@ export class WorldRuntime {
         regionGroups.set(rKey, { rx, rz, chunks: new Map() });
       }
       const group = regionGroups.get(rKey);
+      const dirtyEntry = this._dirtyChunks.get(key);
       const chunk = this._world?.chunks?.get(key);
-      if (chunk && chunk.blockData) {
+      const blockData = dirtyEntry?.blockDataSnapshot || chunk?.blockData || null;
+      if (blockData) {
         const entities = this._game ? this._collectEntitiesForChunk(cx, cz) : { turrets: [], zombieNests: [], minecarts: [] };
         group.chunks.set(key, {
-          blockData: this._serializeBlockData(chunk.blockData),
+          blockData: this._serializeBlockData(blockData),
           staticEntities: chunk.staticEntities || [],
           runtimeSeedData: chunk.runtimeSeedData || {},
           runtimeEntities: entities
@@ -280,13 +305,19 @@ export class WorldRuntime {
   async flushBeforeUnload(cx, cz, blockDataSnapshot, entitiesSnapshot) {
     const key = this._chunkKey(cx, cz);
     const chunk = this._world?.chunks?.get(key);
+    const dirtyEntry = this._dirtyChunks.get(key);
 
     const entities = entitiesSnapshot
       || (this._game ? this._collectEntitiesForChunk(cx, cz) : null)
       || { turrets: [], zombieNests: [], minecarts: [] };
 
     const record = {
-      blockData: blockDataSnapshot ? this._serializeBlockData(blockDataSnapshot) : (chunk ? this._serializeBlockData(chunk.blockData) : {}),
+      blockData: this._serializeBlockData(
+        blockDataSnapshot
+        || dirtyEntry?.blockDataSnapshot
+        || chunk?.blockData
+        || {}
+      ),
       staticEntities: chunk?.staticEntities ? [...chunk.staticEntities] : [],
       runtimeSeedData: chunk?.structureCenters
         ? { structureCenters: chunk.structureCenters }
@@ -397,6 +428,38 @@ export class WorldRuntime {
       return obj;
     }
     return blockData;
+  }
+
+  _ensureDirtyChunkEntry(cx, cz) {
+    const key = this._chunkKey(cx, cz);
+    if (!this._dirtyChunks.has(key)) {
+      this._dirtyChunks.set(key, {
+        cx,
+        cz,
+        dirty: true,
+        pendingFlush: false,
+        blockDataSnapshot: null
+      });
+    }
+    return this._dirtyChunks.get(key);
+  }
+
+  _createChunkSnapshotFromWorld(cx, cz) {
+    const chunk = this._world?.chunks?.get(this._chunkKey(cx, cz));
+    return chunk?.blockData ? this._serializeBlockData(chunk.blockData) : {};
+  }
+
+  _normalizeSerializedEntry(typeOrEntry) {
+    if (!typeOrEntry) return null;
+    if (typeof typeOrEntry === 'string') {
+      return typeOrEntry === 'air' ? null : typeOrEntry;
+    }
+    if (typeof typeOrEntry === 'object') {
+      return typeOrEntry.type === 'air'
+        ? null
+        : { type: typeOrEntry.type, orientation: typeOrEntry.orientation || 0 };
+    }
+    return null;
   }
 
   _scheduleFlush(cx, cz, delayMs = 500) {

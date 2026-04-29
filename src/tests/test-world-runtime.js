@@ -2,6 +2,7 @@
 import { describe } from './runner.js';
 import { assertDeepEqual, assertEqual, assertFalse, assertTrue } from './assert.js';
 import { WorldRuntime } from '../world/WorldRuntime.js';
+import { encodeCoord } from '../utils/CoordEncoding.js';
 
 describe('WorldRuntime 运行时工作集测试', (test) => {
   test('ensureChunkData - region 不存在时返回 missing-region', async () => {
@@ -142,6 +143,64 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     assertEqual(storeACalls[0].cx, 0, 'runtimeA 应写回正确 chunk');
     assertEqual(storeBCalls.length, 1, 'runtimeB 应只写回到新的 worldStore');
     assertEqual(storeBCalls[0].cx, 1, 'runtimeB 应写回正确 chunk');
+
+    globalThis._worldStore = originalWorldStore;
+  });
+
+  test('recordBlockMutation - 首次修改时应基于当前 chunk blockData 初始化快照并增量更新', () => {
+    const baseCode = encodeCoord(1, 2, 3);
+    const newCode = encodeCoord(4, 5, 6);
+    const runtime = new WorldRuntime();
+
+    runtime.setWorld({
+      chunks: new Map([
+        ['0,0', {
+          blockData: new Map([[baseCode, { type: 'dirt', orientation: 0 }]])
+        }]
+      ])
+    });
+
+    runtime.markChunkDirty(0, 0);
+    runtime.recordBlockMutation(0, 0, 4, 5, 6, { type: 'stone', orientation: 1 });
+
+    const dirtyEntry = runtime._dirtyChunks.get('0,0');
+    assertTrue(!!dirtyEntry, '应创建 dirty entry');
+    assertDeepEqual(dirtyEntry.blockDataSnapshot[baseCode], { type: 'dirt', orientation: 0 }, '应先保留当前 blockData 快照');
+    assertDeepEqual(dirtyEntry.blockDataSnapshot[newCode], { type: 'stone', orientation: 1 }, '应增量写入新方块');
+  });
+
+  test('flushChunk - 存在 blockDataSnapshot 时不应依赖 live blockData 重新序列化', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    const baseCode = encodeCoord(1, 2, 3);
+    const newCode = encodeCoord(4, 5, 6);
+    const flushCalls = [];
+    globalThis._worldStore = {
+      putChunkRecord: async (cx, cz, record) => {
+        flushCalls.push({ cx, cz, record });
+        return true;
+      }
+    };
+
+    const runtime = new WorldRuntime();
+    runtime.setWorld({
+      chunks: new Map([
+        ['0,0', {
+          blockData: new Map([[baseCode, { type: 'dirt', orientation: 0 }]]),
+          staticEntities: [],
+          runtimeSeedData: {}
+        }]
+      ])
+    });
+
+    runtime.markChunkDirty(0, 0);
+    runtime.recordBlockMutation(0, 0, 4, 5, 6, { type: 'stone', orientation: 1 });
+
+    runtime._world.chunks.get('0,0').blockData = null;
+    await runtime.flushChunk(0, 0);
+
+    assertEqual(flushCalls.length, 1, '应基于 snapshot 成功 flush 一次');
+    assertDeepEqual(flushCalls[0].record.blockData[baseCode], { type: 'dirt', orientation: 0 }, '应保留初始方块');
+    assertDeepEqual(flushCalls[0].record.blockData[newCode], { type: 'stone', orientation: 1 }, '应写出增量修改方块');
 
     globalThis._worldStore = originalWorldStore;
   });
