@@ -22,28 +22,34 @@
 1. runtime 阶段不再在单帧内同步创建整圈缺失 chunk
 2. chunk 创建顺序必须优先保障玩家近场可见区域
 3. 玩家快速移动时，旧区域 pending 加载任务可被淘汰，避免预算浪费
-4. consolidation 保留现有 idle/backpressure 语义，只在空闲窗口内进一步串行化
-5. bootstrap 阶段保持原有行为不变
-6. 提供 feature flag 和性能观测，支持快速回退与调参
+4. 所有 runtime chunk record 请求入口都受同一调度器约束，避免扩图完成、retry 等旁路重新形成洪峰
+5. runtime-build 的主线程长任务必须被观测，并通过更保守的 runtime 装配准入降低集中爆发概率
+6. consolidation 保留现有 idle/backpressure 语义，只在空闲窗口内进一步串行化，并限制 worker in-flight 数量
+7. bootstrap 阶段保持原有行为不变
+8. 提供 feature flag 和性能观测，支持快速回退与调参
 
 ## 非目标
 
 1. 不解决 `loadFromRecord()` 内部 `blockData` 扫描的根因成本
-2. 不改动 `ChunkAssemblyScheduler` 主流程
+2. 不把 `assembleRuntimeBuildPhase()` 拆成可中断的细粒度分片
 3. 不引入新的持久化 schema 或 `renderCache`
 4. 不承诺提升极端移动速度下的总吞吐，只承诺削峰
+5. 不解决 `WorldRuntime.ensureChunkData()` 首次命中 region 时整块 RegionRecord clone/message transfer 的根因成本
 
 ## 总体策略
 
-方案拆成两条独立链路：
+方案拆成三条相对独立的链路：
 
 1. `ChunkLoadScheduler`
-运行时只负责“发现缺失 chunk 后，何时创建、先创建谁、丢弃谁”。
+运行时负责“发现缺失 chunk 后，何时创建、先创建谁、丢弃谁”，并集中管理 runtime record 请求入口。
 
-2. `GlobalConsolidationQueue`
+2. `ChunkAssemblyScheduler` runtime 策略收紧
+不重写装配主流程，但把 runtime 阶段的 `maxTasks` 策略化下调，并增加单任务耗时观测，避免创建削峰后装配阶段再次集中爆发。
+
+3. `GlobalConsolidationQueue`
 仅在保留现有 idle grace 的前提下，再把可执行的 consolidation 串行化，防止多个 chunk 同时发起 worker 优化请求。
 
-这两条链路是互相独立的。第一阶段先落地 chunk 创建节流和优先级，确认它本身可以缓解尖峰；第二阶段再接入 consolidation 全局串行化。
+这三条链路应分阶段落地。第一阶段先落地 chunk 创建节流和 record 请求入口统一，确认它本身可以缓解尖峰；第二阶段收紧 runtime assembly 准入并补充观测；第三阶段再接入 consolidation 全局串行化。
 
 ## 架构
 
@@ -60,6 +66,16 @@ ChunkLoadScheduler.processOne()
     ↓ _requestRuntimeChunkRecord()
     ↓ 后续仍由 ChunkAssemblyScheduler / GlobalInstancedMeshManager 处理
 
+World.onExpansionFinished()
+    ↓ 不再直接遍历 awaiting chunk 调 _requestRuntimeChunkRecord()
+    ↓ 通知 ChunkLoadScheduler 重新刷新兴趣集 / retry eligible chunk
+    ↓ 仍受同一创建与 record 请求节奏约束
+
+ChunkAssemblyScheduler.processWithinBudget()
+    ↓ bootstrap 保持当前吞吐
+    ↓ runtime 使用更保守的 maxTasks / budgetMs
+    ↓ 记录 runtime-build 单任务耗时与 long task 次数
+
 玩家交互或批量操作
     ↓ chunk.scheduleConsolidation()
     ↓ 进入 deferred-consolidation 候选集合
@@ -67,6 +83,7 @@ RuntimeIdleScheduler 判断 idle grace 满足
     ↓ 将“可执行 chunk”转移到 GlobalConsolidationQueue
 GlobalConsolidationQueue.processOne()
     ↓ 每个 idle 窗口只发起 1 个 chunk.consolidate()
+    ↓ 同时限制 consolidation in-flight 数量，降低 worker 回包 apply 同帧聚集概率
 ```
 
 ## 设计详情
@@ -155,6 +172,8 @@ if (this.bootstrapState.phase === 'bootstrapping' || !GameConfig.ENABLE_FRAME_TH
 3. 已脱离兴趣集的 pending key 被淘汰
 4. 玩家跨 chunk 快速移动时，调度器立刻改以新中心重新排序
 
+此外，`World.onExpansionFinished()` 不能继续直接遍历所有等待重试的 chunk 并调用 `_requestRuntimeChunkRecord()`。扩图完成后只应让调度器重新刷新兴趣集，或把 eligible retry key 纳入 pending，由 `processOne()` 按同一节奏触发 record 请求。否则扩图完成瞬间仍可能绕过节流形成 `ensureChunkData()` / `loadFromRecord()` 回包洪峰。
+
 ### Section 3: 节流参数改为策略化配置
 
 **修改**: `src/constants/GameConfig.js`
@@ -167,14 +186,40 @@ FRAME_THROTTLED_LOADING_MAX_CREATES_PER_FRAME: 1,
 FRAME_THROTTLED_LOADING_COOLDOWN_FRAMES: 2,
 FRAME_THROTTLED_LOADING_NEAR_RING_RADIUS: 1,
 FRAME_THROTTLED_LOADING_DROP_STALE_PENDING: true,
+FRAME_THROTTLED_RUNTIME_ASSEMBLY_MAX_TASKS: 1,
+FRAME_THROTTLED_RUNTIME_ASSEMBLY_BUDGET_MS: 6,
 
 ENABLE_CONSOLIDATION_QUEUE: true,
 CONSOLIDATION_QUEUE_MAX_PER_IDLE_TICK: 1,
+CONSOLIDATION_QUEUE_MAX_IN_FLIGHT: 1,
 ```
 
 这样后续可以根据体感和观测数据迭代调参，而不需要改设计主干。
 
-### Section 4: Consolidation 改为“两层限流”，不破坏现有 idle grace
+### Section 4: Runtime assembly 只做保守准入与观测，不做深拆
+
+**修改**: `src/world/World.js`
+**修改**: `src/world/ChunkAssemblyScheduler.js`
+
+当前 `ChunkAssemblyScheduler` 的预算只在 task 之间生效，不能打断单个 `runtime-build`。`assembleRuntimeBuildPhase()` 内部仍会同步执行 `_buildMeshFromExistingBlockData()`，包含：
+
+1. 遍历 `blockData`
+2. 生成 `blocks`
+3. 转换 `meshData`
+4. 构建 `visibleKeys`
+5. 调用 `buildMeshes()`
+
+因此本轮不能声称“彻底解决 runtime-build 长任务”。更稳妥的做法是：
+
+1. bootstrap 阶段保持当前 `budgetMs/maxTasks`
+2. runtime 阶段使用配置化的更小 `maxTasks`，默认每帧最多处理 1 个 runtime assembly task
+3. 保留现有优先级排序，近场 task 仍优先
+4. 在 `chunk-assembly.task` 或 streaming snapshot 中暴露 `runtimeBuildLastMs`、`runtimeBuildMaxMs`、`runtimeBuildLongTaskCount`
+5. 如果观测显示单个 runtime-build 仍稳定超过帧预算，再进入后续阶段做 runtime-build 分片或小范围 renderCache
+
+这一步的定位是“防止多个重任务同帧叠加”，不是降低单任务成本。
+
+### Section 5: Consolidation 改为“两层限流”，不破坏现有 idle grace
 
 **修改**: `src/world/World.js`
 **修改**: `src/world/ChunkConsolidation.js`
@@ -208,7 +253,15 @@ World._processGlobalConsolidationQueue()
 
 因此，`scheduleConsolidation()` 在启用新特性后，不应该直接调用 `queueConsolidation()`，而应该继续进入 deferred 层。真正进入 global queue 的时机，必须由 `_processDeferredConsolidationQueue()` 决定。
 
-### Section 5: ChunkConsolidation 的行为调整
+关键实现约束：
+
+1. 普通玩家交互调用 `chunk.scheduleConsolidation()` 时，新模式下进入 `world.queueDeferredConsolidation(chunk)`
+2. `_processDeferredConsolidationQueue()` 在 idle grace 满足后，不能再调用 `chunk.scheduleConsolidation()`，否则会重新进入 deferred 层形成循环
+3. 新模式下 `_processDeferredConsolidationQueue()` 应删除 deferred key，并调用 `world.queueConsolidation(chunk)` 把任务推进 global queue
+4. `_processGlobalConsolidationQueue()` 才允许真正调用 `chunk.consolidate()`
+5. global queue 需要维护 `inFlight`，默认最多 1 个，chunk consolidation 完成或失效后释放
+
+### Section 6: ChunkConsolidation 的行为调整
 
 建议改成：
 
@@ -243,8 +296,9 @@ Chunk.prototype.scheduleConsolidation = function() {
 1. 不跳过现有 deferred 层
 2. 不改变 feature flag 关闭时的旧逻辑
 3. 兼容 `dirtyBlocks` 阈值和防抖的回退行为
+4. 避免从 deferred 处理阶段再次调用 `scheduleConsolidation()` 造成队列循环
 
-### Section 6: RuntimeIdleScheduler 的接入方式
+### Section 7: RuntimeIdleScheduler 的接入方式
 
 **修改**: `World._registerRuntimeIdleTasks()`
 
@@ -281,7 +335,14 @@ this.runtimeIdleScheduler.registerTask({
 });
 ```
 
-### Section 7: 观测指标
+`global-consolidation` 的 `run()` 必须同时检查：
+
+1. `GameConfig.ENABLE_CONSOLIDATION_QUEUE`
+2. global queue 非空
+3. 当前 in-flight 数小于 `CONSOLIDATION_QUEUE_MAX_IN_FLIGHT`
+4. chunk 仍 loaded、ready、dirty 且未 disposed
+
+### Section 8: 观测指标
 
 **修改**: `World.consumeStreamingPerfSnapshot()`
 **修改**: `HUD.formatStreamingPerf()`
@@ -294,6 +355,10 @@ this.runtimeIdleScheduler.registerTask({
 4. `lastCreatedChunkDistance`
 5. `pendingDeferredConsolidation`
 6. `pendingGlobalConsolidation`
+7. `consolidationInFlight`
+8. `runtimeBuildLastMs`
+9. `runtimeBuildMaxMs`
+10. `runtimeBuildLongTaskCount`
 
 这些指标比单纯显示“队列长度”更有意义，因为它们能直接回答：
 
@@ -301,8 +366,10 @@ this.runtimeIdleScheduler.registerTask({
 2. 近场 chunk 是否被饿死
 3. 玩家快速移动时是否存在大量过时任务
 4. consolidation 是否真的被后移到 idle 窗口
+5. 创建削峰后，runtime-build 是否仍是单任务长帧来源
+6. consolidation worker 回包是否仍可能集中 apply
 
-### Section 8: 风险与缓解
+### Section 9: 风险与缓解
 
 | 风险 | 缓解 |
 |------|------|
@@ -311,6 +378,10 @@ this.runtimeIdleScheduler.registerTask({
 | 节流过强导致世界出现明显空窗 | 参数化调节 `cooldownFrames`，保留 feature flag 回退 |
 | consolidation 抢占 runtime 预算 | 保留现有 idle grace，仅在满足空闲窗口后串行发起 |
 | 方案只能削峰，不能降低单 chunk 总成本 | 明确这是次优可实施方案，不与 `renderCache` 的目标混淆 |
+| `onExpansionFinished()` 绕过调度器重试大量 chunk | retry 入口统一纳入 `ChunkLoadScheduler` |
+| `runtime-build` 单任务仍然过重 | 本轮先限制同帧 task 数并观测 long task，后续再决定分片/renderCache |
+| consolidation worker 回包同帧聚集 | global queue 增加 in-flight 上限，默认只允许 1 个 |
+| 首次 region 加载仍有 structured clone 尖峰 | 本轮只通过减少并发触发缓解，后续再评估 chunk 级投影读取 |
 
 ## 测试要求
 
@@ -323,6 +394,10 @@ this.runtimeIdleScheduler.registerTask({
 7. consolidation 在 active streaming 期间不能直接发起 worker 请求
 8. idle grace 满足后，global consolidation queue 每次只处理 1 个 chunk
 9. feature flag 关闭时，完整回退到旧行为
+10. `onExpansionFinished()` 不应绕过调度器批量触发 record 请求
+11. runtime assembly 在新配置下每帧最多处理配置允许的任务数
+12. `_processDeferredConsolidationQueue()` 新模式下应推进到 global queue，而不是重新调用 `scheduleConsolidation()` 形成循环
+13. global consolidation in-flight 达上限时，不应继续发起新的 `consolidate()`
 
 ## 改动文件清单
 
@@ -330,6 +405,7 @@ this.runtimeIdleScheduler.registerTask({
 |------|------|------|
 | `src/world/ChunkLoadScheduler.js` | 新增 | 运行时兴趣集调度器 |
 | `src/world/World.js` | 修改 | 集成 chunk 节流、双层 consolidation 队列、性能观测 |
+| `src/world/ChunkAssemblyScheduler.js` | 修改 | 增加 runtime-build 耗时观测与 runtime 准入指标 |
 | `src/world/ChunkConsolidation.js` | 修改 | `scheduleConsolidation` 接回 deferred 层 |
 | `src/constants/GameConfig.js` | 修改 | 增加节流参数与 feature flags |
 | `src/ui/HUD.js` | 修改 | 展示新的 streaming 调度指标 |
