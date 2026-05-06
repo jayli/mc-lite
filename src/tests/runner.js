@@ -188,6 +188,11 @@ export async function runAllTests() {
     testResults.failed += suiteResults.failed;
   }
 
+  // 确保最终进度显示为 100%（避免快速测试导致视觉上的进度丢失）
+  if (progressCallback) {
+    progressCallback(totalTests, totalTests, testResults.suites[testResults.suites.length - 1]?.name || '完成');
+  }
+
   const totalDuration = performance.now() - totalStartTime;
 
   return {
