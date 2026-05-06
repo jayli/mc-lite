@@ -16,7 +16,7 @@ import { FrozenMountain } from './maps/FrozenMountain.js';
 import { IslandMap } from './maps/IslandMap.js';
 import { PlainLand } from './maps/PlainLand.js';
 import { CityMap } from './maps/CityMap.js';
-import { calculateAOForBlock } from '../utils/AOUtils.js';
+
 import { StructureCandidateIndex } from './structure-index/StructureCandidateIndex.js';
 
 console.log('WorldWorker.js loaded');
@@ -2860,13 +2860,9 @@ onmessage = async function(e) {
 
     if (shouldRender && visible) {
       if (!d[block.type]) d[block.type] = [];
-      let aoLow = 0;
-      let aoHigh = 0;
-      // 简化AO逻辑：非透明且实心的方块自动启用AO
-      const isAOEnabled = !props.isTransparent && props.isSolid;
-      if (isAOEnabled) {
-        ({ aoLow, aoHigh } = calculateAOForBlock(block.x, block.y, block.z, isOccluding));
-      }
+      // AO 计算已移至 _refreshAOFromStableSource（AOWorker），bootstrap 阶段跳过
+      const aoLow = 1;
+      const aoHigh = 1;
       d[block.type].push({x: block.x, y: block.y, z: block.z, aoLow, aoHigh, orientation: block.orientation || 0});
       visibleKeysSet.add(key);
       aoMap.set(key, { aoLow, aoHigh });
