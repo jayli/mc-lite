@@ -142,7 +142,10 @@ export function aggregateChunkLoadPerf(maxAgeMs = 5000, scope = globalThis) {
       'world.runtime-chunk-record-db.error',
       'global-instanced-mesh.delta-patch',
       'global-instanced-mesh.patch-chunk',
-      'global-instanced-mesh.flush-mutation'
+      'global-instanced-mesh.flush-mutation',
+      // Interruptible assembly 新指标
+      'chunk.inject-block-data.partial',
+      'chunk.build-mesh-increment.partial'
     ];
     if (topLevelLabels.includes(label)) {
       report.totalMs += event.durationMs;

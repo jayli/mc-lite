@@ -88,6 +88,24 @@ export class Chunk {
   }
 
   /**
+   * 内联计算 4x4 变换矩阵（平移 + Y 轴旋转），避免 per-block 的 THREE.Object3D 开销
+   * @param {number} x - 世界坐标 X
+   * @param {number} y - 世界坐标 Y
+   * @param {number} z - 世界坐标 Z
+   * @param {number} rotY - Y 轴旋转角度（弧度）
+   * @param {Float32Array} target - 目标 Float32Array
+   * @param {number} offset - 写入偏移（16 的倍数）
+   */
+  static _computeTransformMatrix(x, y, z, rotY, target, offset) {
+    const cos = Math.cos(rotY);
+    const sin = Math.sin(rotY);
+    target[offset]     =  cos;  target[offset + 1]  = 0;  target[offset + 2]  = -sin;  target[offset + 3]  = 0;
+    target[offset + 4] =  0;    target[offset + 5]  = 1;  target[offset + 6]  =  0;    target[offset + 7]  = 0;
+    target[offset + 8] =  sin;  target[offset + 9]  = 0;  target[offset + 10] =  cos;  target[offset + 11] = 0;
+    target[offset + 12] = x;    target[offset + 13] = y;  target[offset + 14] =  z;    target[offset + 15] = 1;
+  }
+
+  /**
    * 创建区块实例
    * @param {number} cx - 区块的 X 坐标（区块空间坐标，世界坐标 / 16）
    * @param {number} cz - 区块的 Z 坐标（区块空间坐标）
@@ -165,6 +183,13 @@ export class Chunk {
      *           或通过 setBlockDataState 增量更新。变更后需要同步 solidBlockIds。
      */
     this.blockDataArray = new Uint32Array(4096);
+
+    /**
+     * _assemblyProgress — 可中断装配的游标状态
+     * 仅在 runtime 装配过程中存在，完成后置 null。
+     * 包含 hydrate 和 buildMesh 两个子阶段的游标信息。
+     */
+    this._assemblyProgress = null;
 
     /**
      * blockPalette — blockId 到方块属性的映射（Map<number → { type, orientation }>）
@@ -426,21 +451,6 @@ export class Chunk {
   }
 
   /**
-   * 网格构建阶段：从 hydrated 状态构建到 terrain-built
-   */
-  assembleRuntimeBuildMeshPhase() {
-    if (this.loadState === 'finalized') return true;
-    if (this.loadState !== 'hydrated') {
-      return this.loadState === 'terrain-built' || this.loadState === 'entities-built';
-    }
-
-    this._buildMeshFromExistingBlockData();
-    this.loadState = 'terrain-built';
-    this.isReady = true;
-    return true;
-  }
-
-  /**
    * 运行期 finalize：实体恢复
    */
   assembleRuntimeFinalizePhase() {
@@ -456,7 +466,163 @@ export class Chunk {
   }
 
   /**
-   * 从 _pendingChunkRecord 中提取数据并注入
+   * 可中断装配：清空内部结构并初始化 hydrate 游标
+   * @param {object} blockData - 原始 blockData 对象
+   */
+  _clearForBlockInjection(blockData) {
+    this.blockData.clear();
+    this.blockDataArray.fill(0);
+    this.blockPalette.clear();
+    this.blockPaletteReverse.clear();
+    this.solidBlocks.clear();
+    this.solidBlockIds.clear();
+    this.lightSourceCoords.clear();
+    this.nextBlockId = 1;
+
+    this._assemblyProgress = {
+      hydrate: {
+        blockEntries: Object.entries(blockData).map(([k, v]) => [Number(k), v]),
+        cursor: 0,
+        totalBlocks: Object.keys(blockData).length
+      }
+    };
+  }
+
+  /**
+   * 可中断装配：分批注入 blockData
+   * @param {number} maxMs - 时间预算（毫秒）
+   * @returns {'done' | 'continue'}
+   */
+  _injectBlockDataBatch(maxMs = 3) {
+    const progress = this._assemblyProgress?.hydrate;
+    if (!progress) return 'done';
+
+    const { blockEntries, totalBlocks } = progress;
+    const start = globalThis.performance?.now?.() ?? Date.now();
+
+    while (progress.cursor < totalBlocks) {
+      const [code, entry] = blockEntries[progress.cursor];
+      const decoded = Chunk.decodeCoord(code);
+      const type = typeof entry === 'string' ? entry : entry.type;
+      const orientation = typeof entry === 'object' ? (entry.orientation || 0) : 0;
+
+      this.blockData.set(code, entry);
+
+      const props = getBlockProps(type);
+      if (props?.isSolid) {
+        this.solidBlocks.add(code);
+      }
+      if (props?.isLightSource) {
+        this.lightSourceCoords.add(code);
+      }
+
+      const blockIndex = this._getBlockIndex(decoded.x, decoded.y, decoded.z);
+      if (blockIndex >= 0 && type !== 'air') {
+        const blockEntry = typeof entry === 'string' ? entry : { type, orientation };
+        const blockId = this._getOrCreateBlockId(blockEntry);
+        this.blockDataArray[blockIndex] = blockId;
+        if (props?.isSolid) {
+          this.solidBlockIds.add(blockId);
+        }
+      }
+
+      progress.cursor++;
+
+      if ((globalThis.performance?.now?.() ?? Date.now()) - start >= maxMs) {
+        recordChunkPerf('chunk.inject-block-data.partial', (globalThis.performance?.now?.() ?? Date.now()) - start, {
+          chunkKey: `${this.cx},${this.cz}`,
+          cursor: progress.cursor,
+          totalBlocks: progress.totalBlocks
+        }, { thresholdMs: 0 });
+        return 'continue';
+      }
+    }
+
+    return 'done';
+  }
+
+  /**
+   * 运行期 hydration 阶段（可中断）
+   * @returns {'done' | 'continue' | boolean}
+   */
+  assembleRuntimeHydratePhase() {
+    if (this.loadState !== 'record-ready') {
+      return this.loadState === 'hydrated' || this.loadState === 'terrain-built' ||
+             this.loadState === 'entities-built' || this.loadState === 'finalized';
+    }
+
+    const chunkRecord = this._pendingChunkRecord;
+    const effectiveBlockData = chunkRecord?.blockData || {};
+
+    // 首次调用：初始化
+    if (!this._assemblyProgress?.hydrate) {
+      if (Object.keys(effectiveBlockData).length > 0) {
+        this._clearForBlockInjection(effectiveBlockData);
+      } else {
+        // 没有 blockData 需要注入，直接跳到尾部逻辑
+        if (chunkRecord.staticEntities?.length > 0) {
+          this._injectStaticEntities(chunkRecord.staticEntities);
+        }
+        if (chunkRecord.runtimeSeedData?.structureCenters) {
+          this.structureCenters = chunkRecord.runtimeSeedData.structureCenters;
+        }
+        this.pendingSnapshot = null;
+        this._isPureLoadPath = true;
+        this._pendingChunkRecord = null;
+        this.loadState = 'hydrated';
+        return 'done';
+      }
+    }
+
+    const result = this._injectBlockDataBatch(3);
+    if (result === 'done') {
+      // 执行 _loadFromCachedRecord 的尾部逻辑
+      if (chunkRecord.staticEntities?.length > 0) {
+        this._injectStaticEntities(chunkRecord.staticEntities);
+      }
+      if (chunkRecord.runtimeSeedData?.structureCenters) {
+        this.structureCenters = chunkRecord.runtimeSeedData.structureCenters;
+      }
+      this.pendingSnapshot = null;
+      this._isPureLoadPath = true;
+
+      const hasRuntimeEntities = chunkRecord.runtimeEntities && (
+        chunkRecord.runtimeEntities.turrets?.length > 0 ||
+        chunkRecord.runtimeEntities.zombieNests?.length > 0 ||
+        chunkRecord.runtimeEntities.minecarts?.length > 0
+      );
+
+      if (hasRuntimeEntities) {
+        specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, chunkRecord.runtimeEntities);
+        this._needsEntityMigration = false;
+      } else {
+        const liveShadowEntities = specialEntitiesShadowStore.getAllEntitiesInChunk(this.cx, this.cz);
+        const hasLiveShadowEntities = (
+          liveShadowEntities.turrets?.length > 0 ||
+          liveShadowEntities.zombieNests?.length > 0 ||
+          liveShadowEntities.minecarts?.length > 0
+        );
+        if (!hasLiveShadowEntities) {
+          specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, {
+            turrets: [],
+            zombieNests: [],
+            minecarts: []
+          });
+        }
+        this._needsEntityMigration = false;
+      }
+
+      this.pendingRuntimeEntities = specialEntitiesShadowStore.getAllEntitiesInChunk(this.cx, this.cz);
+      this._pendingChunkRecord = null;
+      this._assemblyProgress = null;
+      this.loadState = 'hydrated';
+    }
+
+    return result;
+  }
+
+  /**
+   * 从 _pendingChunkRecord 中提取数据并注入（旧版同步路径，供非 scheduler 场景使用）
    */
   _loadFromCachedRecord() {
     const chunkRecord = this._pendingChunkRecord;
@@ -584,6 +750,192 @@ export class Chunk {
         this.entities.rovers.push(...entity.positions);
       }
     }
+  }
+
+  /**
+   * 运行期网格构建阶段（可中断）
+   * @returns {'done' | 'continue' | boolean}
+   */
+  assembleRuntimeBuildMeshPhase() {
+    if (this.loadState === 'finalized') return true;
+    if (this.loadState !== 'hydrated') {
+      return this.loadState === 'terrain-built' || this.loadState === 'entities-built';
+    }
+
+    const result = this._buildMeshFromExistingBlockDataIncremental(3);
+    if (result === 'done') {
+      this.loadState = 'terrain-built';
+      this.isReady = true;
+    }
+    return result;
+  }
+
+  /**
+   * 可中断装配：分批构建 mesh 数据
+   * 内部状态机：iterate → convert-group → visible → build-mesh
+   * @param {number} maxMs - 时间预算（毫秒）
+   * @returns {'done' | 'continue'}
+   */
+  _buildMeshFromExistingBlockDataIncremental(maxMs = 3) {
+    const start = globalThis.performance?.now?.() ?? Date.now();
+    const cx = this.cx;
+    const cz = this.cz;
+    const minX = cx * CHUNK_SIZE;
+    const minZ = cz * CHUNK_SIZE;
+
+    // 首次调用：初始化 progress
+    if (!this._assemblyProgress) {
+      this._assemblyProgress = {};
+    }
+    if (!this._assemblyProgress.buildMesh) {
+      this._assemblyProgress.buildMesh = {
+        subStage: 'iterate',
+        cursor: 0,
+        blocks: [],
+        meshData: null,
+        // convert-group 子状态
+        groupedByType: null,
+        groupKeys: null,
+        groupCursor: 0,
+        groupInnerCursor: 0,
+        // 临时状态
+        _currentGroup: null
+      };
+    }
+
+    const p = this._assemblyProgress.buildMesh;
+
+    while ((globalThis.performance?.now?.() ?? Date.now()) - start < maxMs) {
+      switch (p.subStage) {
+        case 'iterate': {
+          const entries = [...this.blockData.entries()];
+          const end = Math.min(p.cursor + 128, entries.length);
+          for (let i = p.cursor; i < end; i++) {
+            const [code, entry] = entries[i];
+            const decoded = Chunk.decodeCoord(Number(code));
+            const localX = decoded.x - minX;
+            const localZ = decoded.z - minZ;
+            if (localX < 0 || localX >= CHUNK_SIZE || localZ < 0 || localZ >= CHUNK_SIZE) continue;
+            const type = typeof entry === 'string' ? entry : entry.type;
+            if (type === 'air') continue;
+            const orientation = typeof entry === 'object' ? (entry.orientation || 0) : 0;
+            p.blocks.push({ x: decoded.x, y: decoded.y, z: decoded.z, type, orientation });
+          }
+          p.cursor = end;
+          if (p.cursor < entries.length) return 'continue';
+          p.subStage = 'convert-group';
+          p.cursor = 0;
+          break;
+        }
+
+        case 'convert-group': {
+          // 首次：按 type 分组
+          if (!p.groupedByType) {
+            p.groupedByType = {};
+            for (const block of p.blocks) {
+              const type = block.type;
+              if (!p.groupedByType[type]) p.groupedByType[type] = [];
+              p.groupedByType[type].push(block);
+            }
+            p.groupKeys = Object.keys(p.groupedByType);
+            p.meshData = [];
+          }
+
+          // 逐组处理
+          while (p.groupCursor < p.groupKeys.length) {
+            const type = p.groupKeys[p.groupCursor];
+            const blocks = p.groupedByType[type];
+            const count = blocks.length;
+
+            // 新组：检查预算
+            if (p.groupInnerCursor === 0 && (globalThis.performance?.now?.() ?? Date.now()) - start >= maxMs) {
+              return 'continue';
+            }
+
+            // 初始化当前组
+            if (p.groupInnerCursor === 0) {
+              p._currentGroup = {
+                type,
+                count,
+                matrices: new Float32Array(count * 16),
+                aoLow: new Float32Array(count),
+                aoHigh: new Float32Array(count),
+                orientation: new Float32Array(count),
+                instanceIndexMap: {}
+              };
+            }
+
+            const group = p._currentGroup;
+            const batchSize = 128;
+            const gEnd = Math.min(p.groupInnerCursor + batchSize, count);
+            for (let i = p.groupInnerCursor; i < gEnd; i++) {
+              const b = blocks[i];
+              if (b.matrix) {
+                group.matrices.set(b.matrix, i * 16);
+              } else {
+                const mx = b.x + 0.5;
+                const my = b.y + 0.5;
+                const mz = b.z + 0.5;
+                const rot = getRotationAngle(b.orientation || 0);
+                Chunk._computeTransformMatrix(mx, my, mz, rot, group.matrices, i * 16);
+              }
+              group.aoLow[i] = b.aoLow ?? 1;
+              group.aoHigh[i] = b.aoHigh ?? 1;
+              group.orientation[i] = b.orientation;
+              const code = Chunk.encodeCoord(b.x, b.y, b.z);
+              group.instanceIndexMap[code] = i;
+            }
+            p.groupInnerCursor = gEnd;
+
+            if (p.groupInnerCursor < count) return 'continue';
+
+            // 组完成
+            p.meshData.push(group);
+            p._currentGroup = null;
+            p.groupCursor++;
+            p.groupInnerCursor = 0;
+          }
+
+          p.subStage = 'visible';
+          p.cursor = 0;
+          break;
+        }
+
+        case 'visible': {
+          const end = Math.min(p.cursor + 256, p.blocks.length);
+          for (let i = p.cursor; i < end; i++) {
+            const block = p.blocks[i];
+            this.visibleKeys.add(Chunk.encodeCoord(block.x, block.y, block.z));
+          }
+          p.cursor = end;
+          if (p.cursor < p.blocks.length) return 'continue';
+          p.subStage = 'build-mesh';
+          break;
+        }
+
+        case 'build-mesh': {
+          this.buildMeshes(p.meshData);
+          p.subStage = 'done';
+          break;
+        }
+
+        case 'done':
+          return 'done';
+      }
+    }
+
+    // 预算耗尽
+    if (p.subStage !== 'done') {
+      recordChunkPerf('chunk.build-mesh-increment.partial', (globalThis.performance?.now?.() ?? Date.now()) - start, {
+        chunkKey: `${cx},${cz}`,
+        subStage: p.subStage,
+        cursor: p.cursor,
+        groupCursor: p.groupCursor,
+        blocksProcessed: p.blocks.length
+      }, { thresholdMs: 0 });
+      return 'continue';
+    }
+    return 'done';
   }
 
   /**

@@ -127,19 +127,25 @@ export class ChunkAssemblyScheduler {
     switch (stage) {
       case 'runtime-hydrate':
         stageResult = chunk.assembleRuntimeHydratePhase();
-        if (stageResult) {
+        if (stageResult === 'continue') {
+          this.enqueue(chunk, stage, task.priority);
+        } else if (stageResult === 'done' || stageResult === true) {
           this.enqueue(chunk, 'runtime-build-mesh', task.priority);
         }
         break;
       case 'runtime-build-mesh':
         stageResult = chunk.assembleRuntimeBuildMeshPhase();
-        if (stageResult) {
+        if (stageResult === 'continue') {
+          this.enqueue(chunk, stage, task.priority);
+        } else if (stageResult === 'done' || stageResult === true) {
           this.enqueue(chunk, 'runtime-finalize', task.priority);
         }
         break;
       case 'runtime-finalize':
         stageResult = chunk.assembleRuntimeFinalizePhase();
-        if (stageResult) {
+        if (stageResult === 'continue') {
+          this.enqueue(chunk, stage, task.priority);
+        } else if (stageResult === 'done' || stageResult === true) {
           this.enqueue(chunk, 'finalize', task.priority);
         }
         break;
