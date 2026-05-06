@@ -5,49 +5,31 @@ import { WorldRuntime } from '../world/WorldRuntime.js';
 import { encodeCoord } from '../utils/CoordEncoding.js';
 
 describe('WorldRuntime 运行时工作集测试', (test) => {
-  test('ensureChunkData - region 不存在时返回 missing-region', async () => {
+  test('ensureChunkData - region 或 chunk 缺失时返回 missing-chunk', async () => {
     const originalWorldStore = globalThis._worldStore;
     globalThis._worldStore = {
-      getRegionRecord: async () => null
+      getChunkRecord: async () => null
     };
 
     const runtime = new WorldRuntime();
     const result = await runtime.ensureChunkData(0, 0);
 
-    assertEqual(result.status, 'missing-region', 'region 缺失时应返回 missing-region');
+    assertEqual(result.status, 'missing-chunk', '缺失时应统一返回 missing-chunk');
     globalThis._worldStore = originalWorldStore;
   });
 
-  test('ensureChunkData - region 存在但 chunk 不存在时返回 missing-chunk', async () => {
-    const originalWorldStore = globalThis._worldStore;
-    globalThis._worldStore = {
-      getRegionRecord: async () => ({
-        regionKey: '0,0',
-        chunks: {}
-      })
-    };
-
-    const runtime = new WorldRuntime();
-    const result = await runtime.ensureChunkData(0, 0);
-
-    assertEqual(result.status, 'missing-chunk', 'chunk 缺失时应返回 missing-chunk');
-    globalThis._worldStore = originalWorldStore;
-  });
-
-  test('ensureChunkData - 读取到 chunk 时返回 ready 与 chunkRecord', async () => {
+  test('ensureChunkData - chunk 存在时返回 ready 与 chunkRecord', async () => {
     const originalWorldStore = globalThis._worldStore;
     const chunkRecord = {
+      cx: 0,
+      cz: 0,
       blockData: { 123: 'stone' },
       staticEntities: [{ type: 'rovers', positions: [{ x: 1, y: 2, z: 3 }] }],
-      runtimeSeedData: { structureCenters: [{ x: 4, z: 5 }] }
+      runtimeSeedData: { structureCenters: [{ x: 4, z: 5 }] },
+      runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
     };
     globalThis._worldStore = {
-      getRegionRecord: async () => ({
-        regionKey: '0,0',
-        chunks: {
-          '0,0': chunkRecord
-        }
-      })
+      getChunkRecord: async () => chunkRecord
     };
 
     const runtime = new WorldRuntime();
@@ -57,10 +39,15 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     assertDeepEqual(result.chunkRecord.blockData, chunkRecord.blockData, 'blockData 应原样返回');
     assertDeepEqual(result.chunkRecord.staticEntities, chunkRecord.staticEntities, 'staticEntities 应原样返回');
     assertDeepEqual(result.chunkRecord.runtimeSeedData, chunkRecord.runtimeSeedData, 'runtimeSeedData 应原样返回');
+
+    const cachedRegion = runtime._regionCache.get('0,0');
+    assertTrue(!!cachedRegion, '读取 chunk 后应向运行时 region cache 注入最小基线');
+    assertDeepEqual(cachedRegion.chunks['0,0'].blockData, chunkRecord.blockData, '缓存中的 chunkRecord 应与读取结果一致');
+
     globalThis._worldStore = originalWorldStore;
   });
 
-  test('ensureChunkData - 缺失 runtimeEntities 时应仅通过 WorldStore 迁移旧档实体', async () => {
+  test('ensureChunkData - 缺失 runtimeEntities 时应通过 WorldStore 迁移旧档实体', async () => {
     const originalWorldStore = globalThis._worldStore;
     const migratedEntities = {
       turrets: [{ id: 'legacy-turret', position: { x: 8, y: 4, z: 8 }, rotation: { yaw: 0, pitch: 0 } }],
@@ -68,21 +55,18 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
       minecarts: []
     };
     const putCalls = [];
+    const chunkRecordWithoutEntities = {
+      cx: 0,
+      cz: 0,
+      blockData: {},
+      staticEntities: [],
+      runtimeSeedData: {},
+      runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] },
+      __runtimeEntitiesWasDefault: true
+    };
 
     globalThis._worldStore = {
-      getRegionRecord: async () => ({
-        regionKey: '0,0',
-        rx: 0,
-        rz: 0,
-        chunkKeys: ['0,0'],
-        chunks: {
-          '0,0': {
-            blockData: {},
-            staticEntities: [],
-            runtimeSeedData: {}
-          }
-        }
-      }),
+      getChunkRecord: async () => chunkRecordWithoutEntities,
       getLegacyChunkDelta: async (cx, cz) => {
         assertEqual(cx, 0, '应查询正确的 legacy cx');
         assertEqual(cz, 0, '应查询正确的 legacy cz');
@@ -99,8 +83,13 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
 
     assertEqual(result.status, 'ready', '迁移后仍应返回 ready');
     assertDeepEqual(result.chunkRecord.runtimeEntities, migratedEntities, '应通过 WorldStore 迁移旧档 runtimeEntities');
+    assertTrue(!result.chunkRecord.__runtimeEntitiesWasDefault, '迁移后应删除临时标记');
     assertEqual(putCalls.length, 1, '迁移完成后应回填 worldStore 一次');
     assertDeepEqual(putCalls[0].record.runtimeEntities, migratedEntities, '回填内容应与迁移实体一致');
+
+    const cachedRegion = runtime._regionCache.get('0,0');
+    assertTrue(!!cachedRegion, '迁移后应向运行时 region cache 注入 chunkRecord');
+    assertDeepEqual(cachedRegion.chunks['0,0'].runtimeEntities, migratedEntities, '缓存中的 runtimeEntities 应为迁移后的值');
 
     globalThis._worldStore = originalWorldStore;
   });
@@ -108,21 +97,18 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
   test('ensureChunkData - 缺失 runtimeEntities 且无旧档时应补空结构且不回写', async () => {
     const originalWorldStore = globalThis._worldStore;
     const putCalls = [];
+    const chunkRecordWithoutEntities = {
+      cx: 0,
+      cz: 0,
+      blockData: {},
+      staticEntities: [],
+      runtimeSeedData: {},
+      runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] },
+      __runtimeEntitiesWasDefault: true
+    };
 
     globalThis._worldStore = {
-      getRegionRecord: async () => ({
-        regionKey: '0,0',
-        rx: 0,
-        rz: 0,
-        chunkKeys: ['0,0'],
-        chunks: {
-          '0,0': {
-            blockData: {},
-            staticEntities: [],
-            runtimeSeedData: {}
-          }
-        }
-      }),
+      getChunkRecord: async () => chunkRecordWithoutEntities,
       getLegacyChunkDelta: async () => null,
       commitChunkRecord: async (...args) => {
         putCalls.push(args);
@@ -139,7 +125,16 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
       zombieNests: [],
       minecarts: []
     }, '应补齐空的 runtimeEntities 结构');
+    assertTrue(!result.chunkRecord.__runtimeEntitiesWasDefault, '迁移后应删除临时标记');
     assertEqual(putCalls.length, 0, '无旧档数据时不应发生回填');
+
+    const cachedRegion = runtime._regionCache.get('0,0');
+    assertTrue(!!cachedRegion, '补空结构后应向运行时 region cache 注入 chunkRecord');
+    assertDeepEqual(cachedRegion.chunks['0,0'].runtimeEntities, {
+      turrets: [],
+      zombieNests: [],
+      minecarts: []
+    }, '缓存中的 runtimeEntities 应为补齐后的空结构');
 
     globalThis._worldStore = originalWorldStore;
   });
@@ -490,15 +485,30 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     const freshCode = encodeCoord(4, 5, 6);
     const savedRecords = [];
 
-    globalThis._worldStore = {
+    // 动态 getChunkRecord：首次返回 null 模拟 DB 无数据，flushBeforeUnload 更新 region cache 后
+    // ensureChunkData 再次调用时应从 region cache 读取
+    const mockWorldStore = {
       putChunkRecord: async (cx, cz, record) => {
         savedRecords.push({ cx, cz, record });
         return true;
       },
-      getRegionRecord: async () => null
+      getChunkRecord: async (cx, cz) => {
+        // 如果 runtime 已初始化且 region cache 中有数据，说明 flushBeforeUnload 已更新过缓存
+        if (runtime && runtime._regionCache) {
+          const { rx, rz } = runtime._chunkToRegion(cx, cz);
+          const regionKey = runtime._regionKey(rx, rz);
+          const region = runtime._regionCache.get(regionKey);
+          if (region && region.chunks && region.chunks[`${cx},${cz}`]) {
+            return region.chunks[`${cx},${cz}`];
+          }
+        }
+        return null;
+      }
     };
 
     const runtime = new WorldRuntime();
+    runtime._worldStore = mockWorldStore;
+    globalThis._worldStore = mockWorldStore;
     runtime._regionCache.set('0,0', {
       regionKey: '0,0',
       rx: 0,
@@ -671,6 +681,59 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
 
     globalThis.CHUNK_PERF_DEBUG = false;
     globalThis.__CHUNK_PERF_EVENTS = originalEvents;
+    globalThis._worldStore = originalWorldStore;
+  });
+
+  test('flushAllDirty - partial region cache 时应走 applyRegionPatch，避免整包覆盖未加载 chunk', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    const appliedPatches = [];
+    const savedRegions = [];
+
+    globalThis._worldStore = {
+      applyRegionPatch: async (rx, rz, patch) => {
+        appliedPatches.push({ rx, rz, patch });
+        return true;
+      },
+      saveRegionRecord: async (rx, rz, region) => {
+        savedRegions.push({ rx, rz, region });
+        return true;
+      }
+    };
+
+    const runtime = new WorldRuntime();
+    runtime._regionCache.set('0,0', {
+      regionKey: '0,0',
+      rx: 0,
+      rz: 0,
+      chunkKeys: ['0,0'],
+      chunks: {
+        '0,0': {
+          blockData: { [encodeCoord(1, 1, 1)]: { type: 'stone', orientation: 0 } },
+          staticEntities: [],
+          runtimeSeedData: { structureCenters: [] },
+          runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
+        }
+      },
+      __partial: true
+    });
+    runtime.setWorld({
+      chunks: new Map([
+        ['0,0', {
+          blockData: new Map([[encodeCoord(2, 2, 2), { type: 'dirt', orientation: 0 }]]),
+          staticEntities: [],
+          runtimeSeedData: {}
+        }]
+      ])
+    });
+
+    runtime.markChunkDirty(0, 0);
+    await runtime.flushAllDirty();
+
+    assertEqual(appliedPatches.length, 1, 'partial region 应通过 applyRegionPatch 写回');
+    assertEqual(savedRegions.length, 0, 'partial region 不应走 saveRegionRecord 整包覆盖');
+    assertEqual(appliedPatches[0].patch.chunkPatches.length, 1, '应只提交当前 dirty chunk 的 patch');
+    assertEqual(appliedPatches[0].patch.chunkPatches[0].chunkKey, '0,0', 'patch 应指向当前 chunk');
+
     globalThis._worldStore = originalWorldStore;
   });
 

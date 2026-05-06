@@ -128,19 +128,27 @@ export class WorldStore {
   }
 
   // ============================================================
-  // ChunkRecord 投影读取（通过 RegionRecord）
+  // ChunkRecord 读取
+  // getChunkRecord(): 走 Worker 侧裁剪，仅传输目标 chunk
+  // getChunkRecordsInRegion(): 仍通过整包 region 读取后本地裁剪
   // ============================================================
 
   /**
-   * 读取单个 ChunkRecord（通过 RegionRecord 投影）
+   * 读取单个 ChunkRecord（Worker 侧裁剪，仅传输目标 chunk）
    * @param {number} cx
    * @param {number} cz
    * @returns {Promise<object|null>}
    */
   async getChunkRecord(cx, cz) {
     const { rx, rz } = this.chunkToRegion(cx, cz);
-    const region = await this.getRegionRecord(rx, rz);
-    return this._extractChunkRecord(region, cx, cz);
+    const regionKey = this.regionKey(rx, rz);
+    const chunkKey = this.chunkKey(cx, cz);
+    return getPersistenceService().postMessage('getChunkRecord', {
+      regionKey,
+      chunkKey,
+      cx,
+      cz
+    });
   }
 
   /**

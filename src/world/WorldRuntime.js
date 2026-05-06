@@ -72,45 +72,60 @@ export class WorldRuntime {
     return `${cx},${cz}`;
   }
 
+  /**
+   * 将单个 chunkRecord 注入运行时 _regionCache，维持 flush/unload 所需的最小基线数据。
+   * 允许 _regionCache 保存部分 region（不要求完整 region 已加载）。
+   */
+  _upsertRegionCacheChunkRecord(cx, cz, chunkRecord) {
+    const { rx, rz } = this._chunkToRegion(cx, cz);
+    const regionKey = this._regionKey(rx, rz);
+    const existingRegion = this._regionCache.get(regionKey) || {
+      regionKey,
+      rx,
+      rz,
+      chunkKeys: [],
+      chunks: {},
+      __partial: true
+    };
+
+    if (!existingRegion.chunks) existingRegion.chunks = {};
+    if (!Array.isArray(existingRegion.chunkKeys)) existingRegion.chunkKeys = [];
+
+    const chunkKey = this._chunkKey(cx, cz);
+    existingRegion.chunks[chunkKey] = chunkRecord;
+    if (!existingRegion.chunkKeys.includes(chunkKey)) {
+      existingRegion.chunkKeys.push(chunkKey);
+    }
+
+    this._regionCache.set(regionKey, existingRegion);
+  }
+
   // ============================================================
   // Chunk 数据加载（纯装载路径）
   // ============================================================
 
   /**
    * 确保 chunk 数据已加载到内存
-   * 优先从 RegionCache 读取，未命中时从 WorldStore 读取整个 RegionRecord
+   * 通过 Worker 侧 getChunkRecord 读取，仅传输目标 chunk 数据
    *
    * @param {number} cx
    * @param {number} cz
    * @returns {Promise<object>} { status, chunkRecord? }
    */
   async ensureChunkData(cx, cz) {
-    const { rx, rz } = this._chunkToRegion(cx, cz);
-    const region = await this.ensureRegion(rx, rz);
+    const chunkRecord = await this._worldStore.getChunkRecord(cx, cz);
 
-    // 从 RegionRecord 中切出目标 chunk
-    if (!region || !region.chunks) {
-      return { status: 'missing-region' };
-    }
-    const chunkKey = this._chunkKey(cx, cz);
-    const chunkData = region.chunks[chunkKey];
-    if (!chunkData) {
+    if (!chunkRecord) {
       return { status: 'missing-chunk' };
     }
 
-    const chunkRecord = {
-      cx,
-      cz,
-      blockData: chunkData.blockData || {},
-      staticEntities: chunkData.staticEntities || [],
-      runtimeSeedData: chunkData.runtimeSeedData || {},
-      runtimeEntities: chunkData.runtimeEntities || { turrets: [], zombieNests: [], minecarts: [] }
-    };
-
-    // 渐进式迁移：如果 region record 中不含 runtimeEntities，仅允许通过 WorldStore 读取旧档。
-    if (!chunkData.runtimeEntities) {
+    // 渐进式迁移：如果 chunk record 中不含 runtimeEntities，通过 WorldStore 读取旧档
+    if (chunkRecord.__runtimeEntitiesWasDefault) {
+      delete chunkRecord.__runtimeEntitiesWasDefault;
       await this._hydrateLegacyRuntimeEntities(cx, cz, chunkRecord);
     }
+
+    this._upsertRegionCacheChunkRecord(cx, cz, chunkRecord);
 
     return {
       status: 'ready',
@@ -313,7 +328,18 @@ export class WorldRuntime {
     for (const [rKey, group] of regionGroups) {
       try {
         const region = this._regionCache.get(rKey);
-        if (region) {
+        if (region?.__partial && typeof this._worldStore.applyRegionPatch === 'function') {
+          const chunkPatches = Array.from(group.chunks.entries()).map(([chunkKey, chunkRecord]) => ({
+            chunkKey,
+            chunkRecord: this._cloneSerializable(chunkRecord, null)
+          }));
+          await this._worldStore.applyRegionPatch(group.rx, group.rz, { chunkPatches });
+          for (const [chunkKey, chunkRecord] of group.chunks) {
+            const [cx, cz] = chunkKey.split(',').map(Number);
+            this._updateRegionCacheChunkRecord(cx, cz, chunkRecord);
+          }
+          this._regionCache.set(rKey, region);
+        } else if (region) {
           // 更新已有 region
           for (const [chunkKey, chunkRecord] of group.chunks) {
             region.chunks[chunkKey] = chunkRecord;
@@ -482,6 +508,11 @@ export class WorldRuntime {
     return record;
   }
 
+  /**
+   * 更新 region cache 中的 chunkRecord。
+   * 与 _upsertRegionCacheChunkRecord 功能类似但来源不同：此方法用于写路径（flush/migration），
+   * 后者用于读路径（ensureChunkData）。两者都是幂等的，后写入者覆盖同 chunk key。
+   */
   _updateRegionCacheChunkRecord(cx, cz, chunkRecord) {
     const { rx, rz } = this._chunkToRegion(cx, cz);
     const regionKey = this._regionKey(rx, rz);
@@ -691,7 +722,11 @@ export class WorldRuntime {
   // ============================================================
 
   /**
-   * 确保 region 已加载到缓存
+   * 确保 region 已加载到缓存。
+   * 注意：ensureChunkData() 已改为 chunk 级热路径，不再调用此方法。
+   * ensureRegion() 仍服务于 region 级预取/完整缓存场景（如 expandWorld、flushAllDirty）。
+   * _regionCache 可能同时包含完整 region（来自 ensureRegion）与部分 region（来自 ensureChunkData）。
+   *
    * @param {number} rx
    * @param {number} rz
    * @returns {Promise<object|null>}
@@ -701,7 +736,7 @@ export class WorldRuntime {
 
     // 1. 缓存命中
     const cached = this._regionCache.get(regionKey);
-    if (cached) return cached;
+    if (cached && !cached.__partial) return cached;
 
     // 2. 检查是否已有正在进行的请求
     const existingPromise = this._regionLoadPromises.get(regionKey);
@@ -982,8 +1017,9 @@ export class WorldRuntime {
       if (prefetched >= maxPrefetches) break;
       const regionKey = this._regionKey(rx, rz);
 
-      // 跳过已缓存或正在加载的
-      if (this._regionCache.has(regionKey)) continue;
+      // 跳过已缓存或正在加载的（跳过完整缓存，部分缓存仍需预取）
+      const cached = this._regionCache.get(regionKey);
+      if (cached && !cached.__partial) continue;
       if (this._regionLoadPromises.has(regionKey)) continue;
 
       // 静默预取（不 await，不阻塞）

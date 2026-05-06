@@ -1,4 +1,5 @@
 // src/workers/PersistenceWorker.js
+/* global structuredClone */
 import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 import { openDatabase, performTransaction } from '../utils/IndexedDBUtils.js';
 
@@ -8,6 +9,10 @@ let db = null;
 const WORLD_META_STORE = 'world_meta';
 const WORLD_REGION_STORE = 'world_regions';
 const WORLD_OVERFLOW_STORE = 'world_overflow';
+
+// Worker 侧 RegionRecord 缓存：避免重复 IndexedDB 读取
+const regionCache = new Map(); // regionKey -> regionRecord
+const REGION_CACHE_MAX_SIZE = 6;
 
 /**
  * 初始化 IndexedDB 数据库
@@ -125,19 +130,74 @@ function getRegionRecord(regionKey) {
   ).then((result) => result ? result.data : null);
 }
 
+function touchRegionCache(regionKey, region) {
+  if (!regionKey || !region) return;
+  if (regionCache.has(regionKey)) {
+    regionCache.delete(regionKey);
+  }
+  regionCache.set(regionKey, region);
+  while (regionCache.size > REGION_CACHE_MAX_SIZE) {
+    const oldestKey = regionCache.keys().next().value;
+    regionCache.delete(oldestKey);
+  }
+}
+
+function getCachedRegion(regionKey) {
+  const region = regionCache.get(regionKey);
+  if (!region) return null;
+  touchRegionCache(regionKey, region);
+  return region;
+}
+
+function clearRegionCache() {
+  regionCache.clear();
+}
+
+/**
+ * 读取单个 ChunkRecord。
+ * 命中 Worker 缓存时直接裁剪，未命中时读取完整 RegionRecord 后缓存。
+ * @param {string} regionKey
+ * @param {string} chunkKey
+ * @param {number} cx
+ * @param {number} cz
+ * @returns {Promise<object|null>}
+ */
+async function getChunkRecord(regionKey, chunkKey, cx, cz) {
+  let region = getCachedRegion(regionKey);
+  if (!region) {
+    region = await getRegionRecord(regionKey);
+    if (!region) return null;
+    touchRegionCache(regionKey, region);
+  }
+
+  const chunkData = region.chunks?.[chunkKey];
+  if (!chunkData) return null;
+
+  return {
+    cx,
+    cz,
+    blockData: chunkData.blockData || {},
+    staticEntities: chunkData.staticEntities || [],
+    runtimeSeedData: chunkData.runtimeSeedData || {},
+    runtimeEntities: chunkData.runtimeEntities || { turrets: [], zombieNests: [], minecarts: [] },
+    __runtimeEntitiesWasDefault: !chunkData.runtimeEntities
+  };
+}
+
 /**
  * 保存 RegionRecord
  * @param {string} regionKey - "rx,rz"
  * @param {object} record - RegionRecord 数据
  */
-function saveRegionRecord(regionKey, record) {
-  return performTransaction(db, WORLD_REGION_STORE, 'readwrite', (store) =>
+async function saveRegionRecord(regionKey, record) {
+  await performTransaction(db, WORLD_REGION_STORE, 'readwrite', (store) =>
     store.put({
       regionKey,
       data: record,
       lastModified: Date.now()
     })
   );
+  touchRegionCache(regionKey, record);
 }
 
 function applyChunkPatchToRegion(region, chunkPatch) {
@@ -167,8 +227,12 @@ function applyChunkPatchToRegion(region, chunkPatch) {
 }
 
 async function applyRegionPatch(regionKey, rx, rz, patch) {
-  const existingRecord = await getRegionRecord(regionKey);
-  const region = existingRecord || {
+  let region = getCachedRegion(regionKey);
+  if (!region) {
+    region = await getRegionRecord(regionKey);
+  }
+  // 深 clone 避免原地修改，写失败时不污染缓存
+  region = region ? structuredClone(region) : {
     regionKey,
     rx,
     rz,
@@ -198,7 +262,12 @@ function saveRegionRecordsBatch(records) {
     for (const { regionKey, record } of records) {
       store.put({ regionKey, data: record, lastModified: now });
     }
-    tx.oncomplete = () => resolve(true);
+    tx.oncomplete = () => {
+      for (const { regionKey, record } of records) {
+        touchRegionCache(regionKey, record);
+      }
+      resolve(true);
+    };
     tx.onerror = () => reject(tx.error);
   });
 }
@@ -262,7 +331,10 @@ function clearWorld() {
     tx.objectStore(WORLD_REGION_STORE).clear();
     tx.objectStore(PERSISTENCE_CONFIG.STORE_NAME).clear();
     tx.objectStore(WORLD_OVERFLOW_STORE).clear();
-    tx.oncomplete = () => resolve(true);
+    tx.oncomplete = () => {
+      clearRegionCache();
+      resolve(true);
+    };
     tx.onerror = () => reject(tx.error);
   });
 }
@@ -297,6 +369,9 @@ self.onmessage = async (event) => {
         break;
       case 'getRegionRecord':
         result = await getRegionRecord(payload.regionKey);
+        break;
+      case 'getChunkRecord':
+        result = await getChunkRecord(payload.regionKey, payload.chunkKey, payload.cx, payload.cz);
         break;
       case 'saveRegionRecord':
         await saveRegionRecord(payload.regionKey, payload.record);
