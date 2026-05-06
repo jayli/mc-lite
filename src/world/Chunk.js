@@ -282,10 +282,16 @@ export class Chunk {
    * @param {object} chunkRecord - { blockData, staticEntities, runtimeSeedData }
    */
   async loadFromRecord(chunkRecord) {
+    const perfStart = globalThis.performance?.now?.() ?? Date.now();
+
     if (!chunkRecord) {
       this.awaitingStoreRecord = true;
       this.needsStoreRetry = true;
       this.loadState = 'awaiting-store-record';
+      const elapsed = (globalThis.performance?.now?.() ?? Date.now()) - perfStart;
+      recordChunkPerf('chunk.load-from-record.null-record', elapsed, {
+        chunkKey: `${this.cx},${this.cz}`
+      });
       return;
     }
 
@@ -295,31 +301,43 @@ export class Chunk {
 
     // 1. runtime blockData 只从 WorldStore 读取，不再让旧 session cache 覆盖权威数据
     const effectiveBlockData = chunkRecord.blockData || {};
+    const blockDataCount = Object.keys(effectiveBlockData).length;
 
-    // 3. 注入合并后的 blockData
-    if (effectiveBlockData && Object.keys(effectiveBlockData).length > 0) {
+    // 2. 注入 blockData 打点
+    const tInjectStart = globalThis.performance?.now?.() ?? Date.now();
+    if (effectiveBlockData && blockDataCount > 0) {
       this._injectBlockData(effectiveBlockData);
     }
+    const tInjectEnd = globalThis.performance?.now?.() ?? Date.now();
+    recordChunkPerf('chunk.load-from-record.inject-block-data', tInjectEnd - tInjectStart, {
+      chunkKey: `${this.cx},${this.cz}`,
+      blockDataCount
+    });
 
-    // 4. 注入静态实体
+    // 3. 注入静态实体
+    const tStaticEntitiesStart = globalThis.performance?.now?.() ?? Date.now();
     if (chunkRecord.staticEntities?.length > 0) {
       this._injectStaticEntities(chunkRecord.staticEntities);
     }
+    const tStaticEntitiesEnd = globalThis.performance?.now?.() ?? Date.now();
+    recordChunkPerf('chunk.load-from-record.inject-static-entities', tStaticEntitiesEnd - tStaticEntitiesStart, {
+      chunkKey: `${this.cx},${this.cz}`,
+      entityCount: chunkRecord.staticEntities?.length || 0
+    });
 
-    // 5. 注入结构中心
+    // 4. 注入结构中心
     if (chunkRecord.runtimeSeedData?.structureCenters) {
       this.structureCenters = chunkRecord.runtimeSeedData.structureCenters;
     }
 
-    // 6. 纯加载路径不再额外构建 pendingSnapshot.blocks，避免重复复制整块 blockData
+    // 5. 纯加载路径不再额外构建 pendingSnapshot.blocks，避免重复复制整块 blockData
     this.pendingSnapshot = null;
 
     // 标记这是纯加载路径，assembleEntityPhase 不应触发持久化刷写
     this._isPureLoadPath = true;
 
-    // 7. 恢复运行时实体数据
-    // P2 之后仅允许从 chunkRecord.runtimeEntities 或同会话 ShadowStore 恢复，
-    // 不再回退 world_deltas / persistence cache.entities。
+    // 6. 恢复运行时实体数据
+    const tEntitiesStart = globalThis.performance?.now?.() ?? Date.now();
     const hasRuntimeEntities = chunkRecord.runtimeEntities && (
       chunkRecord.runtimeEntities.turrets?.length > 0 ||
       chunkRecord.runtimeEntities.zombieNests?.length > 0 ||
@@ -338,7 +356,6 @@ export class Chunk {
       );
 
       if (!hasLiveShadowEntities) {
-        // 确认当前会话内也没有 live 数据时，才清空 ShadowStore，避免已删除实体回流。
         specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, {
           turrets: [],
           zombieNests: [],
@@ -349,13 +366,34 @@ export class Chunk {
     }
 
     this.pendingRuntimeEntities = specialEntitiesShadowStore.getAllEntitiesInChunk(this.cx, this.cz);
+    const tEntitiesEnd = globalThis.performance?.now?.() ?? Date.now();
+    recordChunkPerf('chunk.load-from-record.entity-restore', tEntitiesEnd - tEntitiesStart, {
+      chunkKey: `${this.cx},${this.cz}`,
+      hasRuntimeEntities
+    });
 
-    // 5. 在真实 world 运行路径中，把纯装载装配交给主线程调度器切片执行，
+    // 7. 在真实 world 运行路径中，把纯装载装配交给主线程调度器切片执行，
     // 避免 loadFromRecord 自身同步完成 build + finalize。
+    const tEnqueueStart = globalThis.performance?.now?.() ?? Date.now();
     if (this.world?.onChunkWorkerReady) {
       this.loadState = 'record-ready';
       this.isReady = false;
       this.world.onChunkWorkerReady(this);
+      const tEnqueueEnd = globalThis.performance?.now?.() ?? Date.now();
+      recordChunkPerf('chunk.load-from-record.enqueue-assembly', tEnqueueEnd - tEnqueueStart, {
+        chunkKey: `${this.cx},${this.cz}`
+      });
+
+      // 记录从收到 record 到 enqueue 的总延迟
+      const totalMs = tEnqueueEnd - perfStart;
+      recordChunkPerf('chunk.load-from-record.total', totalMs, {
+        chunkKey: `${this.cx},${this.cz}`,
+        blockDataCount,
+        injectBlockDataMs: tInjectEnd - tInjectStart,
+        staticEntitiesMs: tStaticEntitiesEnd - tStaticEntitiesStart,
+        entityRestoreMs: tEntitiesEnd - tEntitiesStart,
+        enqueueMs: tEnqueueEnd - tEnqueueStart
+      });
       return;
     }
 
@@ -370,7 +408,9 @@ export class Chunk {
    * 注入 blockData 并重建所有派生结构
    */
   _injectBlockData(blockData) {
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
     // 清空现有数据
+    const tClearStart = globalThis.performance?.now?.() ?? Date.now();
     this.blockData.clear();
     this.blockDataArray.fill(0);
     this.blockPalette.clear();
@@ -379,8 +419,12 @@ export class Chunk {
     this.solidBlockIds.clear();
     this.lightSourceCoords.clear();
     this.nextBlockId = 1;
+    const tClearEnd = globalThis.performance?.now?.() ?? Date.now();
 
     // 注入新数据
+    let solidCount = 0;
+    let lightCount = 0;
+    let arrayWriteCount = 0;
     for (const [key, entry] of Object.entries(blockData)) {
       const code = Number(key);
       const decoded = Chunk.decodeCoord(code);
@@ -392,9 +436,11 @@ export class Chunk {
       const props = getBlockProps(type);
       if (props?.isSolid) {
         this.solidBlocks.add(code);
+        solidCount++;
       }
       if (props?.isLightSource) {
         this.lightSourceCoords.add(code);
+        lightCount++;
       }
 
       // 尝试填充 blockDataArray（仅 Y:0~15）
@@ -406,8 +452,20 @@ export class Chunk {
         if (props?.isSolid) {
           this.solidBlockIds.add(blockId);
         }
+        arrayWriteCount++;
       }
     }
+    const t1 = globalThis.performance?.now?.() ?? Date.now();
+    const totalMs = t1 - t0;
+    recordChunkPerf('chunk.inject-block-data', totalMs, {
+      chunkKey: `${this.cx},${this.cz}`,
+      totalBlocks: Object.keys(blockData).length,
+      clearMs: tClearEnd - tClearStart,
+      iterateAndWriteMs: t1 - tClearEnd,
+      solidCount,
+      lightCount,
+      arrayWriteCount
+    }, { thresholdMs: 0 });
   }
 
   /**
@@ -437,46 +495,82 @@ export class Chunk {
     const minX = cx * CHUNK_SIZE;
     const minZ = cz * CHUNK_SIZE;
 
-    // 1. 从 blockData 构建方块列表
-    // WorldStore 中每个 ChunkRecord 只允许保存本 chunk 的权威方块。
+    // 1. 从 blockData 构建方块列表（遍历 + 解码 + 过滤）
+    const tBuildBlocksStart = globalThis.performance?.now?.() ?? Date.now();
     const blocks = [];
+    let iteratedCount = 0;
+    let outOfRangeCount = 0;
+    let airCount = 0;
     for (const [code, entry] of this.blockData) {
+      iteratedCount++;
       const decoded = Chunk.decodeCoord(Number(code));
       const localX = decoded.x - minX;
       const localZ = decoded.z - minZ;
 
       if (localX < 0 || localX >= CHUNK_SIZE || localZ < 0 || localZ >= CHUNK_SIZE) {
+        outOfRangeCount++;
         continue;
       }
 
       const type = typeof entry === 'string' ? entry : entry.type;
-      if (type === 'air') continue;
+      if (type === 'air') {
+        airCount++;
+        continue;
+      }
 
       const orientation = typeof entry === 'object' ? (entry.orientation || 0) : 0;
       blocks.push({ x: decoded.x, y: decoded.y, z: decoded.z, type, orientation });
     }
+    const tBuildBlocksEnd = globalThis.performance?.now?.() ?? Date.now();
+    recordChunkPerf('chunk.build-mesh-from-record.iterate-blocks', tBuildBlocksEnd - tBuildBlocksStart, {
+      chunkKey: `${cx},${cz}`,
+      iteratedCount,
+      validBlocks: blocks.length,
+      outOfRangeCount,
+      airCount
+    });
 
-    // 2. 按类型分组，计算可见性和 AO
+    // 2. 按类型分组，计算可见性和 AO（_convertScatteredBlocksToMeshData）
+    const tConvertStart = globalThis.performance?.now?.() ?? Date.now();
     const meshData = this._convertScatteredBlocksToMeshData(blocks, null, this.structureCenters || []);
-    const t1 = globalThis.performance?.now?.() ?? Date.now();
+    const tConvertEnd = globalThis.performance?.now?.() ?? Date.now();
+    recordChunkPerf('chunk.build-mesh-from-record.convert-mesh-data', tConvertEnd - tConvertStart, {
+      chunkKey: `${cx},${cz}`,
+      inputBlocks: blocks.length,
+      meshGroups: meshData?.length || 0
+    });
 
     // 3. 构建 visibleKeys（所有非空气方块）
+    const tVisibleKeysStart = globalThis.performance?.now?.() ?? Date.now();
     this.visibleKeys.clear();
     for (const block of blocks) {
       this.visibleKeys.add(Chunk.encodeCoord(block.x, block.y, block.z));
     }
+    const tVisibleKeysEnd = globalThis.performance?.now?.() ?? Date.now();
+    recordChunkPerf('chunk.build-mesh-from-record.build-visible-keys', tVisibleKeysEnd - tVisibleKeysStart, {
+      chunkKey: `${cx},${cz}`,
+      visibleCount: this.visibleKeys.size
+    });
 
-    // 4. 构建 mesh
+    // 4. 构建 mesh（调用 GlobalInstancedMeshManager 或传统路径）
+    const tBuildMeshStart = globalThis.performance?.now?.() ?? Date.now();
     this.buildMeshes(meshData);
-    const t2 = globalThis.performance?.now?.() ?? Date.now();
+    const tBuildMeshEnd = globalThis.performance?.now?.() ?? Date.now();
+    recordChunkPerf('chunk.build-mesh-from-record.build-meshes', tBuildMeshEnd - tBuildMeshStart, {
+      chunkKey: `${cx},${cz}`,
+      meshGroups: meshData?.length || 0
+    });
 
-    recordChunkPerf('chunk.load-from-record', t2 - t0, {
+    const totalMs = tBuildMeshEnd - t0;
+    recordChunkPerf('chunk.load-from-record', totalMs, {
       chunkKey: `${cx},${cz}`,
       blockDataSize: this.blockData.size,
       blockCount: blocks.length,
       meshGroups: meshData?.length || 0,
-      convertMeshDataMs: t1 - t0,
-      buildMeshesMs: t2 - t1
+      iterateBlocksMs: tBuildBlocksEnd - tBuildBlocksStart,
+      convertMeshDataMs: tConvertEnd - tConvertStart,
+      buildVisibleKeysMs: tVisibleKeysEnd - tVisibleKeysStart,
+      buildMeshesMs: tBuildMeshEnd - tBuildMeshStart
     });
   }
 

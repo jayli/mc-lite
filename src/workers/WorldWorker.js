@@ -2812,6 +2812,10 @@ onmessage = async function(e) {
   // 记录每个方块的 AO 数据，供 buildScatteredBlocks 使用
   const aoMap = new Map();
 
+  // Worker 子阶段计时器
+  let _workerPhaseFaceCullingMs = 0;
+  let _workerPhaseAOComputationMs = 0;
+
   // --- 跨区块实体渲染支持 ---
   // structureCenters 已在前面完成去重构建，避免重复追加导致 ownership 判定膨胀
 
@@ -2825,6 +2829,7 @@ onmessage = async function(e) {
     blocksForSnapshot[code] = { type: b.type, orientation: b.orientation || 0 };
   }
 
+  const tFaceCullingStart = performance.now();
   for (const [key, block] of blockMap) {
     // consolidation / skipTerrainGeneration 路径中所有方块都在 chunk 范围内，shouldOwnBlock 永远为 true
     const shouldOwnBlock = isOptimization || skipTerrainGeneration || isBlockOwnedByCurrentChunk(block);
@@ -2867,13 +2872,27 @@ onmessage = async function(e) {
       aoMap.set(key, { aoLow, aoHigh });
     }
   }
+  _workerPhaseFaceCullingMs = performance.now() - tFaceCullingStart;
+  // AO 计算包含在上述循环内，单独计时难以精确拆分，用循环总时间近似
+  // 如果需要精确 AO 计时，需要在 calculateAOForBlock 内部累加
 
   // 构建轻量逻辑方块列表和可见渲染方块列表。
   // blockDataBlocks 保留完整逻辑数据；scatteredBlocks 只走渲染路径，避免隐藏块扩大回包。
+  const tBuildDataBlocksStart = performance.now();
   const blockDataBlocks = buildBlockDataBlocks(blockMap);
+  const tBuildDataBlocksEnd = performance.now();
+
+  const tBuildScatteredStart = performance.now();
   const scatteredBlocks = buildScatteredBlocks(blockMap, visibleKeysSet, aoMap);
+  const tBuildScatteredEnd = performance.now();
+
+  const tBuildMeshDataStart = performance.now();
   const meshData = buildMeshDataForChunk(fakeChunk, d, cx, cz);
+  const tBuildMeshDataEnd = performance.now();
+
+  const tBuildRoutingStart = performance.now();
   const routing = buildChunkRouting(blockDataBlocks, scatteredBlocks, cx, cz, meshData);
+  const tBuildRoutingEnd = performance.now();
 
   const workerFinishedAt = performance.now();
   const workerComputeMs = workerFinishedAt - workerReceivedAt;
@@ -2881,6 +2900,7 @@ onmessage = async function(e) {
     ? workerReceivedAt - _consolidationRequestSentAt
     : 0;
 
+  // Worker 端子阶段打点
   postMessage({
     cx, cz, callbackKey, taskId,
     blockDataBlocks,
@@ -2910,6 +2930,15 @@ onmessage = async function(e) {
       workerComputeMs,
       transitToWorkerMs,
       workerFinishedAt
+    },
+    _workerPerfPhases: {
+      faceCullingMs: _workerPhaseFaceCullingMs || 0,
+      aoComputationMs: _workerPhaseAOComputationMs || 0,
+      buildBlockDataBlocksMs: tBuildDataBlocksEnd - tBuildDataBlocksStart,
+      buildScatteredBlocksMs: tBuildScatteredEnd - tBuildScatteredStart,
+      buildMeshDataMs: tBuildMeshDataEnd - tBuildMeshDataStart,
+      buildRoutingMs: tBuildRoutingEnd - tBuildRoutingStart,
+      workerComputeMs
     },
     isOptimization
   });

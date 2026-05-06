@@ -3,6 +3,7 @@ import { getBlockProperties } from '../constants/BlockData.js';
 import { materials as defaultMaterials } from './MaterialManager.js';
 import { geomMap } from '../world/ChunkConsolidation.js';
 import { decodeCoord } from '../utils/CoordEncoding.js';
+import { recordChunkPerf } from '../utils/ChunkPerfMonitor.js';
 
 const DEFAULT_INITIAL_CAPACITY = 256;
 const DEFAULT_MUTATION_MAX_OPS = 600;
@@ -371,11 +372,26 @@ export class GlobalInstancedMeshManager {
   }
 
   replaceChunkVisibleBlocks(chunkKey, meshDataArray) {
-    this.removeChunk(chunkKey);
-    return this.enqueueMeshDataForChunk(chunkKey, meshDataArray);
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
+    const removeCount = this.removeChunk(chunkKey);
+    const t1 = globalThis.performance?.now?.() ?? Date.now();
+    const queued = this.enqueueMeshDataForChunk(chunkKey, meshDataArray);
+    const t2 = globalThis.performance?.now?.() ?? Date.now();
+
+    recordChunkPerf('global-instanced-mesh.replace-chunk', t2 - t0, {
+      chunkKey,
+      removeMs: t1 - t0,
+      enqueueMs: t2 - t1,
+      removedBlocks: removeCount,
+      queuedBlocks: queued,
+      meshGroups: meshDataArray?.length || 0
+    }, { thresholdMs: 0 });
+
+    return queued;
   }
 
   patchChunkVisibleBlocks(chunkKey, meshDataArray) {
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
     if (!Array.isArray(meshDataArray)) return { updated: 0, queued: 0, removed: 0 };
 
     this._purgeQueuedChunk(chunkKey);
@@ -435,6 +451,16 @@ export class GlobalInstancedMeshManager {
 
     this.mutationStats.queuedBlocks += queued;
     this.commitDirtyBuffers();
+    const t1 = globalThis.performance?.now?.() ?? Date.now();
+
+    recordChunkPerf('global-instanced-mesh.patch-chunk', t1 - t0, {
+      chunkKey,
+      updated,
+      queued,
+      removed,
+      meshGroups: meshDataArray.length
+    }, { thresholdMs: 0 });
+
     return { updated, queued, removed };
   }
 

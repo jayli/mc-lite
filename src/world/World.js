@@ -11,7 +11,7 @@ import { parseBlockEntry } from '../utils/OrientationUtils.js';
 import { getBlockProps } from '../constants/BlockData.js';
 import { ChunkAssemblyScheduler } from './ChunkAssemblyScheduler.js';
 import { RuntimeIdleScheduler } from './RuntimeIdleScheduler.js';
-import { recordChunkPerf } from '../utils/ChunkPerfMonitor.js';
+import { recordChunkPerf, aggregateChunkLoadPerf, printChunkLoadPerfReport } from '../utils/ChunkPerfMonitor.js';
 import { GlobalInstancedMeshManager } from '../core/GlobalInstancedMeshManager.js';
 // WorldStore 新架构
 import { WorldRuntime } from './WorldRuntime.js';
@@ -251,6 +251,24 @@ export class World {
     }
   }
 
+  /**
+   * 打印 chunk 装载性能聚合报告
+   * 可在浏览器控制台调用：window.game.world.printChunkLoadPerf(5000)
+   * @param {number} maxAgeMs - 时间窗口（毫秒），默认 5000ms
+   */
+  printChunkLoadPerf(maxAgeMs = 5000) {
+    printChunkLoadPerfReport(maxAgeMs);
+  }
+
+  /**
+   * 获取 chunk 装载性能聚合数据
+   * @param {number} maxAgeMs - 时间窗口（毫秒）
+   * @returns {Map} chunkKey -> 聚合报告
+   */
+  getChunkLoadPerf(maxAgeMs = 5000) {
+    return aggregateChunkLoadPerf(maxAgeMs);
+  }
+
   _ensureBootstrapTargets(cx, cz) {
     if (this.bootstrapState.phase !== 'bootstrapping') return;
     if (this.bootstrapState.targetChunkKeys.size > 0) return;
@@ -293,7 +311,19 @@ export class World {
     chunk.needsStoreRetry = true;
     chunk.loadState = 'awaiting-store-record';
 
+    const dbRequestStart = globalThis.performance?.now?.() ?? Date.now();
+    const chunkKey = `${chunk.cx},${chunk.cz}`;
+
     this.worldRuntime.ensureChunkData(chunk.cx, chunk.cz).then((result) => {
+      const dbRequestEnd = globalThis.performance?.now?.() ?? Date.now();
+      recordChunkPerf('world.runtime-chunk-record-db', dbRequestEnd - dbRequestStart, {
+        chunkKey,
+        status: result?.status,
+        hasBlockData: !!result?.chunkRecord?.blockData,
+        blockDataSize: result?.chunkRecord?.blockData ? Object.keys(result.chunkRecord.blockData).length : 0,
+        hasRuntimeEntities: !!(result?.chunkRecord?.runtimeEntities)
+      });
+
       if (!result || chunk.disposed) return;
       if (result.status === 'ready' && result.chunkRecord) {
         chunk.loadFromRecord(result.chunkRecord);
@@ -306,6 +336,11 @@ export class World {
         chunk.loadState = 'awaiting-store-record';
       }
     }).catch((error) => {
+      const dbRequestEnd = globalThis.performance?.now?.() ?? Date.now();
+      recordChunkPerf('world.runtime-chunk-record-db.error', dbRequestEnd - dbRequestStart, {
+        chunkKey,
+        error: error?.message
+      });
       console.error(`[World] Failed to load runtime chunk record ${chunk.cx},${chunk.cz}:`, error);
       if (!chunk.disposed) {
         chunk.awaitingStoreRecord = true;
@@ -559,6 +594,10 @@ export class World {
     const t1 = globalThis.performance?.now?.() ?? Date.now();
     this.scatterManager.scatter(workerResult);
     const t2 = globalThis.performance?.now?.() ?? Date.now();
+
+    // 提取 Worker 端子阶段打点数据
+    const workerPhases = workerResult?._workerPerfPhases || {};
+
     recordChunkPerf('world.chunk-worker-result', t2 - t0, {
       chunkKey: `${chunk.cx},${chunk.cz}`,
       acceptWorkerResultMs: t1 - t0,
@@ -568,7 +607,13 @@ export class World {
       scatteredBlocks: workerResult?.scatteredBlocks?.length || 0,
       visibleKeys: workerResult?.visibleKeys?.length || 0,
       solidBlocks: workerResult?.solidBlocks?.length || 0,
-      isOptimization: workerResult?.isOptimization === true
+      isOptimization: workerResult?.isOptimization === true,
+      // Worker 端子阶段打点
+      workerFaceCullingMs: workerPhases.faceCullingMs || 0,
+      workerBuildBlockDataBlocksMs: workerPhases.buildBlockDataBlocksMs || 0,
+      workerBuildScatteredBlocksMs: workerPhases.buildScatteredBlocksMs || 0,
+      workerBuildMeshDataMs: workerPhases.buildMeshDataMs || 0,
+      workerBuildRoutingMs: workerPhases.buildRoutingMs || 0
     });
   }
 

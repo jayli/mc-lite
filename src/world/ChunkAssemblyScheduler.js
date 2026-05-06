@@ -25,6 +25,10 @@ export class ChunkAssemblyScheduler {
       return;
     }
 
+    // 记录 chunk 进入该 stage 的时间戳，用于计算排队等待时间
+    if (!chunk._assemblyStageEnqueueTime) chunk._assemblyStageEnqueueTime = {};
+    chunk._assemblyStageEnqueueTime[stage] = now();
+
     chunk.queuedAssemblyStages.add(dedupeKey);
     this.queue.push({
       chunk,
@@ -103,42 +107,70 @@ export class ChunkAssemblyScheduler {
   async _runTask(task) {
     const { chunk, stage } = task;
     const start = now();
+
+    // 计算从 enqueue 到实际执行的排队延迟
+    let queueWaitMs = 0;
+    if (chunk._assemblyStageEnqueueTime?.[stage]) {
+      queueWaitMs = start - chunk._assemblyStageEnqueueTime[stage];
+      delete chunk._assemblyStageEnqueueTime[stage];
+    }
+
     chunk.queuedAssemblyStages?.delete(stage);
     if (!chunk || chunk.disposed) return;
 
+    // 记录 stage 开始时的 chunk 状态
+    const preLoadState = chunk.loadState;
+    const preIsReady = chunk.isReady;
+    const preBlockDataSize = chunk.blockData?.size || 0;
+
+    let stageResult = false;
     switch (stage) {
       case 'runtime-build':
-        if (chunk.assembleRuntimeBuildPhase()) {
+        stageResult = chunk.assembleRuntimeBuildPhase();
+        if (stageResult) {
           this.enqueue(chunk, 'finalize', task.priority);
         }
         break;
       case 'terrain':
-        if (chunk.assembleTerrainPhase()) {
+        stageResult = chunk.assembleTerrainPhase();
+        if (stageResult) {
           this.enqueue(chunk, 'entities', task.priority);
         }
         break;
       case 'entities':
-        if (chunk.assembleEntityPhase()) {
+        stageResult = chunk.assembleEntityPhase();
+        if (stageResult) {
           this.enqueue(chunk, 'finalize', task.priority);
         }
         break;
       case 'finalize':
-        if (chunk.finalizeAssemblyPhase()) {
+        stageResult = chunk.finalizeAssemblyPhase();
+        if (stageResult) {
           this.enqueue(chunk, 'non-deferred-finalize', task.priority);
         }
         break;
       case 'non-deferred-finalize':
         await chunk.finalizeNonDeferredPhase();
+        stageResult = true;
         break;
       default:
         break;
     }
-    recordChunkPerf('chunk-assembly.task', now() - start, {
+
+    const execMs = now() - start;
+    recordChunkPerf('chunk-assembly.task', execMs, {
       chunkKey: `${chunk.cx},${chunk.cz}`,
       stage,
       priority: task.priority,
       loadState: chunk.loadState,
-      isReady: chunk.isReady
+      isReady: chunk.isReady,
+      queueWaitMs,
+      execMs,
+      preLoadState,
+      preIsReady,
+      preBlockDataSize,
+      postBlockDataSize: chunk.blockData?.size || 0,
+      stageResult
     });
   }
 }
