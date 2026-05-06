@@ -2,12 +2,13 @@
 
 > 目标不是消灭单 chunk 的 CPU 成本，而是在放弃 `renderCache` 后，以较低风险把 runtime 加载和 consolidation 的 CPU 尖峰摊平到多个帧和 idle 窗口中。
 
-**Goal:** 通过“兴趣集调度 + 近场优先 + 过时任务淘汰 + consolidation 双层限流”缓解 runtime 移动时的可感知卡顿。
+**Goal:** 通过“兴趣集调度 + 近场优先 + 过时任务淘汰 + runtime assembly 保守准入 + consolidation 双层限流”缓解 runtime 移动时的可感知卡顿。
 
 **Architecture:**  
-`ChunkLoadScheduler` 负责 runtime 阶段的 chunk 创建节奏与优先级。  
-`_pendingDeferredConsolidationChunkKeys` 继续负责 idle grace。  
-新增 `_globalConsolidationQueue` 仅负责在 idle 窗口内串行发起 consolidation。
+`ChunkLoadScheduler` 负责 runtime 阶段的 chunk 创建节奏与优先级。
+runtime 阶段 `ChunkAssemblyScheduler` 使用更保守的配置与观测指标，避免创建削峰后装配任务再次集中爆发。
+`_pendingDeferredConsolidationChunkKeys` 继续负责 idle grace。
+新增 `_globalConsolidationQueue` 仅负责在 idle 窗口内串行发起 consolidation，并限制 in-flight 数量。
 
 **Tech Stack:** JavaScript ES Modules, Three.js, 现有 `World/Chunk/RuntimeIdleScheduler/ChunkAssemblyScheduler` 架构
 
@@ -21,6 +22,7 @@
 **修改文件：**
 - `src/constants/GameConfig.js` — 新增参数化节流配置
 - `src/world/World.js` — 接入 chunk 调度器、双层 consolidation 队列、观测指标
+- `src/world/ChunkAssemblyScheduler.js` — 增加 runtime-build 耗时观测与 runtime 准入指标
 - `src/world/ChunkConsolidation.js` — `scheduleConsolidation` 回接 deferred 层
 - `src/ui/HUD.js` — 展示新的 streaming 调度指标
 
@@ -31,7 +33,7 @@
 
 ## 实施顺序
 
-本计划刻意先做 `chunk 创建调度`，确认它本身有收益，再做 `consolidation` 二次限流。不要一开始同时改两条链路，否则难以定位收益与回归来源。
+本计划刻意先做 `chunk 创建调度 + record 请求入口统一`，确认它本身有收益；然后收紧 runtime assembly 准入并补观测；最后做 `consolidation` 二次限流。不要一开始同时改所有链路，否则难以定位收益与回归来源。
 
 ---
 
@@ -49,10 +51,13 @@
   FRAME_THROTTLED_LOADING_COOLDOWN_FRAMES: 2,
   FRAME_THROTTLED_LOADING_NEAR_RING_RADIUS: 1,
   FRAME_THROTTLED_LOADING_DROP_STALE_PENDING: true,
+  FRAME_THROTTLED_RUNTIME_ASSEMBLY_MAX_TASKS: 1,
+  FRAME_THROTTLED_RUNTIME_ASSEMBLY_BUDGET_MS: 6,
 
   // ==================== consolidation 串行化配置 ====================
   ENABLE_CONSOLIDATION_QUEUE: true,
   CONSOLIDATION_QUEUE_MAX_PER_IDLE_TICK: 1,
+  CONSOLIDATION_QUEUE_MAX_IN_FLIGHT: 1,
 ```
 
 - [ ] 运行 `npm run lint`
@@ -84,6 +89,7 @@ class ChunkLoadScheduler {
   _collectInterestKeys(centerCx, centerCz, renderDistance) {}
   _selectNextChunkKey() {}
   _createAndLoadChunk(key) {}
+  refreshRetryCandidates(centerCx, centerCz, renderDistance) {}
 }
 ```
 
@@ -92,6 +98,7 @@ class ChunkLoadScheduler {
 要求：
 - 只保留当前 render distance 范围内的缺失 key
 - 已加载 chunk 不应进入 pending
+- 已创建但等待 store retry 的 chunk 不应重复创建，只能进入 retry 候选
 - 不在当前兴趣集内的 pending key 必须被淘汰
 - 每个 pending 项必须更新 `distanceSq` 与 `ring`
 - `ring <= nearRingRadius` 的视为近场
@@ -104,6 +111,13 @@ class ChunkLoadScheduler {
 - 冷却未结束时不再继续创建
 - 每次最多创建 `maxCreatesPerFrame`
 - 选择逻辑为：近场优先、距离优先、入队时间稳定排序
+
+- [ ] `_createAndLoadChunk()` 必须完成以下行为
+
+要求：
+- 缺失 chunk：创建 `new Chunk()`、加入 `world.chunks`、`scene.add()`、调用 `_requestRuntimeChunkRecord()`
+- 已存在但 `awaitingStoreRecord` / `needsStoreRetry` 的 chunk：不重复创建，只按调度节奏调用 `_requestRuntimeChunkRecord()`
+- 已 disposed 或离开兴趣集的任务应跳过
 
 - [ ] 运行 `npm run lint`
 
@@ -124,6 +138,7 @@ class ChunkLoadScheduler {
 3. 冷却：创建后接下来的 `cooldownFrames` 内不应继续创建
 4. 淘汰：玩家移动后，旧区域 key 被移出 pending
 5. 优先级：近场 key 优先于远场 key 被创建
+6. retry：已存在且等待 store retry 的 chunk 不应被重复创建
 
 - [ ] 若现有 `World` 构造耦合较强，可直接对 `ChunkLoadScheduler` 做局部 stub 测试
 
@@ -168,6 +183,13 @@ if (this.chunkLoadScheduler.processOne()) {
 
 - [ ] 保证 feature flag 关闭时完整回退到旧逻辑
 
+- [ ] 修改 `World.onExpansionFinished()`
+
+要求：
+- 启用 `ENABLE_FRAME_THROTTLED_LOADING` 时，不再直接遍历所有 awaiting/retry chunk 调 `_requestRuntimeChunkRecord()`
+- 只通知 `ChunkLoadScheduler` 刷新当前兴趣集或 retry 候选
+- feature flag 关闭时保留旧行为
+
 - [ ] 运行 `npm run lint`
 
 ---
@@ -184,6 +206,7 @@ if (this.chunkLoadScheduler.processOne()) {
 3. 接下来的冷却帧内不继续创建
 4. 冷却结束后继续只创建 1 个 chunk
 5. 玩家从 `(0, 0)` 快速移动到远处后，pending 队列会改以新区域为主
+6. `onExpansionFinished()` 在新模式下不会批量触发 `_requestRuntimeChunkRecord()`
 
 - [ ] 测试不要再使用互相矛盾的“第 1 帧不创建 / 第 1 帧创建”混合预期
 
@@ -195,7 +218,43 @@ if (this.chunkLoadScheduler.processOne()) {
 
 ---
 
-### Task 6: 增加观测指标
+### Task 6: 收紧 runtime assembly 准入并增加观测
+
+**Files:**
+- Modify: `src/world/World.js`
+- Modify: `src/world/ChunkAssemblyScheduler.js`
+
+- [ ] 在 `World.processAssemblyQueues()` 中对 bootstrap/runtime 使用不同配置
+
+要求：
+- bootstrap 保持当前高吞吐配置
+- runtime 使用 `GameConfig.FRAME_THROTTLED_RUNTIME_ASSEMBLY_MAX_TASKS`
+- runtime 使用 `GameConfig.FRAME_THROTTLED_RUNTIME_ASSEMBLY_BUDGET_MS`
+- feature flag 关闭时可回退当前 runtime 配置
+
+- [ ] 在 `ChunkAssemblyScheduler` 或 `World` 中记录 runtime-build 单任务耗时
+
+指标：
+- `runtimeBuildLastMs`
+- `runtimeBuildMaxMs`
+- `runtimeBuildLongTaskCount`
+
+说明：
+- long task 阈值建议先使用 8ms
+- 这一步不拆分 `assembleRuntimeBuildPhase()`，只限制同帧重任务数量并暴露观测
+
+- [ ] 新增测试
+
+测试项：
+1. bootstrap 仍按原配置允许多 task
+2. runtime 新模式下每次 `processAssemblyQueues()` 最多处理配置允许数量
+3. runtime-build 超过阈值时 long task 计数增加
+
+- [ ] 运行 `npm run lint`
+
+---
+
+### Task 7: 增加观测指标
 
 **Files:**
 - Modify: `src/world/World.js`
@@ -210,6 +269,10 @@ droppedPendingLoads
 lastCreatedChunkDistance
 pendingDeferredConsolidation
 pendingGlobalConsolidation
+consolidationInFlight
+runtimeBuildLastMs
+runtimeBuildMaxMs
+runtimeBuildLongTaskCount
 ```
 
 - [ ] 在 HUD 中增加对应展示
@@ -220,12 +283,14 @@ pendingGlobalConsolidation
 - `lastDist`
 - `deferredCon`
 - `globalCon`
+- `conInFlight`
+- `rtBuild last/max/long`
 
 - [ ] 保持现有日志结构兼容，不删除旧指标
 
 ---
 
-### Task 7: 接入 consolidation 双层限流
+### Task 8: 接入 consolidation 双层限流
 
 **Files:**
 - Modify: `src/world/World.js`
@@ -235,6 +300,7 @@ pendingGlobalConsolidation
 
 ```js
 this._globalConsolidationQueue = new Set();
+this._globalConsolidationInFlight = new Set();
 ```
 
 - [ ] 新增 `queueConsolidation(chunk)` 与 `_processGlobalConsolidationQueue()`
@@ -242,7 +308,9 @@ this._globalConsolidationQueue = new Set();
 要求：
 - `queueConsolidation()` 只负责加入 global queue
 - `_processGlobalConsolidationQueue()` 每次最多真正 `consolidate()` 1 个 chunk
+- `_processGlobalConsolidationQueue()` 必须遵守 `CONSOLIDATION_QUEUE_MAX_IN_FLIGHT`
 - global queue 中已失效、已卸载、已 clean 的 chunk 要自动跳过
+- consolidation 完成、chunk 卸载或失效后要释放 in-flight 标记
 
 - [ ] 不删除现有 `_pendingDeferredConsolidationChunkKeys`
 
@@ -252,6 +320,7 @@ this._globalConsolidationQueue = new Set();
 - 继续保留当前的 `idle grace` 判定
 - 在启用 `ENABLE_CONSOLIDATION_QUEUE` 时，不再直接触发 `chunk.scheduleConsolidation()`
 - 改为把满足条件的 chunk 从 deferred set 转移到 global queue
+- 新模式下必须调用 `queueConsolidation(chunk)`，不能再次调用 `scheduleConsolidation()`，否则会形成 deferred 循环
 - feature flag 关闭时保留旧逻辑
 
 - [ ] 修改 `Chunk.prototype.scheduleConsolidation()`
@@ -265,7 +334,7 @@ this._globalConsolidationQueue = new Set();
 
 ---
 
-### Task 8: consolidation 队列测试
+### Task 9: consolidation 队列测试
 
 **Files:**
 - Modify: `src/tests/test-world.js`
@@ -277,6 +346,9 @@ this._globalConsolidationQueue = new Set();
 3. idle grace 满足后，deferred queue 可把任务转移到 global queue
 4. `_processGlobalConsolidationQueue()` 每次只处理 1 个
 5. 失效 chunk 会在处理时被自动跳过
+6. `_processDeferredConsolidationQueue()` 新模式下不会再次调用 `scheduleConsolidation()`
+7. in-flight 达上限时不会继续发起新的 `consolidate()`
+8. consolidation 完成后释放 in-flight
 
 - [ ] 尽量用 stub chunk 验证队列语义，而不是依赖完整 worker
 
@@ -284,7 +356,7 @@ this._globalConsolidationQueue = new Set();
 
 ---
 
-### Task 9: 手工验证
+### Task 10: 手工验证
 
 **Files:**
 - 无代码新增，运行现有项目
@@ -306,6 +378,8 @@ this._globalConsolidationQueue = new Set();
 - `pendingNearChunkLoads` 不应长期大于 0
 - `droppedPendingLoads` 在快速移动时应增长
 - `pendingGlobalConsolidation` 不应在持续移动时快速上涨
+- `consolidationInFlight` 不应超过配置上限
+- `runtimeBuildMaxMs` 若仍长期超过 8-12ms，应记录为后续分片/renderCache 决策依据
 - active streaming 期间 consolidation 不应频繁抢占
 
 ---
@@ -317,13 +391,17 @@ this._globalConsolidationQueue = new Set();
 1. bootstrap 行为未回归
 2. runtime 下 chunk 创建不再整圈同步爆发
 3. 近场优先可感知成立，不出现明显“远处先出来、脚下仍空”的退化
-4. consolidation 仍被延后到 idle 窗口，而不是重新抢占 runtime
-5. 所有新增测试通过
-6. `npm run lint` 通过
+4. `onExpansionFinished()` / retry 入口不再绕过 chunk 加载调度器
+5. runtime assembly 不再一帧处理多个配置外的重任务
+6. consolidation 仍被延后到 idle 窗口，而不是重新抢占 runtime
+7. consolidation in-flight 不超过配置上限
+8. 所有新增测试通过
+9. `npm run lint` 通过
 
 ## 暂不做的事
 
 1. 不再尝试 `renderCache`
 2. 不优化 `loadFromRecord()` 内部 `blockData -> meshData` 的根因成本
-3. 不调整 `ChunkAssemblyScheduler` 预算
-4. 不修改持久化 schema
+3. 不把 `assembleRuntimeBuildPhase()` 拆成可中断的细粒度分片
+4. 不解决首次 region 加载的整块 structured clone/message transfer 成本
+5. 不修改持久化 schema
