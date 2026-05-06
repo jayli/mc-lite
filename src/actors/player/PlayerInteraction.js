@@ -35,6 +35,9 @@ export class PlayerInteraction {
    */
   constructor(player) {
     this.player = player;
+    // GC 优化：预分配复用数组和 Set，避免每帧 new
+    this._targetsCache = [];
+    this._seenCache = new Set();
   }
 
   /**
@@ -42,8 +45,10 @@ export class PlayerInteraction {
    * @returns {Array} 交互目标对象数组
    */
   getInteractionTargets() {
-    const targets = [];
-    const seen = new Set();
+    const targets = this._targetsCache;
+    targets.length = 0;
+    const seen = this._seenCache;
+    seen.clear();
     const pushTarget = (obj) => {
       if (!obj || seen.has(obj)) return;
       seen.add(obj);

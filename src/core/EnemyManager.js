@@ -22,6 +22,8 @@ export class EnemyManager {
     this._workerUpdateCounter = 0;
     this._workerUpdateInterval = 3; // 每 3 帧发送一次
     this._lastSentPlayerPosition = null; // 缓存玩家位置用于插值
+    // GC 优化：复用输出数组，避免每帧 Array.from 分配
+    this._allEnemiesCache = [];
     this._getBlockForEnemyPhysics = (x, y, z) => {
       // 敌人物理优先正确性：统一走完整查询，避免跨 Chunk 归属方块漏判
       return this.world?.getBlock ? this.world.getBlock(x, y, z) : null;
@@ -218,7 +220,9 @@ export class EnemyManager {
 
   // 获取所有敌人
   getAllEnemies() {
-    return Array.from(this.zombies.values());
+    this._allEnemiesCache.length = 0;
+    for (const z of this.zombies.values()) this._allEnemiesCache.push(z);
+    return this._allEnemiesCache;
   }
 
   // 获取渲染网格（用于射线检测）

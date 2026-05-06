@@ -847,7 +847,7 @@ export class World {
     }
 
     let processed = 0;
-    for (const key of [...this._pendingDeferredFinalizeChunkKeys]) {
+    for (const key of this._pendingDeferredFinalizeChunkKeys) {
       if (processed >= maxChunks) break;
       const chunk = this.chunks.get(key);
       if (!chunk || chunk.disposed) {
@@ -881,7 +881,7 @@ export class World {
 
 
     let processed = 0;
-    for (const key of [...this._pendingDeferredConsolidationChunkKeys]) {
+    for (const key of this._pendingDeferredConsolidationChunkKeys) {
       if (processed >= maxChunks) break;
       const chunk = this.chunks.get(key);
       if (!chunk || chunk.disposed) {

@@ -162,6 +162,8 @@ export class ZombieInstancedRenderer {
     this.dummy = new THREE.Object3D();
     this.parentDummy = new THREE.Object3D();
     this._tempMatrix = new THREE.Matrix4();
+    // GC 优化：复用丧尸列表缓存数组，避免每帧 Array.from 分配
+    this._zombieCache = [];
   }
 
   // --------------------------------------------------------------------------
@@ -374,20 +376,22 @@ export class ZombieInstancedRenderer {
     }
 
     let count = 0;
-    this.instanceMap = [];
 
     // 重置所有网格的实例计数
     this.resetMeshCounts();
 
-    // 将 Map 转换为数组（支持 Map 和 Array 两种输入）
-    const zombieList = Array.isArray(zombies) ? zombies : Array.from(zombies.values());
+    // GC 优化：复用缓存数组，避免每帧 Array.from 和 [] 分配
+    const iter = Array.isArray(zombies) ? zombies : zombies.values();
+    this._zombieCache.length = 0;
+    for (const z of iter) this._zombieCache.push(z);
+    this.instanceMap = this._zombieCache;
 
     // 限制渲染数量不超过最大值
-    const renderCount = Math.min(zombieList.length, this.maxCount);
+    const renderCount = Math.min(this.instanceMap.length, this.maxCount);
 
     // 更新每个丧尸实例
     for (let i = 0; i < renderCount; i++) {
-      const zombie = zombieList[i];
+      const zombie = this.instanceMap[i];
       this.instanceMap[i] = zombie;
       this.updateZombieInstance(zombie, i, deltaTime);
       count++;
