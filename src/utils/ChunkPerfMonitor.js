@@ -135,7 +135,14 @@ export function aggregateChunkLoadPerf(maxAgeMs = 5000, scope = globalThis) {
       'chunk.build-meshes-global',
       'chunk.build-meshes',
       'chunk.consolidate-worker-callback',
-      'chunk.apply-consolidate-result'
+      'chunk.apply-consolidate-result',
+      // Memory authority 新指标
+      'world.runtime-chunk-record-memory',
+      'world.runtime-chunk-record-db',
+      'world.runtime-chunk-record-db.error',
+      'global-instanced-mesh.delta-patch',
+      'global-instanced-mesh.patch-chunk',
+      'global-instanced-mesh.flush-mutation'
     ];
     if (topLevelLabels.includes(label)) {
       report.totalMs += event.durationMs;

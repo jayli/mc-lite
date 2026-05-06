@@ -1,9 +1,14 @@
 // src/world/WorldStore.js
 /**
- * WorldStore — 权威世界存储接口
+ * WorldStore — 旧存档导入/导出工具
  *
- * 封装 IndexedDB 上的 WorldMeta / RegionRecord / ChunkRecord 读写。
- * IndexedDB 是最终权威数据源，runtime blockData 只是内存工作集视图。
+ * 运行期权威数据源已迁移到 MemoryWorldStore（内存）。
+ * 本类保留 IndexedDB 的读写能力，仅用于：
+ *   - 旧存档一次性导入内存
+ *   - 未来手动保存时从内存导出到 IndexedDB
+ *
+ * 运行期主链路不应直接用它取 chunk record，
+ * 应通过 World.memoryWorldStore 获取。
  *
  * 数据层级：
  *   - WorldMeta: 世界级元数据（边界、种子、生成状态）

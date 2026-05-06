@@ -213,8 +213,8 @@ export class WorldRuntime {
   // ============================================================
 
   /**
-   * 将单个脏 chunk 写回 WorldStore
-   * 由 WorldAccessLayer 调用，玩家交互后异步执行
+   * @deprecated 运行期已旁路，内存权威层接管正确性。
+   * 保留此方法仅供未来手动保存时导出到 IndexedDB。
    */
   async flushChunk(cx, cz, blockDataSnapshot = null) {
     const key = this._chunkKey(cx, cz);
@@ -259,8 +259,8 @@ export class WorldRuntime {
   }
 
   /**
-   * 批量写回所有脏 chunk
-   * 在 chunk 卸载或游戏暂停时调用
+   * @deprecated 运行期已旁路，内存权威层接管正确性。
+   * 保留此方法仅供未来手动保存时导出到 IndexedDB。
    */
   async flushAllDirty() {
     const dirtyKeys = this.getDirtyChunkKeys();
@@ -386,7 +386,9 @@ export class WorldRuntime {
   }
 
   /**
-   * 卸载 chunk 前强制写回
+   * @deprecated 运行期已旁路，内存权威层接管正确性。
+   * chunk 卸载不再触发保存，仅释放渲染资源。
+   * 保留此方法仅供未来手动保存时导出到 IndexedDB。
    * @param {number} cx
    * @param {number} cz
    * @param {object|null} blockDataSnapshot
@@ -566,6 +568,10 @@ export class WorldRuntime {
     return this._worldStore.putChunkRecord(cx, cz, chunkRecord);
   }
 
+  /**
+   * @deprecated 运行期已旁路，内存权威层接管正确性。
+   * 保留此方法仅供未来手动保存时批量导出。
+   */
   flushPendingUnloadQueueWithinBudget(options = {}) {
     if (this._pendingUnloadFlushInFlight) {
       return this._pendingUnloadFlushInFlight;

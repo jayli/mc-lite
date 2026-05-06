@@ -1417,7 +1417,7 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
-  test('runtime-streaming 区块卸载时 flushBeforeUnload 不应再显式传 live blockData', async () => {
+  test('runtime-streaming 区块卸载时 flushBeforeUnload 不应再被调用（内存权威层已接管）', async () => {
     setupEnvironment();
 
     scene = new THREE.Scene();
@@ -1442,8 +1442,8 @@ describe('World 真实类测试', (test) => {
     world.update(new THREE.Vector3(200, 10, 200), 0.016);
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    assertTrue(unloadCalls.length > 0, '应触发 flushBeforeUnload');
-    assertEqual(unloadCalls[0].blockDataSnapshot, null, '卸载时不应再显式传 live blockData');
+    // 运行期已旁路 flush，内存权威层接管正确性
+    assertEqual(unloadCalls.length, 0, '卸载时不应再触发 flushBeforeUnload');
 
     teardownEnvironment();
   });
@@ -1459,9 +1459,7 @@ describe('World 真实类测试', (test) => {
 
     world.bootstrapState.phase = 'runtime-streaming';
     const chunk = world.chunks.get('0,0');
-    let pendingResolve = null;
     let disposeCalled = false;
-    const unloadCalls = [];
 
     chunk.dispose = () => {
       disposeCalled = true;
@@ -1472,11 +1470,9 @@ describe('World 真实类测试', (test) => {
       ensureChunkData() {
         return Promise.resolve({ status: 'missing-region' });
       },
-      flushBeforeUnload(cx, cz, blockDataSnapshot, entities) {
-        unloadCalls.push({ cx, cz, blockDataSnapshot, entities });
-        return new Promise((resolve) => {
-          pendingResolve = resolve;
-        });
+      flushBeforeUnload(_cx, _cz, _blockDataSnapshot, _entities) {
+        // 运行期已旁路，不应被调用
+        return Promise.reject(new Error('flushBeforeUnload should not be called'));
       },
       prefetchRegions() {},
       flushPendingUnloadQueueWithinBudget() {
@@ -1486,12 +1482,10 @@ describe('World 真实类测试', (test) => {
 
     world.update(new THREE.Vector3(200, 10, 200), 0.016);
 
-    assertTrue(unloadCalls.length > 0, '应触发卸载入队');
+    // 运行期已旁路 flush，卸载不再等待写盘
     assertFalse(world.chunks.has('0,0'), '卸载当帧应直接从活动 chunk 集合删除');
     assertTrue(disposeCalled, '卸载当帧应直接调用 chunk.dispose');
-    assertTrue(typeof pendingResolve === 'function', 'flushBeforeUnload promise 此时仍应处于未完成状态');
 
-    pendingResolve();
     await new Promise(resolve => setTimeout(resolve, 0));
 
     teardownEnvironment();

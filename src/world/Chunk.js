@@ -245,6 +245,14 @@ export class Chunk {
     this.deferConsolidation = false;
     this.dynamicMeshes = new Map();
 
+    // 渲染增量：追踪运行期方块修改，供 GlobalInstancedMeshManager.applyChunkDelta 消费
+    this.renderDelta = {
+      added: [],      // [{coord, entry, renderData}]
+      removed: [],    // [coord]
+      updated: []     // [{coord, entry, renderData}]
+    };
+    this._renderDeltaBudget = 500;  // delta 上限，超过后降级为全量刷新
+
     // 批量 Face Culling 更新系统
     this.pendingBatchFaceCullingUpdates = new Set();
     this.batchFaceCullingTimer = null;
@@ -299,11 +307,35 @@ export class Chunk {
     this.needsStoreRetry = false;
     this.loadState = 'loading-from-record';
 
-    // 1. runtime blockData 只从 WorldStore 读取，不再让旧 session cache 覆盖权威数据
-    const effectiveBlockData = chunkRecord.blockData || {};
-    const blockDataCount = Object.keys(effectiveBlockData).length;
+    const blockDataCount = chunkRecord.blockData ? Object.keys(chunkRecord.blockData).length : 0;
 
-    // 2. 注入 blockData 打点
+    // 7. 在真实 world 运行路径中，把纯装载装配交给主线程调度器切片执行，
+    // 避免 loadFromRecord 自身同步完成 build + finalize。
+    // 只缓存 chunkRecord，细粒度 stage 负责后续注入和装配。
+    if (this.world?.onChunkWorkerReady) {
+      this._pendingChunkRecord = chunkRecord;
+      this.loadState = 'record-ready';
+      this.isReady = false;
+
+      const tEnqueueStart = globalThis.performance?.now?.() ?? Date.now();
+      this.world.onChunkWorkerReady(this);
+      const tEnqueueEnd = globalThis.performance?.now?.() ?? Date.now();
+      recordChunkPerf('chunk.load-from-record.enqueue-assembly', tEnqueueEnd - tEnqueueStart, {
+        chunkKey: `${this.cx},${this.cz}`
+      });
+
+      const totalMs = tEnqueueEnd - perfStart;
+      recordChunkPerf('chunk.load-from-record.total', totalMs, {
+        chunkKey: `${this.cx},${this.cz}`,
+        blockDataCount,
+        mode: 'fine-grained-stages'
+      });
+      return;
+    }
+
+    // 无 world 调度器的孤立/测试场景，保留同步路径以保持兼容。
+    // 1. 注入 blockData 打点
+    const effectiveBlockData = chunkRecord.blockData || {};
     const tInjectStart = globalThis.performance?.now?.() ?? Date.now();
     if (effectiveBlockData && blockDataCount > 0) {
       this._injectBlockData(effectiveBlockData);
@@ -314,7 +346,7 @@ export class Chunk {
       blockDataCount
     });
 
-    // 3. 注入静态实体
+    // 2. 注入静态实体
     const tStaticEntitiesStart = globalThis.performance?.now?.() ?? Date.now();
     if (chunkRecord.staticEntities?.length > 0) {
       this._injectStaticEntities(chunkRecord.staticEntities);
@@ -325,18 +357,16 @@ export class Chunk {
       entityCount: chunkRecord.staticEntities?.length || 0
     });
 
-    // 4. 注入结构中心
+    // 3. 注入结构中心
     if (chunkRecord.runtimeSeedData?.structureCenters) {
       this.structureCenters = chunkRecord.runtimeSeedData.structureCenters;
     }
 
-    // 5. 纯加载路径不再额外构建 pendingSnapshot.blocks，避免重复复制整块 blockData
+    // 4. 纯加载路径不再额外构建 pendingSnapshot.blocks
     this.pendingSnapshot = null;
-
-    // 标记这是纯加载路径，assembleEntityPhase 不应触发持久化刷写
     this._isPureLoadPath = true;
 
-    // 6. 恢复运行时实体数据
+    // 5. 恢复运行时实体数据
     const tEntitiesStart = globalThis.performance?.now?.() ?? Date.now();
     const hasRuntimeEntities = chunkRecord.runtimeEntities && (
       chunkRecord.runtimeEntities.turrets?.length > 0 ||
@@ -372,36 +402,110 @@ export class Chunk {
       hasRuntimeEntities
     });
 
-    // 7. 在真实 world 运行路径中，把纯装载装配交给主线程调度器切片执行，
-    // 避免 loadFromRecord 自身同步完成 build + finalize。
-    const tEnqueueStart = globalThis.performance?.now?.() ?? Date.now();
-    if (this.world?.onChunkWorkerReady) {
-      this.loadState = 'record-ready';
-      this.isReady = false;
-      this.world.onChunkWorkerReady(this);
-      const tEnqueueEnd = globalThis.performance?.now?.() ?? Date.now();
-      recordChunkPerf('chunk.load-from-record.enqueue-assembly', tEnqueueEnd - tEnqueueStart, {
-        chunkKey: `${this.cx},${this.cz}`
-      });
-
-      // 记录从收到 record 到 enqueue 的总延迟
-      const totalMs = tEnqueueEnd - perfStart;
-      recordChunkPerf('chunk.load-from-record.total', totalMs, {
-        chunkKey: `${this.cx},${this.cz}`,
-        blockDataCount,
-        injectBlockDataMs: tInjectEnd - tInjectStart,
-        staticEntitiesMs: tStaticEntitiesEnd - tStaticEntitiesStart,
-        entityRestoreMs: tEntitiesEnd - tEntitiesStart,
-        enqueueMs: tEnqueueEnd - tEnqueueStart
-      });
-      return;
-    }
-
-    // 无 world 调度器的孤立/测试场景，保留同步路径以保持兼容。
+    // 同步路径：直接装配
+    this._loadFromCachedRecord();
     this.loadState = 'terrain-built';
     this._buildMeshFromExistingBlockData();
     this.isReady = true;
     await this.finalizeNonDeferredPhase();
+  }
+
+  /**
+   * 从缓存的 chunkRecord 中提取数据并注入到 chunk 数据结构
+   * 供细粒度 runtime-hydrate stage 调用
+   */
+  assembleRuntimeHydratePhase() {
+    if (this.loadState !== 'record-ready') {
+      return this.loadState === 'hydrated' || this.loadState === 'terrain-built' ||
+             this.loadState === 'entities-built' || this.loadState === 'finalized';
+    }
+
+    this._loadFromCachedRecord();
+    this.loadState = 'hydrated';
+    return true;
+  }
+
+  /**
+   * 网格构建阶段：从 hydrated 状态构建到 terrain-built
+   */
+  assembleRuntimeBuildMeshPhase() {
+    if (this.loadState === 'finalized') return true;
+    if (this.loadState !== 'hydrated') {
+      return this.loadState === 'terrain-built' || this.loadState === 'entities-built';
+    }
+
+    this._buildMeshFromExistingBlockData();
+    this.loadState = 'terrain-built';
+    this.isReady = true;
+    return true;
+  }
+
+  /**
+   * 运行期 finalize：实体恢复
+   */
+  assembleRuntimeFinalizePhase() {
+    if (this.loadState === 'finalized') return true;
+    if (this.loadState !== 'terrain-built') {
+      return this.loadState === 'entities-built';
+    }
+
+    this.assembleEntityPhase();
+    this._isPureLoadPath = true;
+    this.loadState = 'entities-built';
+    return true;
+  }
+
+  /**
+   * 从 _pendingChunkRecord 中提取数据并注入
+   */
+  _loadFromCachedRecord() {
+    const chunkRecord = this._pendingChunkRecord;
+    if (!chunkRecord) return;
+
+    const effectiveBlockData = chunkRecord.blockData || {};
+    if (effectiveBlockData && Object.keys(effectiveBlockData).length > 0) {
+      this._injectBlockData(effectiveBlockData);
+    }
+
+    if (chunkRecord.staticEntities?.length > 0) {
+      this._injectStaticEntities(chunkRecord.staticEntities);
+    }
+
+    if (chunkRecord.runtimeSeedData?.structureCenters) {
+      this.structureCenters = chunkRecord.runtimeSeedData.structureCenters;
+    }
+
+    this.pendingSnapshot = null;
+    this._isPureLoadPath = true;
+
+    const hasRuntimeEntities = chunkRecord.runtimeEntities && (
+      chunkRecord.runtimeEntities.turrets?.length > 0 ||
+      chunkRecord.runtimeEntities.zombieNests?.length > 0 ||
+      chunkRecord.runtimeEntities.minecarts?.length > 0
+    );
+
+    if (hasRuntimeEntities) {
+      specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, chunkRecord.runtimeEntities);
+      this._needsEntityMigration = false;
+    } else {
+      const liveShadowEntities = specialEntitiesShadowStore.getAllEntitiesInChunk(this.cx, this.cz);
+      const hasLiveShadowEntities = (
+        liveShadowEntities.turrets?.length > 0 ||
+        liveShadowEntities.zombieNests?.length > 0 ||
+        liveShadowEntities.minecarts?.length > 0
+      );
+      if (!hasLiveShadowEntities) {
+        specialEntitiesShadowStore.deserializeAndMerge(this.cx, this.cz, {
+          turrets: [],
+          zombieNests: [],
+          minecarts: []
+        });
+      }
+      this._needsEntityMigration = false;
+    }
+
+    this.pendingRuntimeEntities = specialEntitiesShadowStore.getAllEntitiesInChunk(this.cx, this.cz);
+    this._pendingChunkRecord = null;
   }
 
   /**
@@ -702,6 +806,12 @@ export class Chunk {
       aoBridge.enqueueSet(`${this.cx},${this.cz}`, code, entry);
     }
 
+    // 同步到内存权威层（运行期主路径）
+    const memStore = this.world?.memoryWorldStore;
+    if (memStore) {
+      memStore.applyBlockMutation(this.cx, this.cz, code, type === 'air' ? null : entry);
+    }
+
     // 更新碰撞体集合
     const props = getBlockProps(type);
     if (props.isSolid) {
@@ -944,13 +1054,20 @@ export class Chunk {
     this._globalRenderDummy.updateMatrix();
 
     const { aoLow, aoHigh } = packAOData(new Uint8Array(24).fill(3));
-    manager.addVisibleBlock(code, { type, orientation }, `${this.cx},${this.cz}`, {
+    const renderData = {
       matrix: new Float32Array(this._globalRenderDummy.matrix.elements),
       aoLow,
       aoHigh,
       orientation
-    });
+    };
+    manager.addVisibleBlock(code, { type, orientation }, `${this.cx},${this.cz}`, renderData);
     this.visibleKeys.add(code);
+
+    // 记录到 render delta（运行期修改路径）
+    if (this.world?.bootstrapState?.phase === 'runtime-streaming') {
+      this.renderDelta.added.push({ coord: code, entry: { type, orientation }, renderData });
+    }
+
     return true;
   }
 
@@ -2369,6 +2486,12 @@ export class Chunk {
           this.world.worldRuntime.recordBlockMutation(this.cx, this.cz, px, py, pz, 'air');
         }
 
+        // 同步到内存权威层
+        const memStore = this.world?.memoryWorldStore;
+        if (memStore) {
+          memStore.applyBlockMutation(this.cx, this.cz, code, null);
+        }
+
         // 记录 AO Worker 副本同步 delta
         aoDeltas.push({ chunkKey, code, op: 'delete', entry: null });
 
@@ -2391,6 +2514,11 @@ export class Chunk {
       positions.forEach(p => {
         const code = Chunk.encodeCoord(Math.floor(p.x), Math.floor(p.y), Math.floor(p.z));
         this.world.globalInstancedMeshManager.removeVisibleBlock(code);
+
+        // 记录到 render delta
+        if (this.world?.bootstrapState?.phase === 'runtime-streaming') {
+          this.renderDelta.removed.push(code);
+        }
       });
     }
 
@@ -2707,10 +2835,13 @@ export class Chunk {
       if (this.deletedBlockTombstones.has(code)) continue;
 
       // 写入 blockData（唯一真相源）
-      if (block.orientation !== 0) {
-        this.blockData.set(code, { type: block.type, orientation: block.orientation });
-      } else {
-        this.blockData.set(code, block.type);
+      const entry = block.orientation !== 0 ? { type: block.type, orientation: block.orientation } : block.type;
+      this.blockData.set(code, entry);
+
+      // 同步到内存权威层（初始加载也直写，确保权威层完整）
+      const memStore = this.world?.memoryWorldStore;
+      if (memStore) {
+        memStore.applyBlockMutation(this.cx, this.cz, code, entry);
       }
 
       // 写入 solidBlocks
@@ -2824,10 +2955,13 @@ export class Chunk {
       if (this.blockData.has(code)) continue;
 
       // 写入 blockData
-      if (block.orientation !== 0) {
-        this.blockData.set(code, { type: block.type, orientation: block.orientation });
-      } else {
-        this.blockData.set(code, block.type);
+      const entry = block.orientation !== 0 ? { type: block.type, orientation: block.orientation } : block.type;
+      this.blockData.set(code, entry);
+
+      // 同步到内存权威层
+      const memStore = this.world?.memoryWorldStore;
+      if (memStore) {
+        memStore.applyBlockMutation(this.cx, this.cz, code, entry);
       }
 
       // 写入 solidBlocks

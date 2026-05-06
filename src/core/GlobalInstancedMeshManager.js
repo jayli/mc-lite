@@ -464,6 +464,70 @@ export class GlobalInstancedMeshManager {
     return { updated, queued, removed };
   }
 
+  /**
+   * 增量 delta patch：只处理新增/删除/更新的坐标，不扫描全量 chunk 可见集
+   * @param {string} chunkKey - "cx,cz"
+   * @param {object} delta - { added: [{coord, entry, renderData}], removed: [coord], updated: [{coord, entry, renderData}] }
+   * @param {object} options - { maxOps?: number, maxMs?: number }
+   * @returns {object} { added: number, removed: number, updated: number }
+   */
+  applyChunkDelta(chunkKey, delta, options = {}) {
+    const t0 = globalThis.performance?.now?.() ?? Date.now();
+    if (!delta) return { added: 0, removed: 0, updated: 0 };
+
+    const maxOps = Number.isFinite(options.maxOps) ? options.maxOps : 200;
+    const maxMs = Number.isFinite(options.maxMs) ? options.maxMs : 1.5;
+
+    let added = 0;
+    let removed = 0;
+    let updated = 0;
+    let ops = 0;
+    const start = t0;
+
+    // 处理新增
+    if (delta.added) {
+      for (const item of delta.added) {
+        if (ops >= maxOps || (globalThis.performance?.now?.() ?? Date.now()) - start >= maxMs) break;
+        this.addVisibleBlock(item.coord, item.entry, chunkKey, item.renderData, { commit: false });
+        added++;
+        ops++;
+      }
+    }
+
+    // 处理更新
+    if (delta.updated) {
+      for (const item of delta.updated) {
+        if (ops >= maxOps || (globalThis.performance?.now?.() ?? Date.now()) - start >= maxMs) break;
+        this.updateVisibleBlock(item.coord, item.entry, item.renderData, { commit: false });
+        updated++;
+        ops++;
+      }
+    }
+
+    // 处理删除
+    if (delta.removed) {
+      for (const coord of delta.removed) {
+        if (ops >= maxOps || (globalThis.performance?.now?.() ?? Date.now()) - start >= maxMs) break;
+        this.removeVisibleBlock(coord, { commit: false });
+        removed++;
+        ops++;
+      }
+    }
+
+    this.commitDirtyBuffers();
+    const t1 = globalThis.performance?.now?.() ?? Date.now();
+
+    recordChunkPerf('global-instanced-mesh.delta-patch', t1 - t0, {
+      chunkKey,
+      added,
+      removed,
+      updated,
+      totalOps: added + removed + updated
+    }, { thresholdMs: 0 });
+
+    return { added, removed, updated, remaining: (delta.added?.length || 0) - added + (delta.updated?.length || 0) - updated + (delta.removed?.length || 0) - removed };
+  }
+
   _purgeQueuedChunk(chunkKey) {
     if (this.mutationQueue.length === 0) return 0;
     let removed = 0;

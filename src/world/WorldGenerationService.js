@@ -14,6 +14,7 @@
  * - 使用 region (8x8 chunk) 作为生成和存储的基本单元
  */
 import { worldStore } from './WorldStore.js';
+// MemoryWorldStore 通过 this._world.memoryWorldStore 访问，不直接导入
 // worldWorkerPool 预留，供未来批量生成优化使用
 // import { worldWorkerPool } from '../workers/WorldWorkerPool.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
@@ -345,6 +346,11 @@ export class WorldGenerationService {
           return;
         }
 
+        // 直写到内存权威层（运行期主路径）
+        if (this._world?.memoryWorldStore) {
+          this._writeRegionToMemoryStore(rx, rz, regionRecord);
+        }
+
         // 收集跨 region overflow blocks
         await this._collectCrossRegionOverflow(data);
 
@@ -366,6 +372,25 @@ export class WorldGenerationService {
         seed: this._seed
       });
     });
+  }
+
+  /**
+   * 将 region 中的每个 chunk 直写到内存权威层
+   */
+  _writeRegionToMemoryStore(rx, rz, regionRecord) {
+    const memoryStore = this._world.memoryWorldStore;
+    if (!memoryStore) return;
+
+    for (const [chunkKey, chunkData] of Object.entries(regionRecord.chunks)) {
+      const [cx, cz] = chunkKey.split(',').map(Number);
+      memoryStore.createOrReplaceChunkRecord(cx, cz, {
+        blockData: chunkData.blockData || {},
+        staticEntities: chunkData.staticEntities || [],
+        runtimeSeedData: chunkData.runtimeSeedData || {},
+        runtimeEntities: chunkData.runtimeEntities || { turrets: [], zombieNests: [], minecarts: [] },
+        generatorVersion: regionRecord.generatorVersion
+      });
+    }
   }
 
   /**

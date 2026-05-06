@@ -19,6 +19,7 @@ import { WorldAccessLayer } from './WorldAccessLayer.js';
 import { WorldBoundsController } from './WorldBoundsController.js';
 import { WorldGenerationService } from './WorldGenerationService.js';
 import { worldStore } from './WorldStore.js';
+import { MemoryWorldStore } from './MemoryWorldStore.js';
 import { specialEntitiesShadowStore } from './SpecialEntitiesShadowStore.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
@@ -168,6 +169,7 @@ export class World {
 
     // --- WorldStore 新架构初始化 ---
     this.worldStore = worldStore;
+    this.memoryWorldStore = new MemoryWorldStore();
     this.worldRuntime = new WorldRuntime();
     this.worldRuntime.setWorld(this);
     this.worldAccessLayer = new WorldAccessLayer(this);
@@ -311,12 +313,46 @@ export class World {
     chunk.needsStoreRetry = true;
     chunk.loadState = 'awaiting-store-record';
 
-    const dbRequestStart = globalThis.performance?.now?.() ?? Date.now();
+    const memRequestStart = globalThis.performance?.now?.() ?? Date.now();
     const chunkKey = `${chunk.cx},${chunk.cz}`;
 
+    // 运行期优先从内存权威层读取
+    const chunkRecord = this.memoryWorldStore.getChunkRecord(chunk.cx, chunk.cz);
+    const memRequestEnd = globalThis.performance?.now?.() ?? Date.now();
+    recordChunkPerf('world.runtime-chunk-record-memory', memRequestEnd - memRequestStart, {
+      chunkKey,
+      status: chunkRecord ? 'ready' : 'missing-chunk',
+      hasBlockData: !!chunkRecord?.blockData,
+      blockDataSize: chunkRecord?.blockData ? Object.keys(chunkRecord.blockData).length : 0,
+      hasRuntimeEntities: !!(chunkRecord?.runtimeEntities)
+    });
+
+    if (chunkRecord && !chunk.disposed) {
+      // 仍然走 WorldRuntime 的 region cache upsert 和 legacy entity 迁移
+      this.worldRuntime.ensureChunkData(chunk.cx, chunk.cz).then((result) => {
+        if (chunk.disposed) return;
+        if (result?.status === 'ready' && result.chunkRecord) {
+          chunk.loadFromRecord(result.chunkRecord);
+          return;
+        }
+        // 内存已有数据但 WorldRuntime 路径也返回了，使用 WorldRuntime 的结果
+        //（包含了 legacy entity  hydration）
+        if (!chunk.disposed) {
+          chunk.loadFromRecord(chunkRecord);
+        }
+      }).catch((_error) => {
+        // WorldRuntime 路径失败但内存有数据，仍可从内存加载
+        if (!chunk.disposed) {
+          chunk.loadFromRecord(chunkRecord);
+        }
+      });
+      return;
+    }
+
+    // 内存中没有数据，回退到 WorldRuntime 的 IndexedDB 路径（旧存档导入场景）
     this.worldRuntime.ensureChunkData(chunk.cx, chunk.cz).then((result) => {
       const dbRequestEnd = globalThis.performance?.now?.() ?? Date.now();
-      recordChunkPerf('world.runtime-chunk-record-db', dbRequestEnd - dbRequestStart, {
+      recordChunkPerf('world.runtime-chunk-record-db', dbRequestEnd - memRequestStart, {
         chunkKey,
         status: result?.status,
         hasBlockData: !!result?.chunkRecord?.blockData,
@@ -337,7 +373,7 @@ export class World {
       }
     }).catch((error) => {
       const dbRequestEnd = globalThis.performance?.now?.() ?? Date.now();
-      recordChunkPerf('world.runtime-chunk-record-db.error', dbRequestEnd - dbRequestStart, {
+      recordChunkPerf('world.runtime-chunk-record-db.error', dbRequestEnd - memRequestStart, {
         chunkKey,
         error: error?.message
       });
@@ -638,27 +674,29 @@ export class World {
       }
     });
 
-    this.runtimeIdleScheduler.registerTask({
-      id: 'unload-flush-queue',
-      priority: 40,
-      minIdleMs: RUNTIME_IDLE_GRACE_MS,
-      run: () => {
-        if (!this.worldRuntime?.pendingUnloadFlushQueue?.size) {
-          return { didWork: false };
-        }
-        if (this.worldRuntime._pendingUnloadFlushInFlight) {
-          return { didWork: false };
-        }
-        this.worldRuntime.flushPendingUnloadQueueWithinBudget({
-          maxRegions: 1,
-          maxChunks: 2,
-          maxMs: 2
-        }).catch((error) => {
-          console.error('[World] Failed to flush pending unload queue within idle budget:', error);
-        });
-        return { didWork: true };
-      }
-    });
+    // 运行期已旁路 unload flush，内存权威层接管正确性
+    // 保留此 idle task 供未来手动保存时使用
+    // this.runtimeIdleScheduler.registerTask({
+    //   id: 'unload-flush-queue',
+    //   priority: 40,
+    //   minIdleMs: RUNTIME_IDLE_GRACE_MS,
+    //   run: () => {
+    //     if (!this.worldRuntime?.pendingUnloadFlushQueue?.size) {
+    //       return { didWork: false };
+    //     }
+    //     if (this.worldRuntime._pendingUnloadFlushInFlight) {
+    //       return { didWork: false };
+    //     }
+    //     this.worldRuntime.flushPendingUnloadQueueWithinBudget({
+    //       maxRegions: 1,
+    //       maxChunks: 2,
+    //       maxMs: 2
+    //     }).catch((error) => {
+    //       console.error('[World] Failed to flush pending unload queue within idle budget:', error);
+    //     });
+    //     return { didWork: true };
+    //   }
+    // });
   }
 
   _processDeferredCrossChunkPatchQueue() {
@@ -681,7 +719,7 @@ export class World {
     this._markStaticTreeTerrainBoostFromChunk(chunk);
     this.chunkAssemblyScheduler.enqueue(
       chunk,
-      chunk.spawnReason === 'runtime-streaming' ? 'runtime-build' : 'terrain',
+      chunk.spawnReason === 'runtime-streaming' ? 'runtime-hydrate' : 'terrain',
       this._computeChunkAssemblyPriority(chunk)
     );
   }
@@ -755,6 +793,47 @@ export class World {
       budgetMs: isBootstrap ? 12 : 8,
       maxTasks: isBootstrap ? 8 : 6
     });
+  }
+
+  /**
+   * 处理所有 chunk 的 render delta patch
+   * 每帧预算内处理增量更新，超过预算留到下一帧
+   */
+  _processChunkDeltaPatches(options = {}) {
+    const maxOps = Number.isFinite(options.maxOps) ? options.maxOps : 100;
+    const maxMs = Number.isFinite(options.maxMs) ? options.maxMs : 1.5;
+    const start = globalThis.performance?.now?.() ?? Date.now();
+    let totalOps = 0;
+
+    for (const chunk of this.chunks.values()) {
+      if (totalOps >= maxOps) break;
+      if ((globalThis.performance?.now?.() ?? Date.now()) - start >= maxMs) break;
+
+      const delta = chunk.renderDelta;
+      if (!delta || (delta.added.length === 0 && delta.removed.length === 0 && delta.updated.length === 0)) {
+        continue;
+      }
+
+      const chunkKey = `${chunk.cx},${chunk.cz}`;
+      const result = this.globalInstancedMeshManager.applyChunkDelta(chunkKey, delta, {
+        maxOps: maxOps - totalOps,
+        maxMs: Math.max(0.5, maxMs - ((globalThis.performance?.now?.() ?? Date.now()) - start))
+      });
+
+      totalOps += result.added + result.removed + result.updated;
+
+      // 清理已消费的 delta
+      if (result.added >= delta.added.length) delta.added = [];
+      else delta.added = delta.added.slice(result.added);
+
+      if (result.removed >= delta.removed.length) delta.removed = [];
+      else delta.removed = delta.removed.slice(result.removed);
+
+      if (result.updated >= delta.updated.length) delta.updated = [];
+      else delta.updated = delta.updated.slice(result.updated);
+    }
+
+    return totalOps;
   }
 
   _processDeferredFinalizeQueue(options = {}) {
@@ -888,11 +967,12 @@ export class World {
           this.minecartManager.stopMinecartsForChunk(chunk.cx, chunk.cz);
         }
 
-        // 2. 收集 runtime entities 快照并统一通过 WorldRuntime 写回 WorldStore
-        if (this.worldRuntime) {
-          const entities = this._collectRuntimeEntitiesForChunk(chunk);
-          this.worldRuntime.flushBeforeUnload(chunk.cx, chunk.cz, null, entities).catch(() => {});
-        }
+        // 2. 运行期已旁路 flush，内存权威层为真相，不再写回 IndexedDB
+        // 保留此调用供未来手动保存时使用
+        // if (this.worldRuntime) {
+        //   const entities = this._collectRuntimeEntitiesForChunk(chunk);
+        //   this.worldRuntime.flushBeforeUnload(chunk.cx, chunk.cz, null, entities).catch(() => {});
+        // }
 
         // 3. 清理方块分发 buffer
         this.scatterManager?.unloadChunk(key);
@@ -961,6 +1041,12 @@ export class World {
       playerCz: cz
     }) || { processedBlocks: 0, elapsedMs: 0 };
     this._recordStreamingPerfFlush(flushResult, flushBudget);
+
+    // 运行期 chunk delta patch（增量网格更新）
+    if (this.bootstrapState.phase === 'runtime-streaming') {
+      this._processChunkDeltaPatches();
+    }
+
     if (this.bootstrapState.phase === 'runtime-streaming') {
       this._processDeferredFinalizeQueue();
       this.runtimeIdleScheduler.process({
