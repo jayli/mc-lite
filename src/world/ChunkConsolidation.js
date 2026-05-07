@@ -8,6 +8,7 @@ import { WORLD_CONFIG } from '../utils/MathUtils.js';
 import { getBlockProperties as getBlockProps } from '../constants/BlockData.js';
 import { blockDataToNumberKeys, coordKeyToCode } from '../utils/CoordEncoding.js';
 import { getRotationAngle } from '../utils/OrientationUtils.js';
+import { createOcclusionChecker, computeBlockAOPacked } from '../utils/AOUtils.js';
 import { filterWorkerResultAgainstBlockData } from './ChunkMeshDataFilter.js';
 import { belongsToCrossChunkStructure } from '../utils/StructureUtils.js';
 import { worldWorker, workerCallbacks, worldWorkerPool } from '../workers/WorldWorkerPool.js';
@@ -430,7 +431,7 @@ export function extendChunk(Chunk) {
     this.buildMeshes(meshData || []);
     const t6 = performance.now();
 
-    // 恢复非脏位置的旧 AO 值（跳过 dirtyAOPositions，交由 AO 刷新修正）
+    // 恢复重建前的 AO，避免 dirty 区域在异步 AO 返回前短暂掉回中性值。
     const t6a = performance.now();
     this._restoreOldAOForNonDirtyPositions(savedAO);
     const t6b = performance.now();
@@ -727,25 +728,26 @@ export function extendChunk(Chunk) {
   };
 
   /**
-   * 将旧 AO 值恢复到新建 InstancedMesh 的非脏位置
-   * 在 buildMeshes 之后调用，脏位置跳过（由后续 AO 刷新修正）
+   * 将旧 AO 值恢复到新建 InstancedMesh。
+   * 对已有旧 AO 的 dirty 位置先保留旧值；只有没有旧 AO 的 dirty 新实例才补算当前 AO。
    * @param {Map<number, {aoLow: number, aoHigh: number}>} oldAO - 从旧 mesh 提取的 AO 值
    */
   Chunk.prototype._restoreOldAOForNonDirtyPositions = function(oldAO) {
     if (!oldAO || oldAO.size === 0) return;
     const gim = this.world?.globalInstancedMeshManager;
     const dirtySet = this.dirtyAOPositions;
+    const restoreInfo = this._buildConsolidatedAORestoreInfo(oldAO, dirtySet);
+    if (!restoreInfo) return;
 
     if (gim) {
-      // 全局路径：遍历当前 chunk 的所有 coord，恢复非脏位置的旧 AO
+      // 全局路径：遍历当前 chunk 的所有 coord，恢复旧 AO；新出现的 dirty 实例则同步补一份当前 AO。
       const chunkKey = `${this.cx},${this.cz}`;
       const coords = gim.chunkToCoords.get(chunkKey);
       if (!coords) return;
 
       const dirtyBuffers = new Set(); // 记录需要 update 的 TypeBuffer
       for (const coord of coords) {
-        if (dirtySet && dirtySet.has(coord)) continue; // 脏位置交给 AO 刷新
-        const saved = oldAO.get(coord);
+        const saved = restoreInfo.get(coord);
         if (!saved) continue;
         const ref = gim.coordToRef.get(coord);
         if (!ref) continue;
@@ -769,7 +771,7 @@ export function extendChunk(Chunk) {
         buffer.markDirty(buffer.count - 1, { matrix: false, ao: true, bounds: false });
       }
     } else {
-      // 本地路径：遍历新 InstancedMesh，恢复非脏位置的旧 AO
+      // 本地路径：遍历新 InstancedMesh，恢复旧 AO；新出现的 dirty 实例则同步补一份当前 AO。
       for (const child of this.group.children) {
         if (!child.isInstancedMesh) continue;
         const type = child.userData?.type;
@@ -790,8 +792,7 @@ export function extendChunk(Chunk) {
         let modified = false;
         for (const [code, indexInfo] of indexMap) {
           const numCode = Number(code);
-          if (dirtySet && dirtySet.has(numCode)) continue; // 脏位置交给 AO 刷新
-          const saved = oldAO.get(numCode);
+          const saved = restoreInfo.get(numCode);
           if (!saved) continue;
           const idx = typeof indexInfo === 'object' ? indexInfo.index : indexInfo;
           if (idx >= aoLowAttr.array.length) continue;
@@ -807,5 +808,30 @@ export function extendChunk(Chunk) {
         }
       }
     }
+  };
+
+  Chunk.prototype._buildConsolidatedAORestoreInfo = function(oldAO, dirtySet) {
+    const restoreInfo = new Map(oldAO);
+    if (!dirtySet || dirtySet.size === 0) return restoreInfo;
+
+    const isOccluding = createOcclusionChecker(
+      { chunk: this, chunks: this.world?.chunks },
+      CHUNK_SIZE,
+      getBlockProps
+    );
+
+    for (const code of dirtySet) {
+      if (restoreInfo.has(code)) continue;
+      const entry = this.blockData.get(code);
+      if (!entry) continue;
+      const type = typeof entry === 'string' ? entry : entry.type;
+      const props = getBlockProps(type);
+      if (!props?.isSolid || props.isTransparent) continue;
+
+      const { x, y, z } = this.constructor.decodeCoord(code);
+      restoreInfo.set(code, computeBlockAOPacked(x, y, z, isOccluding));
+    }
+
+    return restoreInfo;
   };
 }

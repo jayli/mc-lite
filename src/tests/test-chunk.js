@@ -1629,4 +1629,66 @@ describe('Chunk 真实类测试', (test) => {
     }
   });
 
+  test('_applyConsolidateResult 应保留 dirty 可见方块的旧 AO，避免合并后闪烁', () => {
+    setupEnvironment();
+
+    try {
+      const world = createMockWorld();
+      world.onChunkAOSourceStable = () => {};
+      const chunk = new Chunk(0, 0, world);
+      chunk.isReady = true;
+
+      const code = Chunk.encodeCoord(4, 5, 6);
+      chunk.blockData.set(code, 'stone');
+      chunk.visibleKeys.add(code);
+      chunk.dirtyBlocks = 1;
+      chunk.dirtyAOPositions.add(code);
+      chunk.dynamicMeshes = new Map();
+
+      const oldAOLow = 17;
+      const oldAOHigh = 23;
+      chunk._extractOldAOForNonDirtyPositions = () => new Map([
+        [code, { aoLow: oldAOLow, aoHigh: oldAOHigh }]
+      ]);
+      chunk._saveChestStates = () => new Map();
+      chunk._cleanupOldMeshes = () => {};
+      chunk._restoreChestStates = () => {};
+      chunk._unregisterLightSources = () => {};
+      chunk._registerLightSources = () => {};
+      chunk._initArrayStorageFromBlockData = () => {};
+      chunk.regenerateCrossChunkColliders = () => {};
+
+      const geometry = new THREE.InstancedBufferGeometry();
+      geometry.setAttribute('aAoLow', new THREE.InstancedBufferAttribute(new Float32Array([0x00ffffff]), 1));
+      geometry.setAttribute('aAoHigh', new THREE.InstancedBufferAttribute(new Float32Array([0x00ffffff]), 1));
+      const mesh = {
+        isInstancedMesh: true,
+        userData: { type: 'stone' },
+        geometry
+      };
+
+      chunk.buildMeshes = () => {
+        chunk.group.children = [mesh];
+        chunk.instanceIndexMap = {
+          stone: new Map([[code, 0]])
+        };
+      };
+
+      chunk._applyConsolidateResult({
+        scatteredBlocks: [{ x: 4, y: 5, z: 6, type: 'stone' }],
+        meshData: [{ type: 'stone' }],
+        visibleKeys: [code],
+        solidBlocks: [code],
+        structureCenters: []
+      }, 1, new Set());
+
+      const aoLowAttr = mesh.geometry.getAttribute('aAoLow');
+      const aoHighAttr = mesh.geometry.getAttribute('aAoHigh');
+      assertEqual(aoLowAttr.array[0], oldAOLow, 'dirty 可见方块应先保留旧 aoLow，等待异步 AO 覆盖');
+      assertEqual(aoHighAttr.array[0], oldAOHigh, 'dirty 可见方块应先保留旧 aoHigh，等待异步 AO 覆盖');
+    } finally {
+      teardownEnvironment();
+    }
+  });
+
 });
