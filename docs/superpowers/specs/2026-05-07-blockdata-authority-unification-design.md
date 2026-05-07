@@ -35,9 +35,10 @@
 1. 不重写 `visibleKeys`、`solidBlocks`、`blockDataArray`、`solidBlockIds` 的用途与算法
 2. 不改变 AO / Face Culling / Global Instanced Mesh 的核心渲染策略
 3. 不把特殊实体逻辑硬塞进普通 `blockData` 语义
-4. 不在本阶段实现新的 IndexedDB 持久化方案
-5. 不在本阶段推进 TypedArray 化的权威存储
-6. 不要求本次一并解决所有渲染性能热点
+4. 不把 `entityCollisionIndex` 并入 `blockData` 或 `solidBlocks`
+5. 不在本阶段实现新的 IndexedDB 持久化方案
+6. 不在本阶段推进 TypedArray 化的权威存储
+7. 不要求本次一并解决所有渲染性能热点
 
 ## 4. Current System Reality
 
@@ -123,6 +124,7 @@ runtime 中只存在一份 world-level `blockData authority`：
 2. **Chunk 运行时视图层**
    - 持有者：`Chunk.blockData`
    - 语义：指向 world-level `blockData` 中当前 chunk slice 的运行时访问入口
+   - 存储身份：与 `WorldBlockDataStore` 内部该 chunk slice 共享同一个 `Map<number, entry>` 实例
    - 允许写：可以，但写入必须直接命中 world-level authority
    - 生命周期：随 chunk 加载/卸载而出现/消失
 
@@ -131,6 +133,12 @@ runtime 中只存在一份 world-level `blockData authority`：
 - `load`：创建 chunk 实例视图
 - `unload`：销毁 chunk 实例视图
 - world-level `blockData` 全程不发生“转移持有者”
+
+补充约束：
+
+- “共享同一个 `Map` 实例”意味着不存在“先写 world-level authority，再把结果同步写回另一份 `Chunk.blockData` 副本”的第二次写入
+- `Chunk.blockData` 的共享身份只解决零拷贝视图问题，不意味着业务代码可以绕过受控写路径任意 `set/delete`
+- runtime mutation 仍必须统一经过 `WorldAccessLayer`、`Chunk` 的受控 mutation 方法或 store 约定的单一写入口，以保证 `visibleKeys`、`solidBlocks`、`blockDataArray`、AO、tombstone、renderDelta` 等派生层一起更新
 
 ### 5.3 删除 `MemoryWorldStore`
 
@@ -190,7 +198,7 @@ runtime 中只存在一份 world-level `blockData authority`：
 
 语义：服务 chunk 内高频 `isSolid` / `resolveBlockOwner` / 局部块访问，不承担权威职责。
 
-需要特别确认保留：
+以下四项是**热路径上需要特别强调的保留项**，但它们**不是完整保留清单**：
 
 - `Chunk.visibleKeys`
 - `Chunk.solidBlocks`
@@ -205,6 +213,12 @@ runtime 中只存在一份 world-level `blockData authority`：
 - `solidBlockIds`：配合数组路径做 O(1) 实心判断
 
 它们都应继续存在，只是语义上必须严格降级为**派生索引 / 高速查询缓存**。
+
+补充说明：
+
+- `Section 6` 各子节列出的结构默认都属于本次重构的保留对象
+- `6.4` 这里特别点名，是因为这四项直接位于最高频的碰撞 / `isSolid` / 局部查询热路径上
+- `blockPalette` / `blockPaletteReverse`、`lightSourceCoords`、`dirtyAOPositions`、`instanceIndexMap`、`meshData`、`renderDelta`、`deletedBlockTombstones` 等并不是可删项，只是它们的保留理由已在各自层级小节中单独说明
 
 ### 6.5 渲染载荷层
 
@@ -233,6 +247,20 @@ runtime 中只存在一份 world-level `blockData authority`：
 
 语义：实体域权威与碰撞域，不混入普通块逻辑真相。
 
+补充约束：
+
+- `entityCollisionIndex` 继续保持特殊实体碰撞占位的独立语义
+- 本次 authority 重构不把 `entityCollisionIndex` 合并进 `blockData` 或 `solidBlocks`
+- 对 `entityCollisionIndex` 的修改不应被误纳入普通方块写入口改造
+
+### 6.8 Section 6 保留范围总结
+
+除非后续有单独专项设计明确替代方案，`Section 6` 中列出的各层结构默认都应保留：
+
+- 保留它们当前承担的查询、碰撞、渲染、AO、一致性保护职责
+- 只重新定义其权威边界和数据来源
+- 不在本次 runtime authority 重构中顺手删除或合并掉这些结构
+
 ## 7. Target Data Flow
 
 ### 7.1 世界生成
@@ -259,9 +287,9 @@ WorldGenerationService / WorldWorker
 
 ```text
 WorldAccessLayer.setBlock/removeBlock
+-> WorldBlockDataStore.setBlockEntry()
 -> Chunk._updateBlockState()
--> 修改 Chunk.blockData
--> 同步写入 world-level blockData authority
+-> Chunk.blockData 视图立即观察到 world-level authority 的变更
 -> 增量更新 visibleKeys / solidBlocks / blockDataArray / lightSourceCoords / dirtyAOPositions / renderDelta
 -> AOBridge / tombstones 同步
 -> 仅标记 chunk runtime dirty
@@ -269,10 +297,32 @@ WorldAccessLayer.setBlock/removeBlock
 
 关键约束：
 
-- 真相先改 `blockData`
-- `Chunk.blockData` 只是世界级权威的 chunk 访问入口
+- 真相先改 world-level `blockData authority`
+- `Chunk.blockData` 只是世界级权威的 chunk 访问入口，与 authority chunk slice 共享同一个 `Map<number, entry>` 实例
+- 不得先写 chunk-local 副本再“同步回权威层”，也不得执行“authority 写一次 + `Chunk.blockData` 再写一次”的双写流程
+- 共享 `Map` 身份不放开任意直写；合法 mutation 仍必须走受控入口，确保派生索引同步
 - 不再构造完整 `blockDataSnapshot`
 - 不再为了持久化链路即时 clone 整个 chunkRecord
+
+### 7.2.1 Scatter / Cross-Chunk Patch 写入
+
+目标链路：
+
+```text
+BlockScatterManager / deferred cross-chunk patch
+-> 将 patch 按目标 chunk 分组
+-> 对每个目标 chunk 命中各自的 WorldBlockDataStore chunk slice
+-> Chunk.acceptScatteredBlocks() / appendScatteredBlocks()
+-> 共享 Chunk.blockData 视图立即观察到对应 slice 变更
+-> 更新 visibleKeys / solidBlocks / blockDataArray / tombstone / meshData 等派生层
+```
+
+关键约束：
+
+- `acceptScatteredBlocks()` / `appendScatteredBlocks()` 对逻辑方块的写入必须直接命中目标 chunk 的 authority slice
+- 若 patch 涉及多个 chunk，必须分别写入各自 chunk slice，不得先落入某个临时 `blockData` 副本后再统一同步
+- 共享 `Map` 方案下，不允许对同一 patch 再执行一次额外的 `Chunk.blockData.set/delete` 补写
+- tombstone、hidden block、late worker result 过滤等现有一致性保护逻辑继续保留
 
 ### 7.3 Chunk 加载
 
@@ -341,6 +391,7 @@ World.unloadChunk()
 - 所有逻辑修改必须先触达 `blockData`
 - 索引层只能被 `blockData` 驱动更新
 - 不允许索引层反向决定逻辑真相
+- 不允许沿用“先改 `Chunk.blockData` 再同步第二处 holder”的旧双写模式
 
 ## 9. 复制与序列化边界
 
@@ -363,9 +414,16 @@ World.unloadChunk()
 
 ### 9.3 API 边界约束
 
+- `WorldBlockDataStore` 在 runtime 内部的权威存储格式必须是 `Map<number, entry>`
+- chunk slice 的主存储格式也必须是 `Map<number, entry>`，不得以普通对象作为 runtime 主存储格式
+- `Chunk.blockData` 必须直接引用 `WorldBlockDataStore` 内该 chunk slice 的同一个 `Map` 实例
 - world-level `blockData` 的读取接口默认应返回只读视图或约定不可变结果
 - 需要高性能时，应优先提供“取 chunk slice 视图”“同步指定字段”“直接挂载 chunk view”的 API
 - `Chunk.loadFromRecord()` 必须明确输入是“权威视图”还是“保护性快照”，不能混用
+- `replaceChunkSlice(cx, cz, blockData)` 只能用于生成器注入、未来导入、测试夹具、冷边界恢复等低频整块装载场景
+- 单块修改、批量改单块、scatter patch、普通 chunk unload / reload 等热路径禁止调用 `replaceChunkSlice()`
+- `setBlockEntry()`、`deleteBlockEntry()`、批量局部 patch API 才是 runtime 热路径的合法写入口
+- 普通对象序列化形态只允许出现在 Worker 消息、测试快照、未来导出存档等边界，不得回流为 runtime 主存储
 
 ## 10. Bootstrap / Import / Export Strategy
 
@@ -402,6 +460,12 @@ World.unloadChunk()
 3. 世界生成结果直接进入 world-level `blockData`
 4. 不构造 `blockDataSnapshot` 仍能保持 runtime 正确性
 5. `visibleKeys`、`solidBlocks`、`blockDataArray`、`solidBlockIds` 保持原职责
+6. `blockPalette` / `blockPaletteReverse` 继续支撑 `blockDataArray` 紧凑快路径
+7. `lightSourceCoords` / `dirtyAOPositions` 继续支撑光照与 AO 增量刷新
+8. `instanceIndexMap` / `meshData` / `renderDelta` 继续服务渲染派生层
+9. `deletedBlockTombstones` 继续保护晚到 Worker 回包一致性
+10. `Chunk.blockData` 与 `WorldBlockDataStore` chunk slice 共享同一个 `Map<number, entry>` 实例
+11. 热路径中不允许出现“authority 写一次 + chunk map 再写一次”的重复 mutation
 
 ### 11.2 需要改写的旧测试
 

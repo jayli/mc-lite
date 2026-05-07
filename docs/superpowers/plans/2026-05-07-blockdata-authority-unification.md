@@ -90,8 +90,16 @@ Expected:
 
 - `getChunkSlice(cx, cz)`
 - `setBlockEntry(cx, cz, code, entry)`
+- `deleteBlockEntry(cx, cz, code)`
 - `replaceChunkSlice(cx, cz, blockData)`
 - `hasChunkSlice(cx, cz)`
+
+边界要求：
+
+- `WorldBlockDataStore` 的 runtime 内部主存储格式必须是 `Map<number, entry>`
+- 每个 chunk slice 的主存储格式也必须是 `Map<number, entry>`，不能继续以普通对象作为 runtime 主存储
+- `replaceChunkSlice()` 只允许用于世界生成注入、未来导入、测试夹具、冷边界恢复
+- runtime 热路径禁止把 `replaceChunkSlice()` 当成单块修改或 scatter patch 的通用入口
 
 - [ ] **Step 4: 从 `World` 中移除 `MemoryWorldStore` 初始化与引用**
 
@@ -131,6 +139,7 @@ Expected: PASS
 - 修改 `Chunk.blockData` 后，world-level `blockData` 同步可见
 - reload 后新 chunk 视图看到相同数据
 - chunk dispose 后 world-level `blockData` 仍保留
+- `Chunk.blockData` 与 `WorldBlockDataStore.getChunkSlice()` 返回同一个 `Map` 实例
 
 - [ ] **Step 2: 运行测试，确认当前实现仍保留双 holder 语义**
 
@@ -146,8 +155,11 @@ Expected:
 要求：
 
 - `Chunk.blockData` 明确写成 world-level authority 的 chunk slice 视图
+- `Chunk.blockData` 必须直接引用 `WorldBlockDataStore` 内对应 chunk slice 的同一个 `Map<number, entry>` 实例
 - `loadFromRecord()` / `_injectBlockData()` 的文档与行为同步调整
 - 不再把 `Chunk.blockData` 视作未来 unload 时要转移出去的数据
+- 禁止继续保留“先写 chunk-local `blockData`，再同步 world-level authority”的实现方式
+- 禁止把“共享同一个 `Map` 实例”误实现成“任意调用方都可直接 `chunk.blockData.set/delete` 而不经过派生层更新”
 
 - [ ] **Step 4: 运行相关测试确认通过**
 
@@ -185,6 +197,8 @@ Expected: PASS
 - `acceptScatteredBlocks()`
 - `appendScatteredBlocks()`
 - 世界生成结果注入路径
+- authority 写入后不得再对同一逻辑修改额外执行一次 `Chunk.blockData.set/delete`
+- cross-chunk patch 时，每个目标 chunk 必须命中各自的 authority slice
 
 - [ ] **Step 2: 运行测试，确认当前覆盖存在缺口**
 
@@ -199,11 +213,15 @@ Expected:
 
 统一规则：
 
-- 先写 world-level `blockData`
+- 先写 `WorldBlockDataStore`
 - 通过 `Chunk.blockData` 视图反映到当前 chunk
 - 再更新 `visibleKeys` / `solidBlocks` / `blockDataArray` / `solidBlockIds`
 - 再更新 AO / render / tombstone 等异步派生层
 - 禁止任何索引层反向决定逻辑真相
+- 禁止任何“先改 `Chunk.blockData`，再同步回 authority”的旧双写顺序
+- 禁止任何“写 authority 一次后，再对共享 `Chunk.blockData` map 补一次 `set/delete`”的重复 mutation
+- `acceptScatteredBlocks()` / `appendScatteredBlocks()` 若涉及多个 chunk，必须对每个目标 chunk 分别写入对应 authority slice
+- 禁止为 scatter / deferred patch 构造额外的 staging `blockData` 副本，等待后续再同步到 world-level authority
 
 - [ ] **Step 4: 让世界生成直接产出权威 blockData**
 
@@ -238,12 +256,22 @@ Expected: PASS
 
 - [ ] **Step 1: 写失败测试，固定索引层职责**
 
+说明：
+
+- 这里特别点名的结构，是热路径上最需要优先锁死的保留项
+- 但它们不是本次改造的完整保留清单
+- `Section 6` 中其他已列出的派生结构，也默认属于保留对象，只是测试优先级和强调程度不同
+
 明确覆盖：
 
 - `Chunk.visibleKeys` 仍服务可见性判断
 - `Chunk.solidBlocks` 仍服务碰撞判断
 - `Chunk.blockDataArray` 仍作为 chunk 内紧凑快路径
 - `Chunk.solidBlockIds` 仍配合数组路径做 O(1) 实心判断
+- `Chunk.blockPalette` / `Chunk.blockPaletteReverse` 仍支撑 `blockDataArray` 紧凑映射
+- `Chunk.lightSourceCoords` 仍服务光源索引
+- `Chunk.dirtyAOPositions` 仍服务 AO 增量刷新
+- `Chunk.instanceIndexMap` / `meshData` / `renderDelta` 仍服务渲染派生层
 
 - [ ] **Step 2: 运行测试，确认索引层行为当前有覆盖缺口**
 
@@ -259,7 +287,19 @@ Expected:
 
 - 明确保留 `deletedBlockTombstones`
 - AO mirror 继续从 `blockData` 派生
+- `lightSourceCoords` 继续从 `blockData` 派生，不退回全量扫描
+- `blockPalette` / `blockPaletteReverse` 继续作为 `blockDataArray` 配套结构存在
+- `instanceIndexMap` / `meshData` 继续服务局部渲染更新
 - `renderDelta` 仍供全局实例系统消费
+
+- [ ] **Step 3.5: 明确保留范围不止四个热路径结构**
+
+要求：
+
+- 在实现说明、注释或测试命名中明确：`visibleKeys`、`solidBlocks`、`blockDataArray`、`solidBlockIds` 是“重点锁定的热路径保留项”，不是完整保留清单
+- `blockPalette` / `blockPaletteReverse`、`lightSourceCoords`、`dirtyAOPositions`、`instanceIndexMap`、`meshData`、`renderDelta`、`deletedBlockTombstones` 仍默认保留
+- `entityCollisionIndex` 继续保持独立的特殊实体碰撞语义，不并入 `blockData` / `solidBlocks`
+- 除非后续专项设计明确替代方案，本次 authority 重构不得顺手删除这些结构
 
 - [ ] **Step 4: 运行 chunk/world 相关测试**
 
@@ -358,6 +398,7 @@ Expected: PASS
 
 - 不再依赖整份 `blockDataSnapshot`
 - 不再用持久化理由对整 chunk 做热路径全量复制
+- `WorldBlockDataStore` / `Chunk.blockData` 共享同一个 `Map` 实例，而不是通过额外复制维持一致
 
 - [ ] **Step 2: 运行测试确认当前实现仍存在快照式依赖**
 
@@ -374,6 +415,9 @@ Expected:
 - 提供 chunk slice 视图读取接口
 - 提供局部 block entry 更新接口
 - 避免所有路径都走整份 chunk record 替换
+- 将 `replaceChunkSlice()` 的调用点限制在生成、导入、测试夹具、冷边界恢复
+- 为热路径保留局部 patch API，禁止单块修改/批量修改回退到整块替换
+- 通过测试或断言确保不会出现“authority 写一次 + chunk map 再写一次”的重复 mutation 流程
 
 - [ ] **Step 4: 明确允许 clone 的边界**
 
