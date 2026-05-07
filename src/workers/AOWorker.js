@@ -6,6 +6,8 @@ import { calculateAOForBlock } from '../utils/AOUtils.js';
 import { getBlockProperties, isFullCubeOccluder } from '../constants/BlockData.js';
 import { encodeCoord, decodeCoord } from '../utils/CoordEncoding.js';
 
+const CHUNK_SIZE = 16;
+
 /**
  * 判断方块类型是否适用于 AO 计算
  * 条件：实心且不透明（isSolid && !isTransparent）
@@ -112,61 +114,50 @@ function applyDelta(msg) {
 // =========================================
 
 /**
+ * 根据世界坐标计算对应的 chunkKey
+ * @param {number} x - 世界坐标 X
+ * @param {number} z - 世界坐标 Z
+ * @returns {string} chunkKey
+ */
+function getChunkKeyForWorldCoord(x, z) {
+  const cx = Math.floor(Math.floor(x) / CHUNK_SIZE);
+  const cz = Math.floor(Math.floor(z) / CHUNK_SIZE);
+  return `${cx},${cz}`;
+}
+
+/**
+ * 从任意已缓存 chunk 的副本中读取方块条目（跨 chunk 查询）
+ * @param {number} x - 世界坐标 X
+ * @param {number} y - 世界坐标 Y
+ * @param {number} z - 世界坐标 Z
+ * @returns {*} 方块条目或 null
+ */
+function getEntryFromAnyCachedChunk(x, y, z) {
+  const ix = Math.floor(x);
+  const iy = Math.floor(y);
+  const iz = Math.floor(z);
+  const data = chunkCache[getChunkKeyForWorldCoord(ix, iz)];
+  if (!data) return null;
+
+  const code = encodeCoord(ix, iy, iz);
+  if (data[code] !== undefined) return data[code];
+
+  const strKey = `${ix},${iy},${iz}`;
+  return data[strKey] !== undefined ? data[strKey] : null;
+}
+
+/**
  * 创建基于缓存的遮挡检测函数
- * 合并当前 chunk 和邻居 chunk 的 blockData 副本为统一查找表
- * @param {string} chunkKey - 当前 chunk 标识
- * @param {Array} neighborChunks - 邻居 chunk 快照 [{blockData, cx, cz}]
+ * 直接按世界坐标定位 chunkCache，不再每次请求合并大对象
  * @returns {Function} isOccluding(x, y, z) => boolean
  */
-function createOcclusionCheckerFromCache(chunkKey, neighborChunks) {
-  const merged = {};
-
-  // 当前 chunk 数据
-  const currentData = chunkCache[chunkKey];
-  if (currentData) {
-    for (const key in currentData) {
-      merged[key] = currentData[key];
-    }
-  }
-
-  // 邻居 chunk 数据（不覆盖当前 chunk 已有的）
-  if (neighborChunks && neighborChunks.length > 0) {
-    for (const neighbor of neighborChunks) {
-      if (neighbor && neighbor.blockData) {
-        for (const key in neighbor.blockData) {
-          if (!(key in merged)) {
-            merged[key] = neighbor.blockData[key];
-          }
-        }
-      }
-    }
-  }
-
-  // 也合并邻居 chunk 的缓存数据（如果 neighborChunks 只提供了 blockData 快照
-  // 但缓存中有更新的数据，优先用缓存中的）
-  if (neighborChunks && neighborChunks.length > 0) {
-    for (const neighbor of neighborChunks) {
-      const nKey = `${neighbor.cx},${neighbor.cz}`;
-      const cachedData = chunkCache[nKey];
-      if (cachedData) {
-        for (const key in cachedData) {
-          // 缓存数据更新到 merged
-          merged[key] = cachedData[key];
-        }
-      }
-    }
-  }
-
+function createOcclusionCheckerFromCache() {
   return function isOccluding(x, y, z) {
-    const code = encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
-    const entry = merged[code] !== undefined
-      ? merged[code]
-      : merged[`${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`];
+    const entry = getEntryFromAnyCachedChunk(x, y, z);
     if (!entry) return false;
     const type = typeof entry === 'string' ? entry : entry.type;
     if (!type) return false;
-    const props = getBlockProperties(type);
-    return isFullCubeOccluder(props);
+    return isFullCubeOccluder(type);
   };
 }
 
@@ -198,7 +189,7 @@ function getEntryFromCache(chunkKey, code) {
  * @returns {Object} 计算结果
  */
 function handleComputeAO(data) {
-  const { requestId, chunkKey, positions, neighborChunks } = data;
+  const { requestId, chunkKey, positions } = data;
 
   // 空 positions 直接返回空结果
   if (!positions || positions.length === 0) {
@@ -209,8 +200,8 @@ function handleComputeAO(data) {
     };
   }
 
-  // 使用缓存创建遮挡检测函数
-  const isOccluding = createOcclusionCheckerFromCache(chunkKey, neighborChunks || []);
+  // 使用缓存创建遮挡检测函数（直接按坐标查询 chunkCache，不再合并大对象）
+  const isOccluding = createOcclusionCheckerFromCache();
 
   const results = [];
 

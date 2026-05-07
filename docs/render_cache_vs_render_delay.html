@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Superpowers Brainstorming</title>
+  <style>
+    /*
+     * BRAINSTORM COMPANION FRAME TEMPLATE
+     *
+     * This template provides a consistent frame with:
+     * - OS-aware light/dark theming
+     * - Fixed header and selection indicator bar
+     * - Scrollable main content area
+     * - CSS helpers for common UI patterns
+     *
+     * Content is injected via placeholder comment in #claude-content.
+     */
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; }
+
+    /* ===== THEME VARIABLES ===== */
+    :root {
+      --bg-primary: #f5f5f7;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #e5e5e7;
+      --border: #d1d1d6;
+      --text-primary: #1d1d1f;
+      --text-secondary: #86868b;
+      --text-tertiary: #aeaeb2;
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --success: #34c759;
+      --warning: #ff9f0a;
+      --error: #ff3b30;
+      --selected-bg: #e8f4fd;
+      --selected-border: #0071e3;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg-primary: #1d1d1f;
+        --bg-secondary: #2d2d2f;
+        --bg-tertiary: #3d3d3f;
+        --border: #424245;
+        --text-primary: #f5f5f7;
+        --text-secondary: #86868b;
+        --text-tertiary: #636366;
+        --accent: #0a84ff;
+        --accent-hover: #409cff;
+        --selected-bg: rgba(10, 132, 255, 0.15);
+        --selected-border: #0a84ff;
+      }
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      line-height: 1.5;
+    }
+
+    /* ===== FRAME STRUCTURE ===== */
+    .header {
+      background: var(--bg-secondary);
+      padding: 0.5rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); }
+    .header .status { font-size: 0.7rem; color: var(--success); display: flex; align-items: center; gap: 0.4rem; }
+    .header .status::before { content: ''; width: 6px; height: 6px; background: var(--success); border-radius: 50%; }
+
+    .main { flex: 1; overflow-y: auto; }
+    #claude-content { padding: 2rem; min-height: 100%; }
+
+    .indicator-bar {
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
+      padding: 0.5rem 1.5rem;
+      flex-shrink: 0;
+      text-align: center;
+    }
+    .indicator-bar span {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+    .indicator-bar .selected-text {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    /* ===== TYPOGRAPHY ===== */
+    h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 0.5rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.25rem; }
+    .subtitle { color: var(--text-secondary); margin-bottom: 1.5rem; }
+    .section { margin-bottom: 2rem; }
+    .label { font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+
+    /* ===== OPTIONS (for A/B/C choices) ===== */
+    .options { display: flex; flex-direction: column; gap: 0.75rem; }
+    .option {
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.25rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+    .option:hover { border-color: var(--accent); }
+    .option.selected { background: var(--selected-bg); border-color: var(--selected-border); }
+    .option .letter {
+      background: var(--bg-tertiary);
+      color: var(--text-secondary);
+      width: 1.75rem; height: 1.75rem;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 0.85rem; flex-shrink: 0;
+    }
+    .option.selected .letter { background: var(--accent); color: white; }
+    .option .content { flex: 1; }
+    .option .content h3 { font-size: 0.95rem; margin-bottom: 0.15rem; }
+    .option .content p { color: var(--text-secondary); font-size: 0.85rem; margin: 0; }
+
+    /* ===== CARDS (for showing designs/mockups) ===== */
+    .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; }
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .card.selected { border-color: var(--selected-border); border-width: 2px; }
+    .card-image { background: var(--bg-tertiary); aspect-ratio: 16/10; display: flex; align-items: center; justify-content: center; }
+    .card-body { padding: 1rem; }
+    .card-body h3 { margin-bottom: 0.25rem; }
+    .card-body p { color: var(--text-secondary); font-size: 0.85rem; }
+
+    /* ===== MOCKUP CONTAINER ===== */
+    .mockup {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    .mockup-header {
+      background: var(--bg-tertiary);
+      padding: 0.5rem 1rem;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+    .mockup-body { padding: 1.5rem; }
+
+    /* ===== SPLIT VIEW (side-by-side comparison) ===== */
+    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 700px) { .split { grid-template-columns: 1fr; } }
+
+    /* ===== PROS/CONS ===== */
+    .pros-cons { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
+    .pros, .cons { background: var(--bg-secondary); border-radius: 8px; padding: 1rem; }
+    .pros h4 { color: var(--success); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .cons h4 { color: var(--error); font-size: 0.85rem; margin-bottom: 0.5rem; }
+    .pros ul, .cons ul { margin-left: 1.25rem; font-size: 0.85rem; color: var(--text-secondary); }
+    .pros li, .cons li { margin-bottom: 0.25rem; }
+
+    /* ===== PLACEHOLDER (for mockup areas) ===== */
+    .placeholder {
+      background: var(--bg-tertiary);
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      color: var(--text-tertiary);
+    }
+
+    /* ===== INLINE MOCKUP ELEMENTS ===== */
+    .mock-nav { background: var(--accent); color: white; padding: 0.75rem 1rem; display: flex; gap: 1.5rem; font-size: 0.9rem; }
+    .mock-sidebar { background: var(--bg-tertiary); padding: 1rem; min-width: 180px; }
+    .mock-content { padding: 1.5rem; flex: 1; }
+    .mock-button { background: var(--accent); color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; }
+    .mock-input { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1><a href="https://github.com/obra/superpowers" style="color: inherit; text-decoration: none;">Superpowers Brainstorming</a></h1>
+    <div class="status">Connected</div>
+  </div>
+
+  <div class="main">
+    <div id="claude-content">
+      <h2>Chunk 加载流水线 — 瓶颈分析</h2>
+<p class="subtitle">当前实现 vs 帧分散方案对比</p>
+
+<div class="section">
+  <h3>当前实现 — CPU 尖峰分布</h3>
+  <p>一帧内发生的事情（红色 = 瓶颈点，无预算限制）</p>
+
+  <div class="mockup">
+    <div class="mockup-header">单帧时间线（世界加载时，25 个 chunk 同时创建）</div>
+    <div class="mockup-body" style="padding: 16px; font-family: monospace; font-size: 13px;">
+
+      <div style="margin-bottom: 12px;">
+        <div style="color: #888; font-size: 11px;">Frame N（问题帧）</div>
+        <div style="display: flex; align-items: center; gap: 2px; height: 28px; background: #1a1a2e; border-radius: 4px; padding: 4px;">
+          <div style="background: #e74c3c; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">25×new Chunk()<br/>无预算限制</div>
+          <div style="background: #e67e22; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">Worker 回包洪泛<br/>scatter+flush 无预算</div>
+          <div style="background: #f39c12; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">6× 装配任务<br/>8ms 预算</div>
+          <div style="background: #2ecc71; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">mutation flush<br/>2-3ms 预算</div>
+          <div style="flex: 1; background: #333; border-radius: 2px; height: 20px;"></div>
+        </div>
+        <div style="color: #e74c3c; font-size: 11px; margin-top: 4px;">⚠ 此帧可能超过 100ms → 明显卡顿</div>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <div style="color: #888; font-size: 11px;">Frame N+1（剩余 chunk 装配）</div>
+        <div style="display: flex; align-items: center; gap: 2px; height: 28px; background: #1a1a2e; border-radius: 4px; padding: 4px;">
+          <div style="background: #f39c12; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">6× 装配任务<br/>8ms 预算</div>
+          <div style="background: #2ecc71; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">mutation flush</div>
+          <div style="flex: 1; background: #333; border-radius: 2px; height: 20px;"></div>
+        </div>
+        <div style="color: #888; font-size: 11px; margin-top: 4px;">~16ms — 正常帧</div>
+      </div>
+
+      <div style="margin-bottom: 12px;">
+        <div style="color: #888; font-size: 11px;">Frame N+2（consolidation 触发）</div>
+        <div style="display: flex; align-items: center; gap: 2px; height: 28px; background: #1a1a2e; border-radius: 4px; padding: 4px;">
+          <div style="background: #e74c3c; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">多 chunk 同时<br/>consolidate!</div>
+          <div style="background: #2ecc71; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">mutation flush</div>
+          <div style="flex: 1; background: #333; border-radius: 2px; height: 20px;"></div>
+        </div>
+        <div style="color: #e74c3c; font-size: 11px; margin-top: 4px;">⚠ 又一个卡顿帧</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>帧分散方案 — 摊平尖峰</h3>
+  <p>每帧只做少量工作，保持稳定的 16ms 帧率</p>
+
+  <div class="mockup">
+    <div class="mockup-header">分散后的时间线（同样 25 个 chunk，分散到多帧）</div>
+    <div class="mockup-body" style="padding: 16px; font-family: monospace; font-size: 13px;">
+
+      <div style="margin-bottom: 6px;">
+        <div style="color: #888; font-size: 11px;">Frame N: 创建 2 chunk → 装配 2 个</div>
+        <div style="display: flex; align-items: center; gap: 2px; height: 22px; background: #1a1a2e; border-radius: 4px; padding: 4px;">
+          <div style="background: #3498db; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">2×new Chunk()</div>
+          <div style="background: #f39c12; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">2× 装配</div>
+          <div style="background: #2ecc71; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">flush</div>
+          <div style="flex: 1; background: #333; border-radius: 2px; height: 14px;"></div>
+        </div>
+        <div style="color: #2ecc71; font-size: 11px;">~12ms ✓</div>
+      </div>
+
+      <div style="margin-bottom: 6px;">
+        <div style="color: #888; font-size: 11px;">Frame N+3: 创建 2 chunk → 装配 2 个</div>
+        <div style="display: flex; align-items: center; gap: 2px; height: 22px; background: #1a1a2e; border-radius: 4px; padding: 4px;">
+          <div style="background: #3498db; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">2×new Chunk()</div>
+          <div style="background: #f39c12; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">2× 装配</div>
+          <div style="background: #2ecc71; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">flush</div>
+          <div style="flex: 1; background: #333; border-radius: 2px; height: 14px;"></div>
+        </div>
+        <div style="color: #2ecc71; font-size: 11px;">~12ms ✓</div>
+      </div>
+
+      <div style="margin-bottom: 6px;">
+        <div style="color: #888; font-size: 11px;">Frame N+6: 创建 2 chunk → 装配 2 个</div>
+        <div style="display: flex; align-items: center; gap: 2px; height: 22px; background: #1a1a2e; border-radius: 4px; padding: 4px;">
+          <div style="background: #3498db; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">2×new Chunk()</div>
+          <div style="background: #f39c12; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">2× 装配</div>
+          <div style="background: #2ecc71; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">flush</div>
+          <div style="flex: 1; background: #333; border-radius: 2px; height: 14px;"></div>
+        </div>
+        <div style="color: #2ecc71; font-size: 11px;">~12ms ✓</div>
+      </div>
+
+      <div style="margin-bottom: 6px; color: #888; font-size: 11px; font-style: italic;">... 每隔 3 帧加载 2 个 chunk ...</div>
+
+      <div style="margin-bottom: 6px;">
+        <div style="color: #888; font-size: 11px;">Frame N+36: consolidation 队列（每帧 1 个）</div>
+        <div style="display: flex; align-items: center; gap: 2px; height: 22px; background: #1a1a2e; border-radius: 4px; padding: 4px;">
+          <div style="background: #9b59b6; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">1× consolidate</div>
+          <div style="background: #2ecc71; color: white; padding: 2px 6px; border-radius: 2px; font-size: 11px; white-space: nowrap;">flush</div>
+          <div style="flex: 1; background: #333; border-radius: 2px; height: 14px;"></div>
+        </div>
+        <div style="color: #2ecc71; font-size: 11px;">~14ms ✓</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>核心差异</h3>
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>帧分散方案</h4>
+      <ul>
+        <li>不改变数据结构，无持久化风险</li>
+        <li>改动集中在调度层（2-3 个文件）</li>
+        <li>一个 feature flag 即可回退</li>
+        <li>每帧工作量可控、可观测</li>
+        <li>参数可调：每帧 chunk 数、间隔帧数</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>renderCache 方案</h4>
+      <ul>
+        <li>需要改 9+ 文件，涉及读写链路保真</li>
+        <li>影响 IndexedDB schema</li>
+        <li>contentRevision 单调性约束</li>
+        <li>overflow 污染处理复杂</li>
+        <li>bug 面大，已多次失败</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+    </div>
+  </div>
+
+  <div class="indicator-bar">
+    <span id="indicator-text">Click an option above, then return to the terminal</span>
+  </div>
+
+<script>
+(function() {
+  const WS_URL = 'ws://' + window.location.host;
+  let ws = null;
+  let eventQueue = [];
+
+  function connect() {
+    ws = new WebSocket(WS_URL);
+
+    ws.onopen = () => {
+      eventQueue.forEach(e => ws.send(JSON.stringify(e)));
+      eventQueue = [];
+    };
+
+    ws.onmessage = (msg) => {
+      const data = JSON.parse(msg.data);
+      if (data.type === 'reload') {
+        window.location.reload();
+      }
+    };
+
+    ws.onclose = () => {
+      setTimeout(connect, 1000);
+    };
+  }
+
+  function sendEvent(event) {
+    event.timestamp = Date.now();
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(event));
+    } else {
+      eventQueue.push(event);
+    }
+  }
+
+  // Capture clicks on choice elements
+  document.addEventListener('click', (e) => {
+    const target = e.target.closest('[data-choice]');
+    if (!target) return;
+
+    sendEvent({
+      type: 'click',
+      text: target.textContent.trim(),
+      choice: target.dataset.choice,
+      id: target.id || null
+    });
+
+    // Update indicator bar (defer so toggleSelect runs first)
+    setTimeout(() => {
+      const indicator = document.getElementById('indicator-text');
+      if (!indicator) return;
+      const container = target.closest('.options') || target.closest('.cards');
+      const selected = container ? container.querySelectorAll('.selected') : [];
+      if (selected.length === 0) {
+        indicator.textContent = 'Click an option above, then return to the terminal';
+      } else if (selected.length === 1) {
+        const label = selected[0].querySelector('h3, .content h3, .card-body h3')?.textContent?.trim() || selected[0].dataset.choice;
+        indicator.innerHTML = '<span class="selected-text">' + label + ' selected</span> — return to terminal to continue';
+      } else {
+        indicator.innerHTML = '<span class="selected-text">' + selected.length + ' selected</span> — return to terminal to continue';
+      }
+    }, 0);
+  });
+
+  // Frame UI: selection tracking
+  window.selectedChoice = null;
+
+  window.toggleSelect = function(el) {
+    const container = el.closest('.options') || el.closest('.cards');
+    const multi = container && container.dataset.multiselect !== undefined;
+    if (container && !multi) {
+      container.querySelectorAll('.option, .card').forEach(o => o.classList.remove('selected'));
+    }
+    if (multi) {
+      el.classList.toggle('selected');
+    } else {
+      el.classList.add('selected');
+    }
+    window.selectedChoice = el.dataset.choice;
+  };
+
+  // Expose API for explicit use
+  window.brainstorm = {
+    send: sendEvent,
+    choice: (value, metadata = {}) => sendEvent({ type: 'choice', value, ...metadata })
+  };
+
+  connect();
+})();
+
+</script>
+</body>
+</html>

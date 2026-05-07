@@ -1,0 +1,91 @@
+<h2>方案 A 设计：统一持久化路径</h2>
+<p class="subtitle">第 1/3 节：数据流设计</p>
+
+<div class="section">
+<h3>统一后的数据流</h3>
+
+<div class="mockup">
+<div class="mockup-header">Chunk 写入路径（Unified Write）</div>
+<div class="mockup-body" style="font-family:monospace;font-size:12px;line-height:1.8;">
+<pre style="color:#aaa;margin:0;">
+Chunk unload:
+┌─────────────────────────────────────────────────┐
+│ World.update()                                   │
+│  1. snapshotChunkBlocks(key, blockData)          │── 同步
+│  2. stopMinecartsForChunk(cx, cz)                │── 停止移动矿车
+│  3. flushBeforeUnload(cx, cz, blockData, entities)│── 传入 entities
+│     │                                            │
+│     ▼                                            │
+│ WorldRuntime.flushBeforeUnload()                 │
+│  → 构建 ChunkRecord:                              │
+│    {                                              │
+│      blockData: snapshot,                        │
+│      staticEntities: [...],                      │
+│      runtimeSeedData: {...},                     │
+│      runtimeEntities: {  ◄── 新增字段             │
+│        turrets: [...],                            │
+│        zombieNests: [...],                        │
+│        minecarts: [...]                           │
+│      }                                            │
+│    }                                              │
+│  → putChunkRecord(cx, cz, record)                 │
+│     │                                            │
+│     ▼                                            │
+│ WorldStore.putChunkRecord()                       │
+│  → RegionRecord.chunks[key] = record              │
+│  → saveRegionRecord(rx, rz, region)               │── IndexedDB
+└─────────────────────────────────────────────────┘
+</pre>
+</div>
+</div>
+
+<div class="mockup">
+<div class="mockup-header">Chunk 读取路径（Unified Read）</div>
+<div class="mockup-body" style="font-family:monospace;font-size:12px;line-height:1.8;">
+<pre style="color:#aaa;margin:0;">
+Chunk load:
+┌─────────────────────────────────────────────────┐
+│ Chunk.loadFromRecord(chunkRecord)                │
+│  1. ensureChunkSnapshot()                        │── 确保 cache 存在
+│  2. hydrateChunkBlocks(blockData)                │── cache.blocks 优先
+│  3. _injectBlockData(effectiveBlockData)         │
+│  4. _injectStaticEntities(staticEntities)         │
+│  5. structureCenters = runtimeSeedData            │
+│                                                   │
+│  6. 读取 runtimeEntities:                         │── 新增逻辑
+│     if chunkRecord.runtimeEntities:               │
+│       使用 chunkRecord.runtimeEntities            │── 新格式
+│     else:                                         │
+│       从 cache.entities 读取                      │── 旧格式兼容
+│       渐进迁移 → 写入 chunkRecord.runtimeEntities  │
+│                                                   │
+│  7. pendingRuntimeEntities = entities             │
+│  8. finalizeNonDeferredPhase()                    │
+│     → restoreNestsForChunk()                      │
+│     → restoreTurretsForChunk()                    │
+│     → restoreMinecartsForChunk()                  │
+└─────────────────────────────────────────────────┘
+</pre>
+</div>
+</div>
+
+<div class="mockup">
+<div class="mockup-header">渐进式迁移路径</div>
+<div class="mockup-body" style="font-family:monospace;font-size:12px;line-height:1.8;">
+<pre style="color:#aaa;margin:0;">
+旧存档加载时:
+┌─────────────────────────────────────────────────┐
+│ WorldRuntime.ensureChunkData(cx, cz)             │
+│  → getChunkRecord(cx, cz)                        │
+│    → 从 world_regions 读取                        │
+│    → 若 chunkRecord.runtimeEntities 不存在:         │
+│       1. 从 world_deltas 读取对应 chunk 的 entities │
+│       2. chunkRecord.runtimeEntities = entities   │
+│       3. putChunkRecord(cx, cz, chunkRecord)      │── 回填
+│       4. 可选: 从 world_deltas 删除已迁移的数据    │
+│    → return chunkRecord                           │
+└─────────────────────────────────────────────────┘
+</pre>
+</div>
+</div>
+</div>

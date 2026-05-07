@@ -44,7 +44,7 @@ export class ZombieNestPlacementHandler extends EntityPlacementHandler {
     // 检查数量限制
     const canCreateNest = typeof this.zombieNestManager.canCreateNest === 'function'
       ? this.zombieNestManager.canCreateNest()
-      : this.zombieNestManager.nests.size < this.zombieNestManager.maxNests;
+      : this.zombieNestManager.activeNests.size < this.zombieNestManager.maxNests;
 
     if (!canCreateNest) {
       console.warn('[ZombieNestPlacementHandler] 已达到最大丧尸巢穴数量限制，无法放置');

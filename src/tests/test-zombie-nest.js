@@ -150,11 +150,11 @@ describe('ZombieNestManager 数量限制测试', (test) => {
     });
 
     assertTrue(created.every(Boolean), '前 8 个巢穴应创建成功');
-    assertEqual(manager.nests.size, manager.maxNests, '活动巢穴数量应达到上限');
+    assertEqual(manager.activeNests.size, manager.maxNests, '活动巢穴数量应达到上限');
     assertEqual(extraNest, null, '第 9 个巢穴应创建失败');
 
     created[0].destroy();
-    assertEqual(manager.nests.size, manager.maxNests - 1, '失效后应释放一个名额');
+    assertEqual(manager.activeNests.size, manager.maxNests - 1, '失效后应释放一个名额');
 
     const recycledNest = manager.createNest({
       position: { x: 1000, y: 0, z: 0 },
@@ -163,6 +163,6 @@ describe('ZombieNestManager 数量限制测试', (test) => {
     });
 
     assertNotNull(recycledNest, '释放名额后应可再次放置');
-    assertEqual(manager.nests.size, manager.maxNests, '重新放置后应回到上限');
+    assertEqual(manager.activeNests.size, manager.maxNests, '重新放置后应回到上限');
   });
 });

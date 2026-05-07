@@ -1,12 +1,3 @@
-/**
- * Chunk持久化模块
- * 负责区块数据的保存和加载等功能
- */
-import { persistenceService } from '../services/PersistenceService.js';
-
-// --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
-const getPersistenceService = () => globalThis._persistenceService || persistenceService;
-
 export function extendChunk(Chunk) {
   /**
    * 防抖保存区块数据
@@ -14,7 +5,16 @@ export function extendChunk(Chunk) {
   Chunk.prototype.saveDebounced = function() {
     if (this.saveTimeout) clearTimeout(this.saveTimeout);
     this.saveTimeout = setTimeout(() => {
-      getPersistenceService().saveChunkData(this.cx, this.cz);
+      const runtime = this.world?.worldRuntime;
+      if (runtime?.flushChunk) {
+        runtime.flushChunk(this.cx, this.cz).catch((error) => {
+          console.warn(`[ChunkPersistence] flushChunk failed for ${this.cx},${this.cz}:`, error);
+        });
+        this.saveTimeout = null;
+        return;
+      }
+
+      console.warn(`[ChunkPersistence] Missing worldRuntime for ${this.cx},${this.cz}, skip legacy save path`);
       this.saveTimeout = null;
     }, 500);
   };

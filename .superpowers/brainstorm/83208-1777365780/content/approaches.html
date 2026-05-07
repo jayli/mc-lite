@@ -1,0 +1,146 @@
+<h2>三种实现方案</h2>
+<p class="subtitle">基于你的需求对比三种统一持久化路径的方案</p>
+
+<div class="cards">
+<div class="card" data-choice="approach-a" onclick="toggleSelect(this)">
+<div class="card-image" style="background:#1a1a2e;padding:15px;font-family:monospace;font-size:11px;">
+<pre style="color:#aaa;margin:0;">
+// ChunkRecord 扩展
+{
+  blockData: { ... },
+  staticEntities: [...],
+  runtimeSeedData: { ... },
+  runtimeEntities: {
+    turrets: [...],
+    zombieNests: [...],
+    minecarts: [...]
+  }
+}
+
+// 修改点（7个文件）:
+1. WorldStore.js    - ChunkRecord 格式 + migration
+2. WorldRuntime.js  - flushBeforeUnload 写 entities
+3. PersistenceWorker - 新 action: saveEntitiesToChunk
+4. Chunk.js         - loadFromRecord 读 runtimeEntities
+5. Game.js          - collectSnapshot 从 worldStore 读
+6. PersistenceService - cache.entities 桥接
+7. ManualSaveWorker - 统一读取路径
+</pre>
+</div>
+<div class="card-body">
+<h3>方案 A：直接扩展现有路径（推荐）</h3>
+<p>最小改动：扩展 ChunkRecord + 修改 flushBeforeUnload 写入 entities + 渐进迁移</p>
+</div>
+</div>
+
+<div class="card" data-choice="approach-b" onclick="toggleSelect(this)">
+<div class="card-image" style="background:#1a1a2e;padding:15px;font-family:monospace;font-size:11px;">
+<pre style="color:#aaa;margin:0;">
+// 新增独立存储层
+RuntimeEntityStore {
+  saveChunkEntities(cx, cz, entities) → write IDB
+  loadChunkEntities(cx, cz) → read IDB
+  migrateFromDeltas() → progressive
+}
+
+// 修改点（9个文件）:
+1. RuntimeEntityStore - 新类，独立 IDB store
+2. WorldStore.js      - 委托读取 runtimeEntities
+3. WorldRuntime.js    - flush 时调用 RuntimeEntityStore
+4. Chunk.js           - load 时从 RuntimeEntityStore 读
+5. PersistenceService - cache → RuntimeEntityStore 桥接
+6. PersistenceWorker  - 新增 entity actions
+7. Game.js            - collectSnapshot 合并两处数据
+8. ManualSaveWorker   - 统一读取
+9. 三个 Manager       - 改为调用 RuntimeEntityStore
+</pre>
+</div>
+<div class="card-body">
+<h3>方案 B：引入 RuntimeEntityStore 抽象</h3>
+<p>职责分离：runtime entities 单独存储在独立 IDB store，WorldStore 仅做委托</p>
+</div>
+</div>
+
+<div class="card" data-choice="approach-c" onclick="toggleSelect(this)">
+<div class="card-image" style="background:#1a1a2e;padding:15px;font-family:monospace;font-size:11px;">
+<pre style="color:#aaa;margin:0;">
+// 将 entities 作为 worldStore 的一部分
+// 通过 RegionRecord 统一写入
+{
+  region: "rx,rz",
+  chunks: {
+    "cx,cz": {
+      blockData: {...},
+      staticEntities: [...],
+      runtimeSeedData: {...},
+      runtimeEntities: {...}
+    }
+  },
+  runtimeEntities: {  // region 级汇总
+    "cx,cz": { turrets: [...], ... }
+  }
+}
+
+// 修改点（6个文件）:
+1. WorldStore.js      - RegionRecord 格式扩展
+2. WorldRuntime.js    - flush 时汇总到 region
+3. Chunk.js           - load 时从 region 读取
+4. Game.js            - collectSnapshot 改为 region 级
+5. ManualSaveWorker   - 改为 region 级读取
+6. PersistenceService - 渐进迁移逻辑
+</pre>
+</div>
+<div class="card-body">
+<h3>方案 C：Region 级 entity 汇总</h3>
+<p>数据聚合：将 entities 汇总到 RegionRecord 层级，按 region 批量读写</p>
+</div>
+</div>
+</div>
+
+<div class="section">
+<h3>方案对比</h3>
+<table style="width:100%;border-collapse:collapse;font-size:14px;">
+<tr style="border-bottom:1px solid #333;">
+<th style="text-align:left;padding:8px;">维度</th>
+<th style="text-align:left;padding:8px;color:#4fc3f7;">A: 直接扩展</th>
+<th style="text-align:left;padding:8px;">B: 独立抽象</th>
+<th style="text-align:left;padding:8px;">C: Region 级</th>
+</tr>
+<tr style="border-bottom:1px solid #222;">
+<td style="padding:8px;">修改文件数</td>
+<td style="padding:8px;color:#4fc3f7;">7 个</td>
+<td style="padding:8px;">9 个</td>
+<td style="padding:8px;">6 个</td>
+</tr>
+<tr style="border-bottom:1px solid #222;">
+<td style="padding:8px;">新增代码量</td>
+<td style="padding:8px;color:#4fc3f7;">~300 行</td>
+<td style="padding:8px;">~500 行</td>
+<td style="padding:8px;">~250 行</td>
+</tr>
+<tr style="border-bottom:1px solid #222;">
+<td style="padding:8px;">概念复杂度</td>
+<td style="padding:8px;color:#4fc3f7;">低（扩展已有格式）</td>
+<td style="padding:8px;">中（新增抽象层）</td>
+<td style="padding:8px;">中（region 级聚合）</td>
+</tr>
+<tr style="border-bottom:1px solid #222;">
+<td style="padding:8px;">渐进迁移难度</td>
+<td style="padding:8px;color:#4fc3f7;">低（chunk 级自动迁移）</td>
+<td style="padding:8px;">低（同上）</td>
+<td style="padding:8px;">中（需 region 级迁移）</td>
+</tr>
+<tr style="border-bottom:1px solid #222;">
+<td style="padding:8px;">向后兼容</td>
+<td style="padding:8px;color:#4fc3f7;">好（runtimeEntities 可选）</td>
+<td style="padding:8px;">好</td>
+<td style="padding:8px;">一般（region 格式变更）</td>
+</tr>
+<tr style="border-bottom:1px solid #222;">
+<td style="padding:8px;">性能影响</td>
+<td style="padding:8px;color:#4fc3f7;">无额外 I/O</td>
+<td style="padding:8px;">额外一次 I/O</td>
+<td style="padding:8px;">region 级批量更优</td>
+</tr>
+</table>
+</div>

@@ -224,16 +224,19 @@ describe('PersistenceService 真实类测试', (test) => {
     teardownService();
   });
 
-  test('recordChange - 未缓存的区块不记录', () => {
+  test('recordChange - 未缓存的区块自动创建快照', () => {
     const service = createTestService();
 
     // 不在缓存中创建区块，直接记录
     service.recordChange(100, 100, 100, 'stone', 0);
 
-    // 验证没有创建新的缓存条目
+    // runtime-streaming 阶段应自动创建缓存条目
     const chunkKey = '6,6'; // 100/16 = 6
     const chunkData = service.cache.get(chunkKey);
-    assertEqual(chunkData, undefined, '不应该自动创建缓存条目');
+    assertNotNull(chunkData, '应自动创建缓存条目');
+    assertNotNull(chunkData.blocks, '应包含 blocks');
+    const code = encodeCoord(100, 100, 100);
+    assertEqual(chunkData.blocks[code].type, 'stone', '方块应被记录');
 
     teardownService();
   });
@@ -320,7 +323,7 @@ describe('PersistenceService 真实类测试', (test) => {
   // =========== 配置测试 ===========
   test('PERSISTENCE_CONFIG 值正确', () => {
     assertEqual(PERSISTENCE_CONFIG.DB_NAME, 'mc_lite_persistence', '数据库名称正确');
-    assertEqual(PERSISTENCE_CONFIG.DB_VERSION, 1, '数据库版本正确');
+    assertEqual(PERSISTENCE_CONFIG.DB_VERSION, 3, '数据库版本正确（v3: WorldStore + world_overflow 架构）');
     assertEqual(PERSISTENCE_CONFIG.STORE_NAME, 'world_deltas', '存储名称正确');
     assertEqual(PERSISTENCE_CONFIG.SESSION_ONLY, true, '默认仅会话模式');
     assertEqual(PERSISTENCE_CONFIG.CACHE_LIMIT, 100, '缓存限制为 100');

@@ -1,0 +1,11 @@
+SEVERITY:P2|FILE:项目整体|LINE:N/A|ISSUE:缺少静态分析配置|DETAIL:|SUGGEST:配置SwiftLint/OCLint/.clang-format
+SEVERITY:P2|FILE:Src/View/RootView/TRIPHomeViewController+Category/Biz/TRIPHomeViewController+HotelCard.m|LINE:405|ISSUE:方法名应以小写字母开头|DETAIL:|SUGGEST:遵循camelCase
+SEVERITY:P2|FILE:Src/View/RootView/TRIPHomeViewController+Category/Biz/TRIPHomeViewController+Poplayer.m|LINE:22|ISSUE:方法名应以小写字母开头|DETAIL:|SUGGEST:遵循camelCase
+SEVERITY:P2|FILE:Src/View/RootView/TRIPHomeViewController+Category/Biz/TRIPHomeViewController+Poplayer.m|LINE:26|ISSUE:方法名应以小写字母开头|DETAIL:|SUGGEST:遵循camelCase
+SEVERITY:P2|FILE:Src/View/RootView/TRIPHomeViewController+Category/Biz/TRIPHomeViewController+Poplayer.m|LINE:31|ISSUE:方法名应以小写字母开头|DETAIL:|SUGGEST:遵循camelCase
+SEVERITY:P2|FILE:Src/View/RootView/TRIPHomeViewController+Category/Biz/TRIPHomeViewController+Poplayer.m|LINE:37|ISSUE:方法名应以小写字母开头|DETAIL:|SUGGEST:遵循camelCase
+SEVERITY:P2|FILE:Src/View/RootView/TRIPHomeViewController+Category/Other/TRIPHomeViewController+Additional.m|LINE:403|ISSUE:方法名应以小写字母开头|DETAIL:|SUGGEST:遵循camelCase
+SEVERITY:P2|FILE:Src/View/RootView/TRIPHomeViewController+Category/Other/TRIPHomeViewController+Additional.m|LINE:554|ISSUE:方法名应以小写字母开头|DETAIL:|SUGGEST:遵循camelCase
+SEVERITY:P2|FILE:Src/View/RootView/TRIPHomeViewController+Category/Other/TRIPHomeViewController+Additional.m|LINE:593|ISSUE:方法名应以小写字母开头|DETAIL:|SUGGEST:遵循camelCase
+SEVERITY:P2|FILE:Src/View/RootView/TRIPHomeViewController+Category/Other/TRIPHomeViewController+Additional.m|LINE:597|ISSUE:方法名应以小写字母开头|DETAIL:|SUGGEST:遵循camelCase
+SEVERITY:P2|FILE:Src/View/RootView/TRIPHomeViewController+Category/Other/TRIPHomeViewController+Additional.m|LINE:604|ISSUE:方法名应以小写字母开头|DETAIL:|SUGGEST:遵循camelCase

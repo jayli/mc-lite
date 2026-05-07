@@ -15,7 +15,7 @@ import { describe, test } from './runner.js';
 import { assertEqual, assertTrue, assertFalse, assertNotNull } from './assert.js';
 import * as THREE from 'three';
 import { Chunk } from '../world/Chunk.js';
-import { worldWorker } from '../world/ChunkConsolidation.js';
+import { worldWorker, workerCallbacks } from '../world/ChunkConsolidation.js';
 import { mockFaceCullingSystem, mockMaterials, mockBlockData } from './test-mocks.js';
 
 // 模拟 WorldWorker
@@ -50,13 +50,49 @@ class MockWorldWorker {
 // 模拟 persistenceService
 const mockPersistenceService = {
   calls: [],
+  _worldMeta: null,
+  _regions: new Map(),
+  reset() {
+    this.calls = [];
+    this._worldMeta = null;
+    this._regions.clear();
+  },
+  async postMessage(action, payload = {}) {
+    switch (action) {
+      case 'getWorldMeta':
+        return this._worldMeta;
+      case 'saveWorldMeta':
+        this._worldMeta = payload.meta || null;
+        return true;
+      case 'getRegionRecord':
+        return this._regions.get(payload.regionKey) || null;
+      case 'saveRegionRecord':
+        this._regions.set(payload.regionKey, payload.record);
+        return true;
+      case 'saveRegionRecordsBatch':
+        for (const item of payload.records || []) {
+          this._regions.set(item.regionKey, item.record);
+        }
+        return true;
+      case 'getAllRegionKeys':
+        return Array.from(this._regions.keys());
+      case 'clearWorld':
+        this.reset();
+        return true;
+      default:
+        return null;
+    }
+  },
   recordChange: (...args) => {
     mockPersistenceService.calls.push({ method: 'recordChange', args });
   },
   recordChangeForChunk: (...args) => {
     mockPersistenceService.calls.push({ method: 'recordChangeForChunk', args });
   },
-  saveChunkData: () => Promise.resolve(),
+  saveChunkData: (...args) => {
+    mockPersistenceService.calls.push({ method: 'saveChunkData', args });
+    return Promise.resolve();
+  },
   saveDebounced: () => {},
   getChunkData: () => Promise.resolve(null)
 };
@@ -116,18 +152,25 @@ describe('Chunk 真实类测试', (test) => {
     globalThis._blockData = mockBlockData;
     globalThis._carModel = new THREE.Group();
     globalThis._gunManModel = new THREE.Group();
-    mockPersistenceService.calls = [];
+    mockPersistenceService.reset();
   };
 
   // 恢复原始环境
   const teardownEnvironment = () => {
-    if (originalWorker) globalThis.Worker = originalWorker;
-    if (originalPersistenceService) globalThis._persistenceService = originalPersistenceService;
-    if (originalFaceCullingSystem) globalThis._faceCullingSystem = originalFaceCullingSystem;
-    if (originalMaterials) globalThis._materials = originalMaterials;
-    if (originalBlockData) globalThis._blockData = originalBlockData;
-    if (originalCarModel) globalThis._carModel = originalCarModel;
-    if (originalGunManModel) globalThis._gunManModel = originalGunManModel;
+    if (originalWorker === undefined) delete globalThis.Worker;
+    else globalThis.Worker = originalWorker;
+    if (originalPersistenceService === undefined) delete globalThis._persistenceService;
+    else globalThis._persistenceService = originalPersistenceService;
+    if (originalFaceCullingSystem === undefined) delete globalThis._faceCullingSystem;
+    else globalThis._faceCullingSystem = originalFaceCullingSystem;
+    if (originalMaterials === undefined) delete globalThis._materials;
+    else globalThis._materials = originalMaterials;
+    if (originalBlockData === undefined) delete globalThis._blockData;
+    else globalThis._blockData = originalBlockData;
+    if (originalCarModel === undefined) delete globalThis._carModel;
+    else globalThis._carModel = originalCarModel;
+    if (originalGunManModel === undefined) delete globalThis._gunManModel;
+    else globalThis._gunManModel = originalGunManModel;
   };
 
   // =========== 基础状态测试 ===========
@@ -434,6 +477,23 @@ describe('Chunk 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('addBlockDynamic - runtime 路径不应再写入 recordChangeForChunk', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const chunk = new Chunk(0, 0, world);
+
+    chunk.addBlockDynamic(5, 10, 5, 'stone', 0);
+
+    const writeCall = mockPersistenceService.calls.find(call =>
+      call.method === 'recordChangeForChunk'
+    );
+
+    assertEqual(writeCall, undefined, 'runtime addBlockDynamic 不应再直接写旧 session cache');
+
+    teardownEnvironment();
+  });
+
   test('removeBlocksBatch - 越界坐标不应再由当前 chunk 批量写入', () => {
     setupEnvironment();
 
@@ -456,6 +516,136 @@ describe('Chunk 真实类测试', (test) => {
 
     assertEqual(wrongWrite, undefined, '当前 chunk 不应批量写入越界坐标');
 
+    teardownEnvironment();
+  });
+
+  test('removeBlocksBatch - runtime 路径不应再写入 recordChangeForChunk', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const chunk = new Chunk(0, 0, world);
+    chunk.addBlockDynamic(5, 10, 5, 'stone', 0);
+    mockPersistenceService.calls = [];
+
+    chunk.removeBlocksBatch([{ x: 5, y: 10, z: 5 }], false);
+
+    const writeCall = mockPersistenceService.calls.find(call =>
+      call.method === 'recordChangeForChunk'
+    );
+
+    assertEqual(writeCall, undefined, 'runtime removeBlocksBatch 不应再直接写旧 session cache');
+
+    teardownEnvironment();
+  });
+
+  test('saveDebounced - runtime-streaming 下不应再走旧 saveChunkData', async () => {
+    setupEnvironment();
+    await new Promise(resolve => setTimeout(resolve, 650));
+    mockPersistenceService.calls = [];
+
+    const world = createMockWorld();
+    world.bootstrapState = { phase: 'runtime-streaming' };
+    const chunk = new Chunk(0, 0, world);
+
+    chunk.addBlockDynamic(5, 10, 5, 'stone', 0);
+    await new Promise(resolve => setTimeout(resolve, 650));
+
+    const saveCall = mockPersistenceService.calls.find(call =>
+      call.method === 'saveChunkData'
+    );
+
+    assertEqual(saveCall, undefined, 'runtime-streaming 下不应再通过 saveDebounced 写旧持久化通道');
+
+    teardownEnvironment();
+  });
+
+  test('saveDebounced - bootstrapping 下应通过 worldRuntime 写回而不是旧 saveChunkData', async () => {
+    setupEnvironment();
+    await new Promise(resolve => setTimeout(resolve, 650));
+    mockPersistenceService.calls = [];
+
+    const flushCalls = [];
+    const world = createMockWorld();
+    world.bootstrapState = { phase: 'bootstrapping' };
+    world.worldRuntime = {
+      flushChunk: async (cx, cz) => {
+        flushCalls.push({ cx, cz });
+      }
+    };
+    const chunk = new Chunk(0, 0, world);
+
+    chunk.addBlockDynamic(5, 10, 5, 'stone', 0);
+    await new Promise(resolve => setTimeout(resolve, 650));
+
+    const saveCall = mockPersistenceService.calls.find(call =>
+      call.method === 'saveChunkData'
+    );
+
+    assertEqual(saveCall, undefined, 'bootstrapping 下不应再通过旧 saveChunkData 写 world_deltas');
+    assertEqual(flushCalls.length, 1, 'bootstrapping 下应通过 worldRuntime.flushChunk 写回');
+    assertEqual(flushCalls[0].cx, 0, 'flushChunk 应写回正确 cx');
+    assertEqual(flushCalls[0].cz, 0, 'flushChunk 应写回正确 cz');
+
+    teardownEnvironment();
+  });
+
+  test('gen - 应通过 WorldStore 读取 chunkRecord，而不是旧 getChunkData', async () => {
+    setupEnvironment();
+
+    const originalWorldStore = globalThis._worldStore;
+    const originalPostMessage = worldWorker.postMessage;
+    const code = Chunk.encodeCoord(1, 2, 3);
+    const sentMessages = [];
+
+    globalThis._worldStore = {
+      loadChunkRecord: async (cx, cz) => ({
+        cx,
+        cz,
+        blockData: {
+          [code]: { type: 'stone', orientation: 0 }
+        },
+        staticEntities: [],
+        runtimeSeedData: {}
+      })
+    };
+    mockPersistenceService.getChunkData = async () => {
+      throw new Error('gen 不应再直接读取 PersistenceService.getChunkData');
+    };
+
+    worldWorker.postMessage = (message) => {
+      sentMessages.push(message);
+      const callback = workerCallbacks.get(message.taskId);
+      if (callback) {
+        callback({
+          cx: message.cx,
+          cz: message.cz,
+          scatteredBlocks: [],
+          solidBlocks: [],
+          modGunMan: [],
+          rovers: [],
+          allBlockTypes: {},
+          visibleKeys: [],
+          snapshot: message.snapshot || null,
+          structureCenters: [],
+          entities: { modGunMan: [], rovers: [] }
+        });
+      }
+    };
+
+    const world = createMockWorld();
+    world.bootstrapState = { phase: 'runtime-streaming' };
+    const chunk = new Chunk(0, 0, world);
+
+    await chunk.gen();
+
+    assertEqual(sentMessages.length, 1, 'gen 应发送一次 worker 请求');
+    assertTrue(!!sentMessages[0].snapshot, 'gen 应把 WorldStore 的 chunkRecord 转成 snapshot');
+    assertNotNull(sentMessages[0].snapshot.blocks[code], 'snapshot.blocks 应包含 WorldStore 返回的 blockData');
+    assertEqual(sentMessages[0].skipTerrainGeneration, true, '有权威 blockData 时应跳过地形生成');
+
+    worldWorker.postMessage = originalPostMessage;
+    globalThis._worldStore = originalWorldStore;
+    mockPersistenceService.getChunkData = () => Promise.resolve(null);
     teardownEnvironment();
   });
 
@@ -1350,6 +1540,155 @@ describe('Chunk 真实类测试', (test) => {
     // 这里我们只验证基本属性
 
     teardownEnvironment();
+  });
+
+  // =========== AO 热路径回归测试 ===========
+
+  test('_refreshAOFromStableSource 非 fullRefresh 不应调用 fullSync', () => {
+    setupEnvironment();
+
+    // Mock aoBridge 以记录调用
+    const mockFullSyncCalls = [];
+    const mockFlushCalls = [];
+    const originalAoBridge = globalThis._aoBridge;
+    globalThis._aoBridge = {
+      fullSync(chunkKey, blockData) {
+        mockFullSyncCalls.push({ chunkKey, blockDataSize: blockData?.size });
+      },
+      flush() {
+        mockFlushCalls.push(true);
+      }
+    };
+
+    try {
+      const world = createMockWorld();
+      const chunk = new Chunk(0, 0, world);
+      chunk.worldY = 0;
+
+      // 添加方块数据（模拟已 finalize 的 chunk）
+      chunk.addBlockDynamic(5, 5, 5, 'stone', 0);
+      chunk.addBlockDynamic(6, 5, 5, 'dirt', 0);
+
+      // 设置 chunk 为就绪状态
+      chunk.isReady = true;
+
+      // 模拟边界刷新：只标记少量脏位置
+      chunk.dirtyAOPositions.add(Chunk.encodeCoord(5, 5, 5));
+
+      // 非 fullRefresh 路径（邻居边界/角点传播）
+      chunk._refreshAOFromStableSource({});
+
+      // fullSync 不应被调用（Worker 已有该 chunk 的缓存）
+      assertEqual(mockFullSyncCalls.length, 0,
+        '非 fullRefresh 路径不应调用 fullSync');
+
+      // flush 仍应被调用（_executeAORefresh 中发送增量 delta）
+      assertTrue(mockFlushCalls.length >= 1,
+        '_executeAORefresh 应调用 flush 发送增量变更');
+
+    } finally {
+      if (originalAoBridge === undefined) delete globalThis._aoBridge;
+      else globalThis._aoBridge = originalAoBridge;
+      teardownEnvironment();
+    }
+  });
+
+  test('_refreshAOFromStableSource fullRefresh=true 应调用 fullSync', () => {
+    setupEnvironment();
+
+    const mockFullSyncCalls = [];
+    const originalAoBridge = globalThis._aoBridge;
+    globalThis._aoBridge = {
+      fullSync(chunkKey, blockData) {
+        mockFullSyncCalls.push({ chunkKey, blockDataSize: blockData?.size });
+      },
+      flush() {}
+    };
+
+    try {
+      const world = createMockWorld();
+      const chunk = new Chunk(0, 0, world);
+      chunk.worldY = 0;
+
+      chunk.addBlockDynamic(5, 5, 5, 'stone', 0);
+      chunk.isReady = true;
+
+      // fullRefresh=true 路径（chunk 首次 finalize / consolidation 后）
+      chunk._refreshAOFromStableSource({ fullRefresh: true });
+
+      // fullSync 必须被调用（建立 Worker 缓存）
+      assertEqual(mockFullSyncCalls.length, 1,
+        'fullRefresh=true 路径必须调用 fullSync');
+      assertEqual(mockFullSyncCalls[0].chunkKey, '0,0',
+        'fullSync 应传入正确的 chunkKey');
+
+    } finally {
+      if (originalAoBridge === undefined) delete globalThis._aoBridge;
+      else globalThis._aoBridge = originalAoBridge;
+      teardownEnvironment();
+    }
+  });
+
+  test('_applyConsolidateResult 应保留 dirty 可见方块的旧 AO，避免合并后闪烁', () => {
+    setupEnvironment();
+
+    try {
+      const world = createMockWorld();
+      world.onChunkAOSourceStable = () => {};
+      const chunk = new Chunk(0, 0, world);
+      chunk.isReady = true;
+
+      const code = Chunk.encodeCoord(4, 5, 6);
+      chunk.blockData.set(code, 'stone');
+      chunk.visibleKeys.add(code);
+      chunk.dirtyBlocks = 1;
+      chunk.dirtyAOPositions.add(code);
+      chunk.dynamicMeshes = new Map();
+
+      const oldAOLow = 17;
+      const oldAOHigh = 23;
+      chunk._extractOldAOForNonDirtyPositions = () => new Map([
+        [code, { aoLow: oldAOLow, aoHigh: oldAOHigh }]
+      ]);
+      chunk._saveChestStates = () => new Map();
+      chunk._cleanupOldMeshes = () => {};
+      chunk._restoreChestStates = () => {};
+      chunk._unregisterLightSources = () => {};
+      chunk._registerLightSources = () => {};
+      chunk._initArrayStorageFromBlockData = () => {};
+      chunk.regenerateCrossChunkColliders = () => {};
+
+      const geometry = new THREE.InstancedBufferGeometry();
+      geometry.setAttribute('aAoLow', new THREE.InstancedBufferAttribute(new Float32Array([0x00ffffff]), 1));
+      geometry.setAttribute('aAoHigh', new THREE.InstancedBufferAttribute(new Float32Array([0x00ffffff]), 1));
+      const mesh = {
+        isInstancedMesh: true,
+        userData: { type: 'stone' },
+        geometry
+      };
+
+      chunk.buildMeshes = () => {
+        chunk.group.children = [mesh];
+        chunk.instanceIndexMap = {
+          stone: new Map([[code, 0]])
+        };
+      };
+
+      chunk._applyConsolidateResult({
+        scatteredBlocks: [{ x: 4, y: 5, z: 6, type: 'stone' }],
+        meshData: [{ type: 'stone' }],
+        visibleKeys: [code],
+        solidBlocks: [code],
+        structureCenters: []
+      }, 1, new Set());
+
+      const aoLowAttr = mesh.geometry.getAttribute('aAoLow');
+      const aoHighAttr = mesh.geometry.getAttribute('aAoHigh');
+      assertEqual(aoLowAttr.array[0], oldAOLow, 'dirty 可见方块应先保留旧 aoLow，等待异步 AO 覆盖');
+      assertEqual(aoHighAttr.array[0], oldAOHigh, 'dirty 可见方块应先保留旧 aoHigh，等待异步 AO 覆盖');
+    } finally {
+      teardownEnvironment();
+    }
   });
 
 });

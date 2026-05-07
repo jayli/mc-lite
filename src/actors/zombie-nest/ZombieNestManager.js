@@ -1,6 +1,6 @@
 // src/actors/zombie-nest/ZombieNestManager.js
 /**
- * 丧尸巢穴管理器 - 管理巢穴创建、更新与回收
+ * 丧尸巢穴管理器 — 纯行为层（数据由 SpecialEntitiesShadowStore 管理）
  */
 
 import { Zombie } from '../enemy/Zombie.js';
@@ -13,32 +13,25 @@ export class ZombieNestManager {
    * @param {THREE.Scene} scene - 场景
    * @param {World} world - 世界
    * @param {EnemyManager} enemyManager - 敌人管理器
+   * @param {SpecialEntitiesShadowStore} shadowStore - 特殊实体影子存储
+   * @param {ShadowSyncDispatcher} dispatcher - 异步同步调度器
    */
-  constructor(scene, world, enemyManager) {
+  constructor(scene, world, enemyManager, shadowStore, dispatcher) {
     this.scene = scene;
     this.world = world;
     this.enemyManager = enemyManager;
+    this.shadowStore = shadowStore;
+    this.dispatcher = dispatcher;
 
-    this.nests = new Map();
-    this.nestPositionIndex = new Map(); // key: "x,y,z" -> nestId
+    // 活跃的巢穴行为实例 Map<id, ZombieNest>（仅用于 update 循环）
+    this.activeNests = new Map();
+    this.nestPositionIndex = new Map();
     this.maxNests = ZOMBIE_NEST_LIMIT;
     this._isDestroyingAll = false;
   }
 
-  /**
-   * 获取持久化服务（优先测试注入）
-   * @returns {object|null}
-   */
-  getPersistenceService() {
-    return globalThis._persistenceService || this.world?.persistenceService || null;
-  }
-
-  /**
-   * 当前活动巢穴数量
-   * @returns {number}
-   */
   getNestCount() {
-    return this.nests.size;
+    return this.activeNests.size;
   }
 
   /**
@@ -93,90 +86,6 @@ export class ZombieNestManager {
   }
 
   /**
-   * 确保持久化快照中存在巢穴列表
-   * @param {string} chunkKey
-   * @returns {object}
-   */
-  ensureChunkSnapshot(chunkKey) {
-    const persistence = this.getPersistenceService();
-    if (!persistence?.cache) return null;
-
-    let chunkData = persistence.cache.get(chunkKey);
-    if (!chunkData) {
-      chunkData = { blocks: {}, entities: {} };
-      persistence.cache.set(chunkKey, chunkData);
-    }
-    if (!chunkData.entities) chunkData.entities = {};
-    if (!Array.isArray(chunkData.entities.zombieNests)) {
-      chunkData.entities.zombieNests = [];
-    }
-    return chunkData;
-  }
-
-  /**
-   * 巢穴序列化记录
-   * @param {ZombieNest} nest
-   * @returns {{position:{x:number,y:number,z:number},criticalBlock:{x:number,y:number,z:number,type:string}}|null}
-   */
-  toNestSnapshot(nest) {
-    if (!nest || !nest.position || !nest.criticalBlock) return null;
-    const position = this.normalizePosition(nest.position);
-    const critical = this.normalizePosition(nest.criticalBlock);
-    return {
-      position,
-      criticalBlock: {
-        ...critical,
-        type: nest.criticalBlock.type
-      }
-    };
-  }
-
-  /**
-   * 将巢穴写入归属 Chunk 快照
-   * @param {ZombieNest} nest
-   * @returns {void}
-   */
-  saveNestToSnapshot(nest) {
-    const persistence = this.getPersistenceService();
-    if (!persistence) return;
-    const entry = this.toNestSnapshot(nest);
-    if (!entry) return;
-    const chunkKey = this.getChunkKeyByPosition(entry.position);
-    const chunkData = this.ensureChunkSnapshot(chunkKey);
-    if (!chunkData) return;
-    const list = chunkData.entities.zombieNests;
-    const posKey = this.getPositionKey(entry.position);
-    const idx = list.findIndex(item => this.getPositionKey(item.position) === posKey);
-    if (idx >= 0) list[idx] = entry;
-    else list.push(entry);
-
-    const [cx, cz] = chunkKey.split(',').map(Number);
-    persistence.saveChunkData?.(cx, cz, chunkData);
-  }
-
-  /**
-   * 从归属 Chunk 快照中移除巢穴
-   * @param {ZombieNest} nest
-   * @returns {void}
-   */
-  removeNestFromSnapshot(nest) {
-    const persistence = this.getPersistenceService();
-    if (!persistence) return;
-    const entry = this.toNestSnapshot(nest);
-    if (!entry) return;
-    const chunkKey = this.getChunkKeyByPosition(entry.position);
-    const chunkData = this.ensureChunkSnapshot(chunkKey);
-    if (!chunkData) return;
-    const list = chunkData.entities.zombieNests;
-    const posKey = this.getPositionKey(entry.position);
-    const next = list.filter(item => this.getPositionKey(item.position) !== posKey);
-    chunkData.entities.zombieNests = next;
-
-    const [cx, cz] = chunkKey.split(',').map(Number);
-    persistence.saveChunkData?.(cx, cz, chunkData);
-  }
-
-  /**
    * 创建巢穴
    * @param {Object} params - 创建参数
    * @param {{skipLimit?:boolean,persist?:boolean}} options - 可选控制项
@@ -196,7 +105,7 @@ export class ZombieNestManager {
     const positionKey = this.getPositionKey(position);
     const existingId = this.nestPositionIndex.get(positionKey);
     if (existingId) {
-      return this.nests.get(existingId) || null;
+      return this.activeNests.get(existingId) || null;
     }
 
     if (!skipLimit && !this.canCreateNest()) {
@@ -204,7 +113,8 @@ export class ZombieNestManager {
       return null;
     }
 
-    const id = `zombie_nest_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+    // 优先复用快照 id
+    const id = params.restoredId || `zombie_nest_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
     const nest = new ZombieNest({
       id,
       position,
@@ -214,37 +124,75 @@ export class ZombieNestManager {
       onDestroy: (nestId) => this.handleNestDestroy(nestId)
     });
 
-    this.nests.set(id, nest);
-    this.nestPositionIndex.set(positionKey, id);
-    if (shouldPersist) {
-      this.saveNestToSnapshot(nest);
+    // 恢复 lastSpawnTime，避免刷怪节奏重置
+    if (params.lastSpawnTime) {
+      nest.lastSpawnTime = params.lastSpawnTime;
     }
+
+    this.activeNests.set(id, nest);
+    this.nestPositionIndex.set(positionKey, id);
+
+    // 写入 ShadowStore
+    if (this.shadowStore) {
+      const cx = Math.floor(position.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      const cz = Math.floor(position.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      this.shadowStore.addEntity('zombieNest', cx, cz, id, {
+        position,
+        criticalBlock,
+        lastSpawnTime: nest.lastSpawnTime
+      });
+
+      if (shouldPersist && this.dispatcher) {
+        this.dispatcher.markDirty(cx, cz);
+      }
+    }
+
     console.log(`[ZombieNestManager] 创建丧尸巢穴: ${id}，位置: (${position.x}, ${position.y}, ${position.z})`);
     return nest;
   }
 
   /**
-   * 从 Chunk 快照恢复巢穴实例（无扫描，直接按记录重建）
+   * 从 ShadowStore 恢复巢穴实例（支持分帧）
    * @param {number} cx - Chunk X
    * @param {number} cz - Chunk Z
-   * @param {Array} nests - 快照中的巢穴列表
-   * @returns {void}
+   * @param {number} [startIndex=0] - 起始索引
+   * @param {number} [maxCount=3] - 本帧最多恢复数量
+   * @returns {boolean} 是否还有更多巢穴待恢复
    */
-  restoreNestsForChunk(cx, cz, nests) {
-    if (!Array.isArray(nests) || nests.length === 0) return;
-    const currentChunkKey = `${cx},${cz}`;
+  restoreNestsForChunk(cx, cz, startIndex = 0, maxCount = 3) {
+    if (!this.shadowStore) return false;
+    const nests = this.shadowStore.getAllEntities('zombieNest', cx, cz);
+    if (nests.length === 0) return false;
 
-    for (const item of nests) {
+    const currentChunkKey = `${cx},${cz}`;
+    let restored = 0;
+    let i = startIndex;
+
+    for (; i < nests.length && restored < maxCount; i++) {
+      const item = nests[i];
       if (!item?.position || !item?.criticalBlock) continue;
       if (this.getChunkKeyByPosition(item.position) !== currentChunkKey) continue;
+
       this.createNest({
         position: item.position,
-        criticalBlock: item.criticalBlock
+        criticalBlock: item.criticalBlock,
+        restoredId: item.id || null,
+        lastSpawnTime: item.lastSpawnTime || null
       }, {
         skipLimit: true,
         persist: false
       });
+      restored++;
     }
+
+    while (i < nests.length) {
+      const item = nests[i];
+      if (item?.position && item?.criticalBlock && this.getChunkKeyByPosition(item.position) === currentChunkKey) {
+        return true;
+      }
+      i++;
+    }
+    return false;
   }
 
   /**
@@ -275,39 +223,40 @@ export class ZombieNestManager {
    * @param {string} nestId - 巢穴 ID
    */
   handleNestDestroy(nestId) {
-    const nest = this.nests.get(nestId);
+    const nest = this.activeNests.get(nestId);
     if (nest) {
-      this.nestPositionIndex.delete(this.getPositionKey(nest.position));
-      if (!this._isDestroyingAll) {
-        this.removeNestFromSnapshot(nest);
+      const pos = this.normalizePosition(nest.position);
+      const cx = Math.floor(pos.x / PERSISTENCE_CONFIG.CHUNK_SIZE);
+      const cz = Math.floor(pos.z / PERSISTENCE_CONFIG.CHUNK_SIZE);
+
+      // 从 ShadowStore 移除
+      if (this.shadowStore) {
+        this.shadowStore.removeEntity('zombieNest', cx, cz, nestId);
       }
+      if (this.dispatcher) {
+        this.dispatcher.markDirty(cx, cz);
+      }
+
+      this.nestPositionIndex.delete(this.getPositionKey(nest.position));
     }
-    this.nests.delete(nestId);
+    this.activeNests.delete(nestId);
     console.log(`[ZombieNestManager] 丧尸巢穴已失效：${nestId}`);
-    console.log(`[ZombieNestManager] 当前巢穴数量：${this.nests.size}/${this.maxNests}`);
+    console.log(`[ZombieNestManager] 当前巢穴数量：${this.activeNests.size}/${this.maxNests}`);
   }
 
-  /**
-   * 更新所有巢穴
-   * @returns {void}
-   */
   update(_dt) {
-    for (const nest of this.nests.values()) {
+    for (const nest of this.activeNests.values()) {
       nest.update();
     }
   }
 
-  /**
-   * 销毁所有巢穴
-   * @returns {void}
-   */
   destroy() {
     this._isDestroyingAll = true;
-    for (const nest of Array.from(this.nests.values())) {
+    for (const nest of Array.from(this.activeNests.values())) {
       nest.destroy();
     }
     this._isDestroyingAll = false;
-    this.nests.clear();
+    this.activeNests.clear();
     this.nestPositionIndex.clear();
   }
 }

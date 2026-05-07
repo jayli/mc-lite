@@ -75,6 +75,23 @@ export class Physics {
   }
 
   /**
+   * 检查移动是否被世界硬边界阻挡
+   * @param {number} nextX - 目标 X
+   * @param {number} nextZ - 目标 Z
+   * @returns {boolean} true = 被阻挡，不可移动
+   */
+  isMovementBlockedByWorldBounds(nextX, nextZ) {
+    const world = this.world;
+    if (!world?.worldBoundsController) return false;
+    return world.worldBoundsController.shouldBlockMovement(
+      this.player.position.x,
+      this.player.position.z,
+      nextX,
+      nextZ
+    );
+  }
+
+  /**
    * 检查指定位置是否有矿车，并返回矿车对象
    * @param {number} x - X 坐标
    * @param {number} y - Y 坐标（用于检测矿车所在格子）
@@ -348,14 +365,9 @@ export class Physics {
    * 判断指定方块坐标是否为实心（玩家碰撞检测统一入口）
    *
    * 查询顺序（由快到慢，短路返回）：
-   *   1. 帧缓存 — 同帧内同一坐标的查询结果直接复用
-   *   2. World.isSolid() — 四级查询链：
-   *      a. solidBlockIds      → Y:0~15 的实心方块快速查询（Set<number>）
-   *      b. solidBlocks        → Y:16+ 和动态方块的实心查询（Set<string>）
-   *      c. blockData          → 通过 getBlockProps(type).isSolid 判断（其他方块）
-   *      d. entityCollisionIndex → 特殊实体占位（modGunMan、rover）
-   *   3. getBlock().isSolid   → 未加载 chunk 时的噪声地形回退
-   *   4. MinecartManager      → 矿车实体碰撞（独立路径，不走方块体系）
+   *   1. 帧缓存
+   *   2. WorldAccessLayer / World 的实心判定
+   *   3. MinecartManager 碰撞
    *
    * 注意：炮弹碰撞（Projectile.js）和丧尸碰撞不走此路径，
    *       它们有独立的碰撞检测实现。
@@ -368,10 +380,11 @@ export class Physics {
     }
 
     let result = false;
-    if (this.world.isSolid(x, y, z)) {
+    const accessLayer = this.world.worldAccessLayer;
+    if (accessLayer?.isSolid?.(x, y, z)) {
       result = true;
     } else {
-      const type = this.world.getBlock(x, y, z);
+      const type = accessLayer?.getBlockType?.(x, y, z) ?? this.world.getBlock(x, y, z);
       result = !!(type && getBlockProperties(type).isSolid);
     }
 

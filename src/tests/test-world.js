@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 import { mockFaceCullingSystem, mockMaterials, mockBlockData } from './test-mocks.js';
 import { Chunk } from '../world/Chunk.js';
+import { ChunkAssemblyScheduler } from '../world/ChunkAssemblyScheduler.js';
 
 // ============================================
 // Worker 模拟 - 在导入 World 之前设置
@@ -214,9 +215,49 @@ async function runRealWorldWorker(message) {
 
 // 模拟 persistenceService
 const mockPersistenceService = {
+  _worldMeta: null,
+  _regions: new Map(),
+  calls: [],
+  reset() {
+    this._worldMeta = null;
+    this._regions.clear();
+    this.calls = [];
+  },
+  async postMessage(action, payload = {}) {
+    switch (action) {
+      case 'getWorldMeta':
+        return this._worldMeta;
+      case 'saveWorldMeta':
+        this._worldMeta = payload.meta || null;
+        return true;
+      case 'getRegionRecord':
+        return this._regions.get(payload.regionKey) || null;
+      case 'saveRegionRecord':
+        this._regions.set(payload.regionKey, payload.record);
+        return true;
+      case 'saveRegionRecordsBatch':
+        for (const item of payload.records || []) {
+          this._regions.set(item.regionKey, item.record);
+        }
+        return true;
+      case 'getAllRegionKeys':
+        return Array.from(this._regions.keys());
+      case 'clearWorld':
+        this.reset();
+        return true;
+      default:
+        return null;
+    }
+  },
   recordChange: () => {},
   recordChangeForChunk: () => {},
-  saveChunkData: () => Promise.resolve(),
+  saveChunkData: (...args) => {
+    mockPersistenceService.calls.push({ method: 'saveChunkData', args });
+    return Promise.resolve();
+  },
+  snapshotChunkBlocks: (...args) => {
+    mockPersistenceService.calls.push({ method: 'snapshotChunkBlocks', args });
+  },
   saveDebounced: () => {},
   getChunkData: () => Promise.resolve(null)
 };
@@ -261,6 +302,7 @@ const setupEnvironment = () => {
   globalThis._ParticleSystem = MockParticleSystem;
   globalThis._carModel = new THREE.Group();
   globalThis._gunManModel = new THREE.Group();
+  mockPersistenceService.reset();
 
   // 启用 Worker 模拟
   shouldMockWorkers = true;
@@ -268,20 +310,57 @@ const setupEnvironment = () => {
 
 // 恢复原始环境
 const teardownEnvironment = () => {
-  if (originalPersistenceService) globalThis._persistenceService = originalPersistenceService;
-  if (originalFaceCullingSystem) globalThis._faceCullingSystem = originalFaceCullingSystem;
-  if (originalMaterials) globalThis._materials = originalMaterials;
-  if (originalBlockData) globalThis._blockData = originalBlockData;
-  if (originalChestManager) globalThis._chestManager = originalChestManager;
-  if (originalParticleSystem) globalThis._ParticleSystem = originalParticleSystem;
-  if (originalCarModel) globalThis._carModel = originalCarModel;
-  if (originalGunManModel) globalThis._gunManModel = originalGunManModel;
+  if (originalPersistenceService === undefined) delete globalThis._persistenceService;
+  else globalThis._persistenceService = originalPersistenceService;
+  if (originalFaceCullingSystem === undefined) delete globalThis._faceCullingSystem;
+  else globalThis._faceCullingSystem = originalFaceCullingSystem;
+  if (originalMaterials === undefined) delete globalThis._materials;
+  else globalThis._materials = originalMaterials;
+  if (originalBlockData === undefined) delete globalThis._blockData;
+  else globalThis._blockData = originalBlockData;
+  if (originalChestManager === undefined) delete globalThis._chestManager;
+  else globalThis._chestManager = originalChestManager;
+  if (originalParticleSystem === undefined) delete globalThis._ParticleSystem;
+  else globalThis._ParticleSystem = originalParticleSystem;
+  if (originalCarModel === undefined) delete globalThis._carModel;
+  else globalThis._carModel = originalCarModel;
+  if (originalGunManModel === undefined) delete globalThis._gunManModel;
+  else globalThis._gunManModel = originalGunManModel;
 
   // 禁用 Worker 模拟
   shouldMockWorkers = false;
 };
 
 describe('World 真实类测试', (test) => {
+  test('测试环境 persistence mock 支持 WorldStore 的 postMessage 接口', async () => {
+    mockPersistenceService.reset();
+
+    const record = {
+      regionKey: '0,0',
+      chunks: {
+        '0,0': {
+          blockData: { 123: { type: 'stone', orientation: 0 } }
+        }
+      }
+    };
+
+    await mockPersistenceService.postMessage('saveRegionRecord', {
+      regionKey: '0,0',
+      record
+    });
+    const loaded = await mockPersistenceService.postMessage('getRegionRecord', {
+      regionKey: '0,0'
+    });
+
+    assertEqual(loaded, record, 'mock 应能读回 region record');
+
+    await mockPersistenceService.postMessage('clearWorld');
+    const cleared = await mockPersistenceService.postMessage('getRegionRecord', {
+      regionKey: '0,0'
+    });
+    assertEqual(cleared, null, 'clearWorld 后 region record 应被清空');
+  });
+
   test('consumeStreamingPerfSnapshot 每秒聚合一次流式加载统计', () => {
     const world = Object.create(World.prototype);
     world.bootstrapState = { phase: 'runtime-streaming' };
@@ -297,7 +376,14 @@ describe('World 真实类测试', (test) => {
       })
     };
     world.getDeferredCrossChunkPatchStats = () => ({ chunks: 3, blocks: 45 });
-    world.getRuntimeIdleStats = () => ({ idleForMs: 160, taskCount: 2 });
+    world.getRuntimeIdleStats = () => ({
+      idleForMs: 160,
+      taskCount: 2,
+      pendingUnloadFlushQueueSize: 5,
+      pendingUnloadFlushLastProcessedChunks: 2,
+      pendingUnloadFlushLastProcessedRegions: 1,
+      pendingUnloadFlushLastElapsedMs: 0.75
+    });
     world.chunks = new Map([
       ['0,0', { isReady: true, isConsolidating: false, loadState: 'finalized' }],
       ['1,0', { isReady: false, isConsolidating: true, loadState: 'terrain-built' }],
@@ -324,6 +410,10 @@ describe('World 真实类测试', (test) => {
     assertEqual(snapshot.flushMaxMs, 2.25, '应记录窗口内最大 flush 耗时');
     assertEqual(snapshot.deferredPatchChunks, 3, '应返回 deferred patch chunk 数');
     assertEqual(snapshot.deferredPatchBlocks, 45, '应返回 deferred patch block 数');
+    assertEqual(snapshot.pendingUnloadFlushQueueSize, 5, '应暴露 unload flush 队列长度');
+    assertEqual(snapshot.pendingUnloadFlushLastProcessedChunks, 2, '应暴露最近一轮消费的 chunk 数');
+    assertEqual(snapshot.pendingUnloadFlushLastProcessedRegions, 1, '应暴露最近一轮消费的 region 数');
+    assertEqual(snapshot.pendingUnloadFlushLastElapsedMs, 0.75, '应暴露最近一轮消费耗时');
     assertEqual(snapshot.consolidatingChunks, 1, '应统计正在 consolidation 的 chunk 数');
     assertEqual(snapshot.loadingChunks, 2, '应统计未 finalized 的 chunk 数');
     assertEqual(snapshot.readyChunks, 1, '应统计 ready chunk 数');
@@ -706,7 +796,7 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
-  test('onChunkFinalized - 纯新 runtime chunk finalized 后应立即刷新 AO，且不进入 deferred finalize 队列', () => {
+  test('onChunkFinalized - pure runtime chunk 在 runtime-streaming 下收到 deferAORefresh 时应延迟 AO 稳定源刷新并进入 deferred finalize 队列', () => {
     setupEnvironment();
 
     scene = new THREE.Scene();
@@ -719,7 +809,8 @@ describe('World 真实类测试', (test) => {
       cz: 5,
       isReady: true,
       isConsolidating: false,
-      hasDeferredFinalizeWork: false,
+      hasDeferredFinalizeWork: true,
+      _needsDeferredAOStabilization: true,
       dirtyAOPositions: new Set(),
       isPureRuntimeStreamingChunk: () => true,
       _refreshAOFromStableSource: () => { aoRefreshCalls++; },
@@ -727,10 +818,10 @@ describe('World 真实类测试', (test) => {
     };
     world.chunks.set('4,5', chunk);
 
-    world.onChunkFinalized(chunk);
+    world.onChunkFinalized(chunk, { deferAORefresh: true });
 
-    assertEqual(aoRefreshCalls, 1, '纯新 runtime chunk finalized 后应立即刷新自身 AO');
-    assertFalse(world._pendingDeferredFinalizeChunkKeys.has('4,5'), '纯新 runtime chunk 不应进入 deferred finalize 队列');
+    assertEqual(aoRefreshCalls, 0, 'runtime-streaming 下不应在 finalized 当帧立即刷新 AO');
+    assertTrue(world._pendingDeferredFinalizeChunkKeys.has('4,5'), '应进入 deferred finalize 队列等待空闲窗口');
 
     teardownEnvironment();
   });
@@ -948,7 +1039,7 @@ describe('World 真实类测试', (test) => {
     assertFalse(runtimeChunk.hasDeferredFinalizeWork, '纯新 runtime chunk 不应把 finalize 工作后移到 deferred 队列');
 
     // 新架构：finalize 分为预检查 + 非延迟工作两个阶段
-    const result2 = runtimeChunk.finalizeNonDeferredPhase();
+    const result2 = await runtimeChunk.finalizeNonDeferredPhase();
 
     assertTrue(result2, '非延迟阶段应完成');
     assertEqual(runtimeChunk.loadState, 'finalized', '纯新 runtime chunk 应直接进入 finalized');
@@ -956,6 +1047,38 @@ describe('World 真实类测试', (test) => {
     assertFalse(world._pendingDeferredFinalizeChunkKeys.has('0,0'), '纯新 runtime chunk finalize 后不应进入 deferred finalize 队列');
 
     teardownEnvironment();
+  });
+
+  test('ChunkAssemblyScheduler - 同一轮不应继续执行刚刚新入队的后续阶段', async () => {
+    const scheduler = new ChunkAssemblyScheduler({});
+    const calls = [];
+    const chunk = {
+      cx: 0,
+      cz: 0,
+      loadState: 'terrain-built',
+      isReady: false,
+      disposed: false,
+      queuedAssemblyStages: new Set(),
+      assembleRuntimeBuildPhase() {
+        calls.push('runtime-build');
+        return true;
+      },
+      finalizeAssemblyPhase() {
+        calls.push('finalize');
+        return true;
+      },
+      async finalizeNonDeferredPhase() {
+        calls.push('non-deferred-finalize');
+        return true;
+      }
+    };
+
+    scheduler.enqueue(chunk, 'runtime-build', 100);
+    const processed = await scheduler.processWithinBudget({ budgetMs: 100, maxTasks: 10 });
+
+    assertEqual(processed, 1, '首轮只应处理初始队列中的一个任务');
+    assertEqual(calls.join(','), 'runtime-build', '后续阶段应留到下一轮调度');
+    assertEqual(scheduler.getPendingCount(), 1, 'finalize 阶段应继续留在队列中');
   });
 
   // =========== setBlock 测试 ===========
@@ -1037,6 +1160,33 @@ describe('World 真实类测试', (test) => {
 
     const blockType = world.getBlock(5, 10, 5);
     assertEqual(blockType, null, '移除后应该返回 null');
+
+    teardownEnvironment();
+  });
+
+  test('removeBlock - runtime-streaming 下应标记对应 chunk 为脏', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.setBlock(5, 10, 5, 'stone', 0);
+    world.bootstrapState.phase = 'runtime-streaming';
+
+    const dirtyCalls = [];
+    world.worldRuntime = {
+      recordBlockMutation() {},
+      markChunkDirty(cx, cz) {
+        dirtyCalls.push(`${cx},${cz}`);
+      }
+    };
+
+    world.removeBlock(5, 10, 5);
+
+    assertEqual(dirtyCalls.length, 1, '删除方块后应标记一次脏 chunk');
+    assertEqual(dirtyCalls[0], '0,0', '应标记坐标所属 chunk');
 
     teardownEnvironment();
   });
@@ -1239,6 +1389,124 @@ describe('World 真实类测试', (test) => {
 
     // 原区块应该已卸载
     assertFalse(world.chunks.has('0,0'), '区块 0,0 应该已卸载');
+
+    teardownEnvironment();
+  });
+
+  test('runtime-streaming 区块卸载时不应再同步 snapshotChunkBlocks 到旧 cache', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.bootstrapState.phase = 'runtime-streaming';
+    mockPersistenceService.calls = [];
+
+    world.update(new THREE.Vector3(200, 10, 200), 0.016);
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    const snapshotCall = mockPersistenceService.calls.find(call =>
+      call.method === 'snapshotChunkBlocks'
+    );
+
+    assertUndefined(snapshotCall, 'runtime-streaming 卸载时不应再回灌旧 session cache');
+
+    teardownEnvironment();
+  });
+
+  test('runtime-streaming 区块卸载时 flushBeforeUnload 不应再被调用（内存权威层已接管）', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.bootstrapState.phase = 'runtime-streaming';
+    const unloadCalls = [];
+    world.worldRuntime = {
+      ensureChunkData() {
+        return Promise.resolve({ status: 'missing-region' });
+      },
+      flushBeforeUnload(cx, cz, blockDataSnapshot, entities) {
+        unloadCalls.push({ cx, cz, blockDataSnapshot, entities });
+        return Promise.resolve();
+      },
+      prefetchRegions() {}
+    };
+
+    world.update(new THREE.Vector3(200, 10, 200), 0.016);
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // 运行期已旁路 flush，内存权威层接管正确性
+    assertEqual(unloadCalls.length, 0, '卸载时不应再触发 flushBeforeUnload');
+
+    teardownEnvironment();
+  });
+
+  test('runtime-streaming 区块卸载时不应等待写盘完成，应先完成回收与删除', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.bootstrapState.phase = 'runtime-streaming';
+    const chunk = world.chunks.get('0,0');
+    let disposeCalled = false;
+
+    chunk.dispose = () => {
+      disposeCalled = true;
+      chunk.disposed = true;
+    };
+
+    world.worldRuntime = {
+      ensureChunkData() {
+        return Promise.resolve({ status: 'missing-region' });
+      },
+      flushBeforeUnload(_cx, _cz, _blockDataSnapshot, _entities) {
+        // 运行期已旁路，不应被调用
+        return Promise.reject(new Error('flushBeforeUnload should not be called'));
+      },
+      prefetchRegions() {},
+      flushPendingUnloadQueueWithinBudget() {
+        return Promise.resolve({ processedChunks: 0, processedRegions: 0, remainingQueueSize: 0, elapsedMs: 0 });
+      }
+    };
+
+    world.update(new THREE.Vector3(200, 10, 200), 0.016);
+
+    // 运行期已旁路 flush，卸载不再等待写盘
+    assertFalse(world.chunks.has('0,0'), '卸载当帧应直接从活动 chunk 集合删除');
+    assertTrue(disposeCalled, '卸载当帧应直接调用 chunk.dispose');
+
+    await new Promise(resolve => setTimeout(resolve, 0));
+
+    teardownEnvironment();
+  });
+
+  test('dispose - 应尽力 flush WorldRuntime 的待处理写回工作', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    let flushAllPendingWorkCalls = 0;
+    world.worldRuntime = {
+      async flushAllPendingWork() {
+        flushAllPendingWorkCalls++;
+      }
+    };
+
+    await world.dispose();
+
+    assertEqual(flushAllPendingWorkCalls, 1, 'World.dispose 应触发 runtime 待处理写回收口');
 
     teardownEnvironment();
   });

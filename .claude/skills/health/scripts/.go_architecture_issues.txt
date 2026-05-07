@@ -1,0 +1,1 @@
+SEVERITY:P2|FILE:项目结构|LINE:N/A|ISSUE:分层目录较少|CODE:3层|SUGGEST:补充缺失层

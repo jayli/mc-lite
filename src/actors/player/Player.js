@@ -384,6 +384,14 @@ export class Player {
         let nextX = this.position.x + this.velocity.x * dt;
         let nextZ = this.position.z + this.velocity.z * dt;
 
+        // 世界硬边界检查：阻止玩家走出已生成区域
+        if (this.physics.isMovementBlockedByWorldBounds?.(nextX, nextZ)) {
+          this.velocity.x = 0;
+          this.velocity.z = 0;
+          nextX = this.position.x;
+          nextZ = this.position.z;
+        }
+
         if (shouldCheckCollision) {
           const hasCollisionFull = this.physics.checkAABB(nextX, this.position.y, nextZ, true);
 

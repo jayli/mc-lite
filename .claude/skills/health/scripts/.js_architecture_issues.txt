@@ -1,0 +1,1 @@
+SEVERITY:P0|FILE:项目结构|LINE:N/A|ISSUE:缺乏分层架构|CODE:仅0层|SUGGEST:重构为分层架构
