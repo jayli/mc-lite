@@ -15,9 +15,12 @@
 | 文件 | 变更 | 职责 |
 |------|------|------|
 | `src/world/Chunk.js` | 修改 | AO dirty 候选收集、边界标记、AO 刷新计时、回包应用计时 |
-| `src/world/World.js` | 小改或不改 | 保持 `onChunkAOSourceStable()` 语义，必要时只传递原因字段 |
+| `src/world/World.js` | 修改 | AO 稳定源传播范围、邻居边界刷新语义 |
 | `src/workers/AOWorker.js` | 修改 | AO 遮挡查询直接按世界坐标定位 chunk cache |
 | `src/utils/ChunkPerfMonitor.js` | 不改或只使用 | 复用 `recordChunkPerf()` |
+| `src/tests/test-world.js` | 修改 | AO 稳定源传播、正交/对角邻居刷新语义测试 |
+| `src/tests/test-chunk.js` | 修改 | `_markBoundaryDirtyAO()` 边界方向、`Y>15` 覆盖测试 |
+| `src/tests/test-runtime-session-persistence.js` | 可选修改 | deferred finalize AO 稳定源行为回归测试 |
 | `src/tests/index.html` 相关测试 | 视现有覆盖补充 | 浏览器内测试验证 chunk / AO 行为 |
 
 > 仓库指令要求不能自动提交代码。下面保留检查点，但实现者必须等用户明确要求后才能执行 `git commit`。
@@ -280,8 +283,18 @@ Expected: 无新增 lint 错误。
 
 **Files:**
 - Modify: `src/world/Chunk.js`
+- Modify: `src/tests/test-chunk.js`
 
-- [ ] **Step 1: 新增边界候选加入 helper**
+- [ ] **Step 1: 先写边界方向测试，锁定语义**
+
+在 `src/tests/test-chunk.js` 新增至少两类测试：
+
+- 东侧邻居 `neighborCx === this.cx + 1` 时，应标记当前 chunk 的 `maxX / maxX-1` 带，而不是 `minX`；
+- 西侧、南侧、北侧方向同理，至少覆盖一组 `X` 和一组 `Z` 方向断言。
+
+测试应直接构造最小 `blockData` / `visibleKeys` / `dirtyAOPositions` 场景，调用 `_markBoundaryDirtyAO()` 后验证被加入脏集的编码坐标。
+
+- [ ] **Step 2: 新增边界候选加入 helper**
 
 ```js
 _addDirtyAOIfRenderable(code) {
@@ -299,7 +312,7 @@ _addDirtyAOIfRenderable(code) {
 
 如果发现 `visibleKeys` 在某些路径不完整，则放宽为：优先查 `instanceIndexMap`，只有两者都存在且都不包含时才过滤。
 
-- [ ] **Step 2: 替换 `_markBoundaryDirtyAO()` 的全数组扫描**
+- [ ] **Step 3: 替换 `_markBoundaryDirtyAO()` 的全数组扫描，并修正方向**
 
 将 `blockDataArray` 遍历改为根据方向生成边界带：
 
@@ -355,7 +368,18 @@ _markBoundaryDirtyAO(neighborCx, neighborCz) {
 }
 ```
 
-- [ ] **Step 3: 处理 Y 范围风险**
+- [ ] **Step 4: 处理 `Y>15` 范围风险并先补测试**
+
+在 `src/tests/test-chunk.js` 增加一个高层方块用例，例如 `y = 20` 或更高：
+
+- 方块位于边界带内；
+- `blockData` / `visibleKeys` 中存在；
+- `blockDataArray` 不包含它；
+- 调用 `_markBoundaryDirtyAO()` 后，该坐标仍必须进入 `dirtyAOPositions`。
+
+这条测试用于防止实现退化为只扫描 `worldY..worldY+15`。
+
+- [ ] **Step 5: 选择能覆盖高层结构的实现**
 
 如果本项目中可见实例可能存在 `worldY + 15` 之外的实体结构方块，则不要只扫 `worldY..worldY+15`。改为从 `visibleKeys` 过滤边界：
 
@@ -370,7 +394,7 @@ for (const code of this.visibleKeys) {
 
 优先选择能覆盖现有结构高度的实现。
 
-- [ ] **Step 4: 运行 lint**
+- [ ] **Step 6: 运行 lint**
 
 Run:
 
@@ -382,7 +406,71 @@ Expected: 无新增 lint 错误。
 
 ---
 
-### Task 5: AOWorker 避免 per request 合并 chunk cache
+### Task 5: AO 稳定源传播补齐对角邻居语义
+
+**Files:**
+- Modify: `src/world/World.js`
+- Modify: `src/tests/test-world.js`
+
+- [ ] **Step 1: 先写对角邻居传播测试**
+
+在 `src/tests/test-world.js` 新增测试，覆盖下面场景：
+
+- 中心 chunk 稳定后，正交四邻仍会收到 `_markBoundaryDirtyAO()`；
+- 至少一个对角邻居（如 `+1,+1`）若已就绪，也应收到 AO 边界标记或等价刷新触发；
+- 对角邻居在 `dirtyAOPositions.size > 0` 时，应被 `_refreshAOFromStableSource()` 刷新。
+
+不要只验证调用次数，要断言被调用的邻居坐标集合，避免后续有人改回 4 邻传播而测试仍误过。
+
+- [ ] **Step 2: 扩展 `onChunkAOSourceStable()` 的传播范围**
+
+将当前只遍历四邻：
+
+```js
+const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
+```
+
+扩展为覆盖 AO 语义所需的八邻域，并明确区分：
+
+- 正交邻居：继续走边界带刷新；
+- 对角邻居：至少要触发角点影响带刷新，不能因为没有共享整条边就完全跳过。
+
+如不希望复用 `_markBoundaryDirtyAO()` 处理对角语义，可在 `Chunk.js` 追加专门的角点 helper，但要保持计划内职责清晰。
+
+- [ ] **Step 3: 为对角传播选择明确实现**
+
+推荐二选一，实施时固定一种，不要混搭：
+
+```text
+A. 在 Chunk 侧新增 _markCornerDirtyAO(neighborCx, neighborCz)，只标记对应角点 2x2 带
+B. 扩展 _markBoundaryDirtyAO()，让其同时接受对角方向并生成角点影响带
+```
+
+优先推荐 A，语义更清楚，也更不容易把边界带和角点带混在一起。
+
+- [ ] **Step 4: 保持“只刷新已就绪且非合并中的邻居”语义**
+
+修改传播范围后，继续满足现有守卫条件：
+
+- `nChunk` 存在；
+- `nChunk.isReady === true`；
+- `nChunk.isConsolidating !== true` 时才立即刷新。
+
+如果仅标脏不立即刷新，也要保留这一时序约束并补对应测试。
+
+- [ ] **Step 5: 运行 lint**
+
+Run:
+
+```bash
+npm run lint
+```
+
+Expected: 无新增 lint 错误。
+
+---
+
+### Task 6: AOWorker 避免 per request 合并 chunk cache
 
 **Files:**
 - Modify: `src/workers/AOWorker.js`
@@ -469,7 +557,7 @@ Expected: 无新增 lint 错误。
 
 ---
 
-### Task 6: 浏览器测试与手动性能验证
+### Task 7: 浏览器测试与手动性能验证
 
 **Files:**
 - No code changes unless tests reveal regressions
@@ -496,22 +584,33 @@ http://localhost:8080/src/tests/index.html
 
 Expected: 所有现有测试通过。
 
-- [ ] **Step 3: 验证 AO 视觉正确性**
+- [ ] **Step 3: 验证新增 AO 语义的自动化测试**
+
+至少确认以下测试已纳入浏览器测试页并通过：
+
+- `_markBoundaryDirtyAO()` 方向测试；
+- `Y>15` 边界方块 AO 标记测试；
+- `onChunkAOSourceStable()` 对角邻居传播测试；
+- deferred finalize 重复 AO 刷新回归测试。
+
+- [ ] **Step 4: 验证 AO 视觉正确性**
 
 手动检查：
 
 - 新加载 chunk 初始可见，随后 AO 正常补齐；
 - chunk 边界没有明显黑线、闪烁或 AO 断层；
+- 对角拼接处没有晚到 chunk 导致的角点 AO 断层；
 - 挖掘和放置后 consolidation 收敛时 AO 能刷新；
 - Mag7 / TNT 批量删除后 AO 不丢失。
 
-- [ ] **Step 4: 对比 chunk perf 日志**
+- [ ] **Step 5: 对比 chunk perf 日志**
 
 启用现有 `ChunkPerfMonitor` 日志后观察：
 
 - `chunk.ao-refresh.source-stable.markMs` 明显下降；
 - `chunk.ao-refresh.request.positions` 接近可见实例数；
 - `chunk.ao-refresh.mark-boundary` 不再出现固定 4096 扫描级成本；
+- 对角邻居晚到时，能看到对应 chunk 出现边界/角点 AO 刷新日志，而不是完全无事件；
 - `non-deferred-finalize` / deferred finalize 不再出现 AO 造成的 30ms 级峰值。
 
 ---

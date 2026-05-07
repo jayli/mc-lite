@@ -1,38 +1,77 @@
 #!/bin/bash
-# 安全依赖检查
-# 返回得分 (0-15)
+# 安全依赖检查 - 主入口
+# 根据项目类型调用对应的检查脚本
 
-check_security() {
-  local score=0
-  local vulns=0
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
 
-  # 硬编码密钥（5分）- 红线检查
-  local secrets=$(grep -riE "(api[_-]?key|secret|password|token)\s*[=:]\s*[\"'][^\"']{8,}[\"']" src/ --include="*.js" 2>/dev/null | grep -v "//\|/\*" | wc -l)
-  [ "$secrets" -eq 0 ] && score=$((score + 5))
-
-  # 依赖漏洞（5分）
-  if [ -f "package.json" ] && command -v npm &>/dev/null; then
-    npm audit --json > /tmp/audit.json 2>/dev/null
-    if [ -s /tmp/audit.json ]; then
-      vulns=$(grep -Ec "severity.*high|severity.*critical" /tmp/audit.json || true)
-      [ -z "$vulns" ] && vulns=0
-    fi
-  fi
-
-  if [ "$vulns" -eq 0 ]; then
-    score=$((score + 5))
-  elif [ "$vulns" -lt 3 ]; then
-    score=$((score + 3))
-  fi
-
-  # 输入校验（5分）
-  local input_validation=$(grep -r "validateInput\|sanitize\|escapeHtml" src/ --include="*.js" 2>/dev/null | wc -l)
-  [ "$input_validation" -gt 0 ] && score=$((score + 5))
-
-  echo $score
+# 问题详情文件路径
+get_security_issues_file() {
+    local project_type=$(detect_project_type)
+    case "$project_type" in
+        iOS) echo "${SCRIPT_DIR}/../.ios_security_issues.txt" ;;
+        Flutter) echo "${SCRIPT_DIR}/../.flutter_security_issues.txt" ;;
+        Java) echo "${SCRIPT_DIR}/../.java_security_issues.txt" ;;
+        Python) echo "${SCRIPT_DIR}/../.python_security_issues.txt" ;;
+        Go) echo "${SCRIPT_DIR}/../.go_security_issues.txt" ;;
+        Cpp) echo "${SCRIPT_DIR}/../.cpp_security_issues.txt" ;;
+        Ruby) echo "${SCRIPT_DIR}/../.ruby_security_issues.txt" ;;
+        PHP) echo "${SCRIPT_DIR}/../.php_security_issues.txt" ;;
+        Rust) echo "${SCRIPT_DIR}/../.rust_security_issues.txt" ;;
+        *) echo "${SCRIPT_DIR}/../.js_security_issues.txt" ;;
+    esac
 }
 
-# 如果直接执行此脚本
+check_security() {
+    local project_type=$(detect_project_type)
+    local result
+
+    case "$project_type" in
+        iOS)
+            result=$(bash "${SCRIPT_DIR}/checkers/ios/security.sh" 2>/dev/null || echo "0:0")
+            ;;
+        Flutter)
+            result=$(bash "${SCRIPT_DIR}/checkers/flutter/security.sh" 2>/dev/null || echo "0:0")
+            ;;
+        Java)
+            result=$(bash "${SCRIPT_DIR}/checkers/java/security.sh" 2>/dev/null || echo "0:0")
+            ;;
+        Python)
+            result=$(bash "${SCRIPT_DIR}/checkers/python/security.sh" 2>/dev/null || echo "0:0")
+            ;;
+        Go)
+            result=$(bash "${SCRIPT_DIR}/checkers/go/security.sh" 2>/dev/null || echo "0:0")
+            ;;
+        Cpp)
+            result=$(bash "${SCRIPT_DIR}/checkers/cpp/security.sh" 2>/dev/null || echo "0:0")
+            ;;
+        Ruby)
+            result=$(bash "${SCRIPT_DIR}/checkers/ruby/security.sh" 2>/dev/null || echo "0:0")
+            ;;
+        PHP)
+            result=$(bash "${SCRIPT_DIR}/checkers/php/security.sh" 2>/dev/null || echo "0:0")
+            ;;
+        Rust)
+            result=$(bash "${SCRIPT_DIR}/checkers/rust/security.sh" 2>/dev/null || echo "0:0")
+            ;;
+        *)
+            result=$(bash "${SCRIPT_DIR}/checkers/js/security.sh" 2>/dev/null || echo "0:0")
+            ;;
+    esac
+
+    # 输出分数
+    echo "${result%%:*}"
+}
+
+# 输出安全问题详情
+output_security_details() {
+    local issues_file=$(get_security_issues_file)
+    if [ -f "$issues_file" ] && [ -s "$issues_file" ]; then
+        cat "$issues_file"
+    fi
+}
+
+# 如果直接执行
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
-  check_security
+    check_security
 fi

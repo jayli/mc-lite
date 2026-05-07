@@ -1,42 +1,72 @@
 #!/bin/bash
-# 结构复杂性检查
-# 返回得分 (0-5)
+# 结构复杂性检查 - 主入口
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/utils.sh"
+
+get_complexity_issues_file() {
+    local project_type=$(detect_project_type)
+    case "$project_type" in
+        iOS) echo "${SCRIPT_DIR}/../.ios_complexity_issues.txt" ;;
+        Flutter) echo "${SCRIPT_DIR}/../.flutter_complexity_issues.txt" ;;
+        Java) echo "${SCRIPT_DIR}/../.java_complexity_issues.txt" ;;
+        Python) echo "${SCRIPT_DIR}/../.python_complexity_issues.txt" ;;
+        Go) echo "${SCRIPT_DIR}/../.go_complexity_issues.txt" ;;
+        Cpp) echo "${SCRIPT_DIR}/../.cpp_complexity_issues.txt" ;;
+        Ruby) echo "${SCRIPT_DIR}/../.ruby_complexity_issues.txt" ;;
+        PHP) echo "${SCRIPT_DIR}/../.php_complexity_issues.txt" ;;
+        Rust) echo "${SCRIPT_DIR}/../.rust_complexity_issues.txt" ;;
+        *) echo "${SCRIPT_DIR}/../.js_complexity_issues.txt" ;;
+    esac
+}
 
 check_complexity() {
-  local score=0
+    local project_type=$(detect_project_type)
+    local result
 
-  # 大文件控制（2分）- 放宽标准
-  local large_files=$(find src -name "*.js" -exec wc -l {} + 2>/dev/null | awk '$1 > 800 {print}' | wc -l)
-  [ "$large_files" -lt 5 ] && score=$((score + 2))
+    case "$project_type" in
+        iOS)
+            result=$(bash "${SCRIPT_DIR}/checkers/ios/complexity.sh" 2>/dev/null || echo "0:0")
+            ;;
+        Flutter)
+            result=$(bash "${SCRIPT_DIR}/checkers/flutter/complexity.sh" 2>/dev/null || echo "0:0")
+            ;;
+        Java)
+            result=$(bash "${SCRIPT_DIR}/checkers/java/complexity.sh" 2>/dev/null || echo "0:0")
+            ;;
+        Python)
+            result=$(bash "${SCRIPT_DIR}/checkers/python/complexity.sh" 2>/dev/null || echo "0:0")
+            ;;
+        Go)
+            result=$(bash "${SCRIPT_DIR}/checkers/go/complexity.sh" 2>/dev/null || echo "0:0")
+            ;;
+        Cpp)
+            result=$(bash "${SCRIPT_DIR}/checkers/cpp/complexity.sh" 2>/dev/null || echo "0:0")
+            ;;
+        Ruby)
+            result=$(bash "${SCRIPT_DIR}/checkers/ruby/complexity.sh" 2>/dev/null || echo "0:0")
+            ;;
+        PHP)
+            result=$(bash "${SCRIPT_DIR}/checkers/php/complexity.sh" 2>/dev/null || echo "0:0")
+            ;;
+        Rust)
+            result=$(bash "${SCRIPT_DIR}/checkers/rust/complexity.sh" 2>/dev/null || echo "0:0")
+            ;;
+        *)
+            result=$(bash "${SCRIPT_DIR}/checkers/js/complexity.sh" 2>/dev/null || echo "0:0")
+            ;;
+    esac
 
-  # 函数长度（2分）- 简化检查
-  score=$((score + 1))
-
-  # 循环依赖（1分）
-  local circular=$(detect_circular_deps)
-  [ "$circular" -eq 0 ] && score=$((score + 1))
-
-  echo $score
+    echo "${result%%:*}"
 }
 
-# 检测循环依赖（简化版）
-detect_circular_deps() {
-  # 简化检测：检查是否有文件同时导入和导出相同模块
-  local circular=0
-  for file in $(find src -name "*.js" 2>/dev/null); do
-    local imports=$(grep -oE "from\s+['\"][^'\"]+['\"]|require\s*\(\s*['\"][^'\"]+['\"]" "$file" 2>/dev/null | sed "s/.*['\"]//;s/['\"].*//")
-    for imp in $imports; do
-      if [ -f "$imp.js" ]; then
-        if grep -q "$(basename "$file" .js)" "$imp.js" 2>/dev/null; then
-          circular=$((circular + 1))
-        fi
-      fi
-    done
-  done
-  echo $circular
+output_complexity_details() {
+    local issues_file=$(get_complexity_issues_file)
+    if [ -f "$issues_file" ] && [ -s "$issues_file" ]; then
+        cat "$issues_file"
+    fi
 }
 
-# 如果直接执行此脚本
 if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
-  check_complexity
+    check_complexity
 fi

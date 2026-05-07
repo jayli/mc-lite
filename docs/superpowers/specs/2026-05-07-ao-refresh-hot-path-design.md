@@ -38,7 +38,7 @@ World.onChunkAOSourceStable(markNeighborBoundaries: true)
 1. AO 真实计算继续在 `AOWorker` 中，主线程只负责决定哪些实例需要刷新和应用结果。
 2. AO 刷新必须在 face culling 之后，以 `visibleKeys` / `instanceIndexMap` 作为候选来源；没有渲染实例的隐藏块不计算 AO。
 3. 首次显示可继续使用中性 AO，待 chunk 稳定后异步补齐真实 AO。
-4. 邻居到达只刷新边界影响带，不触发本 chunk 或邻居的全量 AO。
+4. 邻居到达只刷新必要的边界/角点影响带，不触发本 chunk 或邻居的全量 AO。
 5. 保持现有 delta/fullSync 时序语义，先做低风险热路径优化，再改 Worker 内部查询结构。
 
 ## 3. 拟采用方案
@@ -73,11 +73,29 @@ World.onChunkAOSourceStable(markNeighborBoundaries: true)
 - 邻居在 `-X`：刷新靠近 `minX` 的两列；
 - 邻居在 `+Z`：刷新靠近 `maxZ` 的两列；
 - 邻居在 `-Z`：刷新靠近 `minZ` 的两列；
-- y 范围使用 chunk 可用高度范围，优先来自 `blockDataArray` 覆盖范围和 `worldY`，必要时回退到遍历 `visibleKeys` 的边界过滤。
+- 方向语义必须先由测试锁定，避免把当前疑似写反的边界选择继续优化固化；
+- y 范围不能默认只限于 `worldY..worldY+15`，因为 `blockData` / `visibleKeys` 允许存在 `Y>15` 的可见方块；必要时回退到遍历 `visibleKeys` 的边界过滤。
 
 每个候选坐标通过统一 helper 校验是否为 AO 可刷新实例，再加入 `dirtyAOPositions`。
 
-### 3.4 AOWorker 遮挡查询避免每次合并大对象
+### 3.4 对角邻居传播补齐 AO 语义
+
+AO 计算依赖 `3x3x3` 邻域，而不仅仅是共享边的四邻 chunk。因此 `World.onChunkAOSourceStable()` 不能只向正交四邻传播稳定源事件。
+
+设计要求：
+
+- 正交邻居继续刷新边界影响带；
+- 对角邻居也必须收到 AO 脏位传播，否则角点处会在“对角 chunk 晚到”时留下旧 AO；
+- 对角传播不应退化为全量刷新，只允许刷新对应角点的小范围影响带。
+
+实现上可二选一：
+
+- 在 `Chunk` 侧新增专门的角点 helper（推荐）；
+- 扩展 `_markBoundaryDirtyAO()` 使其同时处理对角方向。
+
+无论采用哪种方式，都应保持“只对已就绪、非 consolidation 中的邻居执行即时刷新”的现有时序约束。
+
+### 3.5 AOWorker 遮挡查询避免每次合并大对象
 
 `AOWorker.createOcclusionCheckerFromCache()` 当前每个请求都会把当前 chunk 和邻居 cache 复制到 `merged` 对象。这个成本在 Worker，不阻塞主线程，但会拖慢 AO 回包。
 
@@ -105,10 +123,12 @@ function getChunkKeyForWorldCoord(x, z) {
 | 场景 | 预期行为 |
 |------|----------|
 | 新 chunk 首次显示 | 先显示中性 AO，稳定后异步补真实 AO |
-| 邻居 chunk 后到达 | 只刷新双方接壤边界影响带 |
+| 正交邻居后到达 | 只刷新双方接壤边界影响带 |
+| 对角邻居后到达 | 只刷新对应角点影响带，不做全量刷新 |
 | 放置方块 | 当前动态交互期仍延迟到 consolidation 后收敛 |
 | 删除方块 / 批量删除 | 保持现有 `_markDirtyAO()` 3x3x3 影响区语义 |
 | chunk 正在 consolidation | AO 回包仍由 `_aoSourceVersion` 丢弃过期结果 |
+| 边界上存在 `Y>15` 可见方块 | 仍能被边界 AO 标记覆盖，不依赖 `blockDataArray[4096]` |
 | 可见集合缺失 | 回退到旧全量 blockData 标记，优先保证正确性 |
 
 ## 6. 观测与验证
@@ -127,6 +147,9 @@ function getChunkKeyForWorldCoord(x, z) {
 - `non-deferred-finalize` / `deferred-finalize` 不再出现由 AO 前置工作引起的 30ms 级峰值。
 - full refresh positions 数量接近可见实例数量，而不是 `blockData` 全量数量。
 - 邻居边界刷新不再每方向扫描 4096 slot。
+- 东西南北边界方向语义正确，不会把错误边界带继续保留下去。
+- 对角 chunk 晚到时，角点 AO 会触发补刷新，不会留下角落断层。
+- `Y>15` 的可见边界方块仍能进入 AO dirty 集。
 - AO 视觉在 chunk 边界、挖掘、放置、批量删除后保持稳定。
 
 ## 7. 推荐实施顺序
@@ -134,6 +157,7 @@ function getChunkKeyForWorldCoord(x, z) {
 1. 添加 AO 热路径计时，确认改动前后数据。
 2. 修复 deferred finalize 重复 AO 刷新。
 3. 将 full refresh 候选从全量 `blockData` 改为 `instanceIndexMap` / `visibleKeys`。
-4. 将边界 dirty 标记从全数组扫描改为边界带生成。
-5. 优化 AOWorker 遮挡查询，删除 per request `merged` 构造。
-6. 运行 lint 和浏览器测试页，最后用 chunk perf 日志做手动对比。
+4. 先用测试锁定边界方向语义，再将边界 dirty 标记从全数组扫描改为边界/高层可见带生成。
+5. 补齐 `World.onChunkAOSourceStable()` 的对角邻居传播与角点 AO 刷新语义。
+6. 优化 AOWorker 遮挡查询，删除 per request `merged` 构造。
+7. 运行 lint 和浏览器测试页，最后用 chunk perf 日志做手动对比。

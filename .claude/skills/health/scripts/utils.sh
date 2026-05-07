@@ -11,8 +11,12 @@ generate_report_filename() {
   shopt -s nullglob
   for file in ./health_check/${date_str}-*-health-check.md; do
     if [ -f "$file" ]; then
-      local num=$(basename "$file" | grep -oE '^[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}-[0-9]{3}' | tail -1 | cut -d'-' -f4)
-      if [[ "$num" =~ ^[0-9]+$ ]] && [ "$num" -gt "$max_num" ]; then
+      local num=$(basename "$file" | grep -oE '[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}-[0-9]{3}' | tail -1 | cut -d'-' -f4)
+      # 去除前导零，避免八进制解析问题
+      num=$(echo "$num" | sed 's/^0*//')
+      # 如果num为空（原值为000），则设为0
+      [ -z "$num" ] && num=0
+      if [ "$num" -gt "$max_num" ]; then
         max_num="$num"
       fi
     fi
@@ -39,6 +43,13 @@ detect_project_type() {
     echo "PHP"
   elif [ -f "Cargo.toml" ]; then
     echo "Rust"
+  elif [ -f "pubspec.yaml" ]; then
+    echo "Flutter"
+  elif [ -f "Podfile" ] || ls -d *.xcodeproj 2>/dev/null | head -1 | grep -q . || ls -d *.xcworkspace 2>/dev/null | head -1 | grep -q .; then
+    echo "iOS"
+  elif [ -f "CMakeLists.txt" ] || [ -f "Makefile" ] || [ -f "configure.ac" ] || \
+       find . -maxdepth 1 -name "*.c" -print -o -name "*.cpp" -print -o -name "*.cc" -print -o -name "*.h" -print -o -name "*.hpp" -print 2>/dev/null | head -1 | grep -q .; then
+    echo "Cpp"
   else
     echo "Unknown"
   fi
@@ -46,10 +57,13 @@ detect_project_type() {
 
 # 计算代码总行数
 count_total_lines() {
-  find . -type f \( -name "*.js" -o -name "*.ts" -o -name "*.py" -o -name "*.go" -o -name "*.java" -o -name "*.rb" \) \
+  find . -type f \( -name "*.js" -o -name "*.ts" -o -name "*.py" -o -name "*.go" -o -name "*.java" -o -name "*.rb" -o -name "*.dart" -o -name "*.m" -o -name "*.mm" -o -name "*.h" -o -name "*.swift" -o -name "*.c" -o -name "*.cpp" -o -name "*.cc" -o -name "*.hpp" \) \
     -not -path "*/node_modules/*" \
     -not -path "*/.git/*" \
     -not -path "*/dist/*" \
     -not -path "*/build/*" \
+    -not -path "*/Pods/*" \
+    -not -path "*/DerivedData/*" \
+    -not -path "*/.build/*" \
     2>/dev/null | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}'
 }
