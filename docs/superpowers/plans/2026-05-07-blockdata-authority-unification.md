@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 将运行时逻辑真相统一收敛到 `blockData` 语义，保留当前所有功能，同时去掉 `WorldRuntime` / `PersistenceService` 周围的 blockData 快照链，让 `MemoryWorldStore` 只承担未加载 chunk 的 `blockData` 容器职责，`IndexedDB` 降级为冷存储层。
+**Goal:** 将 runtime 中的逻辑真相统一收敛到 world-level `blockData`，去掉 `WorldRuntime` / `PersistenceService` 周围的 blockData 快照链，彻底删除 `MemoryWorldStore`，并把 `Chunk.blockData` 收敛为 chunk 运行时视图而不是第二权威。
 
-**Architecture:** 已加载 chunk 的唯一逻辑权威由 `Chunk.blockData` 持有；未加载 chunk 的逻辑权威由 `MemoryWorldStore.chunks[].blockData` 持有。`visibleKeys`、`solidBlocks`、`blockDataArray`、`meshData`、AO mirror 等全部保留，但统一视为派生索引或渲染载荷。持久化层退出 runtime 正确性主链路，只负责导入、导出和异步冷落盘。
+**Architecture:** world-level `blockData` 是唯一权威。`Chunk.blockData` 是该权威在 chunk 实例中的局部运行时视图。`visibleKeys`、`solidBlocks`、`blockDataArray`、`solidBlockIds`、AO mirror、meshData 等全部保留，但统一视为派生索引、碰撞索引或高速查询结构。本阶段不以 IndexedDB、手动存档、手动读档为交付门槛。
 
-**Tech Stack:** JavaScript, Three.js, Web Workers, IndexedDB, ESLint, 浏览器内测试页面 `src/tests/index.html`
+**Tech Stack:** JavaScript, Three.js, Web Workers, ESLint, 浏览器内测试页面 `src/tests/index.html`
 
 ---
 
@@ -14,33 +14,40 @@
 
 ### 新增文件
 
-- Create: `src/world/ColdPersistenceCoordinator.js`
-  - 负责替代 `WorldRuntime.flushChunk()` 的冷存储标脏与后台落盘调度
+- Create: `src/world/WorldBlockDataStore.js`
+  - world-level `blockData` 唯一权威容器
+  - 负责 chunk slice 读写、生成结果注入、未来导入导出接入点
+
+### 删除文件
+
+- Delete: `src/world/MemoryWorldStore.js`
+  - 其旧有职责全部并入 `WorldBlockDataStore`
 
 ### 重点修改文件
 
 - Modify: `src/world/Chunk.js`
-  - 明确 `blockData` 为 loaded chunk 唯一逻辑权威
-  - 保持 `visibleKeys` / `solidBlocks` / `blockDataArray` / AO / renderDelta 功能不变
-- Modify: `src/world/MemoryWorldStore.js`
-  - 语义收窄为 unloaded chunk 的 `blockData` 容器 + 世界级索引
-  - 增加从 loaded chunk 同步记录的辅助接口
+  - 明确 `blockData` 为 chunk 运行时视图
+  - 收敛所有 blockData 写入口
+  - 保持 `visibleKeys` / `solidBlocks` / `blockDataArray` / `solidBlockIds` / AO / renderDelta 功能不变
 - Modify: `src/world/World.js`
-  - chunk 加载 / 卸载前后的 `blockData` 接班逻辑
-  - 保存前全量同步 loaded chunks 到 `MemoryWorldStore`
+  - chunk 加载 / 卸载前后的 world-level authority 接入
+  - 统一通过 `WorldBlockDataStore` 接收生成结果
+- Modify: `src/world/WorldGenerationService.js`
+  - 区域 / chunk 生成结果直接写入 `WorldBlockDataStore`
 - Modify: `src/world/WorldRuntime.js`
   - 收缩 `blockDataSnapshot`、`pendingUnloadFlushQueue`、`flushChunk()` 热路径职责
 - Modify: `src/world/ChunkPersistence.js`
-  - `saveDebounced()` 改为调用冷存储协调器，而不是 `WorldRuntime.flushChunk()`
+  - 去掉运行中对 `flushChunk()` 的依赖
+- Modify: `src/world/WorldAccessLayer.js`
+  - 明确编辑入口只驱动 runtime authority，不再关心持久化
 - Modify: `src/core/Game.js`
-  - `collectSnapshot()` 改读 `MemoryWorldStore`
-  - `applySaveData()` 改写 `MemoryWorldStore + loaded chunks`
+  - 若存在导入导出路径，仅标记 deferred 或改为 future hook
 - Modify: `src/services/PersistenceService.js`
-  - 删除运行时 cache 职责，只保留兼容与冷存储能力
+  - 标记 deferred / deprecated runtime 职责
 - Modify: `src/world/WorldStore.js`
-  - 明确为冷存储门面
+  - 标记 deferred 冷存储门面
 - Modify: `src/workers/PersistenceWorker.js`
-  - 第二阶段后再评估收缩 `regionCache`
+  - 标记 deferred
 
 ### 重点测试文件
 
@@ -51,200 +58,192 @@
 
 ---
 
-### Task 1: 先把运行时权威语义收敛到 `Chunk.blockData` 与 `MemoryWorldStore`
+### Task 1: 固定新的权威模型并删除 `MemoryWorldStore`
 
 **Files:**
-- Modify: `src/world/Chunk.js`
-- Modify: `src/world/MemoryWorldStore.js`
+- Create: `src/world/WorldBlockDataStore.js`
+- Delete: `src/world/MemoryWorldStore.js`
 - Modify: `src/world/World.js`
-- Test: `src/tests/test-chunk.js`
 - Test: `src/tests/test-world.js`
 
-- [ ] **Step 1: 写失败测试，固定“loaded / unloaded 两种 blockData 持有语义”**
+- [ ] **Step 1: 写失败测试，固定 world-level `blockData` 唯一权威语义**
 
-在 `src/tests/test-world.js` 和 `src/tests/test-chunk.js` 增加测试，覆盖：
+新增测试覆盖：
 
-- 已加载 chunk 时逻辑真相以 `Chunk.blockData` 为准
-- chunk unload 前同步后，`MemoryWorldStore` 中对应 chunkRecord 持有同样的 `blockData`
-- reload 后，重新加载的 chunk 恢复出相同的 `blockData`
-
-测试重点：
-
-- 不能只测“有数据”
-- 要测 `blockData` 内容完全一致
+- loaded chunk 修改后，world-level `blockData` 立即反映变更
+- chunk unload 后，reload 仍能从 world-level `blockData` 恢复
+- 运行时不再依赖 `MemoryWorldStore`
 
 - [ ] **Step 2: 运行测试，确认当前语义未被显式保证**
 
 Run:
-- 启动 `npm run start`
+- `npm run start`
 - 打开 `http://localhost:8080/src/tests/index.html`
 - 运行相关测试
 
 Expected:
-- 新增语义测试至少有一部分失败，暴露现有职责边界不清晰
+- 新增语义测试至少部分失败
 
-- [ ] **Step 3: 修改 `Chunk.blockData` 注释和加载路径语义**
+- [ ] **Step 3: 实现 `WorldBlockDataStore` 最小骨架**
 
-在 `src/world/Chunk.js`：
+至少包含：
 
-- 更新 `blockData` 注释为“完整逻辑块集合”
-- 明确 `loadFromRecord()` / `_injectBlockData()` 在 loaded chunk 接管逻辑权威
+- `getChunkSlice(cx, cz)`
+- `setBlockEntry(cx, cz, code, entry)`
+- `replaceChunkSlice(cx, cz, blockData)`
+- `hasChunkSlice(cx, cz)`
 
-不要改：
-
-- `visibleKeys`
-- `solidBlocks`
-- `blockDataArray`
-- AO / tombstone 功能
-
-- [ ] **Step 4: 修改 `MemoryWorldStore` 注释和最小辅助接口**
-
-在 `src/world/MemoryWorldStore.js`：
-
-- 把类注释改成“未加载 chunk 的 blockData 容器 + 世界级索引”
-- 新增一个最小辅助接口，例如：
-  - `syncChunkRecord(cx, cz, record)`
-  - 或 `syncLoadedChunkToStore(cx, cz, chunkLikeRecord)`
+- [ ] **Step 4: 从 `World` 中移除 `MemoryWorldStore` 初始化与引用**
 
 要求：
 
-- 不要引入新的运行时快照层
-- 只做数据接班同步
+- `World` 不再创建 `MemoryWorldStore`
+- `World` 改为持有 `WorldBlockDataStore`
+- 任何“卸载前同步到内存仓库”的语义全部删除
 
-- [ ] **Step 5: 在 `World` 中补上 unload 前同步入口**
-
-在 `src/world/World.js` 增加一个集中入口，例如：
-
-- `beforeChunkUnloadSync(chunk)`
-
-职责：
-
-- 用当前 chunk 的 `blockData`
-- 加上 `runtimeEntities/staticEntities/runtimeSeedData`
-- 覆盖 `MemoryWorldStore` 中对应记录
-
-- [ ] **Step 6: 运行相关测试确认通过**
+- [ ] **Step 5: 运行相关测试确认通过**
 
 Run:
 - 测试页面中运行 `test-world.js`
-- 运行 `test-chunk.js`
 
 Expected:
-- 新增 loaded/unloaded 权威语义测试通过
+- 新增唯一权威语义测试通过
 
-- [ ] **Step 7: 运行 lint**
+- [ ] **Step 6: 运行 lint**
 
 Run: `npm run lint`
 Expected: PASS
 
 ---
 
-### Task 2: 去掉 `WorldRuntime` 的 blockData 快照主链路
+### Task 2: 将 `Chunk.blockData` 收敛为 world-level authority 的 chunk 视图
 
 **Files:**
-- Modify: `src/world/WorldRuntime.js`
-- Modify: `src/world/ChunkPersistence.js`
 - Modify: `src/world/Chunk.js`
-- Create: `src/world/ColdPersistenceCoordinator.js`
-- Test: `src/tests/test-world-runtime.js`
-- Test: `src/tests/test-runtime-session-persistence.js`
+- Modify: `src/world/World.js`
+- Test: `src/tests/test-chunk.js`
+- Test: `src/tests/test-world.js`
 
-- [ ] **Step 1: 写失败测试，固定“runtime 正确性不依赖 blockDataSnapshot”**
+- [ ] **Step 1: 写失败测试，固定 `Chunk.blockData` 不是第二权威**
 
-在 `src/tests/test-world-runtime.js` 和 `src/tests/test-runtime-session-persistence.js` 增加测试：
+新增测试覆盖：
 
-- 单块修改后，即便不构造 `dirtyEntry.blockDataSnapshot`，chunk unload/reload 仍不丢数据
-- `saveDebounced()` 不需要 `flushChunk()` 成功才能保证运行时正确性
+- 修改 `Chunk.blockData` 后，world-level `blockData` 同步可见
+- reload 后新 chunk 视图看到相同数据
+- chunk dispose 后 world-level `blockData` 仍保留
 
-- [ ] **Step 2: 运行测试，确认当前实现仍依赖 snapshot 语义**
+- [ ] **Step 2: 运行测试，确认当前实现仍保留双 holder 语义**
 
 Run:
-- 浏览器测试页运行新增测试
+- 测试页面运行 `test-chunk.js`
+- 运行 `test-world.js`
 
 Expected:
-- 至少有测试因 `_dirtyChunks[].blockDataSnapshot` 或 `flushChunk()` 假设而失败
+- 至少暴露一部分仍依赖 chunk-local 独立持有的行为
 
-- [ ] **Step 3: 新增冷存储协调器最小骨架**
-
-在 `src/world/ColdPersistenceCoordinator.js` 实现最小版本：
-
-- `schedulePersistChunk(cx, cz)`
-- `flushDirtyChunks()`
-
-第一版只要求：
-
-- 记录哪些 chunk 需要冷落盘
-- 提供未来接入 `WorldStore` 的位置
-
-不要第一步就做复杂批处理。
-
-- [ ] **Step 4: 修改 `ChunkPersistence.saveDebounced()`**
-
-在 `src/world/ChunkPersistence.js`：
-
-- 不再直接调用 `runtime.flushChunk()`
-- 改为调用新的冷存储协调器 `schedulePersistChunk()`
-
-目标：
-
-- runtime 正确性退出 `flushChunk()` 依赖
-
-- [ ] **Step 5: 收缩 `WorldRuntime.recordBlockMutation()`**
-
-在 `src/world/WorldRuntime.js`：
-
-- 停止首次脏化时创建完整 `blockDataSnapshot`
-- 将其职责收缩为“记录 chunk 脏状态”或直接由新协调器接管
+- [ ] **Step 3: 调整 `Chunk` 构造与 hydrate 语义**
 
 要求：
 
-- 保持 `markChunkDirty()` 语义兼容
-- 不要破坏现有其他测试
+- `Chunk.blockData` 明确写成 world-level authority 的 chunk slice 视图
+- `loadFromRecord()` / `_injectBlockData()` 的文档与行为同步调整
+- 不再把 `Chunk.blockData` 视作未来 unload 时要转移出去的数据
 
-- [ ] **Step 6: 将 `flushChunk()` 明确降级为冷存储工具接口**
-
-在 `src/world/WorldRuntime.js`：
-
-- 标注 `flushChunk()` 不再参与 runtime 正确性
-- 停止让 `saveDebounced()` 依赖它
-
-第一阶段允许保留：
-
-- `flushAllDirty()`
-- `_commitChunkRecord()`
-
-仅作为冷写工具。
-
-- [ ] **Step 7: 运行运行时相关测试**
+- [ ] **Step 4: 运行相关测试确认通过**
 
 Run:
-- 测试页面中运行 `test-world-runtime.js`
-- 运行 `test-runtime-session-persistence.js`
+- 测试页面运行 `test-chunk.js`
+- 运行 `test-world.js`
 
 Expected:
-- 卸载/重载正确性不再依赖 `blockDataSnapshot`
+- `Chunk.blockData` 视图语义成立
 
-- [ ] **Step 8: 运行 lint**
+- [ ] **Step 5: 运行 lint**
 
 Run: `npm run lint`
 Expected: PASS
 
 ---
 
-### Task 3: 保持渲染索引与查询索引原样工作
+### Task 3: 穷尽所有 blockData 写入口并统一顺序
+
+**Files:**
+- Modify: `src/world/Chunk.js`
+- Modify: `src/world/WorldGenerationService.js`
+- Modify: `src/world/WorldAccessLayer.js`
+- Modify: `src/world/WorldBlockDataStore.js`
+- Test: `src/tests/test-chunk.js`
+- Test: `src/tests/test-world.js`
+
+- [ ] **Step 1: 写失败测试，覆盖所有主要写入口**
+
+至少覆盖：
+
+- `addBlockDynamic()`
+- `addBlocksBatchFast()`
+- `removeBlocksBatch()`
+- `acceptScatteredBlocks()`
+- `appendScatteredBlocks()`
+- 世界生成结果注入路径
+
+- [ ] **Step 2: 运行测试，确认当前覆盖存在缺口**
+
+Run:
+- 测试页面运行 `test-chunk.js`
+- 运行 `test-world.js`
+
+Expected:
+- 至少暴露一部分写入口没有被新 invariant 约束
+
+- [ ] **Step 3: 收敛写路径顺序**
+
+统一规则：
+
+- 先写 world-level `blockData`
+- 通过 `Chunk.blockData` 视图反映到当前 chunk
+- 再更新 `visibleKeys` / `solidBlocks` / `blockDataArray` / `solidBlockIds`
+- 再更新 AO / render / tombstone 等异步派生层
+- 禁止任何索引层反向决定逻辑真相
+
+- [ ] **Step 4: 让世界生成直接产出权威 blockData**
+
+要求：
+
+- 生成器结果先进入 `WorldBlockDataStore`
+- 当前 chunk 已加载时，再 hydrate 到 `Chunk.blockData`
+- 不再为持久化缓存额外铺第二条热路径
+
+- [ ] **Step 5: 运行相关测试确认通过**
+
+Run:
+- 测试页面运行 `test-chunk.js`
+- 运行 `test-world.js`
+
+Expected:
+- 所有主要写入口都满足统一顺序
+
+- [ ] **Step 6: 运行 lint**
+
+Run: `npm run lint`
+Expected: PASS
+
+---
+
+### Task 4: 明确保留 chunk 层索引结构
 
 **Files:**
 - Modify: `src/world/Chunk.js`
 - Test: `src/tests/test-chunk.js`
 - Test: `src/tests/test-world.js`
 
-- [ ] **Step 1: 写失败测试，固定“索引层保留原用途”**
+- [ ] **Step 1: 写失败测试，固定索引层职责**
 
-在 `src/tests/test-chunk.js` 增加测试，覆盖：
+明确覆盖：
 
-- `visibleKeys` 仍服务可见性判断，不因权威语义收敛被合并或清空
-- `solidBlocks` 仍服务碰撞判断
-- `blockDataArray + solidBlockIds` 仍保持 chunk 内快路径可用
+- `Chunk.visibleKeys` 仍服务可见性判断
+- `Chunk.solidBlocks` 仍服务碰撞判断
+- `Chunk.blockDataArray` 仍作为 chunk 内紧凑快路径
+- `Chunk.solidBlockIds` 仍配合数组路径做 O(1) 实心判断
 
 - [ ] **Step 2: 运行测试，确认索引层行为当前有覆盖缺口**
 
@@ -254,96 +253,143 @@ Run:
 Expected:
 - 至少需要补一个或多个更明确的断言
 
-- [ ] **Step 3: 修正 `Chunk` 中可能依赖旧持久化假设的逻辑**
-
-在 `src/world/Chunk.js`：
-
-- 检查 `_updateBlockState()`
-- 检查 `acceptScatteredBlocks()`
-- 检查 `appendScatteredBlocks()`
+- [ ] **Step 3: 检查 AO mirror / renderDelta / tombstone 相关逻辑**
 
 要求：
 
-- 只允许 `blockData` 驱动索引层更新
-- 禁止让索引层去反向决定逻辑真相
-
-- [ ] **Step 4: 明确保留 tombstone / AO mirror / renderDelta**
-
-在 `src/world/Chunk.js` 添加或修正文档注释：
-
-- `deletedBlockTombstones` 继续保留
-- `AOBridge` 镜像仍从 `blockData` 派生
+- 明确保留 `deletedBlockTombstones`
+- AO mirror 继续从 `blockData` 派生
 - `renderDelta` 仍供全局实例系统消费
 
-- [ ] **Step 5: 运行 chunk/world 相关测试**
+- [ ] **Step 4: 运行 chunk/world 相关测试**
 
 Run:
 - 测试页面运行 `test-chunk.js`
 - 运行 `test-world.js`
 
 Expected:
-- 索引层与渲染补丁相关测试通过
+- 派生索引与渲染补丁相关测试通过
 
-- [ ] **Step 6: 运行 lint**
+- [ ] **Step 5: 运行 lint**
 
 Run: `npm run lint`
 Expected: PASS
 
 ---
 
-### Task 4: 手动保存改为直接从 `MemoryWorldStore` 导出
+### Task 5: 去掉 runtime blockData 快照主链路
 
 **Files:**
-- Modify: `src/core/Game.js`
-- Modify: `src/world/World.js`
+- Modify: `src/world/WorldRuntime.js`
+- Modify: `src/world/ChunkPersistence.js`
+- Modify: `src/world/Chunk.js`
 - Test: `src/tests/test-world-runtime.js`
+- Test: `src/tests/test-runtime-session-persistence.js`
 
-- [ ] **Step 1: 写失败测试，固定 `collectSnapshot()` 的新来源**
+- [ ] **Step 1: 写失败测试，固定“runtime 正确性不依赖 blockDataSnapshot”**
 
-在相关测试中新增断言：
+新增测试覆盖：
 
-- `collectSnapshot()` 不再调用 `worldStore.getChunkRecord()`
-- 保存前先同步所有 loaded chunks 到 `MemoryWorldStore`
-- 导出结果来自 `MemoryWorldStore`
+- 单块修改后，即便不构造 `dirtyEntry.blockDataSnapshot`，unload/reload 仍不丢数据
+- `saveDebounced()` 失败或被旁路时，不影响 runtime 正确性
 
-- [ ] **Step 2: 运行测试确认当前实现仍依赖 `worldStore.getChunkRecord()`**
+- [ ] **Step 2: 运行测试，确认当前实现仍依赖 snapshot 语义**
 
 Run:
 - 浏览器测试页运行新增测试
 
 Expected:
-- 新增测试失败，暴露当前逐 chunk 冷读取路径
+- 至少有测试因 `_dirtyChunks[].blockDataSnapshot` 或 `flushChunk()` 假设而失败
 
-- [ ] **Step 3: 在 `World` 中新增保存前同步入口**
-
-在 `src/world/World.js` 增加：
-
-- `syncAllLoadedChunksToMemoryStore()`
-
-职责：
-
-- 遍历 `this.chunks`
-- 将每个 loaded chunk 当前 `blockData` 和实体记录同步回 `MemoryWorldStore`
-
-- [ ] **Step 4: 改写 `Game.collectSnapshot()`**
-
-在 `src/core/Game.js`：
-
-- 调用 `world.syncAllLoadedChunksToMemoryStore()`
-- 直接从 `world.memoryWorldStore` 读取 chunk 记录
-- 生成 `worldDeltas`
+- [ ] **Step 3: 收缩 `WorldRuntime.recordBlockMutation()`**
 
 要求：
 
-- 不再逐 chunk `await world.worldStore.getChunkRecord()`
+- 停止首次脏化时创建完整 `blockDataSnapshot`
+- 收缩为 runtime dirty 标记，或直接由 chunk/local state 接管
+
+- [ ] **Step 4: 修改 `ChunkPersistence.saveDebounced()`**
+
+要求：
+
+- 不再直接依赖 `runtime.flushChunk()`
+- 本阶段允许只保留防抖 dirty 标记，或直接让它成为 no-op
+
+- [ ] **Step 5: 将 `flushChunk()` 和 `pendingUnloadFlushQueue` 明确降级**
+
+要求：
+
+- 注释标明不再参与 runtime 正确性
+- 若暂时保留，仅作为未来冷存储恢复时的兼容工具
+
+- [ ] **Step 6: 运行运行时相关测试**
+
+Run:
+- 测试页面中运行 `test-world-runtime.js`
+- 运行 `test-runtime-session-persistence.js`
+
+Expected:
+- 卸载/重载正确性不再依赖 `blockDataSnapshot`
+
+- [ ] **Step 7: 运行 lint**
+
+Run: `npm run lint`
+Expected: PASS
+
+---
+
+### Task 6: 收紧 clone / snapshot / serialize 边界
+
+**Files:**
+- Modify: `src/world/WorldBlockDataStore.js`
+- Modify: `src/world/World.js`
+- Modify: `src/world/Chunk.js`
+- Test: `src/tests/test-world-runtime.js`
+
+- [ ] **Step 1: 写失败测试，固定“热路径不允许全量 clone”约束**
+
+重点覆盖：
+
+- 单块修改
+- 批量改单块
+- 普通运行中的 chunk unload
+
+测试不要求精确测时间，但要能证明：
+
+- 不再依赖整份 `blockDataSnapshot`
+- 不再用持久化理由对整 chunk 做热路径全量复制
+
+- [ ] **Step 2: 运行测试确认当前实现仍存在快照式依赖**
+
+Run:
+- 浏览器测试页运行新增测试
+
+Expected:
+- 至少有测试或断言暴露旧 clone 假设
+
+- [ ] **Step 3: 调整 world-level authority API**
+
+要求：
+
+- 提供 chunk slice 视图读取接口
+- 提供局部 block entry 更新接口
+- 避免所有路径都走整份 chunk record 替换
+
+- [ ] **Step 4: 明确允许 clone 的边界**
+
+代码和注释中只允许在以下边界做全量复制：
+
+- Worker 消息边界
+- 测试快照
+- 未来导出存档
 
 - [ ] **Step 5: 运行相关测试**
 
 Run:
-- 浏览器测试页中运行 `test-world-runtime.js`
+- 测试页面运行 `test-world-runtime.js`
 
 Expected:
-- `collectSnapshot()` 路径测试通过
+- 热路径中的整包快照依赖显著收缩
 
 - [ ] **Step 6: 运行 lint**
 
@@ -352,79 +398,22 @@ Expected: PASS
 
 ---
 
-### Task 5: 手动导入改为先写 `MemoryWorldStore`，再同步已加载 chunk
+### Task 7: 推迟存档与冷存储能力，并把代码边界标记清楚
 
 **Files:**
 - Modify: `src/core/Game.js`
-- Modify: `src/world/World.js`
-- Modify: `src/services/PersistenceService.js`
-- Test: `src/tests/test-world-runtime.js`
-
-- [ ] **Step 1: 写失败测试，固定 `applySaveData()` 新链路**
-
-新增测试覆盖：
-
-- `applySaveData()` 不再依赖 `persistenceService.injectSaveData()`
-- 存档中的 `worldDeltas` 先写入 `MemoryWorldStore`
-- 如果目标 chunk 已加载，需同步刷新对应 `Chunk.blockData`
-
-- [ ] **Step 2: 运行测试确认当前仍依赖 `injectSaveData()`**
-
-Run:
-- 浏览器测试页运行新增测试
-
-Expected:
-- 当前实现因调用 `injectSaveData()` 而失败
-
-- [ ] **Step 3: 修改 `Game.applySaveData()`**
-
-在 `src/core/Game.js`：
-
-- 将 `saveData.worldDeltas` 转写到 `world.memoryWorldStore`
-- 对已加载 chunk：
-  - 覆盖其 `blockData`
-  - 重建 `blockDataArray`
-  - 重建 `solidBlocks`
-  - 触发可见性 / mesh 重新装配
-
-- [ ] **Step 4: 将 `PersistenceService.injectSaveData()` 降级为 deprecated**
-
-在 `src/services/PersistenceService.js`：
-
-- 保留旧接口以兼容旧代码
-- 注释标明不再是 runtime 主链路
-
-- [ ] **Step 5: 运行导入相关测试**
-
-Run:
-- 浏览器测试页运行 `test-world-runtime.js`
-
-Expected:
-- 存档导入、loaded chunk 覆盖、reload 恢复测试通过
-
-- [ ] **Step 6: 运行 lint**
-
-Run: `npm run lint`
-Expected: PASS
-
----
-
-### Task 6: 收缩旧持久化缓存层，只保留冷存储职责
-
-**Files:**
-- Modify: `src/world/WorldRuntime.js`
 - Modify: `src/services/PersistenceService.js`
 - Modify: `src/world/WorldStore.js`
 - Modify: `src/workers/PersistenceWorker.js`
 - Test: `src/tests/test-world-runtime.js`
 
-- [ ] **Step 1: 写失败测试，固定“运行时不再依赖旧 cache 层”**
+- [ ] **Step 1: 写失败测试，固定“runtime 不再依赖旧持久化层”**
 
 测试覆盖：
 
 - `PersistenceService.cache` 不再承载 runtime blockData 权威
-- `WorldRuntime._regionCache` 只服务冷读取/预取
-- `pendingUnloadFlushQueue` 不再参与运行时正确性
+- `WorldStore.getChunkRecord()` 不是 runtime 主链路的必需前提
+- `collectSnapshot()` / `applySaveData()` 若继续保留，应显式标记 deferred 或兼容路径
 
 - [ ] **Step 2: 运行测试，确认当前实现仍保留旧缓存职责**
 
@@ -434,51 +423,30 @@ Run:
 Expected:
 - 测试失败，暴露旧缓存职责仍在
 
-- [ ] **Step 3: 收缩 `PersistenceService` 的运行时接口**
+- [ ] **Step 3: 标记 deferred / deprecated 边界**
 
-在 `src/services/PersistenceService.js`：
+要求：
 
-- 标记以下方法 deprecated：
-  - `snapshotChunkBlocks`
-  - `hydrateChunkBlocks`
-  - `replaceChunkBlocks`
-  - `injectSaveData`
+- `PersistenceService.injectSaveData()`、`snapshotChunkBlocks()`、`hydrateChunkBlocks()`、`replaceChunkBlocks()` 标记 deprecated
+- `WorldStore`、`PersistenceWorker` 标记为冷存储 deferred
+- `Game.collectSnapshot()`、`Game.applySaveData()` 若不立即重写，至少明确为非本阶段门槛
 
-- [ ] **Step 4: 收缩 `WorldRuntime` 的旧 flush 队列职责**
-
-在 `src/world/WorldRuntime.js`：
-
-- 将 `pendingUnloadFlushQueue` 标注为冷写兼容工具
-- 检查是否仍有调用路径依赖它保证 runtime 正确性
-- 若有，改接到 `MemoryWorldStore`
-
-- [ ] **Step 5: 暂不删除 `PersistenceWorker.regionCache`，只改注释和边界**
-
-在 `src/workers/PersistenceWorker.js`：
-
-- 注释说明其仅服务冷启动/冷读取
-- 不把它作为运行时主链路优化项
-
-原因：
-
-- 避免过早删除导致旧档冷启动性能回退
-
-- [ ] **Step 6: 运行运行时测试**
+- [ ] **Step 4: 运行运行时测试**
 
 Run:
 - 浏览器测试页运行 `test-world-runtime.js`
 
 Expected:
-- 无回归
+- runtime 路径不再把持久化层当成正确性前提
 
-- [ ] **Step 7: 运行 lint**
+- [ ] **Step 5: 运行 lint**
 
 Run: `npm run lint`
 Expected: PASS
 
 ---
 
-### Task 7: 完整回归与性能验证
+### Task 8: 完整回归与性能验证
 
 **Files:**
 - Test: `src/tests/test-chunk.js`
@@ -494,7 +462,7 @@ Run:
 - 点击“运行所有测试”
 
 Expected:
-- 所有现有测试通过
+- 所有与 runtime authority 相关的现有测试通过
 
 - [ ] **Step 2: 手动验证单块修改与 reload**
 
@@ -508,16 +476,16 @@ Expected:
 Expected:
 - 方块状态正确恢复
 
-- [ ] **Step 3: 手动验证导入导出**
+- [ ] **Step 3: 手动验证世界生成结果直接进入 blockData**
 
 手动步骤：
 
-1. 导出当前存档
-2. 刷新页面
-3. 导入刚导出的存档
+1. 进入未生成区域
+2. 观察新区块生成
+3. 触发 unload / reload
 
 Expected:
-- 世界块数据、实体数据、玩家状态正确恢复
+- 生成结果经 unload / reload 后仍一致
 
 - [ ] **Step 4: 手动验证渲染与碰撞功能未丢失**
 
@@ -525,19 +493,20 @@ Expected:
 
 - `visibleKeys` 驱动的上屏/补面仍正常
 - `solidBlocks` 驱动的碰撞仍正常
+- `blockDataArray + solidBlockIds` 快路径仍正常
 - AO 无明显错乱
 
-- [ ] **Step 5: 记录 Chrome Trace 基线与结果**
+- [ ] **Step 5: 记录性能对比**
 
 对比项：
 
 - consolidation 后长帧
 - `WorldRuntime.flushChunk()` 是否已退出热路径
-- 是否仍有大块 `postMessage` / `applyRegionPatch` 热点
+- 是否仍有大块 `blockDataSnapshot` / region patch / 结构化复制热点
 
 Expected:
 - 热路径显著收缩
-- 若仍有长帧，应归因为下一阶段“持久化粒度优化”而不是旧 snapshot 链
+- 剩余长帧若存在，应归因于后续渲染或数据结构优化，而不是旧快照链
 
 - [ ] **Step 6: 运行 lint 作为最终门禁**
 

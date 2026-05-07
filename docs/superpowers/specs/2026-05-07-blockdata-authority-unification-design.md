@@ -2,72 +2,97 @@
 
 > **Problem:** 当前 runtime 期间的逻辑方块真相被拆散在 `Chunk.blockData`、`MemoryWorldStore.chunks[].blockData`、`WorldRuntime` 的快照链、`PersistenceService.cache` 与 `PersistenceWorker.regionCache` 周围。结果是运行时既存在双权威语义，也存在多条全量 clone / region patch / flush queue 链路，导致数据层次复杂、拷贝次数多、`postMessage` 载荷过大，且后续优化难以落点。
 
-## 1. Goal
+## 1. Revised Scope
 
-本设计的目标是把运行时的逻辑真相统一收敛到 `blockData` 语义上，并在此基础上保留当前所有关键功能：
+结合当前目标，本次设计做三条重要收敛：
 
-1. 已加载 chunk 的逻辑真相由 `Chunk.blockData` 唯一承载
-2. 未加载 chunk 的逻辑真相由 `MemoryWorldStore` 持有对应 chunk 的 `blockData`
-3. `visibleKeys`、`solidBlocks`、`blockDataArray`、`meshData` 等结构继续保留，但明确降级为派生索引或渲染载荷
-4. `IndexedDB` 降级为冷存储 / 导出 / 刷新恢复来源，不再参与 runtime 权威判断
-5. 消灭运行时的 blockData 全量快照链，减少 clone、序列化和跨线程传输次数，为后续 `postMessage` / 持久化粒度优化打基础
-
-## 2. Non-Goals
-
-本次设计明确不做以下事情：
-
-1. 不重写 `visibleKeys`、`solidBlocks`、`blockDataArray` 的用途与算法
-2. 不改变 AO / Face Culling / Global Instanced Mesh 的核心渲染策略
-3. 不把特殊实体逻辑硬塞进普通 `blockData` 语义
-4. 不在第一阶段改成 chunk 级独立 `IndexedDB` store
-5. 不在第一阶段推进 TypedArray 化的权威存储
-6. 不要求本次一并解决所有渲染性能热点
-
-## 3. Current System Reality
-
-### 3.1 当前并非单一运行时权威
-
-当前代码中，逻辑真相至少被拆在两处：
-
-- 已加载 chunk 的真相主要在 `Chunk.blockData`
-- 未加载 chunk 的真相主要在 `MemoryWorldStore.chunks[].blockData`
-
-这本身是合理的冷热分层，但问题在于系统没有把它们表达为“同一语义在 loaded / unloaded 两种形态下的持有者”，而是让它们看起来像两套并行权威。
-
-### 3.2 运行时仍然保留旧持久化快照链
-
-尽管若干注释已将 `IndexedDB` 描述为冷存储，但当前运行时仍保留下列热路径：
-
-- `Chunk.saveDebounced()`
-- `WorldRuntime.recordBlockMutation()`
-- `WorldRuntime._dirtyChunks[].blockDataSnapshot`
-- `WorldRuntime.flushChunk()`
-- `pendingUnloadFlushQueue`
-- `WorldStore.commitChunkRecord()`
-- `PersistenceWorker.applyRegionPatch()`
+1. **runtime 只解决内存中的权威数据正确流转**
+2. **世界级 `blockData` 是唯一权威数据源**
+3. **彻底删除 `MemoryWorldStore`，其职责并入 world-level `blockData`**
 
 这意味着：
 
-- runtime 期间仍在构造稳定 blockData 快照
-- 仍在维护 region 级 patch / flush 队列
-- 仍有完整对象跨线程传输和 `IndexedDB.put()` 的结构化复制
+- `IndexedDB` 在本阶段不是必须能力
+- 手动存档 / 读档延后到 runtime 架构稳定后再恢复
+- chunk unload 不再承担“权威转移”职责
+- 所有设计优先服务“运行中的正确性、清晰性、可优化性”
 
-### 3.3 当前渲染与查询索引本身并不是问题
+## 2. Goal
 
-以下结构虽然重复了部分 block 信息，但其职责是合理的：
+本设计的目标是把运行时的逻辑真相统一收敛到 `blockData` 语义上，并在此基础上保留当前所有关键功能：
 
-- `visibleKeys`：显示可见性索引
-- `solidBlocks`：碰撞索引
-- `blockDataArray` + `solidBlockIds` + palette：chunk 内高频查询索引
-- `meshData` / `instanceIndexMap` / `renderDelta`：渲染载荷与增量补丁
-- `lightSourceCoords` / `dirtyAOPositions`：光照与 AO 派生索引
-- `deletedBlockTombstones`：异步一致性保护层
+1. `blockData` 升级为**世界级唯一权威数据源**
+2. `Chunk.blockData` 不再是独立第二份真相，而是 world-level `blockData` 在 chunk 实例中的局部运行时视图
+3. 世界生成直接产出并写入 world-level `blockData`
+4. 彻底删除 `MemoryWorldStore`
+5. `Chunk.visibleKeys`、`Chunk.solidBlocks`、`Chunk.blockDataArray`、`Chunk.solidBlockIds` 继续保留，作为 chunk 层派生索引或高速查询结构
+6. 消灭运行时的 blockData 全量快照链，减少 clone、序列化和跨线程传输次数，为后续性能优化打基础
 
-因此本设计不是“去掉所有重复数据”，而是“去掉所有重复权威和重复快照链”。
+## 3. Non-Goals
 
-## 4. Proposed Authority Model
+本次设计明确不做以下事情：
 
-### 4.1 统一语义：`blockData` 是唯一逻辑真相
+1. 不重写 `visibleKeys`、`solidBlocks`、`blockDataArray`、`solidBlockIds` 的用途与算法
+2. 不改变 AO / Face Culling / Global Instanced Mesh 的核心渲染策略
+3. 不把特殊实体逻辑硬塞进普通 `blockData` 语义
+4. 不在本阶段实现新的 IndexedDB 持久化方案
+5. 不在本阶段推进 TypedArray 化的权威存储
+6. 不要求本次一并解决所有渲染性能热点
+
+## 4. Current System Reality
+
+### 4.1 当前真正的问题不是“有没有 blockData”，而是“权威边界不干净”
+
+当前代码里：
+
+- `Chunk.blockData` 已经是 loaded chunk 的完整逻辑块集合
+- `MemoryWorldStore.chunks[].blockData` 实际承担 unload 后恢复职责
+- `WorldRuntime._dirtyChunks[].blockDataSnapshot`、`pendingUnloadFlushQueue`、`PersistenceService.cache` 又构成了一套持久化过渡快照链
+
+所以问题不是没有权威数据源，而是：
+
+1. 同一个逻辑真相被多层持有
+2. 不同层对“自己是不是权威”语义不一致
+3. 写路径为照顾旧持久化链路发生了明显写放大
+
+### 4.2 当前渲染与查询索引层本身不是主要矛盾
+
+以下结构虽有重复信息，但职责合理，应保留：
+
+- `Chunk.visibleKeys`
+- `Chunk.solidBlocks`
+- `Chunk.blockDataArray`
+- `Chunk.solidBlockIds`
+- `Chunk.blockPalette` / `Chunk.blockPaletteReverse`
+- `meshData`
+- `instanceIndexMap`
+- `renderDelta`
+- `lightSourceCoords`
+- `dirtyAOPositions`
+- `deletedBlockTombstones`
+
+本次设计不是“去掉所有重复数据”，而是“去掉重复权威和重复快照链”。
+
+### 4.3 新设计中，`blockData` 不能再等同于“某个 Chunk 实例上的 Map”
+
+本次改造有一个核心前提：
+
+- `Chunk.blockData` 只是 chunk 运行时对象上的访问入口
+- 真正的 `blockData` 是**独立于 chunk 生命周期存在的世界级权威数据**
+
+这意味着：
+
+- chunk unload 不是“把真相写回另一个内存层”
+- 而是“销毁一个运行时实例，但不销毁 world-level `blockData`”
+
+所以目标是：
+
+- 让 `Chunk.blockData` 从世界级权威数据中取用自己的 chunk slice
+- 卸载时只释放派生层与渲染层，不再做“权威转移”
+
+## 5. Proposed Authority Model
+
+### 5.1 统一语义：`blockData` 是唯一逻辑真相
 
 新模型里，`blockData` 作为概念上的唯一逻辑真相，覆盖：
 
@@ -85,61 +110,78 @@
 
 这些都属于派生层。
 
-### 4.2 Loaded / Unloaded 两种持有形态
+### 5.2 统一权威持有模型
 
-`blockData` 在运行时有两种持有形态：
+runtime 中只存在一份 world-level `blockData authority`：
 
-1. **Loaded 形态**
-   - 由 `Chunk.blockData` 持有
-   - 当 chunk 已加载时，它是该 chunk 的唯一活跃逻辑权威
+1. **世界级权威层**
+   - 持有者：`World.blockData` 或等价世界级 authority 容器
+   - 允许写：是
+   - 允许读：是
+   - 生命周期：独立于 chunk 实例
 
-2. **Unloaded 形态**
-   - 由 `MemoryWorldStore.chunks[].blockData` 持有
-   - 当 chunk 被卸载后，它接管该 chunk 的逻辑真相
+2. **Chunk 运行时视图层**
+   - 持有者：`Chunk.blockData`
+   - 语义：指向 world-level `blockData` 中当前 chunk slice 的运行时访问入口
+   - 允许写：可以，但写入必须直接命中 world-level authority
+   - 生命周期：随 chunk 加载/卸载而出现/消失
 
-这意味着：
+状态切换规则：
 
-- `MemoryWorldStore` 不能删除
-- 但它不再被视为“另一套并行权威模型”
-- 它应被重新定义为“未加载 chunk 的 `blockData` 容器 + 世界级索引”
+- `load`：创建 chunk 实例视图
+- `unload`：销毁 chunk 实例视图
+- world-level `blockData` 全程不发生“转移持有者”
 
-### 4.3 冷存储退出运行时权威判断
+### 5.3 删除 `MemoryWorldStore`
 
-`IndexedDB` 在目标模型中只负责：
+本设计的目标态中：
 
-- 启动时读入旧档
-- 手动保存或后台异步落盘
-- 刷新页面后的恢复来源
+- 不保留 `MemoryWorldStore`
+- 不保留“loaded / unloaded 双 holder”模型
+- 不保留任何“卸载前把权威同步到另一个内存层”的语义
 
-运行时正确性不再依赖：
+需要留下来的能力只有：
+
+- world-level `blockData`
+- world-level chunk record 索引
+- chunk 视图的加载和释放
+
+### 5.4 冷存储完全退出本阶段主链路
+
+本阶段 runtime 正确性不再依赖：
 
 - `WorldRuntime.blockDataSnapshot`
 - `PersistenceService.cache`
 - `pendingUnloadFlushQueue`
 - `PersistenceWorker.regionCache`
+- `WorldStore.commitChunkRecord()`
 
-## 5. Target Layering
+`IndexedDB`、`PersistenceService`、`WorldStore`、`PersistenceWorker` 在本阶段统一视为：
 
-### 5.1 权威逻辑层
+- 延后恢复的冷存储能力
+- 暂不作为 runtime 改造的阻塞条件
 
-- `Chunk.blockData`
-- `MemoryWorldStore.chunks[].blockData`
+## 6. Target Layering
 
-语义：世界逻辑真相，只在 loaded / unloaded 两种状态下切换持有者。
+### 6.1 权威逻辑层
 
-### 5.2 渲染索引层
+- world-level `blockData authority`
+
+语义：世界逻辑真相的唯一持有者，独立于 chunk 生命周期。
+
+### 6.2 渲染索引层
 
 - `Chunk.visibleKeys`
 
 语义：当前是否应显示、是否参与补面与可见块更新。
 
-### 5.3 碰撞索引层
+### 6.3 碰撞索引层
 
 - `Chunk.solidBlocks`
 
 语义：当前是否是实心块、是否参与碰撞和物理查询。
 
-### 5.4 高频查询索引层
+### 6.4 高频查询索引层
 
 - `Chunk.blockDataArray`
 - `Chunk.solidBlockIds`
@@ -148,7 +190,23 @@
 
 语义：服务 chunk 内高频 `isSolid` / `resolveBlockOwner` / 局部块访问，不承担权威职责。
 
-### 5.5 渲染载荷层
+需要特别确认保留：
+
+- `Chunk.visibleKeys`
+- `Chunk.solidBlocks`
+- `Chunk.blockDataArray`
+- `Chunk.solidBlockIds`
+
+这四类结构在新设计中仍然有明确价值：
+
+- `visibleKeys`：可见性与补面判断
+- `solidBlocks`：碰撞与实心判定
+- `blockDataArray`：chunk 内紧凑数组快路径
+- `solidBlockIds`：配合数组路径做 O(1) 实心判断
+
+它们都应继续存在，只是语义上必须严格降级为**派生索引 / 高速查询缓存**。
+
+### 6.5 渲染载荷层
 
 - Worker `meshData`
 - `Chunk.instanceIndexMap`
@@ -157,7 +215,7 @@
 
 语义：面向渲染提速和 GPU 输出。
 
-### 5.6 光照与一致性保护层
+### 6.6 光照与一致性保护层
 
 - `Chunk.lightSourceCoords`
 - `Chunk.dirtyAOPositions`
@@ -166,18 +224,36 @@
 
 语义：AO / 光照增量刷新与晚到回包保护。
 
-### 5.7 实体与冷存储层
+### 6.7 实体层
 
 - `runtimeEntities`
 - `staticEntities`
 - `entityCollisionIndex`
-- `IndexedDB`
+- `specialEntitiesShadowStore`
 
-语义：实体域权威与冷存储。
+语义：实体域权威与碰撞域，不混入普通块逻辑真相。
 
-## 6. Target Data Flow
+## 7. Target Data Flow
 
-### 6.1 单块修改
+### 7.1 世界生成
+
+目标链路：
+
+```text
+WorldGenerationService / WorldWorker
+-> 产出 chunkRecord.blockData
+-> 直接写入 world-level blockData authority
+-> 若 chunk 当前已加载，则 hydrate 到 Chunk.blockData
+-> 从 blockData 派生可见性 / mesh / AO
+```
+
+关键约束：
+
+- 生成结果首先是 `blockData`
+- 不通过 `PersistenceService.cache`
+- 不为“未来存档”额外维护第二条热路径
+
+### 7.2 单块修改
 
 目标链路：
 
@@ -185,190 +261,200 @@
 WorldAccessLayer.setBlock/removeBlock
 -> Chunk._updateBlockState()
 -> 修改 Chunk.blockData
+-> 同步写入 world-level blockData authority
 -> 增量更新 visibleKeys / solidBlocks / blockDataArray / lightSourceCoords / dirtyAOPositions / renderDelta
 -> AOBridge / tombstones 同步
--> MemoryWorldStore.applyBlockMutation()
--> 标记冷存储落盘脏块（仅标脏，不构造快照）
+-> 仅标记 chunk runtime dirty
 ```
 
 关键约束：
 
-- 真相先改 `Chunk.blockData`
-- `MemoryWorldStore` 只做 unloaded 接班准备
+- 真相先改 `blockData`
+- `Chunk.blockData` 只是世界级权威的 chunk 访问入口
 - 不再构造完整 `blockDataSnapshot`
+- 不再为了持久化链路即时 clone 整个 chunkRecord
 
-### 6.2 Chunk 加载
+### 7.3 Chunk 加载
 
 目标链路：
 
 ```text
 World 请求 chunk
--> 先查 MemoryWorldStore.getChunkRecord()
--> miss 时回源冷存储或生成器
--> 回源结果先写入 MemoryWorldStore
--> Chunk.loadFromRecord()
--> Chunk.blockData 接管为 loaded 权威
+-> 先查 world-level blockData authority / chunk record 索引
+-> miss 时回源生成器
+-> 回源结果直接写入 world-level blockData
+-> Chunk.loadFromRecord() / createChunkView()
 -> 从 blockData 重建 blockDataArray / solidBlocks / solidBlockIds / lightSourceCoords
--> Worker 计算 visibleKeys / meshData / AO
--> Worker 回包只更新派生层
+-> Worker 只计算派生层
 ```
 
 关键约束：
 
 - Worker 不能直接改写逻辑真相
-- `Chunk.blockData` 在加载完成后成为唯一活跃逻辑权威
+- `Chunk.blockData` 不是第二权威，而是权威数据的 chunk 视图
 
-### 6.3 Chunk 卸载
+### 7.4 Chunk 卸载
 
 目标链路：
 
 ```text
-World.beforeChunkUnloadSync()
--> 用当前 Chunk.blockData / runtimeEntities / staticEntities 覆盖 MemoryWorldStore 中对应记录
+World.unloadChunk()
 -> 释放 visibleKeys / solidBlocks / blockDataArray / meshData / instanceIndexMap / dynamicMeshes
--> 标记冷存储落盘脏块
+-> 销毁 chunk 实例视图
 ```
 
 关键约束：
 
-- 卸载后仍能 reload 恢复
-- 不再依赖 `pendingUnloadFlushQueue`
+- unload 不再承担权威同步动作
+- unload 后 reload 必须仍从 world-level `blockData` 恢复
+- 本阶段不要求同步写盘
 
-### 6.4 Reload / 刷新恢复
+### 7.5 JSON 导入 / 导出
 
-目标链路：
+本阶段结论：
 
-```text
-启动
--> 从 IndexedDB 读取 chunkRecord / regionRecord
--> 导入 MemoryWorldStore
--> runtime streaming 时从 MemoryWorldStore 读取
--> Chunk.loadFromRecord() 接管 loaded 权威
-```
+- **推迟实现**
+- 文档只保留约束，不把它放进第一阶段交付门槛
 
-关键约束：
+未来恢复时应满足：
 
-- 先建立世界级内存视图，再进入 runtime streaming
-- 导入 JSON 存档时走 MemoryWorldStore，而不是先走 PersistenceService.cache
+- 导入先写 world-level `blockData`
+- 已加载 chunk 再从 world-level `blockData` 覆盖刷新
+- 导出直接从 world-level `blockData` 统一读取
 
-### 6.5 手动保存
+## 8. 写入口清单
 
-目标链路：
+以下所有路径都必须纳入统一改造，不允许遗漏：
 
-```text
-保存前先把所有 loaded chunk 同步回 MemoryWorldStore
--> collectSnapshot() 直接从 MemoryWorldStore 读取
--> 生成 saveData
--> 可选异步落盘到 IndexedDB
-```
+1. `addBlockDynamic()`
+2. `addBlocksBatchFast()`
+3. `removeBlocksBatch()`
+4. `Chunk._updateBlockState()`
+5. `Chunk.acceptScatteredBlocks()`
+6. `Chunk.appendScatteredBlocks()`
+7. `Chunk.loadFromRecord()` / `_injectBlockData()`
+8. `WorldGenerationService` 写入生成结果的路径
+9. 未来 `applySaveData()` / import 路径
 
-关键约束：
+统一原则：
 
-- 导出文件不依赖当前 `IndexedDB` 状态
-- `collectSnapshot()` 不再逐 chunk 回查 `worldStore.getChunkRecord()`
+- 所有逻辑修改必须先触达 `blockData`
+- 索引层只能被 `blockData` 驱动更新
+- 不允许索引层反向决定逻辑真相
 
-## 7. Component Responsibilities After Migration
+## 9. 复制与序列化边界
 
-### 7.1 `Chunk`
+这次改造必须把“什么时候允许 clone”写成硬约束，否则只会把性能问题换位置。
 
-保留职责：
+### 9.1 允许 clone 的边界
 
-- 持有 loaded chunk 的 `blockData`
-- 维护所有查询 / 渲染派生层
-- 在单块编辑时驱动派生层增量更新
-- 对 AO / Face Culling / render delta 负责
+- Worker `postMessage`
+- 测试断言快照
+- 未来真正导出存档时
 
-调整职责：
+### 9.2 不允许全量 clone 的热路径
 
-- `blockData` 注释更新为“完整逻辑块集合”
-- 不再承担持久化快照链的协调逻辑
+- 单块修改
+- 批量改单块
+- `markChunkDirty()`
+- `saveDebounced()`
+- 普通运行中的 AO / FaceCulling 派生刷新
+- chunk unload
 
-### 7.2 `MemoryWorldStore`
+### 9.3 API 边界约束
 
-保留职责：
+- world-level `blockData` 的读取接口默认应返回只读视图或约定不可变结果
+- 需要高性能时，应优先提供“取 chunk slice 视图”“同步指定字段”“直接挂载 chunk view”的 API
+- `Chunk.loadFromRecord()` 必须明确输入是“权威视图”还是“保护性快照”，不能混用
 
-- 世界级 chunk 索引
-- 已知世界块数据的内存持有
-- chunk unload 后的逻辑状态承接
-- 手动保存与刷新恢复的统一读取入口
+## 10. Bootstrap / Import / Export Strategy
 
-调整职责：
+### 10.1 本阶段 bootstrap
 
-- 语义从“并行运行时权威”收窄为“未加载 chunk 的 `blockData` 容器”
-- `dirtyChunks` 只为冷存储落盘服务
+本阶段推荐最小闭环：
 
-### 7.3 `WorldRuntime`
+1. 启动游戏
+2. 需要 chunk 时先查 world-level `blockData`
+3. 没有则走生成器
+4. 生成结果直接写 world-level `blockData`
+5. loaded chunk 从 world-level `blockData` hydrate
 
-保留职责：
+### 10.2 本阶段不恢复的能力
 
-- 冷读取协调
-- 旧档导入辅助
-- region 预取辅助
-- 冷写入调度
+- 不要求冷启动从 IndexedDB 批量导入
+- 不要求手动导入 JSON
+- 不要求手动导出 JSON
 
-删除或退出主链路的职责：
+这些能力等 runtime 架构稳定后再恢复，成本更低，也更不容易反复返工。
 
-- runtime 期间完整 `blockDataSnapshot` 维护
-- `flushChunk()` 参与运行时正确性
-- `pendingUnloadFlushQueue`
+### 10.3 将来恢复持久化时的接入点
 
-### 7.4 `PersistenceService` / `WorldStore` / `PersistenceWorker`
+- world-level `blockData` 是唯一导入入口
+- world-level `blockData` 是唯一导出来源
+- 持久化层永远不得再次插入 runtime 正确性主链路
 
-保留职责：
+## 11. 测试迁移矩阵
 
-- 冷存储读写
-- 旧档兼容转换
-- 手动保存或后台落盘
+### 11.1 必须新增的 invariant
 
-退出职责：
+1. loaded chunk 修改后，world-level `blockData` 是唯一立即可见真相
+2. chunk unload 后，reload 恢复的数据与 unload 前一致
+3. 世界生成结果直接进入 world-level `blockData`
+4. 不构造 `blockDataSnapshot` 仍能保持 runtime 正确性
+5. `visibleKeys`、`solidBlocks`、`blockDataArray`、`solidBlockIds` 保持原职责
 
-- runtime 主链路权威读取
-- 运行时 blockData snapshot cache
+### 11.2 需要改写的旧测试
 
-## 8. Migration Strategy
+- 任何把 `flushChunk()`、`blockDataSnapshot`、`PersistenceService.cache` 当作 runtime 正确性前提的测试
+- 任何把 `MemoryWorldStore`、parked holder 或 unload 接班同步当成目标语义的测试
+
+### 11.3 仍应保留的测试
+
+- 旧档迁移测试可暂时保留但降级为 deferred
+- AO / tombstone / late worker result 防护测试必须保留
+- `acceptScatteredBlocks` / `appendScatteredBlocks` 对隐藏块和跨 chunk 块的正确性测试必须保留
+
+## 12. Migration Strategy
 
 ### Phase 1: 语义收敛
 
-- 更新 `Chunk.blockData` 与 `MemoryWorldStore` 的职责定义
-- 不改现有功能行为
+- 把文档和注释全部收敛到“world-level `blockData` 唯一权威”语义
+- 删除 `MemoryWorldStore` 的目标地位
+- 建立 `Chunk.blockData` 作为 chunk 视图的语义
 
-### Phase 2: 去掉 runtime blockData 快照链
+### Phase 2: 统一所有 blockData 写入口
+
+- 穷尽写入口清单
+- 统一修改顺序为：`blockData -> 派生索引 -> 异步派生系统`
+- 移除任何从索引层反推权威层的路径
+
+### Phase 3: 去掉 runtime blockData 快照链
 
 - 收缩 `WorldRuntime.recordBlockMutation()`
 - 停止构建完整 `blockDataSnapshot`
-- `saveDebounced()` 只标记冷存储脏块
+- `saveDebounced()` 只保留 runtime dirty 标记或直接去除其持久化职责
 
-### Phase 3: 保存与导入改读内存权威
+### Phase 4: 推迟存档层实现
 
-- `Game.collectSnapshot()` 改从 `MemoryWorldStore` 读取
-- `Game.applySaveData()` 改直接写 `MemoryWorldStore`
+- `PersistenceService` / `WorldStore` / `PersistenceWorker` 标记为 deferred
+- 等 runtime 架构稳定后，再基于 world-level `blockData` 恢复导入导出
 
-### Phase 4: 收缩旧持久化缓存层
+## 13. Risks
 
-- deprecated `PersistenceService.cache`
-- deprecated `pendingUnloadFlushQueue`
-- 将 `WorldRuntime` 明确降级为冷存储协调器
-
-### Phase 5: 真正评估消息粒度 / 持久化粒度优化
-
-- 区分 `postMessage` 消息体成本与 `IndexedDB.put(regionRecord)` 结构化复制成本
-- 再决定是否推进 chunk 级持久化
-
-## 9. Risks
-
-1. 若过早删除 `PersistenceWorker.regionCache`，旧档冷启动可能退化
-2. 若 `collectSnapshot()` 改读内存后未先同步 loaded chunk，手动保存会漏最新修改
-3. 若错误地删除 `deletedBlockTombstones`，会重新引入晚到 Worker 回包脏写
-4. 若把特殊实体占位强塞进普通 `blockData`，会污染块语义与索引层
+1. 若 world-level `blockData` 实际上仍只是 `Chunk.blockData` 的拷贝集合，而不是唯一权威，则会重新引入双写与同步歧义
+2. 若只改单块修改路径，漏掉 scatter / batch / generation 等写入口，最终仍会存在双语义
+3. 若未明确 clone 边界，只会把深拷贝热点从 `WorldRuntime` 转移到新的 authority API
+4. 若错误地删除 `deletedBlockTombstones`，会重新引入晚到 Worker 回包脏写
 5. 若误把 `blockDataArray` / `solidBlockIds` 当成多余权威副本删除，会导致高频查询性能回退
 
-## 10. Success Criteria
+## 14. Success Criteria
 
 改造完成后，应满足以下判断：
 
-1. 已加载 chunk 的逻辑真相只在 `Chunk.blockData`
-2. 未加载 chunk 的逻辑真相只在 `MemoryWorldStore.chunks[].blockData`
-3. `visibleKeys` / `solidBlocks` / `blockDataArray` 只作为派生索引存在
-4. runtime 正确性不再依赖任何 `blockDataSnapshot` / unload flush queue / PersistenceService.cache
-5. `collectSnapshot()` 与 `applySaveData()` 不再依赖 `worldStore.getChunkRecord()` 或 `PersistenceService.injectSaveData()`
-6. `IndexedDB` 只承担冷存储职责
+1. runtime 中逻辑真相只认 world-level `blockData`
+2. `Chunk.blockData` 只是 chunk 视图，不再是第二权威
+3. 世界生成结果直接写入 world-level `blockData`
+4. chunk unload 不再承担权威同步动作
+5. runtime 正确性不再依赖任何 `blockDataSnapshot` / unload flush queue / `PersistenceService.cache`
+6. `visibleKeys`、`solidBlocks`、`blockDataArray`、`solidBlockIds` 继续存在，但只作为派生索引或高速查询缓存
+7. 持久化层即使暂时缺席，也不影响 runtime 正确性
