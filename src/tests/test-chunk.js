@@ -1542,4 +1542,91 @@ describe('Chunk 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  // =========== AO 热路径回归测试 ===========
+
+  test('_refreshAOFromStableSource 非 fullRefresh 不应调用 fullSync', () => {
+    setupEnvironment();
+
+    // Mock aoBridge 以记录调用
+    const mockFullSyncCalls = [];
+    const mockFlushCalls = [];
+    const originalAoBridge = globalThis._aoBridge;
+    globalThis._aoBridge = {
+      fullSync(chunkKey, blockData) {
+        mockFullSyncCalls.push({ chunkKey, blockDataSize: blockData?.size });
+      },
+      flush() {
+        mockFlushCalls.push(true);
+      }
+    };
+
+    try {
+      const world = createMockWorld();
+      const chunk = new Chunk(0, 0, world);
+      chunk.worldY = 0;
+
+      // 添加方块数据（模拟已 finalize 的 chunk）
+      chunk.addBlockDynamic(5, 5, 5, 'stone', 0);
+      chunk.addBlockDynamic(6, 5, 5, 'dirt', 0);
+
+      // 设置 chunk 为就绪状态
+      chunk.isReady = true;
+
+      // 模拟边界刷新：只标记少量脏位置
+      chunk.dirtyAOPositions.add(Chunk.encodeCoord(5, 5, 5));
+
+      // 非 fullRefresh 路径（邻居边界/角点传播）
+      chunk._refreshAOFromStableSource({});
+
+      // fullSync 不应被调用（Worker 已有该 chunk 的缓存）
+      assertEqual(mockFullSyncCalls.length, 0,
+        '非 fullRefresh 路径不应调用 fullSync');
+
+      // flush 仍应被调用（_executeAORefresh 中发送增量 delta）
+      assertTrue(mockFlushCalls.length >= 1,
+        '_executeAORefresh 应调用 flush 发送增量变更');
+
+    } finally {
+      if (originalAoBridge === undefined) delete globalThis._aoBridge;
+      else globalThis._aoBridge = originalAoBridge;
+      teardownEnvironment();
+    }
+  });
+
+  test('_refreshAOFromStableSource fullRefresh=true 应调用 fullSync', () => {
+    setupEnvironment();
+
+    const mockFullSyncCalls = [];
+    const originalAoBridge = globalThis._aoBridge;
+    globalThis._aoBridge = {
+      fullSync(chunkKey, blockData) {
+        mockFullSyncCalls.push({ chunkKey, blockDataSize: blockData?.size });
+      },
+      flush() {}
+    };
+
+    try {
+      const world = createMockWorld();
+      const chunk = new Chunk(0, 0, world);
+      chunk.worldY = 0;
+
+      chunk.addBlockDynamic(5, 5, 5, 'stone', 0);
+      chunk.isReady = true;
+
+      // fullRefresh=true 路径（chunk 首次 finalize / consolidation 后）
+      chunk._refreshAOFromStableSource({ fullRefresh: true });
+
+      // fullSync 必须被调用（建立 Worker 缓存）
+      assertEqual(mockFullSyncCalls.length, 1,
+        'fullRefresh=true 路径必须调用 fullSync');
+      assertEqual(mockFullSyncCalls[0].chunkKey, '0,0',
+        'fullSync 应传入正确的 chunkKey');
+
+    } finally {
+      if (originalAoBridge === undefined) delete globalThis._aoBridge;
+      else globalThis._aoBridge = originalAoBridge;
+      teardownEnvironment();
+    }
+  });
+
 });

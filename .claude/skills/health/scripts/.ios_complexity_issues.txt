@@ -1,0 +1,16 @@
+SEVERITY:P1|FILE:total|LINE:N/A|ISSUE:文件过大|DETAIL:74560行|SUGGEST:按功能拆分模块
+SEVERITY:P1|FILE:Src/View/RootView/TRIPHomeViewController.m|LINE:N/A|ISSUE:文件过大|DETAIL:5170行|SUGGEST:按功能拆分模块
+SEVERITY:P1|FILE:Src/Page/Data/TRIPHomeDataHelper/TRIPHomeDataHelper.m|LINE:N/A|ISSUE:文件过大|DETAIL:4660行|SUGGEST:按功能拆分模块
+SEVERITY:P1|FILE:Src/Page/Data/TRIPHomeDataHelper/Biz/TRIPHomeDataHelper+SplashScreen.m|LINE:N/A|ISSUE:文件过大|DETAIL:1978行|SUGGEST:按功能拆分模块
+SEVERITY:P1|FILE:Src/Page/Biz/Splash/FliggyCacheSplashScreenPageController.m|LINE:N/A|ISSUE:文件过大|DETAIL:1575行|SUGGEST:按功能拆分模块
+SEVERITY:P1|FILE:Src/View/RootView/TRIPHomeViewController+Category/DX/DXWidget/TRIPHomeViewController+DX.m|LINE:N/A|ISSUE:文件过大|DETAIL:1164行|SUGGEST:按功能拆分模块
+SEVERITY:P1|FILE:Src/Page/TRIPHomeViewController/HomeMultiPageContainer/BaseData/BaseHomeDXHelper.m|LINE:N/A|ISSUE:文件过大|DETAIL:1088行|SUGGEST:按功能拆分模块
+SEVERITY:P1|FILE:Src/View/RootView/TRIPHomeViewController+Category/Other/TRIPHomeViewController+Additional.m|LINE:N/A|ISSUE:文件过大|DETAIL:1080行|SUGGEST:按功能拆分模块
+SEVERITY:P1|FILE:Src/View/H5Container/FliggyH5TabController.m|LINE:N/A|ISSUE:文件过大|DETAIL:1019行|SUGGEST:按功能拆分模块
+SEVERITY:P1|FILE:Src/Page/TRIPHomeViewController/HomeMultiPageContainer/DestinationTab/DestinationTabDataHelper/FliggyDestinationTabDataHelper+Category/Data/Request/FliggyDestinationTabDataHelper+Request.m|LINE:N/A|ISSUE:文件过大|DETAIL:998行|SUGGEST:按功能拆分模块
+SEVERITY:P1|FILE:Src/Page/Utility/TRIPHomeOrangeHelper.m|LINE:N/A|ISSUE:文件过大|DETAIL:978行|SUGGEST:按功能拆分模块
+SEVERITY:P1|FILE:Src/Page/UI/CustomView/TRIPHomeTitleBarView/TRIPHomeTitleBarView.m|LINE:N/A|ISSUE:文件过大|DETAIL:975行|SUGGEST:按功能拆分模块
+SEVERITY:P1|FILE:Src/View/RootView/TRIPHomeViewController+Category/TopViews/TRIPHomeViewController+TopView.m|LINE:N/A|ISSUE:文件过大|DETAIL:949行|SUGGEST:按功能拆分模块
+SEVERITY:P1|FILE:Src/Page/UI/DXComponent/CustomDinamicComponents/DXFliggyInspire/FliggyInspire.m|LINE:N/A|ISSUE:文件过大|DETAIL:936行|SUGGEST:按功能拆分模块
+SEVERITY:P1|FILE:Src/Track/TRIPHomeTrackManager.m|LINE:N/A|ISSUE:文件过大|DETAIL:929行|SUGGEST:按功能拆分模块
+SEVERITY:P2|FILE:头文件整体|LINE:N/A|ISSUE:前向声明不足|DETAIL:仅      48/     317使用@class|SUGGEST:在.h中使用@class减少依赖

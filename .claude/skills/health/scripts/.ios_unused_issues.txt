@@ -1,0 +1,11 @@
+SEVERITY:P2|FILE:项目整体|LINE:N/A|ISSUE:有注释掉的代码|DETAIL:      16处|SUGGEST:清理废弃代码
+SEVERITY:P2|FILE:Src/ViewModel/FliggyHomeRecommandViewModel+WebCache.h|LINE:32|ISSUE:疑似废弃代码(注释)|DETAIL:|SUGGEST:清理或恢复使用
+SEVERITY:P2|FILE:Src/Page/UI/TopView/HeaderCard/widgetNode/DXFliggyCalendarBtnWidgetNode.m|LINE:24|ISSUE:疑似废弃代码(注释)|DETAIL:|SUGGEST:清理或恢复使用
+SEVERITY:P2|FILE:Src/Page/UI/TopView/HeaderCard/widgetNode/DXFliggyCalendarBtnWidgetNode.m|LINE:64|ISSUE:疑似废弃代码(注释)|DETAIL:|SUGGEST:清理或恢复使用
+SEVERITY:P2|FILE:Src/Page/UI/DXComponent/EventHandler/FHomeEvent_EventHandler.m|LINE:50|ISSUE:疑似废弃代码(注释)|DETAIL:|SUGGEST:清理或恢复使用
+SEVERITY:P2|FILE:Src/Page/UI/DXComponent/EventHandler/TRIPOnPoiTabClickEventHandler.m|LINE:57|ISSUE:疑似废弃代码(注释)|DETAIL:|SUGGEST:清理或恢复使用
+SEVERITY:P2|FILE:Src/Page/UI/DXComponent/EventHandler/FResumeVideoView_EventHandler.m|LINE:33|ISSUE:疑似废弃代码(注释)|DETAIL:|SUGGEST:清理或恢复使用
+SEVERITY:P2|FILE:Src/Page/UI/DXComponent/EventHandler/Frefresh_EventHandler.m|LINE:28|ISSUE:疑似废弃代码(注释)|DETAIL:|SUGGEST:清理或恢复使用
+SEVERITY:P2|FILE:Src/Page/UI/DXComponent/CustomDinamicComponents/DXFliRemoteFontTextView/DXFliRemoteFontTextViewWidgetNode.m|LINE:27|ISSUE:疑似废弃代码(注释)|DETAIL:|SUGGEST:清理或恢复使用
+SEVERITY:P2|FILE:Src/Page/UI/DXComponent/CustomDinamicComponents/DXLottieView/DXFliggyLottieViewWidgetNode.m|LINE:37|ISSUE:疑似废弃代码(注释)|DETAIL:|SUGGEST:清理或恢复使用
+SEVERITY:P2|FILE:Src/Page/Biz/Upgrade/TRIPUpgradeHelper.m|LINE:350|ISSUE:疑似废弃代码(注释)|DETAIL:|SUGGEST:清理或恢复使用

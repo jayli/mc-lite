@@ -34,6 +34,7 @@ const getFaceCullingSystem = () => globalThis._faceCullingSystem || faceCullingS
 const getMaterials = () => globalThis._materials || materials;
 const getCarModel = () => globalThis._carModel || carModel;
 const getGunManModel = () => globalThis._gunManModel || gunManModel;
+const getAOBridge = () => globalThis._aoBridge || aoBridge;
 
 // 获取方块属性函数 - 优先使用测试环境的模拟
 const getBlockProps = createBlockPropsResolver(getBlockProperties);
@@ -1598,29 +1599,130 @@ export class Chunk {
    * @param {boolean} [options.fullRefresh=false] - 是否全量刷新（标记所有方块为脏）
    */
   _refreshAOFromStableSource(options = {}) {
-    if (options.fullRefresh) {
-      this._markAllBlocksDirtyAO();
-    }
+    const startedAt = performance.now();
+    let markMs = 0;
+    let fullSyncMs = 0;
 
-    // 全量同步 AO Worker 副本（chunk 首次稳定 / consolidation 后）
-    aoBridge.fullSync(`${this.cx},${this.cz}`, this.blockData);
+    if (options.fullRefresh) {
+      const markStartedAt = performance.now();
+      this._markAllBlocksDirtyAO();
+      markMs = performance.now() - markStartedAt;
+
+      // 全量同步 AO Worker 副本（chunk 首次稳定 / consolidation 后）
+      // 边界/角点刷新跳过 fullSync：Worker 已有该 chunk 的缓存数据
+      const syncStartedAt = performance.now();
+      getAOBridge().fullSync(`${this.cx},${this.cz}`, this.blockData);
+      fullSyncMs = performance.now() - syncStartedAt;
+    }
 
     if (this.aoRefreshTimer) {
       clearTimeout(this.aoRefreshTimer);
       this.aoRefreshTimer = null;
     }
     this._executeAORefresh();
+
+    recordChunkPerf('chunk.ao-refresh.source-stable', performance.now() - startedAt, {
+      chunkKey: `${this.cx},${this.cz}`,
+      fullRefresh: options.fullRefresh === true,
+      dirtyAO: this.dirtyAOPositions?.size || 0,
+      markMs,
+      fullSyncMs,
+      reason: options.reason || 'unknown'
+    });
+  }
+
+  /**
+   * 判定方块条目是否需要 AO 计算（实心且不透明）
+   * @param {*} entry - blockData 中的条目
+   * @returns {boolean}
+   */
+  _isAOApplicableEntry(entry) {
+    if (!entry) return false;
+    const type = typeof entry === 'string' ? entry : entry.type;
+    if (!type) return false;
+    const props = getBlockProps(type);
+    return props.isSolid && !props.isTransparent;
+  }
+
+  /**
+   * 从 instanceIndexMap / visibleKeys 收集所有可见实例的编码坐标
+   * 优先使用 instanceIndexMap，回退到 visibleKeys
+   * @returns {Set<number>}
+   */
+  _collectVisibleAOInstanceCodes() {
+    const codes = new Set();
+
+    const collectFromTypeMap = (typeMap) => {
+      if (!typeMap) return;
+      const entries = typeMap instanceof Map
+        ? typeMap.keys()
+        : Object.keys(typeMap);
+      for (const codeLike of entries) {
+        codes.add(Number(codeLike));
+      }
+    };
+
+    // instanceIndexMap: { type -> { code -> index } }
+    if (this.instanceIndexMap) {
+      const typeKeys = this.instanceIndexMap instanceof Map
+        ? this.instanceIndexMap.keys()
+        : Object.keys(this.instanceIndexMap);
+      for (const typeKey of typeKeys) {
+        const typeMap = this.instanceIndexMap instanceof Map
+          ? this.instanceIndexMap.get(typeKey)
+          : this.instanceIndexMap[typeKey];
+        if (!typeMap) continue;
+        collectFromTypeMap(typeMap);
+      }
+    }
+
+    if (codes.size === 0 && this.visibleKeys?.size > 0) {
+      for (const code of this.visibleKeys) {
+        codes.add(Number(code));
+      }
+    }
+
+    return codes;
+  }
+
+  /**
+   * 将可渲染的 AO 候选坐标加入脏集
+   * @param {number} code - 编码坐标
+   * @returns {boolean} 是否成功加入
+   */
+  _addDirtyAOIfRenderable(code) {
+    const entry = this.blockData.get(code);
+    if (!this._isAOApplicableEntry(entry)) return false;
+
+    if (this.visibleKeys?.size > 0 && !this.visibleKeys.has(code)) {
+      return false;
+    }
+
+    this.dirtyAOPositions.add(code);
+    return true;
   }
 
   /**
    * 标记所有实心不透明方块为 AO 脏位置
+   * 优先遍历可见实例（instanceIndexMap / visibleKeys），只标记 face culling 后的可见方块
    * 用于 chunk 首次加载后全量刷新（WorldWorker 生成的 AO 可能因缺少邻居数据而不准确）
    */
   _markAllBlocksDirtyAO() {
+    const visibleCodes = this._collectVisibleAOInstanceCodes();
+
+    if (visibleCodes.size > 0) {
+      for (const code of visibleCodes) {
+        const entry = this.blockData.get(code);
+        if (this._isAOApplicableEntry(entry)) {
+          this.dirtyAOPositions.add(code);
+        }
+      }
+      return;
+    }
+
+    // 兼容回退：没有可见索引时保留旧行为，优先保证正确性
     for (const [code, entry] of this.blockData) {
-      if (!entry) continue;
-      const type = typeof entry === 'string' ? entry : entry.type;
-      if (type && getBlockProps(type).isSolid && !getBlockProps(type).isTransparent) {
+      if (this._isAOApplicableEntry(entry)) {
         this.dirtyAOPositions.add(code);
       }
     }
@@ -1628,39 +1730,112 @@ export class Chunk {
 
   /**
    * 标记与指定邻居 chunk 相邻的边界方块为 AO 脏位
-   * 只刷新与新 chunk 接壤的那一列方块，而非整个 chunk
+   * 根据邻居方向直接生成边界影响带，不再扫描整个 blockDataArray
    * @param {number} neighborCx - 邻居 chunk 的 cx
    * @param {number} neighborCz - 邻居 chunk 的 cz
    */
   _markBoundaryDirtyAO(neighborCx, neighborCz) {
+    const startedAt = performance.now();
     const dx = neighborCx - this.cx;
     const dz = neighborCz - this.cz;
-    // 确定边界列：邻居在哪个方向，就取哪个方向的边界列
-    let boundaryX = null, boundaryZ = null;
-    if (dx === 1) boundaryX = this.cx * CHUNK_SIZE;        // 邻居在 +X 方向，取本地 X=0 列
-    else if (dx === -1) boundaryX = this.cx * CHUNK_SIZE + CHUNK_SIZE - 1; // 邻居在 -X 方向，取本地 X=15 列
-    if (dz === 1) boundaryZ = this.cz * CHUNK_SIZE;
-    else if (dz === -1) boundaryZ = this.cz * CHUNK_SIZE + CHUNK_SIZE - 1;
 
-    // 遍历数组存储的方块
-    for (let i = 0; i < this.blockDataArray.length; i++) {
-      const blockId = this.blockDataArray[i];
-      if (blockId === 0) continue;
-      if (!this.solidBlockIds.has(blockId)) continue;
+    const minX = this.cx * CHUNK_SIZE;
+    const maxX = minX + CHUNK_SIZE - 1;
+    const minZ = this.cz * CHUNK_SIZE;
+    const maxZ = minZ + CHUNK_SIZE - 1;
+    const minY = this.worldY;
+    const maxY = this.worldY + CHUNK_SIZE - 1;
 
-      const { x: lx, y: ly, z: lz } = Chunk.unpackBlockIndex(i);
-      const x = this.cx * CHUNK_SIZE + lx;
-      const y = this.worldY + ly;
-      const z = this.cz * CHUNK_SIZE + lz;
-      const code = Chunk.encodeCoord(x, y, z);
+    const xValues = [];
+    const zValues = [];
 
-      // 只标记边界列上的方块（±1 范围覆盖对角线）
-      const matchX = boundaryX !== null && Math.abs(x - boundaryX) <= 1;
-      const matchZ = boundaryZ !== null && Math.abs(z - boundaryZ) <= 1;
-      if (matchX || matchZ) {
-        this.dirtyAOPositions.add(code);
+    // 邻居在 +X 方向 → 刷新本 chunk 的 maxX / maxX-1 列（东侧边界）
+    if (dx === 1) { xValues.push(maxX, maxX - 1); }
+    // 邻居在 -X 方向 → 刷新本 chunk 的 minX / minX+1 列（西侧边界）
+    else if (dx === -1) { xValues.push(minX, minX + 1); }
+
+    // 邻居在 +Z 方向 → 刷新本 chunk 的 maxZ / maxZ-1 列（南侧边界）
+    if (dz === 1) { zValues.push(maxZ, maxZ - 1); }
+    // 邻居在 -Z 方向 → 刷新本 chunk 的 minZ / minZ+1 列（北侧边界）
+    else if (dz === -1) { zValues.push(minZ, minZ + 1); }
+
+    let marked = 0;
+
+    // 按 X 边界带生成候选
+    for (const x of xValues) {
+      for (let y = minY; y <= maxY; y++) {
+        for (let z = minZ; z <= maxZ; z++) {
+          if (this._addDirtyAOIfRenderable(Chunk.encodeCoord(x, y, z))) marked++;
+        }
       }
     }
+
+    // 按 Z 边界带生成候选
+    for (const z of zValues) {
+      for (let y = minY; y <= maxY; y++) {
+        for (let x = minX; x <= maxX; x++) {
+          if (this._addDirtyAOIfRenderable(Chunk.encodeCoord(x, y, z))) marked++;
+        }
+      }
+    }
+
+    // Y>15 安全网：visibleKeys 中可能存在 worldY+CHUNK_SIZE 之外的高层可见方块
+    if (this.visibleKeys?.size > 0) {
+      for (const code of this.visibleKeys) {
+        const { x, y, z } = Chunk.decodeCoord(code);
+        if (y <= maxY) continue; // 已在上面覆盖
+        const nearX = dx === 1 ? x >= maxX - 1 : dx === -1 ? x <= minX + 1 : false;
+        const nearZ = dz === 1 ? z >= maxZ - 1 : dz === -1 ? z <= minZ + 1 : false;
+        if ((nearX || nearZ) && this._addDirtyAOIfRenderable(code)) marked++;
+      }
+    }
+
+    recordChunkPerf('chunk.ao-refresh.mark-boundary', performance.now() - startedAt, {
+      chunkKey: `${this.cx},${this.cz}`,
+      neighborKey: `${neighborCx},${neighborCz}`,
+      marked
+    });
+  }
+
+  /**
+   * 标记对角邻居方向的小范围角点影响带为 AO 脏位
+   * AO 计算依赖 3x3x3 邻域，对角 chunk 后到达时角点也需要补刷新
+   * @param {number} neighborCx - 对角邻居 chunk 的 cx
+   * @param {number} neighborCz - 对角邻居 chunk 的 cz
+   */
+  _markCornerDirtyAO(neighborCx, neighborCz) {
+    const startedAt = performance.now();
+    const dx = neighborCx - this.cx;
+    const dz = neighborCz - this.cz;
+
+    const minX = this.cx * CHUNK_SIZE;
+    const maxX = minX + CHUNK_SIZE - 1;
+    const minZ = this.cz * CHUNK_SIZE;
+    const maxZ = minZ + CHUNK_SIZE - 1;
+    const minY = this.worldY;
+    const maxY = this.worldY + CHUNK_SIZE - 1;
+
+    // 确定角点 X/Z 范围（2x2 带）
+    const xStart = dx === 1 ? maxX - 1 : minX;
+    const xEnd = dx === 1 ? maxX : minX + 1;
+    const zStart = dz === 1 ? maxZ - 1 : minZ;
+    const zEnd = dz === 1 ? maxZ : minZ + 1;
+
+    let marked = 0;
+
+    for (let x = xStart; x <= xEnd; x++) {
+      for (let z = zStart; z <= zEnd; z++) {
+        for (let y = minY; y <= maxY; y++) {
+          if (this._addDirtyAOIfRenderable(Chunk.encodeCoord(x, y, z))) marked++;
+        }
+      }
+    }
+
+    recordChunkPerf('chunk.ao-refresh.mark-corner', performance.now() - startedAt, {
+      chunkKey: `${this.cx},${this.cz}`,
+      neighborKey: `${neighborCx},${neighborCz}`,
+      marked
+    });
   }
 
   /**
@@ -1709,11 +1884,13 @@ export class Chunk {
     const sentCodes = new Set(this.dirtyAOPositions);
 
     // 收集脏位置
+    const collectStartedAt = performance.now();
     const positions = [...sentCodes].map(code => Chunk.decodeCoord(code));
+    const collectPositionsMs = performance.now() - collectStartedAt;
 
     // flush 所有积压的 delta，确保 Worker 副本是最新的
     // aoBridge 是全局单例，一次 flush 即发送所有 chunk 的待处理变更
-    aoBridge.flush();
+    getAOBridge().flush();
 
     // 收集邻居 chunk 标识（Worker 侧用 cacheKey 合并缓存数据）
     // 不再传全量 blockData，Worker 从缓存副本读取
@@ -1742,6 +1919,12 @@ export class Chunk {
       });
 
       // 发送给 Worker — 不再传全量 blockData
+      recordChunkPerf('chunk.ao-refresh.request', collectPositionsMs, {
+        chunkKey: `${this.cx},${this.cz}`,
+        positions: positions.length,
+        collectPositionsMs
+      });
+
       aoWorker.postMessage({
         requestId,
         chunkKey: `${this.cx},${this.cz}`,
@@ -1757,6 +1940,8 @@ export class Chunk {
    * @param {Array} results - [{x, y, z, aoLow, aoHigh}]
    */
   _applyAOResults(results, sentKeys) {
+    const applyStartedAt = performance.now();
+
     if (!results || results.length === 0) {
       // 即使无结果，也要清除已发送的脏标记
       if (sentKeys) {
@@ -1821,6 +2006,12 @@ export class Chunk {
     } else {
       this.dirtyAOPositions.clear();
     }
+
+    recordChunkPerf('chunk.ao-refresh.apply-results', performance.now() - applyStartedAt, {
+      chunkKey: `${this.cx},${this.cz}`,
+      results: results?.length || 0,
+      sentKeys: sentKeys?.size || 0
+    });
   }
 
   /**
@@ -2452,6 +2643,8 @@ export class Chunk {
   runDeferredFinalizePhase() {
     if (this.disposed || !this.hasDeferredFinalizeWork) return true;
 
+    let aoRefreshTriggeredThisPass = false;
+
     // 分帧恢复运行时实体：每帧最多恢复 MAX_ENTITIES_PER_FRAME 个
     if (this._needsDeferredRuntimeEntityRestore) {
       const MAX_ENTITIES_PER_FRAME = 3;
@@ -2506,6 +2699,7 @@ export class Chunk {
         markNeighborBoundaries: true,
         reason: 'deferred-finalize-ao-stable'
       });
+      aoRefreshTriggeredThisPass = true;
       this._needsDeferredAOStabilization = false;
     }
 
@@ -2515,8 +2709,8 @@ export class Chunk {
       this._needsDeferredAOStabilization
     );
 
-    // 所有延迟工作完成后，触发 AO 刷新
-    if (!this.hasDeferredFinalizeWork) {
+    // 所有延迟工作完成后，触发 AO 刷新（避免同一轮重复触发）
+    if (!this.hasDeferredFinalizeWork && !aoRefreshTriggeredThisPass) {
       this.world?.onChunkAOSourceStable?.(this, {
         fullRefresh: true,
         markNeighborBoundaries: true,

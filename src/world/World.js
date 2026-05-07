@@ -741,13 +741,29 @@ export class World {
       chunk._refreshAOFromStableSource?.({ fullRefresh });
     }
 
-    const dirs = [[1,0],[-1,0],[0,1],[0,-1]];
-    for (const [dx, dz] of dirs) {
+    // 正交邻居：共享边，需要刷新边界影响带
+    const orthogonalDirs = [[1,0],[-1,0],[0,1],[0,-1]];
+    for (const [dx, dz] of orthogonalDirs) {
       const nChunk = this.chunks.get(`${chunk.cx + dx},${chunk.cz + dz}`);
       if (!nChunk) continue;
 
       if (markNeighborBoundaries) {
         nChunk._markBoundaryDirtyAO?.(chunk.cx, chunk.cz);
+      }
+
+      if (nChunk.isReady && !nChunk.isConsolidating && nChunk.dirtyAOPositions?.size > 0) {
+        nChunk._refreshAOFromStableSource?.();
+      }
+    }
+
+    // 对角邻居：AO 计算依赖 3x3x3 邻域，角点处也需要补刷新
+    const diagonalDirs = [[1,1],[1,-1],[-1,1],[-1,-1]];
+    for (const [dx, dz] of diagonalDirs) {
+      const nChunk = this.chunks.get(`${chunk.cx + dx},${chunk.cz + dz}`);
+      if (!nChunk) continue;
+
+      if (markNeighborBoundaries) {
+        nChunk._markCornerDirtyAO?.(chunk.cx, chunk.cz);
       }
 
       if (nChunk.isReady && !nChunk.isConsolidating && nChunk.dirtyAOPositions?.size > 0) {

@@ -1,0 +1,11 @@
+SEVERITY:P2|FILE:项目整体|LINE:N/A|ISSUE:TODO/FIXME较多|DETAIL:      44处|SUGGEST:定期review并处理
+SEVERITY:P2|FILE:Src/ViewModel/FliggyHomeBaseViewModel.h|LINE:71|ISSUE:TODO/FIXME标记|DETAIL:|SUGGEST:review并处理
+SEVERITY:P2|FILE:Src/ViewModel/FliggyHomeBaseViewModel.m|LINE:121|ISSUE:TODO/FIXME标记|DETAIL:|SUGGEST:review并处理
+SEVERITY:P2|FILE:Src/Page/UI/TopView/HeaderCard/FliggyHomeHeaderCardTapEvent.m|LINE:68|ISSUE:TODO/FIXME标记|DETAIL:|SUGGEST:review并处理
+SEVERITY:P2|FILE:Src/Page/UI/TopView/HeaderCard/FliggyHomeHeaderCardManager.m|LINE:127|ISSUE:TODO/FIXME标记|DETAIL:|SUGGEST:review并处理
+SEVERITY:P2|FILE:Src/Page/UI/TopView/HeaderCard/FliggyHomeHeaderCardManager.m|LINE:141|ISSUE:TODO/FIXME标记|DETAIL:|SUGGEST:review并处理
+SEVERITY:P2|FILE:Src/Page/UI/TopView/HeaderCard/FliggyHomeHeaderCardManager.m|LINE:149|ISSUE:TODO/FIXME标记|DETAIL:|SUGGEST:review并处理
+SEVERITY:P2|FILE:Src/Page/UI/DXComponent/CustomDinamicComponents/FGuesslikeTabIndicatorLayoutView/TRIPHomeIndicatorLayoutView2021/TRIPHomeIndicatorTab2021View.m|LINE:289|ISSUE:TODO/FIXME标记|DETAIL:|SUGGEST:review并处理
+SEVERITY:P2|FILE:Src/Page/UI/CustomView/TRIPHomeTitleBarView/TRIPHomeTitleBarView.m|LINE:769|ISSUE:TODO/FIXME标记|DETAIL:|SUGGEST:review并处理
+SEVERITY:P2|FILE:Src/Page/Biz/Splash/FliggyCacheSplashScreenPageController.m|LINE:1040|ISSUE:TODO/FIXME标记|DETAIL:|SUGGEST:review并处理
+SEVERITY:P2|FILE:Src/Page/Biz/Splash/TRIPWelcomePageController.m|LINE:398|ISSUE:TODO/FIXME标记|DETAIL:|SUGGEST:review并处理
