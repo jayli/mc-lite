@@ -418,6 +418,10 @@ export function extendChunk(Chunk) {
     // 保存宝箱状态
     const savedChestStates = this._saveChestStates();
 
+    // 提取旧 InstancedMesh 中的 AO 值（consolidation 重建会丢弃非脏方块的正确 AO）
+    const savedAO = this._extractOldAOForNonDirtyPositions();
+    const t5a = performance.now();
+
     // 清理旧网格
     this._cleanupOldMeshes(consolidatedMeshKeys);
     const t5 = performance.now();
@@ -425,6 +429,11 @@ export function extendChunk(Chunk) {
     // 构建新的渲染网格
     this.buildMeshes(meshData || []);
     const t6 = performance.now();
+
+    // 恢复非脏位置的旧 AO 值（跳过 dirtyAOPositions，交由 AO 刷新修正）
+    const t6a = performance.now();
+    this._restoreOldAOForNonDirtyPositions(savedAO);
+    const t6b = performance.now();
 
     // 恢复宝箱状态
     this._restoreChestStates(savedChestStates);
@@ -455,11 +464,14 @@ export function extendChunk(Chunk) {
       filterMs: t2 - t1,
       convertMeshDataMs: t3 - t2,
       syncVisibilityMs: t4 - t3,
-      cleanupOldMeshesMs: t5 - t4,
+      extractOldAOMs: t5a - t4,
+      cleanupOldMeshesMs: t5 - t5a,
       buildMeshesMs: t6 - t5,
-      restoreAndReindexMs: t7 - t6,
+      restoreOldAOMs: t6b - t6a,
+      restoreAndReindexMs: t7 - t6b,
       workerComputeMs: data?._workerTiming?.workerComputeMs,
-      dirtyBlocks: this.dirtyBlocks
+      dirtyBlocks: this.dirtyBlocks,
+      savedAOCount: savedAO?.size || 0
     });
   };
 
@@ -645,6 +657,154 @@ export function extendChunk(Chunk) {
           child.geometry.dispose();
         }
         this.group.remove(child);
+      }
+    }
+  };
+
+  /**
+   * 从旧 InstancedMesh 中提取所有可见方块的 AO 值
+   * 在 cleanupOldMeshes 之前调用，保存非脏方块已有的正确 AO
+   * 同时处理本地路径（group.children）和全局路径（GlobalInstancedMeshManager）
+   * @returns {Map<number, {aoLow: number, aoHigh: number}>} code → AO 值映射
+   */
+  Chunk.prototype._extractOldAOForNonDirtyPositions = function() {
+    const oldAO = new Map();
+    const gim = this.world?.globalInstancedMeshManager;
+
+    if (gim) {
+      // 全局路径：从 TypeBuffer 读取
+      const chunkKey = `${this.cx},${this.cz}`;
+      const coords = gim.chunkToCoords.get(chunkKey);
+      if (coords) {
+        for (const coord of coords) {
+          const ref = gim.coordToRef.get(coord);
+          if (!ref) continue;
+          const buffer = gim.buffers.get(ref.renderKey);
+          if (!buffer) continue;
+          const aoLowAttr = buffer.mesh.geometry.getAttribute('aAoLow');
+          const aoHighAttr = buffer.mesh.geometry.getAttribute('aAoHigh');
+          if (!aoLowAttr || !aoHighAttr) continue;
+          if (ref.index < aoLowAttr.array.length) {
+            oldAO.set(coord, {
+              aoLow: aoLowAttr.array[ref.index],
+              aoHigh: aoHighAttr.array[ref.index]
+            });
+          }
+        }
+      }
+    } else {
+      // 本地路径：从 group.children 的 InstancedMesh 读取
+      for (const child of this.group.children) {
+        if (!child.isInstancedMesh) continue;
+        const type = child.userData?.type;
+        if (!type) continue;
+        const aoLowAttr = child.geometry?.getAttribute('aAoLow');
+        const aoHighAttr = child.geometry?.getAttribute('aAoHigh');
+        if (!aoLowAttr || !aoHighAttr) continue;
+
+        let indexMap;
+        if (type === 'batched') {
+          const textureUrl = child.userData?.textureUrl;
+          indexMap = this.instanceIndexMap?.['batched_' + textureUrl];
+        } else {
+          indexMap = this.instanceIndexMap?.[type];
+        }
+        if (!indexMap) continue;
+
+        for (const [code, indexInfo] of indexMap) {
+          const idx = typeof indexInfo === 'object' ? indexInfo.index : indexInfo;
+          if (idx < aoLowAttr.array.length) {
+            oldAO.set(Number(code), {
+              aoLow: aoLowAttr.array[idx],
+              aoHigh: aoHighAttr.array[idx]
+            });
+          }
+        }
+      }
+    }
+
+    return oldAO;
+  };
+
+  /**
+   * 将旧 AO 值恢复到新建 InstancedMesh 的非脏位置
+   * 在 buildMeshes 之后调用，脏位置跳过（由后续 AO 刷新修正）
+   * @param {Map<number, {aoLow: number, aoHigh: number}>} oldAO - 从旧 mesh 提取的 AO 值
+   */
+  Chunk.prototype._restoreOldAOForNonDirtyPositions = function(oldAO) {
+    if (!oldAO || oldAO.size === 0) return;
+    const gim = this.world?.globalInstancedMeshManager;
+    const dirtySet = this.dirtyAOPositions;
+
+    if (gim) {
+      // 全局路径：遍历当前 chunk 的所有 coord，恢复非脏位置的旧 AO
+      const chunkKey = `${this.cx},${this.cz}`;
+      const coords = gim.chunkToCoords.get(chunkKey);
+      if (!coords) return;
+
+      const dirtyBuffers = new Set(); // 记录需要 update 的 TypeBuffer
+      for (const coord of coords) {
+        if (dirtySet && dirtySet.has(coord)) continue; // 脏位置交给 AO 刷新
+        const saved = oldAO.get(coord);
+        if (!saved) continue;
+        const ref = gim.coordToRef.get(coord);
+        if (!ref) continue;
+        const buffer = gim.buffers.get(ref.renderKey);
+        if (!buffer) continue;
+        const aoLowAttr = buffer.mesh.geometry.getAttribute('aAoLow');
+        const aoHighAttr = buffer.mesh.geometry.getAttribute('aAoHigh');
+        if (!aoLowAttr || !aoHighAttr) continue;
+        if (ref.index >= aoLowAttr.array.length) continue;
+
+        aoLowAttr.array[ref.index] = saved.aoLow;
+        aoHighAttr.array[ref.index] = saved.aoHigh;
+        dirtyBuffers.add(buffer);
+      }
+
+      for (const buffer of dirtyBuffers) {
+        const aoLowAttr = buffer.mesh.geometry.getAttribute('aAoLow');
+        const aoHighAttr = buffer.mesh.geometry.getAttribute('aAoHigh');
+        if (aoLowAttr) aoLowAttr.needsUpdate = true;
+        if (aoHighAttr) aoHighAttr.needsUpdate = true;
+        buffer.markDirty(buffer.count - 1, { matrix: false, ao: true, bounds: false });
+      }
+    } else {
+      // 本地路径：遍历新 InstancedMesh，恢复非脏位置的旧 AO
+      for (const child of this.group.children) {
+        if (!child.isInstancedMesh) continue;
+        const type = child.userData?.type;
+        if (!type) continue;
+        const aoLowAttr = child.geometry?.getAttribute('aAoLow');
+        const aoHighAttr = child.geometry?.getAttribute('aAoHigh');
+        if (!aoLowAttr || !aoHighAttr) continue;
+
+        let indexMap;
+        if (type === 'batched') {
+          const textureUrl = child.userData?.textureUrl;
+          indexMap = this.instanceIndexMap?.['batched_' + textureUrl];
+        } else {
+          indexMap = this.instanceIndexMap?.[type];
+        }
+        if (!indexMap) continue;
+
+        let modified = false;
+        for (const [code, indexInfo] of indexMap) {
+          const numCode = Number(code);
+          if (dirtySet && dirtySet.has(numCode)) continue; // 脏位置交给 AO 刷新
+          const saved = oldAO.get(numCode);
+          if (!saved) continue;
+          const idx = typeof indexInfo === 'object' ? indexInfo.index : indexInfo;
+          if (idx >= aoLowAttr.array.length) continue;
+
+          aoLowAttr.array[idx] = saved.aoLow;
+          aoHighAttr.array[idx] = saved.aoHigh;
+          modified = true;
+        }
+
+        if (modified) {
+          aoLowAttr.needsUpdate = true;
+          aoHighAttr.needsUpdate = true;
+        }
       }
     }
   };

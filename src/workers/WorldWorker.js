@@ -2860,9 +2860,10 @@ onmessage = async function(e) {
 
     if (shouldRender && visible) {
       if (!d[block.type]) d[block.type] = [];
-      // AO 计算已移至 _refreshAOFromStableSource（AOWorker），bootstrap 阶段跳过
-      const aoLow = 1;
-      const aoHigh = 1;
+      // AO 计算已移至 _refreshAOFromStableSource（AOWorker），写入全亮中性值
+      // 全亮打包值 0x00ffffff = 所有 12 个顶点 AO 值均为 3（无遮挡）
+      const aoLow = 0x00ffffff;
+      const aoHigh = 0x00ffffff;
       d[block.type].push({x: block.x, y: block.y, z: block.z, aoLow, aoHigh, orientation: block.orientation || 0});
       visibleKeysSet.add(key);
       aoMap.set(key, { aoLow, aoHigh });
