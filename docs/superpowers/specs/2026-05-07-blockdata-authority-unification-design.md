@@ -380,7 +380,40 @@ runtime 中只存在一份 world-level `blockData authority`：
 - `Chunk.blockData` 的共享身份不是“每次随便拿一个最新 Map”
 - 而是“attach 后在当前生命周期内具有引用稳定性”
 
-### 5.3.4 replaceChunkSlice Contract
+### 5.3.4 Chunk -> WorldBlockDataStore Access Contract
+
+本阶段还必须显式固定 `Chunk` 访问 authority owner 的路径，否则 `_updateBlockState()` 一类旧双写汇聚点在实现时会重新临时发明依赖路径。
+
+约束如下：
+
+1. `WorldBlockDataStore` 的 owner 是 `World`
+   - `World` 负责创建并持有唯一 runtime `WorldBlockDataStore` 实例
+   - `Chunk` 不允许自行 new / 缓存另一份 authority store owner
+
+2. `Chunk` 对 authority 的访问必须经由所属 `World`
+   - 推荐固定为 `this.world.worldBlockDataStore`
+   - 或由 `World` 提供等价稳定 accessor
+   - 但语义上都属于“`World` 向 `Chunk` 提供 world-level authority 引用”
+
+3. `Chunk.blockData` 不是 owner，只是 attach 后的 shared slice view
+   - `Chunk._updateBlockState()`
+   - `acceptScatteredBlocks()`
+   - `appendScatteredBlocks()`
+   - batch edit / patch helper
+   - 都必须通过 `World` 提供的 `WorldBlockDataStore` mutation API 落 authority
+
+4. 本阶段不建议把 `WorldBlockDataStore` 作为独立构造参数广泛注入到 `new Chunk(...)`
+   - 当前代码基线里 `Chunk` 已经通过 `world` 获取跨 chunk 能力与运行时资源
+   - 因此优先保持“authority owner 在 world-level，由 `World` 暴露给 `Chunk`”这一结构
+   - 若未来为了测试夹具或解耦需要增加 accessor wrapper，可以做，但不能改变 owner 语义
+
+设计目标：
+
+- 避免实现时重新出现 `this.world.memoryWorldStore` 退役后“Chunk 不知道该写谁”的临时拼接
+- 避免把 world-level authority 错误地下沉成 chunk constructor 层面的第二持有者
+- 让 `_updateBlockState()` 的迁移保持最小签名扰动，同时与“authority owner 在 world-level”原则一致
+
+### 5.3.5 replaceChunkSlice Contract
 
 `replaceChunkSlice(cx, cz, entries)` 必须被定义为**低频 authority lifecycle API**，而不是普通热路径 mutation API。
 
@@ -413,6 +446,66 @@ runtime 中只存在一份 world-level `blockData authority`：
 
 - `Chunk` 侧 `clear + repopulate`
 - 对 live attached slice 静默换引用
+
+### 5.3.5 Unloaded Chunk Mutation Contract
+
+world-level authority 独立于 live `Chunk` 生命周期存在，这意味着本阶段必须把“目标 chunk 未加载时的写入语义”明确固定下来，而不能继续让不同子系统各自决定是否暂存、忽略或延后同步。
+
+本阶段统一采用以下契约：
+
+1. **逻辑修改先命中 authority**
+   - 只要某个 mutation 已经被判定为合法世界修改，它的首个稳定落点必须是 world-level authority
+   - 目标 chunk 当前是否已加载，不影响其是否进入 authority
+
+2. **未加载 chunk 不是“禁止写入”的理由**
+   - `cross-chunk scatter`
+   - `overflow merge`
+   - `deferred patch`
+   - bootstrap 期间生成出的目标 chunk 数据
+   - 上述几类路径在目标 chunk 未加载时，也必须写入对应 authority slice 或等价 world-level patch 容器
+
+3. **pending buffer 只能是装配/调度层，不是第二权威**
+   - `BlockScatterManager.pendingCrossChunkPatchBuffers`
+   - 各类 worker result buffer
+   - 各类 runtime deferred patch queue
+   - 这些结构若继续存在，只允许持有：
+     - 待装配的派生层输入
+     - 待应用到 authority 的临时 patch 描述
+   - 不允许成为“唯一尚未写入 authority 的逻辑真相 holder”
+
+4. **玩家编辑的边界必须单独定义**
+   - 若当前产品语义仍然规定“未加载 chunk 上的玩家编辑被忽略”，则应在 `WorldAccessLayer` 中显式保留此边界
+   - 但文档必须同时写明：这是一条产品交互边界，而不是 authority 模型能力限制
+   - 也就是说，本阶段不要求把所有未加载 chunk 玩家编辑都改成可写，但禁止实现者据此推导“未加载 chunk 一律不能进入 authority”
+
+最低约束：
+
+- 任何已经接受的逻辑修改，不得只存在于 chunk-local buffer
+- `reload` / `future attach` 必须能从 authority 重新观察到之前写入的结果
+- 不允许出现“某个补丁在 live chunk 时正确，一旦目标 chunk 当时未加载就丢失”的分叉语义
+
+### 5.3.6 Query Boundary Contract
+
+本阶段的 primary goal 是统一 runtime 写入权威，而不是顺手扩展所有查询能力。因此查询边界也必须显式固定。
+
+本阶段建议采用保守契约：
+
+1. `WorldAccessLayer.getBlock()`
+2. `WorldAccessLayer.isSolid()`
+3. `WorldAccessLayer.getCollisionAt()`
+
+默认仍然以 **loaded chunk view correctness** 为主，不要求在本阶段把 world-level authority 暴露成 unloaded chunk 查询后备源。
+
+理由：
+
+- 这样可以避免在 authority 重构过程中，额外把 world-level store 拉进碰撞、物理、可见性等热路径
+- 这样也可以把本阶段聚焦在“唯一真相如何写入、attach、restore”，而不是把查询体系一并扩散改造
+
+明确约束：
+
+- 不允许因为 world-level authority 已存在，就默认把所有 unloaded chunk 查询回源到 authority
+- 若后续确有需要扩展 world-level logical query，应作为单独设计决策提出
+- 当前查询路径继续只保证 live chunk 视图语义，不得因此反向影响 authority 的唯一性设计
 
 ### 5.4 冷存储完全退出本阶段主链路
 
@@ -455,6 +548,36 @@ runtime 中只存在一份 world-level `blockData authority`：
 
 - `RegionCache` 可以保留
 - 但它必须从“权威候选层”降级为“冷边界 / region 管理辅助层”
+
+### 5.4.2 Legacy Hot-Path Exit Criteria
+
+本阶段不仅要“设计上降级旧链路”，还要给出明确的退出标准，避免实现完成后 runtime 仍然暗中依赖旧 holder。
+
+最低退出标准：
+
+1. `MemoryWorldStore`
+   - 不再参与 runtime 热路径读写
+   - 不再承担 unload/reload 正确性
+
+2. `WorldRuntime.blockDataSnapshot`
+   - 不再参与 runtime 正确性
+   - 即便暂时保留，也只能作为 future cold export / deprecated hook
+
+3. `pendingUnloadFlushQueue`
+   - 不再是 runtime 会话闭环的一部分
+   - flush 成功/失败不得影响当前会话中的逻辑正确性
+
+4. `ChunkPersistence.saveDebounced()`
+   - 不再是玩家编辑后保持 runtime 正确性的必要步骤
+
+5. `World._requestRuntimeChunkRecord()`
+   - 不再以 “memory store -> db fallback” 作为 runtime 主语义
+   - cold boundary 只允许作为 authority 尚未建立时的一次性输入源
+
+换句话说：
+
+- “deprecated” 不应只是注释标签
+- 必须通过测试与调用关系保证这些旧链路退出热路径正确性闭环
 
 ## 6. Target Layering
 
@@ -600,6 +723,27 @@ WorldGenerationService / WorldWorker
 - 不通过 `PersistenceService.cache`
 - 不为“未来存档”额外维护第二条热路径
 
+### 7.1.0 Runtime Generation Ordering Contract
+
+为了避免实现中继续沿用“先落冷存储、再回灌 runtime”旧顺序，本阶段必须把生成链路顺序写死。
+
+推荐顺序：
+
+```text
+WorldGenerationService / WorldWorker result
+-> 写 WorldChunkRegistry
+-> 写 WorldChunkPayloadRegistry
+-> 写 WorldBlockDataStore
+-> 若目标 chunk 已加载，则 attach / rebuild
+-> 若需要保留 cold persistence hook，则异步 deferred 触发
+```
+
+强约束：
+
+- runtime authority 的建立必须先于任何 cold persistence
+- `saveRegionRecord()`、`saveWorldMeta()`、`commitChunkRecord()` 若暂时保留，不得成为 runtime 正确性的前提
+- generation result 中的 `blockData`、`runtimeSeedData`、`staticEntities` 必须先进入 world-level runtime owner，再决定是否额外导出
+
 ### 7.1.1 WorldGenerationService / WorldBlockDataStore Contract
 
 本阶段必须明确：`WorldGenerationService` 的运行时主产物是 `WorldBlockDataStore`，不是 `WorldStore`。
@@ -701,6 +845,9 @@ BlockScatterManager / deferred cross-chunk patch
 - 若 patch 涉及多个 chunk，必须分别写入各自 chunk slice，不得先落入某个临时 `blockData` 副本后再统一同步
 - 共享 `Map` 方案下，不允许对同一 patch 再执行一次额外的 `Chunk.blockData.set/delete` 补写
 - tombstone、hidden block、late worker result 过滤等现有一致性保护逻辑继续保留
+- 目标 chunk 未加载时，patch 也必须先进入 authority 或 authority-level patch 容器，不能因为缺少 live chunk view 就只停留在待装配 buffer
+- `pendingCrossChunkPatchBuffers` 若继续保留，只能承担 authority patch 调度与派生层装配延迟职责，不能成为“尚未写入 authority 的唯一逻辑真相 holder”
+- 对同一坐标的 patch 冲突必须固定优先级：玩家后续修改 > tombstone / 删除保护 > 晚到生成或 scatter patch
 
 ### 7.2.2 BlockScatterManager Contract
 
@@ -728,6 +875,28 @@ BlockScatterManager / deferred cross-chunk patch
 
 - `Chunk.acceptScatteredBlocks()` / `appendScatteredBlocks()` 是目标 chunk 的派生层装配入口
 - `BlockScatterManager` 才是 scatter patch 的 authority-level 编排入口
+
+### 7.2.3 Unloaded Target Chunk Write Semantics
+
+本阶段必须额外固定一个容易被实现时绕回旧模型的问题：**未加载目标 chunk 的逻辑修改是否进入 authority**。
+
+统一答案是：
+
+- **会**
+
+更准确地说：
+
+1. 对于世界生成、overflow、scatter、deferred cross-chunk patch：
+   - 目标 chunk 未加载时，逻辑修改仍然必须进入对应 world-level authority owner
+   - live chunk view 只是未来 attach 的消费者，不是写入前提
+
+2. 对于玩家主动编辑：
+   - 若当前产品语义仍规定“未加载 chunk 不响应编辑”，可以继续保留该交互边界
+   - 但这是一条产品交互边界，而不是 authority 模型能力限制
+
+3. 对于 reload 语义：
+   - 后续 chunk attach 时，应从 authority 观察到这些先前写入的结果
+   - 不允许再依赖重新生成、重新散射或回源冷边界来“碰巧恢复”
 
 ### 7.3 Chunk 加载
 
@@ -1036,10 +1205,130 @@ shared authority view 模式下，必须显式定义“晚到回包如何失效�
 - `deletedBlockTombstones` 继续保留，但 tombstone 不是唯一的一致性保护机制
 - 不能只靠“当前 chunk 还在不在 map 里”判断回包是否有效
 
+最小实现契约：
+
+1. `authority version` 必须由 world-level authority owner 维护
+   - 对同一 chunk slice 的逻辑修改一旦提交到 `WorldBlockDataStore`，对应 version 递增
+   - 不能由各个 worker 链路各自维护一套彼此无关的“本地版本号”
+
+2. `assembly epoch` 必须由 live chunk attach lifecycle 维护
+   - 每次 attach 新 live view 时生成或递增
+   - detach / dispose 后旧 epoch 立即失效
+   - 同坐标 chunk reload 后，即使复用同一 authority slice，也必须视为新的 assembly epoch
+
+3. 发往异步链路的 request 必须携带过期识别信息
+   - 至少带上 `chunkKey + assemblyEpoch`
+   - 需要基于逻辑变更过滤的链路还应带上 `authorityVersion` 或等价快照版本
+
+4. 异步回包落地前必须统一校验
+   - 当前 live chunk 是否仍存在
+   - 当前 live chunk 的 `assemblyEpoch` 是否仍匹配
+   - 若该链路依赖逻辑快照，则 `authorityVersion` 是否仍可接受
+   - 任一条件不满足，都必须把回包视为 stale result 并丢弃
+
+5. 该协议必须作为统一 runtime contract 复用
+   - consolidation
+   - AO worker
+   - chunk assembly / worker hydrate callback
+   - 其他 attach 后才允许落到派生层的异步结果
+   - 不允许每条链路各自发明一套 token / disposed / boolean 标志来替代统一协议
+
 设计意图：
 
 - tombstone 解决“旧块被删除后晚到结果复活”
 - authority version / epoch 解决“整个 attach 生命周期已经变化，旧回包不该再落地”
+
+### 7.4.3 Consolidation Protocol
+
+`consolidation` 不是本阶段的 primary redesign target。它的既有 face culling / mesh / 3x3x3 AO 相关行为逻辑应当继续保留，本阶段只要求它与新的 authority / shared view / epoch 语义兼容，不得因为权威数据源重构而回退。
+
+之所以仍需单独写出协议，是因为 `consolidation` 天然是一条“authority 边界序列化 -> worker 重算 -> 异步结果回放”链路。如果不把它的边界写清楚，实施时很容易在这里重新引入第二权威或旧式快照 holder。
+
+因此，本阶段对 consolidation 的定位必须是：
+
+- **它消费 authority 的边界快照**
+- **它产出新的派生层/渲染层结果**
+- **它不能反向成为逻辑真相来源**
+
+也就是说，在本阶段它的职责是：
+
+1. 基于 authority 当前内容构造 worker 输入
+2. 让 worker 重算 face culling / mesh / AO 相关派生结果
+3. 在主线程回放结果时，与 authority 当前状态做兼容性校验
+4. 只更新派生层与渲染输出，不替换 authority
+
+#### 7.4.3.1 Consolidation Send-Side Contract
+
+send side 必须明确：
+
+1. `consolidate()` 读取的是当前 authority slice
+2. 允许为了 worker `postMessage` 做一次 **boundary serialization**
+3. 这次 serialization 的语义是：
+   - worker 输入快照
+   - 不是新的权威 holder
+   - 不是后续 reload 的真相来源
+
+因此，在本阶段：
+
+- `blockDataToNumberKeys(this.blockData)` 一类操作在新模型下只允许被视为 worker 消息边界 codec
+- 它的存在不应重新引入 `blockDataSnapshot` / parked snapshot / unload holder 语义
+- consolidation send side 允许 clone 一次，但这个 clone 只能服务于当前 worker 任务
+
+#### 7.4.3.2 Consolidation Receive-Side Contract
+
+receive side 必须明确：
+
+1. `_applyConsolidateResult()` 回放的是 worker 派生结果
+2. 它可以：
+   - 重建 mesh
+   - 清理旧 dynamic mesh / instanced mesh
+   - 刷新 `instanceIndexMap`
+   - 刷新 `renderDelta` 对应输出状态
+   - 从 authority 重新 rebuild `blockDataArray` / `solidBlockIds` / `lightSourceCoords` 等派生索引
+
+3. 它不可以：
+   - 用 worker 回包替换 authority slice
+   - 把 worker 结果当成“比 authority 更新的逻辑真相”
+   - 因为收到 consolidation 结果，就重走一遍 “clear authority -> reinject blockData” 旧流程
+
+硬约束：
+
+- `_initArrayStorageFromBlockData()` 在 consolidation receive side 的语义必须明确为：
+  - **从 authority rebuild derived indexes**
+  - 而不是“根据 worker 回包重建逻辑真相”
+
+#### 7.4.3.3 Consolidation Concurrency Contract
+
+consolidation 期间，玩家可能继续修改方块。因此 worker 回包必须额外通过以下保护，以确保既有行为逻辑在新 authority 模型下不退化：
+
+1. `authority version`
+2. `assembly epoch`
+3. `deletedBlockTombstones`
+4. 玩家修改后与 worker 输入快照之间的差异过滤
+
+最低要求：
+
+- consolidation 开始后发生的玩家修改，不得被旧回包覆盖
+- `_applyConsolidateResult()` 中对 scatteredBlocks / visible blocks / meshData 的过滤，必须以“authority 当前状态优先”为原则
+- 若 worker 回包与 authority 当前内容冲突，authority 胜出，冲突部分结果必须被丢弃或裁剪
+
+换句话说：
+
+- consolidation 的结果是“可应用的派生建议”
+- 不是“主线程必须无条件接受的新真相”
+
+#### 7.4.3.4 Consolidation and Shared Map Compatibility
+
+shared `Map` 模式下，consolidation 还必须满足两个额外兼容条件：
+
+1. consolidation 不能通过 `this.blockData.clear()` 或替换 `this.blockData = new Map()` 来准备重建
+2. consolidation 不能因为要重建派生层，就隐式改变 live authority slice 的引用身份
+
+因此：
+
+- consolidation 允许清空 chunk-local 派生索引
+- consolidation 不允许清空或替换 shared authority slice
+- consolidation 结果落地后，`Chunk.blockData` 仍应保持对同一 authority slice 的共享引用
 
 ### 7.5 JSON 导入 / 导出
 
@@ -1336,6 +1625,8 @@ authority 重构后，读路径也必须显式收敛，避免后续出现“写�
 5. `saveDebounced()`、`flushChunk()`、`PersistenceService.cache` 失效或旁路时，不影响 runtime authority 正确性
 6. `RegionCache` 中残留的 `blockData` 不会在 authority 建立后重新覆盖或污染 live truth
 7. AO Worker mirror 延迟或重建时，不会把旧 AO 结果回写成逻辑真相
+8. consolidation 期间玩家后续修改不会被晚到 consolidation 回包覆盖
+9. consolidation 回包不会替换 authority slice，只会刷新派生层与渲染输出
 
 ## 12. Migration Strategy
 
