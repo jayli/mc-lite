@@ -25,6 +25,66 @@
   - 特殊实体（矿车、丧尸巢穴、炮塔等）的既有渲染、互动、与主世界/玩家的交互能力不回退
 - 若实现过程中发现某一步必须重新依赖 `PersistenceService.cache`、`WorldStore.commitChunkRecord()`、`blockDataSnapshot` 或 `pendingUnloadFlushQueue` 才能保证 runtime 正确性，则应停止推进并回到设计层修正，而不是临时接回旧链路。
 
+## Deferred 能力矩阵
+
+| 能力 | 本阶段状态 | 允许行为 | 禁止行为 |
+|---|---|---|---|
+| `IndexedDB` 自动持久化 | deferred | 保留兼容壳层、future hook | 作为 runtime correctness 前提 |
+| `Game.collectSnapshot()` / 手动存档 | deferred or compatibility-only | 显式禁用，或改为 authority/export hook | 继续直接读取 `worldStore` 作为 runtime 真相 |
+| `applySaveData()` / 手动读档 | deferred or compatibility-only | 保留接口签名、future hook | 在本阶段承担 live authority owner 职责 |
+| JSON 导入 / 导出 | deferred | 只保留 codec / 接入点 | 反向定义 runtime 主存储格式 |
+| 旧存档兼容迁移 | compatibility-only | 一次性 cold import 后写入 authority | 运行期持续从旧冷边界回源做 live truth |
+
+硬约束：
+
+- 若某个 deferred 能力暂时继续暴露给 UI 或测试，必须在注释中明确自己不是本阶段门槛。
+- `collectSnapshot()` / `applySaveData()` 若不立即重写，必须在计划中被标记为 `deferred shell` 或 `authority-based rewrite`，不能处于语义模糊状态。
+
+## 旧 API 退役矩阵
+
+| 旧接口 / 结构 | 本阶段目标命运 |
+|---|---|
+| `Chunk.loadFromRecord()` | authority 编排入口或拆分重命名 |
+| `_injectBlockData()` | 删除，或收缩为单一 rebuild/helper |
+| `_injectBlockDataBatch()` | 改成分帧 rebuild helper，不再注入 truth |
+| `_clearForBlockInjection()` | 删除或重写，不再 `clear()` authority slice |
+| `ChunkPersistence.saveDebounced()` | dirty marker shell 或 no-op |
+| `WorldRuntime.recordBlockMutation()` | runtime-dirty only，或与 export-dirty 明确分离 |
+| `flushChunk()` / `flushBeforeUnload()` / `flushAllDirty()` | deferred cold-export shell |
+| `pendingUnloadFlushQueue` | deferred shell 或删除 |
+| `Game.collectSnapshot()` | deferred shell 或 authority-based rewrite |
+| `PersistenceService.cache` | compatibility-only，退出 runtime 真相链 |
+
+硬约束：
+
+- shared authority 语义下有误导性的 helper，优先删名或改名，不接受“只补注释不拆职责”的假收口。
+- 任何保留下来的旧接口都必须在实现中明确标注：是否参与 runtime 主链路、若读取数据则新来源是什么。
+
+## 写入口收编矩阵
+
+| 入口 | 本阶段目标职责 |
+|---|---|
+| `WorldAccessLayer.setBlock/removeBlock/applyBatchEdits` | 唯一业务层编辑入口，先命中 authority mutation primitive |
+| `Chunk._updateBlockState()` | 薄派生层同步 helper，不再承担双写 |
+| `Chunk.addBlockDynamic()` | 单块编辑编排入口 |
+| `Chunk.addBlocksBatchFast()` | 批量局部 patch 编排入口 |
+| `Chunk.removeBlocksBatch()` | 批量删除 patch 编排入口 |
+| `Chunk.acceptScatteredBlocks()` / `appendScatteredBlocks()` | authority 已建立后的派生层装配入口或薄 wrapper |
+| `WorldGenerationService` 生成结果接入 | world worker 边界到 authority 的唯一正式转换点 |
+| `loadFromRecord()` / cold import | cold boundary 编排入口，先入 authority 再 attach/rebuild |
+
+硬约束：
+
+- 每个入口都必须归类为：authority mutation primitive 调用方、authority attach/rebuild 编排方、或纯派生层装配方。
+- 不允许继续保留“一个 helper 同时负责写 truth、同步第二 holder、顺带建索引”的混合职责。
+
+## 迁移期防护与观测
+
+- 开发期断言：禁止 live attached slice 上 `clear()`；禁止绕过受控入口直接写 shared `Chunk.blockData`。
+- 调用点统计：记录 `replaceChunkSlice()`、`flushChunk()`、`saveDebounced()`、`RegionCache.blockData` live 读取路径命中次数。
+- 迁移期日志：区分 authority mutation、attach/rebuild、cold import、deferred export。
+- 退出型测试：证明旧链路失败、旁路或 no-op 时，runtime correctness 仍成立。
+
 ### 新增文件
 
 - Create: `src/world/WorldBlockDataStore.js`
@@ -140,6 +200,36 @@
 - 文档中明确写出 runtime-only 成功标准
 - 明确哪些旧功能降级为 deferred
 - 明确哪些旧测试将删除、哪些将重写、哪些将在本阶段降级
+
+- [ ] **Step 4.2: 固定未加载 chunk 的读语义**
+
+要求：
+
+- 明确哪些查询只服务 loaded chunk runtime view
+- 明确哪些编排路径允许显式读取未加载 authority slice
+- 明确本阶段不要求把所有高频 query 都升级成 world-level authority 读取
+- 明确 `RegionCache` / `worldStore.getChunkRecord()` 只能作为 cold boundary import，而不是 live truth query
+
+- [ ] **Step 4.3: 固定 deferred 能力矩阵**
+
+要求：
+
+- `collectSnapshot()`、`applySaveData()`、手动存档/读档、JSON 导入导出都要被标记为 deferred、compatibility-only 或 authority-based rewrite
+- 禁止继续保留“接口还在，但语义不明确”的状态
+
+- [ ] **Step 4.4: 固定旧 API 退役矩阵**
+
+要求：
+
+- `loadFromRecord()`、`_injectBlockData*()`、`saveDebounced()`、`flushChunk()`、`collectSnapshot()` 的命运必须在文档中逐项写死
+- 明确哪些旧 helper 允许保留名称，哪些必须删名或改名
+
+- [ ] **Step 4.5: 固定写入口收编矩阵与迁移期 guardrails**
+
+要求：
+
+- 所有 blockData 写入口都必须归类并收编到统一原语
+- 明确开发期断言、调用点统计、退出型测试的最小集合
 
 ---
 
@@ -261,6 +351,7 @@ Expected: PASS
 - `runtimeSeedData/staticEntities` 在 chunk unload 后仍有 world-level owner
 - reload 时这两类 non-block payload 从 registry 恢复，而不是依赖 live chunk 残留
 - `runtimeEntities` / 特殊实体链路在本阶段保持兼容，不要求进入新的 registry owner 体系
+- `runtimeEntities` 的 compatibility owner、cold import 来源、reload 恢复来源必须写清，不能继续依赖隐式优先级
 
 - [ ] **Step 2: 实现 `WorldChunkRegistry` 最小骨架**
 
@@ -293,6 +384,10 @@ Expected: PASS
 - `runtimeSeedData/staticEntities` 的 world-level owner 必须固定
 - `Chunk` 不得继续作为这两类 payload 的唯一最终持有者
 - `runtimeEntities` 若预留接口，只允许作为兼容挂点，不得因此扩成本阶段特殊实体大重构
+- `runtimeEntities` / `SpecialEntitiesShadowStore` 的兼容边界必须在注释和测试里固定：
+  - 不反向主导 `blockData authority`
+  - 不阻塞 `runtimeSeedData/staticEntities` 的 world-level owner 迁移
+  - 不允许同时混用 `cache.entities` / `worldStore.runtimeEntities` / live shadow state 作为模糊真相
 
 - [ ] **Step 4: 对齐生成与加载链路**
 
@@ -970,6 +1065,19 @@ Expected:
 - `entityCollisionIndex` 继续保持独立的特殊实体碰撞语义，不并入 `blockData` / `solidBlocks`
 - 除非后续专项设计明确替代方案，本次 authority 重构不得顺手删除这些结构
 
+- [ ] **Step 3.8: 固定读路径契约**
+
+要求：
+
+- `WorldAccessLayer.getBlock()`、`World.getBlockEntry()`、`resolveBlockOwner()` 等高频查询必须明确自己是 loaded chunk runtime view read
+- unloaded authority read 只允许出现在：
+  - generation result injection
+  - unloaded target patch
+  - reload / future export
+- `isSolid()` / `getCollisionAt()` 继续优先走 `blockDataArray` / `solidBlockIds` / `solidBlocks`
+- 禁止在本阶段为了“统一权威”而把所有高频 query 粗暴改成 `WorldBlockDataStore` 全局读取
+- 若某条路径仍读取 `RegionCache.blockData` 或 `worldStore.getChunkRecord().blockData`，必须在代码注释中明确这是 cold boundary import，不是 live query
+
 - [ ] **Step 4: 运行 chunk/world 相关测试**
 
 Run:
@@ -1158,6 +1266,20 @@ Expected:
 - worker 消息边界允许继续使用序列化对象，不要求直接传 `Map`
 - 注释中明确：plain object 是 boundary format，不是 runtime authority format
 
+- [ ] **Step 4.8: 加入迁移期 guardrails 与观测**
+
+要求：
+
+- 开发期断言：
+  - attached slice 上调用 `clear()` 必须报错或显式告警
+  - 非受控入口对 shared `Chunk.blockData.set/delete` 的直接调用必须可观测
+  - `replaceChunkSlice()` 命中 live attached slice 时必须要求 detach/reattach 协议
+- 调用点统计：
+  - 记录 `replaceChunkSlice()` 来源
+  - 记录 `flushChunk()` / `saveDebounced()` 命中次数
+  - 记录是否仍存在从 `RegionCache.blockData` 读取 live truth 的路径
+- 这些 guardrails 可以是开发期逻辑，不要求最终产物长期保留，但必须帮助实施阶段识别“假退出”
+
 - [ ] **Step 5: 运行相关测试**
 
 Run:
@@ -1210,6 +1332,28 @@ Expected:
 - `WorldRuntime.ensureChunkData()` 若暂时仍承接冷边界输入，必须在注释中明确：它不再是 runtime 正确性的权威来源，只是未来冷恢复接入点或过渡边界
 - `WorldGenerationService` 若暂时仍保留 `saveRegionRecord()` / `saveWorldMeta()` 一类调用，必须在注释中明确：这些调用不是本阶段生成正确性的组成部分
 - `RegionCache` 若继续缓存带 `blockData` 的 chunkRecord，也必须在注释中明确：这些 `blockData` 只用于冷边界输入，不得作为 live authority
+
+- [ ] **Step 3.1: 明确 `collectSnapshot()` / `applySaveData()` 的本阶段命运**
+
+要求：
+
+- 二者必须二选一：
+  - `deferred shell`
+  - `authority-based rewrite`
+- 若暂时保留旧接口：
+  - 不得继续直接从 `worldStore` 读取 runtime 块真相
+  - 必须在注释和测试中明确：不是当前 runtime correctness 的组成部分
+- 若暂时禁用：
+  - 必须给出清晰注释，说明等待 authority/export 边界稳定后再恢复
+
+- [ ] **Step 3.15: 固定 `runtimeEntities` 的兼容边界**
+
+要求：
+
+- 明确 `SpecialEntitiesShadowStore` 是本阶段 `runtimeEntities` 的 compatibility owner
+- 明确 `chunkRecord.runtimeEntities` / 手动存档输入只作为 cold import 或 future export source
+- 禁止继续出现 `cache.entities`、`worldStore.runtimeEntities`、live shadow state 三者的隐式优先级混用
+- 测试必须覆盖：block authority 切换后，矿车、炮塔、丧尸巢穴的 reload/互动/碰撞行为不回退
 
 - [ ] **Step 3.2: 收紧 `WorldRuntime.ensureChunkData()` 的边界语义**
 
@@ -1394,6 +1538,19 @@ Expected:
 Expected:
 - 热路径显著收缩
 - 剩余长帧若存在，应归因于后续渲染或数据结构优化，而不是旧快照链
+
+- [ ] **Step 5.2: 记录退出型性能验收结论**
+
+至少回答以下问题：
+
+1. `flushChunk()` / `flushBeforeUnload()` 是否已经退出玩家改单块后的热路径
+2. consolidation 后是否仍能在主线程观察到由 `blockDataSnapshot` / region patch / 结构化复制主导的长帧
+3. chunk reload 是否仍依赖旧 snapshot holder 才能恢复正确数据
+
+Expected:
+- 至少能用日志、trace、调用计数或注释证据证明：
+  - 旧快照链已退出 runtime correctness 主链路
+  - 旧结构化复制热点不再是本阶段已知主瓶颈
 
 - [ ] **Step 6: 运行 lint 作为最终门禁**
 
