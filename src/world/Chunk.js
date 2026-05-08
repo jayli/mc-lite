@@ -304,6 +304,62 @@ export class Chunk {
   // ============================================================
 
   /**
+   * 将 Chunk.blockData 挂接到 WorldBlockDataStore 的共享 authority slice
+   * 此后 this.blockData 与 store 内部 slice 是同一个 Map 实例
+   * @returns {boolean} 是否成功 attach
+   */
+  attachAuthoritySlice() {
+    const store = this.world?.worldBlockDataStore;
+    if (!store) return false;
+
+    const slice = store.ensureChunkSlice(this.cx, this.cz);
+    this.blockData = slice;
+    store.markAttached(this.cx, this.cz);
+
+    // 递增 assembly epoch，使旧异步回包失效
+    this._assemblyEpoch = (this._assemblyEpoch || 0) + 1;
+
+    return true;
+  }
+
+  /**
+   * 从共享 authority slice 重建所有派生索引
+   * 允许清空 visibleKeys/solidBlocks/blockDataArray/solidBlockIds 等派生层
+   * 严禁清空或替换 authority slice（this.blockData）
+   */
+  rebuildDerivedIndexesFromAuthority() {
+    // 清空派生索引层（不清空 authority slice）
+    this.visibleKeys.clear();
+    this.solidBlocks.clear();
+    this.lightSourceCoords.clear();
+    this.blockDataArray.fill(0);
+    this.solidBlockIds.clear();
+    this.blockPalette.clear();
+    this.blockPaletteReverse.clear();
+    this.nextBlockId = 1;
+
+    // 从 authority slice 重建 blockDataArray / blockPalette / solidBlocks 等
+    this._initArrayStorageFromBlockData();
+  }
+
+  /**
+   * 从 authority slice 分离 Chunk.blockData 引用
+   * 此后 this.blockData 置为空的 chunk-local Map，不再与 store 共享
+   */
+  detachAuthoritySlice() {
+    const store = this.world?.worldBlockDataStore;
+    if (store) {
+      store.markDetached(this.cx, this.cz);
+    }
+
+    // 替换为空的 chunk-local Map（dispose 时使用）
+    this.blockData = new Map();
+
+    // 递增 assembly epoch，使旧异步回包失效
+    this._assemblyEpoch = (this._assemblyEpoch || 0) + 1;
+  }
+
+  /**
    * 从权威 ChunkRecord 装载数据（纯装载，不生成地形）
    *
    * 流程：
@@ -467,11 +523,13 @@ export class Chunk {
   }
 
   /**
-   * 可中断装配：清空内部结构并初始化 hydrate 游标
-   * @param {object} blockData - 原始 blockData 对象
+   * 可中断装配：清空派生索引并初始化 hydrate 游标
+   * 注意：shared authority view 下不再清空 this.blockData
+   * @param {object} blockData - 原始 blockData 对象（仅用于计算游标进度）
    */
   _clearForBlockInjection(blockData) {
-    this.blockData.clear();
+    // shared authority view 模式下禁止清空 blockData
+    // 只清空派生索引层
     this.blockDataArray.fill(0);
     this.blockPalette.clear();
     this.blockPaletteReverse.clear();
@@ -561,10 +619,10 @@ export class Chunk {
         this._clearForBlockInjection(effectiveBlockData);
       } else {
         // 没有 blockData 需要注入，直接跳到尾部逻辑
-        if (chunkRecord.staticEntities?.length > 0) {
+        if (chunkRecord?.staticEntities?.length > 0) {
           this._injectStaticEntities(chunkRecord.staticEntities);
         }
-        if (chunkRecord.runtimeSeedData?.structureCenters) {
+        if (chunkRecord?.runtimeSeedData?.structureCenters) {
           this.structureCenters = chunkRecord.runtimeSeedData.structureCenters;
         }
         this.pendingSnapshot = null;
@@ -578,16 +636,16 @@ export class Chunk {
     const result = this._injectBlockDataBatch(3);
     if (result === 'done') {
       // 执行 _loadFromCachedRecord 的尾部逻辑
-      if (chunkRecord.staticEntities?.length > 0) {
+      if (chunkRecord?.staticEntities?.length > 0) {
         this._injectStaticEntities(chunkRecord.staticEntities);
       }
-      if (chunkRecord.runtimeSeedData?.structureCenters) {
+      if (chunkRecord?.runtimeSeedData?.structureCenters) {
         this.structureCenters = chunkRecord.runtimeSeedData.structureCenters;
       }
       this.pendingSnapshot = null;
       this._isPureLoadPath = true;
 
-      const hasRuntimeEntities = chunkRecord.runtimeEntities && (
+      const hasRuntimeEntities = chunkRecord?.runtimeEntities && (
         chunkRecord.runtimeEntities.turrets?.length > 0 ||
         chunkRecord.runtimeEntities.zombieNests?.length > 0 ||
         chunkRecord.runtimeEntities.minecarts?.length > 0
@@ -676,13 +734,13 @@ export class Chunk {
   }
 
   /**
-   * 注入 blockData 并重建所有派生结构
+   * 从 plain object 注入 blockData 并重建所有派生结构
+   * 注意：shared authority view 下不清空 this.blockData，只写入/更新条目并重建派生索引
    */
   _injectBlockData(blockData) {
     const t0 = globalThis.performance?.now?.() ?? Date.now();
-    // 清空现有数据
+    // 清空派生索引（不清空 shared blockData）
     const tClearStart = globalThis.performance?.now?.() ?? Date.now();
-    this.blockData.clear();
     this.blockDataArray.fill(0);
     this.blockPalette.clear();
     this.blockPaletteReverse.clear();
@@ -692,7 +750,7 @@ export class Chunk {
     this.nextBlockId = 1;
     const tClearEnd = globalThis.performance?.now?.() ?? Date.now();
 
-    // 注入新数据
+    // 注入新数据（直接写入 this.blockData，shared view 下即写入 authority）
     let solidCount = 0;
     let lightCount = 0;
     let arrayWriteCount = 0;
@@ -1144,7 +1202,7 @@ export class Chunk {
     const code = Chunk.encodeCoord(x, y, z);
     this.world?.scatterManager?.invalidatePendingBlock?.(x, y, z);
 
-    // === blockData（权威存储） ===
+    // === blockData（权威存储，shared authority view 下直接命中 world-level store） ===
     if (type === 'air') {
       this.deletedBlockTombstones.add(code);
       this.blockData.delete(code);
@@ -1159,7 +1217,14 @@ export class Chunk {
       aoBridge.enqueueSet(`${this.cx},${this.cz}`, code, entry);
     }
 
-    // 同步到内存权威层（运行期主路径）
+    // authority version：shared view 模式下通过 store 递增
+    const blockStore = this.world?.worldBlockDataStore;
+    if (blockStore?.isAttached(this.cx, this.cz)) {
+      blockStore._versions?.set(blockStore.chunkKey(this.cx, this.cz),
+        (blockStore.getAuthorityVersion(this.cx, this.cz) || 0) + 1);
+    }
+
+    // 同步到旧内存权威层（兼容过渡，后续移除）
     const memStore = this.world?.memoryWorldStore;
     if (memStore) {
       memStore.applyBlockMutation(this.cx, this.cz, code, type === 'air' ? null : entry);

@@ -20,6 +20,9 @@ import { WorldBoundsController } from './WorldBoundsController.js';
 import { WorldGenerationService } from './WorldGenerationService.js';
 import { worldStore } from './WorldStore.js';
 import { MemoryWorldStore } from './MemoryWorldStore.js';
+import { WorldBlockDataStore } from './WorldBlockDataStore.js';
+import { WorldChunkRegistry } from './WorldChunkRegistry.js';
+import { WorldChunkPayloadRegistry } from './WorldChunkPayloadRegistry.js';
 import { specialEntitiesShadowStore } from './SpecialEntitiesShadowStore.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
@@ -170,6 +173,9 @@ export class World {
     // --- WorldStore 新架构初始化 ---
     this.worldStore = worldStore;
     this.memoryWorldStore = new MemoryWorldStore();
+    this.worldBlockDataStore = new WorldBlockDataStore();
+    this.worldChunkRegistry = new WorldChunkRegistry();
+    this.worldChunkPayloadRegistry = new WorldChunkPayloadRegistry();
     this.worldRuntime = new WorldRuntime();
     this.worldRuntime.setWorld(this);
     this.worldAccessLayer = new WorldAccessLayer(this);
@@ -316,6 +322,54 @@ export class World {
     const memRequestStart = globalThis.performance?.now?.() ?? Date.now();
     const chunkKey = `${chunk.cx},${chunk.cz}`;
 
+    // --- 新 authority 路径：优先检查 WorldChunkRegistry + WorldBlockDataStore ---
+    if (this.worldChunkRegistry?.hasKnownChunk(chunk.cx, chunk.cz)) {
+      const hasAuthoritySlice = this.worldBlockDataStore?.hasChunkSlice(chunk.cx, chunk.cz);
+      if (hasAuthoritySlice && !chunk.disposed) {
+        // 新 authority 流程：attach + rebuild + restore payload
+        chunk.awaitingStoreRecord = false;
+        chunk.needsStoreRetry = false;
+
+        chunk.attachAuthoritySlice();
+        chunk.rebuildDerivedIndexesFromAuthority();
+
+        // 恢复 non-block payload
+        const payload = this.worldChunkPayloadRegistry?.getChunkPayload(chunk.cx, chunk.cz);
+        if (payload) {
+          if (payload.staticEntities?.length > 0) {
+            chunk._injectStaticEntities(payload.staticEntities);
+          }
+          if (payload.runtimeSeedData?.structureCenters) {
+            chunk.structureCenters = payload.runtimeSeedData.structureCenters;
+          }
+        }
+
+        // authority slice 已 attach，派生索引已重建
+        // 设置 record-ready 状态，走标准 runtime-hydrate 管线：
+        //   record-ready → runtime-hydrate（assembleRuntimeHydratePhase）
+        //     → hydrated → runtime-build-mesh（assembleRuntimeBuildMeshPhase）
+        //     → terrain-built → runtime-finalize → finalize
+        chunk.loadState = 'record-ready';
+        chunk.isReady = false;
+
+        this.chunkAssemblyScheduler.enqueue(
+          chunk,
+          'runtime-hydrate',
+          this._computeChunkAssemblyPriority(chunk)
+        );
+
+        const memRequestEnd = globalThis.performance?.now?.() ?? Date.now();
+        recordChunkPerf('world.runtime-chunk-record-authority', memRequestEnd - memRequestStart, {
+          chunkKey,
+          status: 'attached-from-authority',
+          hasBlockData: true,
+          blockDataSize: this.worldBlockDataStore.peekChunkSlice(chunk.cx, chunk.cz)?.size || 0
+        });
+        return;
+      }
+    }
+
+    // --- 旧路径：MemoryWorldStore（兼容过渡） ---
     // 运行期优先从内存权威层读取
     const chunkRecord = this.memoryWorldStore.getChunkRecord(chunk.cx, chunk.cz);
     const memRequestEnd = globalThis.performance?.now?.() ?? Date.now();

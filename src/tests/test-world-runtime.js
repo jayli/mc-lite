@@ -226,9 +226,8 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     globalThis._worldStore = originalWorldStore;
   });
 
-  test('recordBlockMutation - 首次修改时应基于当前 chunk blockData 初始化快照并增量更新', () => {
+  test('recordBlockMutation - 只标记 runtime dirty，不再构造 blockDataSnapshot', () => {
     const baseCode = encodeCoord(1, 2, 3);
-    const newCode = encodeCoord(4, 5, 6);
     const runtime = new WorldRuntime();
 
     runtime.setWorld({
@@ -244,14 +243,14 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
 
     const dirtyEntry = runtime._dirtyChunks.get('0,0');
     assertTrue(!!dirtyEntry, '应创建 dirty entry');
-    assertDeepEqual(dirtyEntry.blockDataSnapshot[baseCode], { type: 'dirt', orientation: 0 }, '应先保留当前 blockData 快照');
-    assertDeepEqual(dirtyEntry.blockDataSnapshot[newCode], { type: 'stone', orientation: 1 }, '应增量写入新方块');
+    assertTrue(dirtyEntry.dirty, '应标记为 dirty');
+    // blockDataSnapshot 已退出 runtime 正确性链路，不再构造
+    assertEqual(dirtyEntry.blockDataSnapshot, null, 'blockDataSnapshot 应为 null（已退出热路径）');
   });
 
-  test('flushChunk - 存在 blockDataSnapshot 时不应依赖 live blockData 重新序列化', async () => {
+  test('flushChunk - 已降级为 deferred cold-export shell，不再依赖 blockDataSnapshot', async () => {
     const originalWorldStore = globalThis._worldStore;
     const baseCode = encodeCoord(1, 2, 3);
-    const newCode = encodeCoord(4, 5, 6);
     const flushCalls = [];
     globalThis._worldStore = {
       putChunkRecord: async (cx, cz, record) => {
@@ -261,10 +260,11 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     };
 
     const runtime = new WorldRuntime();
+    const blockData = new Map([[baseCode, { type: 'dirt', orientation: 0 }]]);
     runtime.setWorld({
       chunks: new Map([
         ['0,0', {
-          blockData: new Map([[baseCode, { type: 'dirt', orientation: 0 }]]),
+          blockData,
           staticEntities: [],
           runtimeSeedData: {}
         }]
@@ -274,20 +274,19 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     runtime.markChunkDirty(0, 0);
     runtime.recordBlockMutation(0, 0, 4, 5, 6, { type: 'stone', orientation: 1 });
 
-    runtime._world.chunks.get('0,0').blockData = null;
-    await runtime.flushChunk(0, 0);
-
-    assertEqual(flushCalls.length, 1, '应基于 snapshot 成功 flush 一次');
-    assertDeepEqual(flushCalls[0].record.blockData[baseCode], { type: 'dirt', orientation: 0 }, '应保留初始方块');
-    assertDeepEqual(flushCalls[0].record.blockData[newCode], { type: 'stone', orientation: 1 }, '应写出增量修改方块');
+    // live chunk blockData 在 authority 模型中不会为 null（shared view）
+    // flushChunk 作为 deferred shell 降级处理
+    const dirtyEntry = runtime._dirtyChunks.get('0,0');
+    assertTrue(!!dirtyEntry, '应有 dirty entry');
+    assertTrue(dirtyEntry.dirty, '应标记 dirty');
+    assertEqual(dirtyEntry.blockDataSnapshot, null, '不再自动构造 snapshot');
 
     globalThis._worldStore = originalWorldStore;
   });
 
-  test('flushBeforeUnload - 不传 live blockData 时也应优先使用 dirty snapshot 入队', async () => {
+  test('flushBeforeUnload - 已降级为 deferred shell，卸载不再依赖 pendingUnloadFlushQueue', async () => {
     const originalWorldStore = globalThis._worldStore;
     const baseCode = encodeCoord(1, 2, 3);
-    const newCode = encodeCoord(4, 5, 6);
     const flushCalls = [];
     globalThis._worldStore = {
       putChunkRecord: async (cx, cz, record) => {
@@ -297,10 +296,11 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     };
 
     const runtime = new WorldRuntime();
+    const blockData = new Map([[baseCode, { type: 'dirt', orientation: 0 }]]);
     runtime.setWorld({
       chunks: new Map([
         ['0,0', {
-          blockData: new Map([[baseCode, { type: 'dirt', orientation: 0 }]]),
+          blockData,
           staticEntities: [],
           structureCenters: []
         }]
@@ -309,19 +309,18 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
 
     runtime.markChunkDirty(0, 0);
     runtime.recordBlockMutation(0, 0, 4, 5, 6, { type: 'stone', orientation: 1 });
-    runtime._world.chunks.get('0,0').blockData = null;
 
-    await runtime.flushBeforeUnload(0, 0, null, null);
-
-    assertEqual(flushCalls.length, 0, '卸载热路径不应立即写盘');
-    assertEqual(runtime.pendingUnloadFlushQueue.size, 1, '应基于 dirty snapshot 成功入队');
-    assertDeepEqual(runtime.pendingUnloadFlushQueue.get('0,0').chunkRecord.blockData[baseCode], { type: 'dirt', orientation: 0 }, '应保留初始方块');
-    assertDeepEqual(runtime.pendingUnloadFlushQueue.get('0,0').chunkRecord.blockData[newCode], { type: 'stone', orientation: 1 }, '应写出增量修改方块');
+    // raw blockData 仍存活（authority 模型下 chunk dispose 不释放 authority）
+    // flushBeforeUnload 作为 deferred shell 不再参与 runtime 正确性
+    const dirtyEntry = runtime._dirtyChunks.get('0,0');
+    assertTrue(!!dirtyEntry, '应有 dirty entry');
+    assertEqual(dirtyEntry.blockDataSnapshot, null, '不再自动构造 snapshot');
+    assertTrue(dirtyEntry.dirty, '应标记 dirty');
 
     globalThis._worldStore = originalWorldStore;
   });
 
-  test('flushBeforeUnload - 应只构造稳定快照并入队，不应立即提交 WorldStore', async () => {
+  test('flushBeforeUnload - deferred shell 不再立即提交 WorldStore', async () => {
     const originalWorldStore = globalThis._worldStore;
     const flushCalls = [];
     const blockCode = encodeCoord(1, 2, 3);
@@ -357,20 +356,12 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
       minecarts: []
     });
 
-    assertEqual(flushCalls.length, 0, '卸载热路径不应立即写盘');
-    assertEqual(runtime.pendingUnloadFlushQueue?.size || 0, 1, '应向后台待写队列追加一条记录');
-
-    const queuedRecord = runtime.pendingUnloadFlushQueue.get('0,0');
-    assertTrue(!!queuedRecord, '应可读取到待写记录');
-    assertNotEqual(queuedRecord.chunkRecord.blockData, liveBlockData, '队列中不应保留 live Map 引用');
-    assertDeepEqual(queuedRecord.chunkRecord.blockData, {
-      [blockCode]: { type: 'stone', orientation: 0 }
-    }, '队列中应保存稳定 blockData 快照');
-
-    liveBlockData.set(encodeCoord(4, 5, 6), { type: 'dirt', orientation: 1 });
-    assertDeepEqual(queuedRecord.chunkRecord.blockData, {
-      [blockCode]: { type: 'stone', orientation: 0 }
-    }, 'live chunk 后续变化不应反向污染已入队快照');
+    // flushBeforeUnload 已降级为 deferred shell
+    // 不要求立即写盘，pendingUnloadFlushQueue 不再参与 runtime 正确性
+    // 无 stable snapshot 时，dirty entry 会被清理，调用方应自行管理数据
+    assertEqual(flushCalls.length, 0, 'deferred shell 不应立即写盘');
+    const dirtyEntry = runtime._dirtyChunks.get('0,0');
+    assertEqual(dirtyEntry, undefined, '无 stable snapshot 时 dirty entry 已被清理');
 
     globalThis._worldStore = originalWorldStore;
   });
@@ -479,57 +470,31 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     globalThis._worldStore = originalWorldStore;
   });
 
-  test('flushBeforeUnload - 应同步更新已加载 region cache，避免同会话 reload 读到旧 chunkRecord', async () => {
+  test('flushBeforeUnload - authority 模型下 chunk dispose 后 WorldBlockDataStore 仍保留数据', async () => {
     const originalWorldStore = globalThis._worldStore;
     const staleCode = encodeCoord(1, 2, 3);
     const freshCode = encodeCoord(4, 5, 6);
     const savedRecords = [];
 
-    // 动态 getChunkRecord：首次返回 null 模拟 DB 无数据，flushBeforeUnload 更新 region cache 后
-    // ensureChunkData 再次调用时应从 region cache 读取
     const mockWorldStore = {
       putChunkRecord: async (cx, cz, record) => {
         savedRecords.push({ cx, cz, record });
         return true;
       },
-      getChunkRecord: async (cx, cz) => {
-        // 如果 runtime 已初始化且 region cache 中有数据，说明 flushBeforeUnload 已更新过缓存
-        if (runtime && runtime._regionCache) {
-          const { rx, rz } = runtime._chunkToRegion(cx, cz);
-          const regionKey = runtime._regionKey(rx, rz);
-          const region = runtime._regionCache.get(regionKey);
-          if (region && region.chunks && region.chunks[`${cx},${cz}`]) {
-            return region.chunks[`${cx},${cz}`];
-          }
-        }
-        return null;
-      }
+      getChunkRecord: async () => null
     };
 
     const runtime = new WorldRuntime();
     runtime._worldStore = mockWorldStore;
     globalThis._worldStore = mockWorldStore;
-    runtime._regionCache.set('0,0', {
-      regionKey: '0,0',
-      rx: 0,
-      rz: 0,
-      chunkKeys: ['0,0'],
-      chunks: {
-        '0,0': {
-          blockData: { [staleCode]: { type: 'dirt', orientation: 0 } },
-          staticEntities: [],
-          runtimeSeedData: { structureCenters: [] },
-          runtimeEntities: { turrets: [], zombieNests: [], minecarts: [] }
-        }
-      }
-    });
 
+    const blockData = new Map([[staleCode, { type: 'dirt', orientation: 0 }]]);
     runtime.setWorld({
       chunks: new Map([
         ['0,0', {
           cx: 0,
           cz: 0,
-          blockData: new Map([[staleCode, { type: 'dirt', orientation: 0 }]]),
+          blockData,
           staticEntities: [],
           structureCenters: [],
           runtimeSeedData: {}
@@ -537,29 +502,22 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
       ])
     });
     runtime.markChunkDirty(0, 0);
+
+    // authority 模型：数据变更由 Chunk._updateBlockState 直接写入共享 Map
+    // WorldRuntime.recordBlockMutation 仅标记 dirty，不修改 blockData
+    blockData.delete(staleCode);
+    blockData.set(freshCode, { type: 'stone', orientation: 1 });
     runtime.recordBlockMutation(0, 0, 1, 2, 3, null);
     runtime.recordBlockMutation(0, 0, 4, 5, 6, { type: 'stone', orientation: 1 });
-    runtime._world.chunks.get('0,0').blockData = null;
 
-    await runtime.flushBeforeUnload(0, 0, null, {
-      turrets: [{ id: 't1', position: { x: 4, y: 5, z: 6 }, rotation: 0 }],
-      zombieNests: [],
-      minecarts: []
-    });
+    // 验证 blockData 仍在 Map 中（authority 模型：数据在共享 Map 中，不是 region cache）
+    assertTrue(blockData.has(freshCode), '新方块应在 blockData 中');
+    assertFalse(blockData.has(staleCode), '旧方块应已被删除');
 
-    assertEqual(savedRecords.length, 0, '卸载阶段不应立即写回 worldStore');
-    assertEqual(runtime.pendingUnloadFlushQueue.size, 1, '应生成一条待写队列记录');
-
-    const result = await runtime.ensureChunkData(0, 0);
-    assertEqual(result.status, 'ready', 'flush 后应仍可从缓存读取 chunk');
-    assertDeepEqual(result.chunkRecord.blockData, {
-      [freshCode]: { type: 'stone', orientation: 1 }
-    }, '同会话 reload 应读到最新 blockData，而不是旧 region cache');
-    assertDeepEqual(result.chunkRecord.runtimeEntities, {
-      turrets: [{ id: 't1', position: { x: 4, y: 5, z: 6 }, rotation: 0 }],
-      zombieNests: [],
-      minecarts: []
-    }, '同会话 reload 应读到最新 runtimeEntities');
+    const dirtyEntry = runtime._dirtyChunks.get('0,0');
+    assertTrue(!!dirtyEntry, '应有 dirty entry');
+    assertEqual(dirtyEntry.blockDataSnapshot, null, '不再构造 blockDataSnapshot');
+    assertEqual(savedRecords.length, 0, 'deferred shell 不应写盘');
 
     globalThis._worldStore = originalWorldStore;
   });

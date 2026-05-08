@@ -162,8 +162,9 @@ export class WorldRuntime {
   }
 
   /**
-   * 记录单个方块变更到 runtime 写回快照。
-   * 首次脏化时从当前 chunk.blockData 建一次序列化快照，之后只做增量更新。
+   * 记录方块变更为 runtime dirty（不再构造 blockDataSnapshot）
+   * authority 由 WorldBlockDataStore 统一持有，此处仅标记 runtime dirty
+   * blockDataSnapshot 语义已退出 runtime 正确性主链路
    * @param {number} cx
    * @param {number} cz
    * @param {number} x
@@ -173,17 +174,9 @@ export class WorldRuntime {
    */
   recordBlockMutation(cx, cz, x, y, z, typeOrEntry) {
     const dirtyEntry = this._ensureDirtyChunkEntry(cx, cz);
-    if (!dirtyEntry.blockDataSnapshot) {
-      dirtyEntry.blockDataSnapshot = this._createChunkSnapshotFromWorld(cx, cz);
-    }
-
-    const code = encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
-    const entry = this._normalizeSerializedEntry(typeOrEntry);
-    if (!entry) {
-      delete dirtyEntry.blockDataSnapshot[code];
-      return;
-    }
-    dirtyEntry.blockDataSnapshot[code] = entry;
+    dirtyEntry.dirty = true;
+    // blockDataSnapshot 已不再构造，authority 由 WorldBlockDataStore 持有
+    // 旧 snapshot 字段保留为 null 用于向后兼容，消费者应迁移到 authority
   }
 
   /**
@@ -813,6 +806,8 @@ export class WorldRuntime {
       };
     }
 
+    // blockDataSnapshot 已退出 runtime 正确性链路
+    // 旧 dirtyEntry.blockDataSnapshot 路径保留为 deferred compatibility fallback
     if (dirtyEntry?.blockDataSnapshot) {
       return {
         blockData: dirtyEntry.blockDataSnapshot,

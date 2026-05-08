@@ -418,7 +418,14 @@ Expected: PASS
   - chunk presence / generation state -> `WorldChunkRegistry`
 - `WorldGenerationService._writeRegionToMemoryStore()`、`World._requestRuntimeChunkRecord()` 等旧读写路径必须先改为新 owner/registry 组合，再删除旧容器
 - 删除时不允许留下任何仍以整包 chunk record 读取 `MemoryWorldStore` 作为 runtime 正确性前提的路径
-- `MemoryWorldStore` 的删除应视为“新 owner 全部接管完成”的收尾步骤，而不是第一阶段的前置动作
+- `MemoryWorldStore` 的删除应视为”新 owner 全部接管完成”的收尾步骤，而不是第一阶段的前置动作
+
+- [ ] **Step 4.6: 迁移 Chunk.js 内部对 `memoryWorldStore` 的直接引用**
+
+`Chunk.js` 中当前有 4 处直接引用 `this.world?.memoryWorldStore`（约在 `_updateBlockState()`、`acceptScatteredBlocks()` 附近、batch edit 路径等），这些引用必须在 `MemoryWorldStore` 删除前全部迁移为：
+- `blockData` 写操作 -> `this.world.worldBlockDataStore.setBlockEntry()` / `deleteBlockEntry()`
+- `staticEntities` / `runtimeSeedData` 读写 -> `this.world.worldChunkPayloadRegistry`
+- 禁止在 `MemoryWorldStore` 删除后留下 `this.world?.memoryWorldStore` 的空引用或 fallback 路径
 
 - [ ] **Step 5: 运行相关测试**
 
