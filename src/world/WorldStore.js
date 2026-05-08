@@ -2,13 +2,10 @@
 /**
  * WorldStore — 旧存档导入/导出工具
  *
- * 运行期权威数据源已迁移到 MemoryWorldStore（内存）。
+ * 运行期权威数据源已迁移到 WorldBlockDataStore（内存）。
  * 本类保留 IndexedDB 的读写能力，仅用于：
  *   - 旧存档一次性导入内存
  *   - 未来手动保存时从内存导出到 IndexedDB
- *
- * 运行期主链路不应直接用它取 chunk record，
- * 应通过 World.memoryWorldStore 获取。
  *
  * 数据层级：
  *   - WorldMeta: 世界级元数据（边界、种子、生成状态）

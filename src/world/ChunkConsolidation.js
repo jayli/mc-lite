@@ -332,7 +332,19 @@ export function extendChunk(Chunk) {
     // 阶段 2: 注册 Worker 回调并请求重新计算
     const taskId = `consolidate:${this.cx},${this.cz}:${performance.now()}:${Math.random().toString(36).slice(2, 8)}`;
     const isCrossChunkPatch = this.hasDeferredFinalizeWork === true;
+    const assemblyEpoch = this._assemblyEpoch || 0;
+    const authorityVersion = this.world?.worldBlockDataStore?.getAuthorityVersion(this.cx, this.cz) || 0;
     workerCallbacks.set(taskId, (data) => {
+      // 过期回包拒绝：chunk 已 disposed / detach-reattach / authority 已变更
+      if (this.disposed || this._assemblyEpoch !== assemblyEpoch) {
+        return;
+      }
+      // authority version 校验：consolidation 期间玩家修改了 blockData，丢弃回包
+      const currentVersion = this.world?.worldBlockDataStore?.getAuthorityVersion(this.cx, this.cz) || 0;
+      if (currentVersion !== authorityVersion) {
+        return;
+      }
+
       const callbackReceivedAt = performance.now();
       const workerTiming = data._workerTiming || {};
       const transitFromWorkerMs = workerTiming.workerFinishedAt
@@ -356,6 +368,8 @@ export function extendChunk(Chunk) {
       taskId,
       seed: WORLD_CONFIG.SEED,
       _consolidationRequestSentAt: sendTimestamp,
+      _assemblyEpoch: assemblyEpoch,
+      _authorityVersion: authorityVersion,
       snapshot: {
         blocks: blockDataToNumberKeys(this.blockData),
         entities: {

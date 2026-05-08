@@ -312,6 +312,9 @@ export class Chunk {
     const store = this.world?.worldBlockDataStore;
     if (!store) return false;
 
+    // 开发期断言：验证 slice 完整性
+    store._verifySliceIntegrity(this.cx, this.cz, 'Chunk.attachAuthoritySlice');
+
     const slice = store.ensureChunkSlice(this.cx, this.cz);
     this.blockData = slice;
     store.markAttached(this.cx, this.cz);
@@ -1224,12 +1227,6 @@ export class Chunk {
         (blockStore.getAuthorityVersion(this.cx, this.cz) || 0) + 1);
     }
 
-    // 同步到旧内存权威层（兼容过渡，后续移除）
-    const memStore = this.world?.memoryWorldStore;
-    if (memStore) {
-      memStore.applyBlockMutation(this.cx, this.cz, code, type === 'air' ? null : entry);
-    }
-
     // 更新碰撞体集合
     const props = getBlockProps(type);
     if (props.isSolid) {
@@ -1974,12 +1971,15 @@ export class Chunk {
     // 生成请求 ID
     const requestId = `${this.cx},${this.cz}-${Date.now()}`;
     const aoSourceVersion = this._aoSourceVersion;
+    const assemblyEpoch = this._assemblyEpoch || 0;
 
     // 动态导入 Worker 和回调
     import('./ChunkConsolidation.js').then(({ aoWorker, aoCallbacks }) => {
       // 注册回调
       aoCallbacks.set(requestId, (data) => {
-        if (!this.isReady || this.isConsolidating || this._aoSourceVersion !== aoSourceVersion) return;
+        if (this.disposed || !this.isReady || this.isConsolidating) return;
+        if (this._aoSourceVersion !== aoSourceVersion) return;
+        if (this._assemblyEpoch !== assemblyEpoch) return;
         this._applyAOResults(data.results, sentCodes);
       });
 
@@ -2438,6 +2438,7 @@ export class Chunk {
    * @param {object} payload - Worker 回包数据
    */
   acceptWorkerResult(payload = {}) {
+    if (this.disposed) return;
     const t0 = globalThis.performance?.now?.() ?? Date.now();
     const {
       scatteredBlocks,
@@ -3097,12 +3098,6 @@ export class Chunk {
           this.world.worldRuntime.recordBlockMutation(this.cx, this.cz, px, py, pz, 'air');
         }
 
-        // 同步到内存权威层
-        const memStore = this.world?.memoryWorldStore;
-        if (memStore) {
-          memStore.applyBlockMutation(this.cx, this.cz, code, null);
-        }
-
         // 记录 AO Worker 副本同步 delta
         aoDeltas.push({ chunkKey, code, op: 'delete', entry: null });
 
@@ -3449,12 +3444,6 @@ export class Chunk {
       const entry = block.orientation !== 0 ? { type: block.type, orientation: block.orientation } : block.type;
       this.blockData.set(code, entry);
 
-      // 同步到内存权威层（初始加载也直写，确保权威层完整）
-      const memStore = this.world?.memoryWorldStore;
-      if (memStore) {
-        memStore.applyBlockMutation(this.cx, this.cz, code, entry);
-      }
-
       // 写入 solidBlocks
       const props = getBlockProps(block.type);
       if (props.isSolid) {
@@ -3568,12 +3557,6 @@ export class Chunk {
       // 写入 blockData
       const entry = block.orientation !== 0 ? { type: block.type, orientation: block.orientation } : block.type;
       this.blockData.set(code, entry);
-
-      // 同步到内存权威层
-      const memStore = this.world?.memoryWorldStore;
-      if (memStore) {
-        memStore.applyBlockMutation(this.cx, this.cz, code, entry);
-      }
 
       // 写入 solidBlocks
       const props = getBlockProps(block.type);

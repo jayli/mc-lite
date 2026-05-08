@@ -195,22 +195,22 @@ export class WorldBlockDataStore {
    * @param {number} cz
    * @param {Map<number, object>} blockData - 新的 Map 实例
    */
-  replaceChunkSlice(cx, cz, blockData) {
+  replaceChunkSlice(cx, cz, blockData, _callSource = 'unknown') {
     const key = this.chunkKey(cx, cz);
 
     // guard：已 attach 的 slice 不允许直接 replace
     if (this._attached.has(key)) {
       console.warn(
-        `[WorldBlockDataStore] replaceChunkSlice(${cx},${cz}) called on attached slice. ` +
-        'Use detach -> replace -> reattach protocol.'
+        `[WorldBlockDataStore] replaceChunkSlice(${cx},${cz}) called on attached slice ` +
+        `(source: ${_callSource}). Use detach -> replace -> reattach protocol.`
       );
       return;
     }
 
     if (!(blockData instanceof Map)) {
       console.warn(
-        `[WorldBlockDataStore] replaceChunkSlice(${cx},${cz}) received non-Map input. ` +
-        'Runtime authority must use Map<number, entry>.'
+        `[WorldBlockDataStore] replaceChunkSlice(${cx},${cz}) received non-Map input ` +
+        `(source: ${_callSource}). Runtime authority must use Map<number, entry>.`
       );
       return;
     }
@@ -222,6 +222,8 @@ export class WorldBlockDataStore {
     this._versions.set(key, currentVersion + 1);
 
     this.stats.totalWrites++;
+    this.stats._replaceCallSources = this.stats._replaceCallSources || {};
+    this.stats._replaceCallSources[_callSource] = (this.stats._replaceCallSources[_callSource] || 0) + 1;
   }
 
   // ============================================================
@@ -323,7 +325,30 @@ export class WorldBlockDataStore {
       writes: this.stats.totalWrites,
       mutations: this.stats.totalMutations,
       hits: this.stats.hits,
-      misses: this.stats.misses
+      misses: this.stats.misses,
+      replaceCallSources: { ...this.stats._replaceCallSources }
     };
+  }
+
+  /**
+   * 开发期断言：验证 chunk slice 未被意外清空
+   * 在关键状态转换点调用，检测是否存在绕过受控入口的 clear() 调用
+   * @param {number} cx
+   * @param {number} cz
+   * @param {string} caller - 调用点标识
+   * @returns {boolean}
+   */
+  _verifySliceIntegrity(cx, cz, caller = 'unknown') {
+    const key = this.chunkKey(cx, cz);
+    const slice = this._slices.get(key);
+    if (!slice) {
+      console.warn(`[WorldBlockDataStore] _verifySliceIntegrity(${cx},${cz}) from ${caller}: slice is null/missing`);
+      return false;
+    }
+    if (!(slice instanceof Map)) {
+      console.warn(`[WorldBlockDataStore] _verifySliceIntegrity(${cx},${cz}) from ${caller}: slice is not a Map`);
+      return false;
+    }
+    return true;
   }
 }

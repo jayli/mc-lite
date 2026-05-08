@@ -45,6 +45,12 @@ export class WorldRuntime {
       lastElapsedMs: 0,
       lastProcessedAt: 0
     };
+    // 迁移期调用点统计
+    this._callStats = {
+      recordBlockMutation: 0,
+      flushChunk: 0,
+      flushBeforeUnload: 0
+    };
   }
 
   /**
@@ -173,10 +179,10 @@ export class WorldRuntime {
    * @param {string|object|null} typeOrEntry
    */
   recordBlockMutation(cx, cz, x, y, z, typeOrEntry) {
+    this._callStats.recordBlockMutation++;
     const dirtyEntry = this._ensureDirtyChunkEntry(cx, cz);
     dirtyEntry.dirty = true;
     // blockDataSnapshot 已不再构造，authority 由 WorldBlockDataStore 持有
-    // 旧 snapshot 字段保留为 null 用于向后兼容，消费者应迁移到 authority
   }
 
   /**
@@ -210,6 +216,7 @@ export class WorldRuntime {
    * 保留此方法仅供未来手动保存时导出到 IndexedDB。
    */
   async flushChunk(cx, cz, blockDataSnapshot = null) {
+    this._callStats.flushChunk++;
     const key = this._chunkKey(cx, cz);
     const dirtyEntry = this._dirtyChunks.get(key);
     if (!dirtyEntry) return;
@@ -388,6 +395,7 @@ export class WorldRuntime {
    * @param {object|null} entitiesSnapshot
    */
   async flushBeforeUnload(cx, cz, blockDataSnapshot, entitiesSnapshot) {
+    this._callStats.flushBeforeUnload++;
     const startedAt = globalThis.performance?.now?.() ?? Date.now();
     const key = this._chunkKey(cx, cz);
     const chunk = this._world?.chunks?.get(key) || null;

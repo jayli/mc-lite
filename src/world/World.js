@@ -19,7 +19,6 @@ import { WorldAccessLayer } from './WorldAccessLayer.js';
 import { WorldBoundsController } from './WorldBoundsController.js';
 import { WorldGenerationService } from './WorldGenerationService.js';
 import { worldStore } from './WorldStore.js';
-import { MemoryWorldStore } from './MemoryWorldStore.js';
 import { WorldBlockDataStore } from './WorldBlockDataStore.js';
 import { WorldChunkRegistry } from './WorldChunkRegistry.js';
 import { WorldChunkPayloadRegistry } from './WorldChunkPayloadRegistry.js';
@@ -172,7 +171,6 @@ export class World {
 
     // --- WorldStore 新架构初始化 ---
     this.worldStore = worldStore;
-    this.memoryWorldStore = new MemoryWorldStore();
     this.worldBlockDataStore = new WorldBlockDataStore();
     this.worldChunkRegistry = new WorldChunkRegistry();
     this.worldChunkPayloadRegistry = new WorldChunkPayloadRegistry();
@@ -369,41 +367,7 @@ export class World {
       }
     }
 
-    // --- 旧路径：MemoryWorldStore（兼容过渡） ---
-    // 运行期优先从内存权威层读取
-    const chunkRecord = this.memoryWorldStore.getChunkRecord(chunk.cx, chunk.cz);
-    const memRequestEnd = globalThis.performance?.now?.() ?? Date.now();
-    recordChunkPerf('world.runtime-chunk-record-memory', memRequestEnd - memRequestStart, {
-      chunkKey,
-      status: chunkRecord ? 'ready' : 'missing-chunk',
-      hasBlockData: !!chunkRecord?.blockData,
-      blockDataSize: chunkRecord?.blockData ? Object.keys(chunkRecord.blockData).length : 0,
-      hasRuntimeEntities: !!(chunkRecord?.runtimeEntities)
-    });
-
-    if (chunkRecord && !chunk.disposed) {
-      // 仍然走 WorldRuntime 的 region cache upsert 和 legacy entity 迁移
-      this.worldRuntime.ensureChunkData(chunk.cx, chunk.cz).then((result) => {
-        if (chunk.disposed) return;
-        if (result?.status === 'ready' && result.chunkRecord) {
-          chunk.loadFromRecord(result.chunkRecord);
-          return;
-        }
-        // 内存已有数据但 WorldRuntime 路径也返回了，使用 WorldRuntime 的结果
-        //（包含了 legacy entity  hydration）
-        if (!chunk.disposed) {
-          chunk.loadFromRecord(chunkRecord);
-        }
-      }).catch((_error) => {
-        // WorldRuntime 路径失败但内存有数据，仍可从内存加载
-        if (!chunk.disposed) {
-          chunk.loadFromRecord(chunkRecord);
-        }
-      });
-      return;
-    }
-
-    // 内存中没有数据，回退到 WorldRuntime 的 IndexedDB 路径（旧存档导入场景）
+    // 新 authority 未命中，回退到 WorldRuntime 的 IndexedDB 路径（旧存档导入场景）
     this.worldRuntime.ensureChunkData(chunk.cx, chunk.cz).then((result) => {
       const dbRequestEnd = globalThis.performance?.now?.() ?? Date.now();
       recordChunkPerf('world.runtime-chunk-record-db', dbRequestEnd - memRequestStart, {
