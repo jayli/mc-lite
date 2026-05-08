@@ -22,6 +22,7 @@
   - chunk unload 只释放视图与派生层
   - chunk reload 从 world-level authority 恢复
   - AO / tombstone / renderDelta / scatter patch 语义不回退
+  - 特殊实体（矿车、丧尸巢穴、炮塔等）的既有渲染、互动、与主世界/玩家的交互能力不回退
 - 若实现过程中发现某一步必须重新依赖 `PersistenceService.cache`、`WorldStore.commitChunkRecord()`、`blockDataSnapshot` 或 `pendingUnloadFlushQueue` 才能保证 runtime 正确性，则应停止推进并回到设计层修正，而不是临时接回旧链路。
 
 ### 新增文件
@@ -29,6 +30,13 @@
 - Create: `src/world/WorldBlockDataStore.js`
   - world-level `blockData` 唯一权威容器
   - 负责 chunk slice 读写、生成结果注入、未来导入导出接入点
+- Create: `src/world/WorldChunkPayloadRegistry.js`
+  - world-level non-block payload authority
+  - 本阶段负责 `runtimeSeedData`、`staticEntities` 的持有与恢复
+  - 为 `runtimeEntities` 预留兼容挂点，但不要求本阶段完成其 owner 重构
+- Create: `src/world/WorldChunkRegistry.js`
+  - world-level chunk presence / generation state registry
+  - 负责区分 missing chunk、known empty chunk、known non-empty chunk
 
 ### 删除文件
 
@@ -44,8 +52,16 @@
 - Modify: `src/world/World.js`
   - chunk 加载 / 卸载前后的 world-level authority 接入
   - 统一通过 `WorldBlockDataStore` 接收生成结果
+- Modify: `src/world/WorldChunkRegistry.js`
+  - 若实现为类文件，补充 chunk presence / generation state 查询
 - Modify: `src/world/WorldGenerationService.js`
   - 区域 / chunk 生成结果直接写入 `WorldBlockDataStore`
+- Modify: `src/world/BlockScatterManager.js`
+  - cross-chunk patch / scatter 编排必须对齐 authority slice 语义
+  - 保持 tombstone、hidden block、late worker result 保护在 shared authority 模式下仍然正确
+- Modify: `src/world/ChunkAssemblyScheduler.js`
+  - hydrate stage 在 authority slice 已存在时只做 attach + rebuild
+  - 不再驱动旧的 clear + inject blockData 语义
 - Modify: `src/world/WorldRuntime.js`
   - 收缩 `blockDataSnapshot`、`pendingUnloadFlushQueue`、`flushChunk()` 热路径职责
   - 明确 `RegionCache` 降级为冷边界 / region 管理辅助层
@@ -68,6 +84,16 @@
 - Test: `src/tests/test-world.js`
 - Test: `src/tests/test-world-runtime.js`
 - Test: `src/tests/test-runtime-session-persistence.js`
+- Test: `src/tests/test-world-generation-cross-region.js`
+
+### 需要删除或重写的旧测试
+
+- Delete or rewrite: `src/tests/test-memory-world-store.js`
+  - `MemoryWorldStore` 删除后，此测试不再成立
+- Rewrite: `src/tests/test-runtime-session-persistence.js`
+  - 从“cache 是会话权威”迁移为“authority 是会话权威，冷边界只是可选导出路径”
+- Rewrite: `src/tests/test-world-runtime.js`
+  - 从 `flushChunk()/snapshot/commitChunkRecord()` 主语义迁移为 authority attach / reload / cold boundary 降级语义
 
 ---
 
@@ -90,7 +116,11 @@
 要求：
 
 - 明确 `WorldBlockDataStore` 只负责 world-level `blockData` slice
-- 明确 `runtimeSeedData`、`staticEntities`、`runtimeEntities` 属于 chunk-level non-block payload
+- 明确 `WorldChunkPayloadRegistry` 本阶段持有 `runtimeSeedData`、`staticEntities`
+- 明确 `runtimeEntities` / 特殊实体系统本阶段作为兼容层保留，不作为 primary authority 重构对象
+- 明确特殊实体虽然不是 primary authority 重构对象，但其既有运行行为是本阶段硬性验收项，不允许功能回退
+- 明确 `WorldChunkRegistry` 持有 chunk presence / generation state，而不是靠空 slice 猜测
+- 明确 `runtimeSeedData`、`staticEntities` 属于本阶段要收口的 chunk-level non-block payload
 - 明确这些 non-block payload 不再以 `Chunk` 生命周期作为唯一持有语义
 
 - [ ] **Step 3: 固定 runtime 最小闭环**
@@ -108,6 +138,7 @@
 
 - 文档中明确写出 runtime-only 成功标准
 - 明确哪些旧功能降级为 deferred
+- 明确哪些旧测试将删除、哪些将重写、哪些将在本阶段降级
 
 ---
 
@@ -175,6 +206,84 @@ Run:
 
 Expected:
 - 新增唯一权威语义测试通过
+
+- [ ] **Step 6: 运行 lint**
+
+Run: `npm run lint`
+Expected: PASS
+
+---
+
+### Task 1.2: 固定 chunk presence / generation state 与 non-block payload owner
+
+**Files:**
+- Create: `src/world/WorldChunkPayloadRegistry.js`
+- Create: `src/world/WorldChunkRegistry.js`
+- Modify: `src/world/World.js`
+- Modify: `src/world/WorldRuntime.js`
+- Modify: `src/world/WorldGenerationService.js`
+- Test: `src/tests/test-world.js`
+- Test: `src/tests/test-world-runtime.js`
+
+- [ ] **Step 1: 写失败测试，固定 registry 语义**
+
+新增测试覆盖：
+
+- missing chunk 与 known empty chunk 必须可区分
+- bootstrap 生成出的空 chunk 不得因 slice 为空而被判定为 missing
+- `runtimeSeedData/staticEntities` 在 chunk unload 后仍有 world-level owner
+- reload 时这两类 non-block payload 从 registry 恢复，而不是依赖 live chunk 残留
+- `runtimeEntities` / 特殊实体链路在本阶段保持兼容，不要求进入新的 registry owner 体系
+
+- [ ] **Step 2: 实现 `WorldChunkRegistry` 最小骨架**
+
+至少包含：
+
+- `markChunkKnown(cx, cz, meta)`
+- `getChunkState(cx, cz)`
+- `hasKnownChunk(cx, cz)`
+- `markChunkGenerated(cx, cz)` 或等价接口
+
+边界要求：
+
+- 不允许通过 `ensureChunkSlice()` 是否被调用来隐式推断 chunk 是否已知存在
+- 必须能明确表达：
+  - missing chunk
+  - known empty chunk
+  - known non-empty chunk
+
+- [ ] **Step 3: 实现 `WorldChunkPayloadRegistry` 最小骨架**
+
+至少包含：
+
+- `getChunkPayload(cx, cz)`
+- `setChunkPayload(cx, cz, payload)`
+- `mergeChunkPayload(cx, cz, partialPayload)`
+- `hasChunkPayload(cx, cz)`
+
+边界要求：
+
+- `runtimeSeedData/staticEntities` 的 world-level owner 必须固定
+- `Chunk` 不得继续作为这两类 payload 的唯一最终持有者
+- `runtimeEntities` 若预留接口，只允许作为兼容挂点，不得因此扩成本阶段特殊实体大重构
+
+- [ ] **Step 4: 对齐生成与加载链路**
+
+要求：
+
+- 世界生成先写 `WorldChunkRegistry` 与 `WorldChunkPayloadRegistry`
+- chunk load / reload 时，先判定 chunk presence，再 attach authority / restore payload
+- `WorldRuntime.ensureChunkData()` 若仍保留冷边界职责，必须与 registry 语义对齐，而不是另起一套 missing 判定
+- `runtimeEntities` / 特殊实体恢复继续沿用现有兼容链路，只要求与新的 authority attach / reload 不冲突
+
+- [ ] **Step 5: 运行相关测试**
+
+Run:
+- 测试页面运行 `test-world.js`
+- 运行 `test-world-runtime.js`
+
+Expected:
+- chunk presence 与 payload owner 语义稳定成立
 
 - [ ] **Step 6: 运行 lint**
 
@@ -253,6 +362,7 @@ Expected: PASS
 - Modify: `src/world/Chunk.js`
 - Modify: `src/world/World.js`
 - Modify: `src/world/WorldRuntime.js`
+- Modify: `src/world/ChunkAssemblyScheduler.js`
 - Test: `src/tests/test-chunk.js`
 - Test: `src/tests/test-world-runtime.js`
 
@@ -276,9 +386,15 @@ Expected: PASS
 - 让代码层面能看出：
   - 哪一步在 attach
   - 哪一步在 rebuild
-  - 哪一步在恢复 `runtimeSeedData` / `staticEntities` / `runtimeEntities`
+  - 哪一步在恢复 `runtimeSeedData` / `staticEntities`
+  - 哪一步在兼容现有 `runtimeEntities` / 特殊实体恢复链路
 - 让代码层面能看出：
   - 哪一步在处理 cold input -> authority
+- `ChunkAssemblyScheduler` 调用的 hydrate stage 在 authority slice 已存在时，只允许：
+  - attach authority slice
+  - rebuild derived indexes
+  - restore payload
+  - 禁止继续驱动 `_clearForBlockInjection()` + `_injectBlockDataBatch()` 这类 clear + inject 语义
 - 明确采用三段式协议：
   - `WorldBlockDataStore.replaceChunkSlice()` / fill API
   - `Chunk.attachAuthoritySlice()` 或等价挂载步骤
@@ -318,6 +434,21 @@ Expected: PASS
 - `chunkRecord.blockData` 作为 plain object 输入时，先进入 authority，而不是直接写 chunk-local map
 - authority slice 已存在时，`loadFromRecord()` 只做 attach / rebuild，不重复注入逻辑真相
 - rebuild 只影响派生索引，不影响 authority 内容
+- `runtimeSeedData/staticEntities` 的恢复步骤与 blockData attach 步骤彼此独立
+- `runtimeEntities` / 特殊实体恢复在本阶段只是兼容步骤，不得反向主导 authority attach
+- `Chunk` dispose 后，authority / payload registry 仍保留，新的 chunk attach 不依赖旧实例残留
+
+- [ ] **Step 2.9: 固定 detach / dispose 协议**
+
+要求：
+
+- 明确 `Chunk.dispose()` / unload 期间：
+  - 哪些结构被释放
+  - 哪些 world-level authority 被保留
+  - 哪些异步回包必须失效
+- 为 attach / detach 生命周期引入 epoch 或等价版本语义
+- 测试必须能证明：晚到 worker 结果不会污染新 attach 的 chunk 视图
+- 测试必须能证明：scheduler 切片 hydrate 在 authority slice 已存在时不会 clear 或重注入 `Chunk.blockData`
 
 - [ ] **Step 3: 运行相关测试**
 
@@ -339,6 +470,7 @@ Expected: PASS
 
 **Files:**
 - Modify: `src/world/Chunk.js`
+- Modify: `src/world/BlockScatterManager.js`
 - Modify: `src/world/WorldGenerationService.js`
 - Modify: `src/world/WorldAccessLayer.js`
 - Modify: `src/world/WorldBlockDataStore.js`
@@ -352,6 +484,7 @@ Expected: PASS
 - `addBlockDynamic()`
 - `addBlocksBatchFast()`
 - `removeBlocksBatch()`
+- `BlockScatterManager.distributeBlocks()` / `scatter()` / deferred cross-chunk patch 路径
 - `acceptScatteredBlocks()`
 - `appendScatteredBlocks()`
 - 世界生成结果注入路径
@@ -394,6 +527,19 @@ Expected:
 - `acceptWorkerResult()` 若继续直接装配派生层，必须建立在 authority 已写入且 chunk 已 attach 的前提下
 - 禁止把 worker 回包的派生层数据反向当成逻辑真相来源
 
+- [ ] **Step 3.3: 适配 `BlockScatterManager` 到 authority slice 语义**
+
+要求：
+
+- `BlockScatterManager` 在 shared authority 模式下被明确视为 patch 编排层，而不是 chunk-local blockData 灌入层
+- `distributeBlocks()`、`scatter()`、deferred cross-chunk patch 路径必须对每个目标 chunk 命中其 authority slice
+- tombstone 检查、hidden block 过滤、late worker result 保护在 shared authority 模式下必须继续成立
+- 禁止 `BlockScatterManager` 通过“先把块灌进 chunk-local 副本，后续再同步”的旧思路维持正确性
+- 测试必须覆盖：
+  - cross-chunk patch 命中正确目标 slice
+  - 玩家修改不会被晚到 scatter 结果覆盖
+  - hidden block / tombstone 保护不会因 shared Map 而失效
+
 - [ ] **Step 3.5: 建立统一 mutation 原语**
 
 要求：
@@ -411,6 +557,15 @@ Expected:
   - AO / tombstone / renderDelta / render patch 更新
   - dirty 标记 / 异步派生调度
 - 测试或断言必须能发现“authority 写一次 + chunk map 再写一次”的重复 mutation
+
+- [ ] **Step 3.6: 建立 authority codec 边界**
+
+要求：
+
+- 明确 runtime authority 主存储为 `Map<number, entry>`
+- 明确 worker / 冷边界 / 测试夹具的序列化格式为 plain object 或等价边界格式
+- 为 object <-> Map 转换提供统一 codec，而不是让 `WorldGenerationService`、`WorldRuntime`、`Chunk` 各自散落转换
+- 禁止热路径借助 codec 进行整块 object/map 往返
 
 - [ ] **Step 3.8: 完成双写机制切换**
 
@@ -431,7 +586,8 @@ Expected:
 - 当前 chunk 已加载时，再 hydrate 到 `Chunk.blockData`
 - 不再为持久化缓存额外铺第二条热路径
 - 当前 chunk 未加载时，authority 仍应持有对应 slice，等待未来 chunk attach
-- `runtimeSeedData`、`staticEntities`、`runtimeEntities` 若随生成阶段一起产出，也必须写入对应的 world-level / registry 层，而不是继续只暂存在 chunk 生命周期中
+- `runtimeSeedData`、`staticEntities` 若随生成阶段一起产出，也必须写入对应的 world-level / registry 层，而不是继续只暂存在 chunk 生命周期中
+- `runtimeEntities` / 特殊实体本阶段不要求随生成链路一并重构，只要求不破坏既有兼容逻辑
 
 - [ ] **Step 4.5: 明确禁止 world generation 双写旧持久化层**
 
@@ -493,6 +649,7 @@ Expected: PASS
 - cross-region overflow 合并后，目标 chunk 的 `blockData` 必须先进入 authority
 - 目标 chunk 尚未加载时，不得因为没有 live chunk view 就跳过写入
 - bootstrap 期间 authority 必须能够独立持有未加载 chunk 的 slice，等待未来 attach
+- bootstrap 期间也必须同步建立 chunk presence / generation state，不允许把“空 slice”误当缺失 chunk
 
 - [ ] **Step 4: 对齐 bootstrap chunk 的后续加载来源**
 
@@ -620,6 +777,14 @@ Expected:
 - 停止首次脏化时创建完整 `blockDataSnapshot`
 - 收缩为 runtime dirty 标记，或直接由 chunk/local state 接管
 
+- [ ] **Step 3.2: 拆分 runtime dirty 与 export/save dirty**
+
+要求：
+
+- `markChunkDirty()` 只表达 runtime 后续处理需求
+- 若需要保留 future save dirty，必须显式拆成独立字段、独立注释、独立调度
+- 禁止 runtime dirty 默认附带“顺手准备持久化快照”的旧语义
+
 - [ ] **Step 3.5: 降级 `RegionCache` 中的 blockData 语义**
 
 要求：
@@ -657,6 +822,14 @@ Expected:
 - 若某方法继续保留，必须在注释中明确：
   - 它是否仍参与 runtime 主链路
   - 它若取数据，新来源是什么
+
+- [ ] **Step 5.8: 重写运行时测试语义**
+
+要求：
+
+- `src/tests/test-world-runtime.js` 从“flush/snapshot 正确性”迁移为“authority attach/reload/deferred cold boundary”语义
+- `src/tests/test-runtime-session-persistence.js` 从“cache 是会话权威”迁移为“authority 是会话权威，cache/worker 只是导出或冷边界”
+- 删除或彻底改写 `src/tests/test-memory-world-store.js`
 
 - [ ] **Step 6: 运行运行时相关测试**
 
@@ -726,6 +899,14 @@ Expected:
 - 未来导出存档
 - 未来冷存储恢复前的显式序列化边界
 
+- [ ] **Step 4.5: 对齐测试夹具与 worker 边界格式**
+
+要求：
+
+- 测试夹具可以继续使用 plain object，但进入 runtime authority 前必须走 codec
+- worker 消息边界允许继续使用序列化对象，不要求直接传 `Map`
+- 注释中明确：plain object 是 boundary format，不是 runtime authority format
+
 - [ ] **Step 5: 运行相关测试**
 
 Run:
@@ -779,6 +960,14 @@ Expected:
 - `WorldGenerationService` 若暂时仍保留 `saveRegionRecord()` / `saveWorldMeta()` 一类调用，必须在注释中明确：这些调用不是本阶段生成正确性的组成部分
 - `RegionCache` 若继续缓存带 `blockData` 的 chunkRecord，也必须在注释中明确：这些 `blockData` 只用于冷边界输入，不得作为 live authority
 
+- [ ] **Step 3.2: 收紧 `WorldRuntime.ensureChunkData()` 的边界语义**
+
+要求：
+
+- 明确它的职责是 cold boundary import / compatibility bridge，而不是 live authority owner
+- 若该方法返回 plain-object `chunkRecord`，必须在进入 runtime authority 前走 codec 与 registry
+- `missing-chunk` 判定必须与 `WorldChunkRegistry` 对齐，不能再由旧 `WorldStore` 是否命中单独决定
+
 - [ ] **Step 4: 运行运行时测试**
 
 Run:
@@ -786,6 +975,7 @@ Run:
 
 Expected:
 - runtime 路径不再把持久化层当成正确性前提
+- 特殊实体兼容链路不会因 authority 重构而被冷边界降级逻辑误伤
 
 - [ ] **Step 5: 运行 lint**
 
@@ -843,6 +1033,7 @@ Expected: PASS
 - Test: `src/tests/test-world.js`
 - Test: `src/tests/test-world-runtime.js`
 - Test: `src/tests/test-runtime-session-persistence.js`
+- Test: `src/tests/test-world-generation-cross-region.js`
 
 - [ ] **Step 1: 运行浏览器内测试全套回归**
 
@@ -853,6 +1044,7 @@ Run:
 
 Expected:
 - 所有与 runtime authority 相关的现有测试通过
+- 已删除/已替换的旧测试不再依赖 `MemoryWorldStore` 或 session cache 权威语义
 
 - [ ] **Step 2: 手动验证单块修改与 reload**
 
@@ -904,6 +1096,19 @@ Expected:
 - runtime-only 闭环稳定
 - 冷存储路径缺席不会破坏当前会话内正确性
 - 方块状态正确恢复
+
+- [ ] **Step 3.2: 手动验证特殊实体兼容性**
+
+手动步骤：
+
+1. 验证矿车、丧尸巢穴、炮塔在改造后仍能生成或被恢复到既有运行状态
+2. 验证它们与玩家的互动不回退
+3. 验证它们与主世界方块、碰撞、流式加载/卸载的交互不回退
+4. 对包含这些特殊实体的 chunk 执行 unload / reload，再次验证行为
+
+Expected:
+- 特殊实体的渲染、更新、互动、与主世界/玩家的交互能力保持正常
+- `blockData authority` 重构不会导致特殊实体失活、丢失或交互异常
 
 - [ ] **Step 3: 手动验证世界生成结果直接进入 blockData**
 

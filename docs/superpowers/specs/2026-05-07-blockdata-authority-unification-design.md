@@ -79,6 +79,11 @@
    - 所有 patch 直接命中目标 chunk 的 authority slice
    - 不允许先堆积在某个 chunk-local staging blockData 中等待二次同步
 
+5. **特殊实体兼容性**
+   - 矿车、丧尸巢穴、炮塔等既有特殊实体在本阶段改造后必须继续正常运行
+   - 必须保持与玩家、主世界、普通方块 authority 的互动行为不回退
+   - chunk unload / reload 后，这些特殊实体的既有行为链路不得因 `blockData authority` 重构而失效
+
 ## 3. Non-Goals
 
 本次设计明确不做以下事情：
@@ -235,7 +240,10 @@ runtime 中只存在一份 world-level `blockData authority`：
    - 至少包括：
      - `runtimeSeedData`
      - `staticEntities`
-     - `runtimeEntities`
+   - 本阶段 primary scope 只要求明确：
+     - `runtimeSeedData`
+     - `staticEntities`
+   - `runtimeEntities` / 特殊实体系统不作为本阶段 primary authority 重构对象，只要求与新 `blockData authority` 保持兼容
    - 这些数据可以暂时不并入 `WorldBlockDataStore` 同一个类，但必须在语义上明确：它们不再依赖 `Chunk` 生命周期作为唯一持有者
 
 约束：
@@ -249,6 +257,79 @@ runtime 中只存在一份 world-level `blockData authority`：
 - `WorldBlockDataStore` 不是“仅服务已加载 chunk 的 cache”
 - 它必须能在 chunk 尚未加载时就持有对应的 chunk slice
 - 也就是说，world-level authority 是世界逻辑真相仓库，而不是 loaded chunk 的附属物
+
+### 5.3.1.1 Chunk Payload Registry Contract
+
+仅统一 `blockData authority` 还不够，本阶段还必须把 `blockData` 之外的 chunk 级 payload owner 写清楚，否则删除 `MemoryWorldStore` 后，只会把“第二权威”从 blockData 转移到其他字段。
+
+本阶段建议显式引入：
+
+1. **`WorldChunkPayloadRegistry`**（名称可调整，但职责必须固定）
+   - 持有与 chunk 同坐标关联、但不属于普通块逻辑真相的 payload
+   - 本阶段至少包括：
+     - `runtimeSeedData`
+     - `staticEntities`
+   - 可预留 `runtimeEntities` 接口挂点，但不要求本阶段完成其 owner 重构
+
+2. **持有语义**
+   - 生命周期独立于 live `Chunk` 实例
+   - chunk unload 后仍可保留
+   - chunk reload 时可再次 attach / restore
+
+3. **职责边界**
+   - `WorldBlockDataStore` 只负责普通逻辑块 authority
+   - `WorldChunkPayloadRegistry` 只负责本阶段纳入范围的 non-block payload authority
+   - `Chunk` 只负责 attach、restore、rebuild 本地运行时视图
+   - `runtimeEntities` / `specialEntitiesShadowStore` 在本阶段视为既有兼容层，而不是新的 primary authority 改造对象
+
+4. **不允许的旧语义**
+   - `Chunk` 作为 `runtimeSeedData/staticEntities` 的最终唯一持有者
+   - `WorldRuntime._regionCache` 临时碰到谁就替谁持有 live payload
+   - `loadFromRecord()` 同时隐式决定普通块权威和 non-block payload 权威
+
+补充要求：
+
+- 本阶段即便不把 `WorldChunkPayloadRegistry` 做成最终形态，也必须在接口、注释和调用关系上把 owner 固定下来
+- 否则后续 reload、export、entity restore 都会继续混用冷边界对象与 live chunk 状态
+- `runtimeEntities` / 特殊实体系统本阶段只要求：
+  - 渲染、互动、reload 行为不回退
+  - 矿车、丧尸巢穴、炮塔等既有实体在世界流式加载、玩家交互、方块权威切换后仍可正常工作
+  - 不反向成为 `blockData authority` 的真相来源
+  - 不阻塞 `runtimeSeedData/staticEntities` 的 world-level restore 设计
+
+### 5.3.1.2 Chunk Registry / Generation State Contract
+
+只靠 `WorldBlockDataStore: Map<string, Map<number, entry>>` 无法表达“一个 chunk 是否已知存在”。本阶段还必须显式区分以下状态：
+
+1. **missing chunk**
+   - 当前 authority 中根本不存在该 chunk
+   - 可能尚未生成、尚未导入、也可能不在当前已知世界范围内
+
+2. **known empty chunk**
+   - chunk 已被生成或导入
+   - 只是其 `blockData` slice 为空
+
+3. **known non-empty chunk**
+   - chunk 已被生成或导入
+   - 且 authority slice 中存在至少一个条目
+
+建议显式引入 world-level chunk registry（可以是单独容器，也可以是 `WorldBlockDataStore` 的元数据层），至少记录：
+
+- `chunkKey`
+- `presenceState` 或等价字段
+- 是否完成 bootstrap/runtime generation
+- non-block payload 是否存在
+
+最低约束：
+
+- `ensureChunkSlice()` 创建空 slice 不能自动等价于“世界中确实存在该 chunk”
+- 查询 missing/known-empty 必须有不同返回语义
+- `WorldRuntime.ensureChunkData()`、bootstrap、cross-region overflow、未来 import/export 都必须基于同一套 chunk presence contract
+
+否则会出现两类严重歧义：
+
+- 一个空 `Map` 到底代表“这个 chunk 已生成但没有逻辑块”，还是“只是有人顺手 ensure 了一下”
+- reload 到底应该 attach 一个空 slice，还是回源生成器 / 冷边界
 
 ### 5.3.2 WorldBlockDataStore Storage Contract
 
@@ -485,6 +566,11 @@ AO Worker 的 `blockData` 镜像在新模型中仍然允许存在，但它必须
 - `entityCollisionIndex` 继续保持特殊实体碰撞占位的独立语义
 - 本次 authority 重构不把 `entityCollisionIndex` 合并进 `blockData` 或 `solidBlocks`
 - 对 `entityCollisionIndex` 的修改不应被误纳入普通方块写入口改造
+- `runtimeEntities` / `specialEntitiesShadowStore` 在本阶段视为兼容对象：
+  - 只要求现有渲染、互动、reload 行为不回退
+  - 不要求本阶段完成其 owner 模型重构
+  - 但必须明确其状态不能反向成为 `blockData authority` 的真相来源
+- 相比之下，`staticEntities` 与 `runtimeSeedData` 更靠近 chunk reload / 装配主链路，本阶段必须为它们提供明确的 world-level restore 来源
 
 ### 6.8 Section 6 保留范围总结
 
@@ -616,6 +702,33 @@ BlockScatterManager / deferred cross-chunk patch
 - 共享 `Map` 方案下，不允许对同一 patch 再执行一次额外的 `Chunk.blockData.set/delete` 补写
 - tombstone、hidden block、late worker result 过滤等现有一致性保护逻辑继续保留
 
+### 7.2.2 BlockScatterManager Contract
+
+`BlockScatterManager` 在新模型中不能继续被理解为“把 worker 结果灌进某个 chunk 的本地 blockData”，而必须被重新定义为：
+
+- **authority patch 编排层**
+
+也就是说，它负责：
+
+1. 按目标 chunk 分组 patch
+2. 将 patch 路由到各自 authority slice
+3. 驱动目标 chunk 的派生层更新
+4. 保持 tombstone、hidden block、late worker result 保护逻辑继续成立
+
+硬约束：
+
+- `BlockScatterManager` 不得再隐式依赖“chunk 先局部持有逻辑真相，未来再同步到别处”
+- `distributeBlocks()`、`scatter()`、deferred cross-chunk patch 都必须以 authority slice 为目标语义
+- shared authority 模式下，late worker result 的保护必须同时考虑：
+  - tombstone
+  - authority version / assembly epoch
+  - 玩家后续修改优先级
+
+换句话说：
+
+- `Chunk.acceptScatteredBlocks()` / `appendScatteredBlocks()` 是目标 chunk 的派生层装配入口
+- `BlockScatterManager` 才是 scatter patch 的 authority-level 编排入口
+
 ### 7.3 Chunk 加载
 
 目标链路：
@@ -696,6 +809,40 @@ World 请求 chunk
   - `attachAuthoritySlice()`
   - `rebuildDerivedIndexesFromAuthority()`
 
+### 7.3.1.0 ChunkAssemblyScheduler Alignment
+
+`ChunkAssemblyScheduler` 是 attach/hydrate/rebuild 协议的真实执行器之一，因此本阶段必须显式要求它与 shared authority 模型对齐。
+
+当前旧语义中，scheduler 驱动的 hydrate stage 仍可能复用：
+
+```text
+_clearForBlockInjection()
+-> _injectBlockDataBatch()
+```
+
+这在 chunk-local holder 模式下可以工作，但在 shared authority view 模式下属于非法路径。
+
+因此本阶段要求：
+
+1. 当 authority slice 已存在时，scheduler 驱动的 hydrate stage 只允许：
+   - attach authority slice
+   - rebuild derived indexes
+   - restore payload
+
+2. 当输入是 cold boundary plain object 时：
+   - 先执行 cold input -> authority
+   - 再进入 attach / rebuild
+
+3. scheduler 不得在 authority slice 已 attach 的场景下继续驱动：
+   - `Chunk.blockData.clear()`
+   - `_clearForBlockInjection()`
+   - `_injectBlockDataBatch()` 这类以“重建 chunk-local blockData”为前提的旧流程
+
+换句话说：
+
+- scheduler 不只是“调用 Chunk 的某个方法”
+- 它本身也承担了新 authority 生命周期协议是否真正落地的边界责任
+
 ### 7.3.1.1 loadFromRecord / _injectBlockData Migration Matrix
 
 本阶段必须把 `loadFromRecord()`、`_injectBlockData()`、`_injectBlockDataBatch()` 的旧复合职责拆开，否则 shared authority view 设计会在实施时被旧 mental model 拉回去。
@@ -760,6 +907,35 @@ World 请求 chunk
 - 禁止继续保留“一个 helper 同时负责写 `blockData` 和建索引”的旧复合职责
 - 禁止在 authority 已存在时，`loadFromRecord()` 仍重复执行“plain object -> chunk.blockData”注入流程
 
+### 7.3.1.2 Non-Block Payload Attach / Restore Protocol
+
+与 `blockData` attach 协议并列，本阶段还必须补上 non-block payload 的 restore 协议。
+
+推荐拆成独立步骤：
+
+1. `restoreChunkPayloadsFromRegistry(cx, cz)`
+   - 从 `WorldChunkPayloadRegistry` 读取 `runtimeSeedData/staticEntities`
+   - 不处理普通块 authority
+
+2. `Chunk.attachAuthoritySlice()`
+   - 只挂接 shared `blockData` slice
+
+3. `Chunk.rebuildDerivedIndexesFromAuthority()`
+   - 只重建 `visibleKeys/solidBlocks/blockDataArray/...`
+
+4. `Chunk.restoreRuntimePayloads()`
+   - 只恢复 `structureCenters`、静态实体
+   - `runtimeEntities` / 特殊实体恢复继续走现有兼容链路
+
+硬约束：
+
+- 恢复 `runtimeSeedData/staticEntities` 不能再顺手承担普通块 authority 建立职责
+- 同样地，普通块 authority attach / rebuild 也不能再顺手决定这些 payload 的 owner
+- 若继续保留 `loadFromRecord()`，它必须只是上面几步的编排入口，而不是新的混合权威容器
+- `runtimeEntities` / `specialEntitiesShadowStore` 在本阶段可以继续保留既有恢复方式，但必须明确：
+  - 它是兼容层，不是 `blockData authority`
+  - 它的状态不能反向决定普通块真相
+
 ### 7.3.2 Clear / Replace Boundary
 
 为了避免 shared Map 方案在实施时被旧实现语义污染，必须把“谁可以 clear / replace 什么”写成硬约束：
@@ -808,6 +984,62 @@ World.unloadChunk()
 - unload 不再承担权威同步动作
 - unload 后 reload 必须仍从 world-level `blockData` 恢复
 - 本阶段不要求同步写盘
+
+### 7.4.1 Detach / Dispose Protocol
+
+本阶段必须把 unload/dispose 写成与 attach/hydrate 同等级别的协议，而不是只说“卸载时不再 flush”。
+
+建议最少拆成：
+
+1. **detach authority view**
+   - `Chunk.blockData` 与 world-level authority 的共享引用解除
+   - 解除后 chunk 实例不再参与 live 读写
+
+2. **dispose derived indexes**
+   - 释放 `visibleKeys`
+   - 释放 `solidBlocks`
+   - 释放 `blockDataArray`
+   - 释放 `solidBlockIds`
+   - 释放 `meshData/instanceIndexMap/dynamicMeshes/renderDelta` 等 chunk-local 派生层
+
+3. **preserve world-level authorities**
+   - `WorldBlockDataStore` 中的 block slice 保留
+   - `WorldChunkPayloadRegistry` 中本阶段纳入范围的 non-block payload 保留
+   - `runtimeEntities` / 特殊实体状态继续沿用现有兼容层，不要求在本阶段改造为 registry owner
+
+4. **invalidate async callbacks**
+   - 与该 chunk 生命周期绑定的 worker 回包、AO 回包、consolidation 回包必须在 dispose 后可被识别为过期
+
+补充说明：
+
+- chunk dispose 允许清空 chunk-local 派生结构
+- chunk dispose 不允许清空 world-level authority
+- 若某段旧代码仍以 `Chunk.clear()` / `_injectBlockData()` 作为“卸载前准备”，必须明确拆除
+
+### 7.4.2 Authority Version / Assembly Epoch Contract
+
+shared authority view 模式下，必须显式定义“晚到回包如何失效”，否则旧 worker 结果会污染新 attach 的 slice。
+
+本阶段建议引入至少一种显式版本机制：
+
+1. **authority version**
+   - 每个 chunk slice 在发生逻辑变更时递增
+   - AO / consolidation / worker rebuild 可带上 version 或基于 version 做过滤
+
+2. **assembly epoch**
+   - 每次 chunk attach / detach / rebuild 生命周期切换时递增
+   - live chunk 只接受当前 epoch 的异步回包
+
+最低要求：
+
+- `acceptWorkerResult()`、scatter patch、AO 回包、consolidation 回包都必须有过期识别依据
+- `deletedBlockTombstones` 继续保留，但 tombstone 不是唯一的一致性保护机制
+- 不能只靠“当前 chunk 还在不在 map 里”判断回包是否有效
+
+设计意图：
+
+- tombstone 解决“旧块被删除后晚到结果复活”
+- authority version / epoch 解决“整个 attach 生命周期已经变化，旧回包不该再落地”
 
 ### 7.5 JSON 导入 / 导出
 
@@ -958,6 +1190,55 @@ authority 重构后，读路径也必须显式收敛，避免后续出现“写�
 5. RegionCache 读取边界
    - runtime 热路径不得把 `RegionCache` 中的 `blockData` 当成 live truth
    - 若某条路径仍读取 `cachedChunkRecord.blockData`，必须明确这是冷边界导入阶段，而不是运行中逻辑判定阶段
+
+## 8.3 Authority Codec / Serialization Boundary
+
+本阶段必须显式区分两种数据格式：
+
+1. **runtime authority format**
+   - `Map<number, entry>`
+   - 仅存在于主线程 world-level authority 与 live chunk shared view
+
+2. **boundary serialization format**
+   - plain object / worker payload / 测试夹具对象
+   - 仅用于：
+     - Worker 消息
+     - 冷边界输入输出
+     - 测试断言快照
+     - 未来导入导出
+
+建议新增明确 codec：
+
+- `deserializeChunkBlockDataObject(obj) -> Map<number, entry>`
+- `serializeChunkBlockDataSlice(map) -> object`
+
+硬约束：
+
+- codec 是边界层，不是热路径 mutation API
+- 业务代码不得在 runtime 主链路中频繁 `Object.entries(blockData)` 再回填 authority
+- `WorldGenerationService`、`WorldRuntime.ensureChunkData()`、未来 import/export 必须统一走 codec，而不是各自散落地做 object/map 转换
+
+这样做的目的不是形式统一，而是防止旧 plain object 心智继续从冷边界回流到 runtime 主存储
+
+## 8.4 Runtime Dirty vs Export Dirty
+
+本阶段虽然不以持久化为门槛，但必须把“dirty”语义拆清楚：
+
+1. **runtime dirty**
+   - 含义：chunk 的派生层、AO、render patch、consolidation 等需要后续处理
+   - 服务对象：runtime correctness / visual consistency
+   - 不要求生成 `blockDataSnapshot`
+
+2. **export/save dirty**
+   - 含义：将来若要导出或持久化，此 chunk 有尚未导出的变更
+   - 服务对象：冷存储 / 手动保存
+   - 不得再反向影响 runtime live truth
+
+因此：
+
+- `markChunkDirty()` 不应再默认触发“为持久化构造完整 snapshot”
+- `recordBlockMutation()` 若保留，必须明确自己属于哪种 dirty 语义
+- `flushChunk()`、`pendingUnloadFlushQueue`、`PersistenceService.cache` 不得再被当成 runtime correctness 机制
 
 ## 9. 复制与序列化边界
 
