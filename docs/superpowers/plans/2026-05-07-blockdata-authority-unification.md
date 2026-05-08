@@ -143,11 +143,10 @@
 
 ---
 
-### Task 1: 固定新的权威模型并删除 `MemoryWorldStore`
+### Task 1: 固定新的权威模型并先建立新的 world-level owners
 
 **Files:**
 - Create: `src/world/WorldBlockDataStore.js`
-- Delete: `src/world/MemoryWorldStore.js`
 - Modify: `src/world/World.js`
 - Test: `src/tests/test-world.js`
 
@@ -192,17 +191,17 @@ Expected:
 - runtime 热路径禁止把 `replaceChunkSlice()` 当成单块修改或 scatter patch 的通用入口
 - 一旦某个 slice 已 attach 给 live chunk，禁止静默替换其 `Map` 实例；若必须整块替换，只能走 detach -> replace -> reattach 协议
 
-- [ ] **Step 4: 从 `World` 中移除 `MemoryWorldStore` 初始化与引用**
+- [ ] **Step 4: 让 `World` 先持有新的 block authority owner**
 
 要求：
 
-- `World` 不再创建 `MemoryWorldStore`
 - `World` 改为持有 `WorldBlockDataStore`
 - `World` 必须向 live `Chunk` 暴露稳定的 authority store 引用
   - 推荐固定为 `world.worldBlockDataStore`
   - 或提供等价 accessor，但 owner 语义必须仍然属于 `World`
 - `Chunk` 不允许自行 new / 缓存第二份 authority store owner
-- 任何“卸载前同步到内存仓库”的语义全部删除
+- 在 `WorldChunkPayloadRegistry` / `WorldChunkRegistry` 尚未到位前，不得提前删除 `MemoryWorldStore`
+- 本 step 的目标是先让新的 block authority owner 可用，而不是立即移除旧容器
 
 - [ ] **Step 4.2: 固定 Chunk 访问 authority owner 的路径**
 
@@ -213,6 +212,18 @@ Expected:
 - `_updateBlockState()`、`acceptScatteredBlocks()`、`appendScatteredBlocks()`、batch edit helper 不允许在 `MemoryWorldStore` 删除后各自临时决定依赖注入方式
 - 不建议为了这次改造把 `WorldBlockDataStore` 作为新的广泛构造参数塞进 `new Chunk(...)`
 - 若出于测试夹具需要提供 accessor wrapper，也必须保持“`World` 持有 owner，`Chunk` 经由 `World` 访问”的语义不变
+
+- [ ] **Step 4.5: 明确 `MemoryWorldStore` 的删除前置条件**
+
+要求：
+
+- 删除 `MemoryWorldStore` 之前，以下三类新 owner 必须全部到位：
+  - `WorldBlockDataStore`
+  - `WorldChunkPayloadRegistry`
+  - `WorldChunkRegistry`
+- 在 `staticEntities`、`runtimeSeedData`、chunk presence / generation state 仍未迁出前，`MemoryWorldStore` 只能被视为临时兼容容器，不能被提前移除
+- 文档与实现都必须避免出现“blockData 已迁出，但 non-block payload 暂时无处承接”的中间态
+- `runtimeEntities` / 特殊实体链路即使本阶段不做大重构，也必须在旧容器删除前有明确兼容落点
 
 - [ ] **Step 5: 运行相关测试确认通过**
 
@@ -234,6 +245,7 @@ Expected: PASS
 **Files:**
 - Create: `src/world/WorldChunkPayloadRegistry.js`
 - Create: `src/world/WorldChunkRegistry.js`
+- Delete: `src/world/MemoryWorldStore.js`
 - Modify: `src/world/World.js`
 - Modify: `src/world/WorldRuntime.js`
 - Modify: `src/world/WorldGenerationService.js`
@@ -290,6 +302,28 @@ Expected: PASS
 - chunk load / reload 时，先判定 chunk presence，再 attach authority / restore payload
 - `WorldRuntime.ensureChunkData()` 若仍保留冷边界职责，必须与 registry 语义对齐，而不是另起一套 missing 判定
 - `runtimeEntities` / 特殊实体恢复继续沿用现有兼容链路，只要求与新的 authority attach / reload 不冲突
+
+- [ ] **Step 4.2: 明确 Task 1.2 -> Task 2 的临时装配过渡态**
+
+要求：
+
+- 在 Task 2 建立 shared view 之前，`WorldBlockDataStore` 已经是 runtime authority owner，但 `Chunk.blockData` 仍可能是 chunk-local `Map`
+- 因此在这一过渡期内，`World._requestRuntimeChunkRecord()` 可临时从 `WorldBlockDataStore` 读取 authority slice，并通过兼容过渡版 hydrate / inject 流程填充 `Chunk.blockData`
+- 这类 copy 仅是过渡期装配手段，不构成第二权威
+- unload / reload 正确性在这一阶段仍必须由 `WorldBlockDataStore` 保证，而不是由 chunk-local `Map` 保证
+- 该临时复制路径必须在 Task 2 中被 `attachAuthoritySlice()` + shared slice view + `rebuildDerivedIndexesFromAuthority()` 取代
+
+- [ ] **Step 4.5: 在三类新 owner 接管后再删除 `MemoryWorldStore`**
+
+要求：
+
+- 只有当以下职责都已迁出后，才允许删除 `MemoryWorldStore`：
+  - `blockData` -> `WorldBlockDataStore`
+  - `staticEntities` / `runtimeSeedData` -> `WorldChunkPayloadRegistry`
+  - chunk presence / generation state -> `WorldChunkRegistry`
+- `WorldGenerationService._writeRegionToMemoryStore()`、`World._requestRuntimeChunkRecord()` 等旧读写路径必须先改为新 owner/registry 组合，再删除旧容器
+- 删除时不允许留下任何仍以整包 chunk record 读取 `MemoryWorldStore` 作为 runtime 正确性前提的路径
+- `MemoryWorldStore` 的删除应视为“新 owner 全部接管完成”的收尾步骤，而不是第一阶段的前置动作
 
 - [ ] **Step 5: 运行相关测试**
 
@@ -410,6 +444,16 @@ Expected: PASS
   - rebuild derived indexes
   - restore payload
   - 禁止继续驱动 `_clearForBlockInjection()` + `_injectBlockDataBatch()` 这类 clear + inject 语义
+- `ChunkAssemblyScheduler` 的 runtime hydrate stage 需要显式迁移为：
+  - `record-ready`
+  - `attach-slice`
+  - `rebuild-indexes`（可分帧）
+  - `terrain-built`
+  - `runtime-finalize` / `finalized`
+- 若实现继续沿用 `runtime-hydrate` 命名，也必须在语义上改成：
+  - 首次进入时 attach slice 并初始化 rebuild cursor
+  - 后续分帧只推进 derived indexes rebuild
+  - 不再分帧注入 `blockData`
 - 明确采用三段式协议：
   - `WorldBlockDataStore.replaceChunkSlice()` / fill API
   - `Chunk.attachAuthoritySlice()` 或等价挂载步骤
@@ -429,6 +473,7 @@ Expected: PASS
 - `Chunk` 侧只允许：
   - 重新 attach slice
   - 清空并重建派生索引
+- `_clearForBlockInjection()` 若保留，必须重写成“清空派生索引并初始化 rebuild progress”，不得再操作 `this.blockData`
 - 测试必须能证明：shared authority slice 在 chunk rebuild 过程中不会被清空
 
 - [ ] **Step 2.75: 拆除 `loadFromRecord` / `_injectBlockData` 的旧复合职责**
@@ -440,6 +485,8 @@ Expected: PASS
   - cold input -> authority helper
   - 或 authority -> derived indexes rebuild helper
 - `_injectBlockDataBatch()` 若保留，必须明确是在分批 rebuild 派生索引，而不是分批写 chunk-local 逻辑真相
+- `assembleRuntimeHydratePhase()` 必须从“分帧注入 `blockData`”迁移为“分帧 rebuild 派生索引”
+- `ChunkAssemblyScheduler._runTask()` 必须能清晰读出 attach / rebuild / finalize 的阶段边界，而不是继续把 hydrate 理解成 blockData 注入
 - 禁止继续保留“一个 helper 同时负责写 `blockData` 和建索引”的旧实现
 
 - [ ] **Step 2.8: 写失败测试，锁定迁移后的职责边界**
@@ -452,6 +499,7 @@ Expected: PASS
 - `runtimeSeedData/staticEntities` 的恢复步骤与 blockData attach 步骤彼此独立
 - `runtimeEntities` / 特殊实体恢复在本阶段只是兼容步骤，不得反向主导 authority attach
 - `Chunk` dispose 后，authority / payload registry 仍保留，新的 chunk attach 不依赖旧实例残留
+- 大 chunk runtime hydrate 仍保留分帧能力，但分帧推进的是 derived indexes rebuild，而不是 blockData 注入
 
 - [ ] **Step 2.85: 实现统一的 authority version / assembly epoch 机制**
 
@@ -486,8 +534,7 @@ Expected: PASS
   - 旧 AO 回包不会落到新的 live chunk view
   - 旧 assembly callback 不会在 reattach 后继续重建新 chunk 的派生层
 
-- [ ] **Step 2.9: 固定 detach / dispose 协议**
-- [ ] **Step 2.95: 固定 detach / dispose 协议**
+- [ ] **Step 2.10: 固定 detach / dispose 协议**
 
 要求：
 
@@ -662,9 +709,22 @@ Expected:
 
 - `BlockScatterManager` 在 shared authority 模式下被明确视为 patch 编排层，而不是 chunk-local blockData 灌入层
 - `distributeBlocks()`、`scatter()`、deferred cross-chunk patch 路径必须对每个目标 chunk 命中其 authority slice
+- `_scatterWithRouting()` 必须改为按目标 chunk 产出 authority patch plan，而不是产出 chunk-local 注入计划
+- `ownBuffer` / target buffer 的语义必须改成：
+  - authority patch batch
+  - 以及后续派生层装配计划
+  - 不再代表“待写入 chunk-local blockData 的列表”
+- 对于已加载目标 chunk：
+  - scatter 结果必须经由统一 mutation primitive 写入 authority
+  - `acceptScatteredBlocks()` / `appendScatteredBlocks()` 若保留，只允许承担 authority 已写入后的派生层更新或薄编排壳职责
+- 对于未加载目标 chunk：
+  - scatter 结果也必须立即写入 `WorldBlockDataStore`
+  - 不得因为没有 live chunk view 就只留在 `chunkBuffers` / `pendingCrossChunkPatchBuffers`
 - tombstone 检查、hidden block 过滤、late worker result 保护在 shared authority 模式下必须继续成立
 - 禁止 `BlockScatterManager` 通过“先把块灌进 chunk-local 副本，后续再同步”的旧思路维持正确性
+- 禁止 `acceptScatteredBlocks()` / `appendScatteredBlocks()` 继续一边写 truth、一边直接维护另一份隐式 chunk-local 正确性
 - 测试必须覆盖：
+  - own chunk / loaded foreign chunk / unloaded foreign chunk 三种目标分支
   - cross-chunk patch 命中正确目标 slice
   - 玩家修改不会被晚到 scatter 结果覆盖
   - hidden block / tombstone 保护不会因 shared Map 而失效
@@ -677,7 +737,9 @@ Expected:
 - `pendingCrossChunkPatchBuffers` 若继续保留，只允许承担：
   - authority patch 调度容器
   - 派生层装配延迟队列
+- `chunkBuffers` 若继续保留，也只允许承担已写 authority 后的分组/调度元数据，不得继续保存唯一逻辑真相
 - 禁止 `pendingCrossChunkPatchBuffers` 成为“尚未写入 authority 的唯一逻辑真相 holder”
+- 禁止形成“scatter patch 先缓存在 buffer，等目标 chunk 加载后再真正写 authority”的新中间态
 - 若玩家编辑对未加载 chunk 仍保持“忽略请求”的现状，必须在 `WorldAccessLayer` 注释和测试中明确：这是产品交互边界，不是 authority 模型限制
 - 测试必须覆盖：
   - 目标 chunk 当时未加载，后续 attach / reload 仍能看到先前 patch 结果
@@ -797,7 +859,28 @@ Expected: PASS
 - 预生成结果的 runtime 主落点改为 `WorldBlockDataStore`
 - `_writeRegionToMemoryStore` 一类旧内存权威写入路径必须退出
 - `RegionRecord` / chunk 结果整理后，先写 authority，再决定是否触发已加载 chunk 的 attach / rebuild
+- `WorldGenerationService` 必须成为 worker 边界到 runtime authority 的主转换点：
+  - `blockDataBlocks[]` / plain object boundary format
+  - 统一走 codec
+  - 构建 `Map<number, entry>`
+  - 再调用 `WorldBlockDataStore.replaceChunkSlice(cx, cz, map)`
+- `Chunk` 不再承担 world generation 的 plain object -> Map 转换职责
 - `WorldStore.saveRegionRecord()`、`saveWorldMeta()` 若暂时保留，只能作为 deferred / future hook，不得作为 runtime 正确性的必要步骤
+
+- [ ] **Step 2.2: 固定 `_generateRegion()` 的生成结果注入顺序**
+
+要求：
+
+- 对每个生成出的 chunk，runtime 注入顺序必须明确可读为：
+  - worker result / `blockDataBlocks[]`
+  - `WorldGenerationService` 调用统一 codec
+  - `WorldBlockDataStore.replaceChunkSlice(cx, cz, map)`
+  - `WorldChunkRegistry.markChunkGenerated(cx, cz)`
+  - `WorldChunkPayloadRegistry.setChunkPayload(cx, cz, { runtimeSeedData, staticEntities })`
+  - 若 chunk 已加载，再执行 `attachAuthoritySlice()` + `rebuildDerivedIndexesFromAuthority()`
+- 若某些中间结构继续使用 plain object，只允许作为 boundary format 存在
+- 不允许在 `Chunk.loadFromRecord()` / `_injectBlockData()` 阶段再临时承担生成结果转 authority 的职责
+- 不允许让 `WorldStore` / `RegionRecord` 的 plain object 反向决定 runtime authority 主格式
 
 - [ ] **Step 3: 处理 bootstrap 路径中的 overflow 与未加载 chunk**
 

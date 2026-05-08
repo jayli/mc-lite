@@ -693,6 +693,10 @@ AO Worker 的 `blockData` 镜像在新模型中仍然允许存在，但它必须
   - 只要求现有渲染、互动、reload 行为不回退
   - 不要求本阶段完成其 owner 模型重构
   - 但必须明确其状态不能反向成为 `blockData authority` 的真相来源
+- owner 边界必须显式固定：
+  - `WorldChunkPayloadRegistry` 本阶段只负责 `runtimeSeedData + staticEntities`
+  - `runtimeEntities` 继续由现有 `SpecialEntitiesShadowStore` 持有和管理
+  - `WorldChunkPayloadRegistry` 可预留未来接入挂点，但本阶段不接管 `runtimeEntities`
 - 相比之下，`staticEntities` 与 `runtimeSeedData` 更靠近 chunk reload / 装配主链路，本阶段必须为它们提供明确的 world-level restore 来源
 
 ### 6.8 Section 6 保留范围总结
@@ -786,6 +790,58 @@ WorldGenerationService._generateRegion()
 - 它们只能是 deferred / future hook
 - 不能是本阶段生成完成的必要步骤
 
+### 7.1.1.1 Generation Result Injection Protocol
+
+除了确定“生成结果先写 authority”之外，本阶段还必须明确 **world generation 的 blockData 格式转换链路**。
+
+当前 world generation 天然会经过 worker / cold boundary 格式：
+
+- WorldWorker 产出 `blockDataBlocks[]` 或等价消息结构
+- `RegionRecord.chunks[].blockData` 若继续存在，也更接近 plain object boundary format
+
+但 runtime authority 主存储必须固定为 `Map<number, entry>`。因此本阶段推荐把生成结果注入协议写死为：
+
+```text
+Worker result (blockDataBlocks[] / plain-object boundary format)
+-> WorldGenerationService 调用统一 codec
+-> 构建 chunk authority Map<number, entry>
+-> WorldBlockDataStore.replaceChunkSlice(cx, cz, map)
+-> WorldChunkRegistry.markChunkGenerated(cx, cz)
+-> WorldChunkPayloadRegistry.setChunkPayload(cx, cz, payload)
+-> 若 chunk 已加载：attachAuthoritySlice() + rebuildDerivedIndexesFromAuthority()
+-> 若 chunk 未加载：仅保留 authority / registry / payload，等待未来 attach
+```
+
+硬约束：
+
+1. `plain object -> Map<number, entry>` 的主转换点必须前移到 generation result injection boundary
+   - 推荐由 `WorldGenerationService` 调用统一 codec 完成
+   - 不允许继续把转换延后到 `Chunk.loadFromRecord()` / `_injectBlockData()` 内部再做
+
+2. `Chunk` 不再承担“把生成结果变成 runtime authority”的职责
+   - `Chunk` 只负责 attach authority slice
+   - rebuild derived indexes
+   - restore non-block payload
+
+3. `replaceChunkSlice()` 在这里属于合法低频整块 authority 注入
+   - 因为世界生成属于 authority lifecycle 建立场景
+   - 但它仍然不是普通热路径 mutation API
+
+4. 若 `RegionRecord` / `WorldStore` / `saveRegionRecord()` 等冷边界仍暂时保留
+   - 它们只能被视为 deferred serialization / cold persistence boundary
+   - 不得反向决定 runtime authority 的主格式
+
+5. `blockDataBlocks[]`、plain object、`Map<number, entry>` 三者职责必须被严格区分
+   - `blockDataBlocks[]`：worker 消息边界格式
+   - plain object：冷边界 / 测试夹具 / 兼容输入格式
+   - `Map<number, entry>`：runtime authority 唯一主格式
+
+设计意图：
+
+- 让 `WorldGenerationService` 成为 world worker 边界到 runtime authority 的正式转换点
+- 避免 object/map 转换散落在 `WorldGenerationService`、`WorldRuntime`、`Chunk` 多处
+- 避免 `Chunk` 在 shared authority 模式下继续承担旧式“注入 blockData”职责
+
 ### 7.1.2 Region Concept vs Region Persistence
 
 本阶段必须把两个概念拆开：
@@ -875,6 +931,51 @@ BlockScatterManager / deferred cross-chunk patch
 
 - `Chunk.acceptScatteredBlocks()` / `appendScatteredBlocks()` 是目标 chunk 的派生层装配入口
 - `BlockScatterManager` 才是 scatter patch 的 authority-level 编排入口
+
+### 7.2.2.1 Scatter Routing / Buffer / Authority Injection Protocol
+
+为了避免 scatter 路径在 shared authority 模式下重新长出 staging truth，本阶段还必须把 `BlockScatterManager` 的 routing 与 buffer 语义写具体。
+
+推荐协议：
+
+1. `_scatterWithRouting()` 输出的不再是“往某个 chunk-local blockData 灌数据”的计划
+   - 而是按目标 chunk 分组后的 authority patch plan
+   - 对每个目标 chunk 都要先决定：
+     - own chunk
+     - loaded foreign chunk
+     - unloaded foreign chunk
+
+2. 对于 own chunk / 已加载目标 chunk
+   - scatter 结果必须先经由统一 mutation primitive 写入目标 authority slice
+   - 然后再由目标 chunk 增量更新 `visibleKeys`、`solidBlocks`、`lightSourceCoords`、`blockDataArray` 等派生层
+   - `acceptScatteredBlocks()` / `appendScatteredBlocks()` 若继续保留，必须降级为：
+     - authority 已经写入后的派生层装配入口
+     - 或统一 mutation primitive 的薄编排壳
+   - 不允许它们继续一边写 truth、一边顺手维护另一份“隐式 chunk-local 正确性”
+
+3. 对于未加载目标 chunk
+   - patch 也必须立即进入 `WorldBlockDataStore`
+   - 不得因为缺少 live chunk view 而暂缓 authority 建立
+   - 未来该 chunk attach 时，再通过 attach / rebuild 恢复派生层
+
+4. `chunkBuffers` / `pendingCrossChunkPatchBuffers` 若继续保留，其语义必须降级
+   - 允许承担：
+     - 已提交 authority 的 patch metadata
+     - attach 后的派生层补建 / 延迟装配任务
+   - 不允许承担：
+     - 尚未写入 authority 的唯一逻辑真相
+     - “先缓存在 buffer，等 chunk 加载后再真正写 world-level truth”的旧职责
+
+5. `ownBuffer` / target buffer 的设置逻辑必须随之调整
+   - ownBuffer 不再代表“本 chunk 的 chunk-local 注入列表”
+   - 而应代表“本目标 chunk 的 authority patch batch + 后续派生层装配计划”
+   - 若某批 patch 最终被 tombstone / 玩家后续修改 / hidden-block 过滤掉，必须在 authority 判定阶段就消化，而不是等 chunk-local 注入时再决定
+
+设计意图：
+
+- 让 scatter routing 在 authority level 完成逻辑真相落地
+- 让 loaded / unloaded target 的区别只影响“何时装配派生层”，不影响“真相是否已成立”
+- 让 `acceptScatteredBlocks()` / `appendScatteredBlocks()` 退出旧式 truth + index 混合职责
 
 ### 7.2.3 Unloaded Target Chunk Write Semantics
 
@@ -1006,6 +1107,35 @@ _clearForBlockInjection()
    - `Chunk.blockData.clear()`
    - `_clearForBlockInjection()`
    - `_injectBlockDataBatch()` 这类以“重建 chunk-local blockData”为前提的旧流程
+
+4. scheduler 的可中断能力必须保留，但作用对象要改变
+   - 旧模式里，分帧 budget 用在“分批把 plain object 注入 `Chunk.blockData`”
+   - 新模式里，分帧 budget 必须改为“分批 rebuild `visibleKeys` / `solidBlocks` / `blockDataArray` / `solidBlockIds` / `lightSourceCoords` 等派生索引”
+   - 不允许因为 shared authority 改造，就把大 chunk hydrate 简化为一次性同步全量 rebuild，从而把主线程卡顿重新引入
+
+5. 推荐把 scheduler 的 runtime hydrate 链路语义显式调整为：
+
+```text
+record-ready
+-> attach-slice
+-> rebuild-indexes   // 可分帧
+-> terrain-built
+-> finalized
+```
+
+如果实现上继续沿用 `runtime-hydrate` 命名，也必须满足：
+
+- 首次进入时只做 attach authority slice 与 rebuild cursor 初始化
+- 后续继续帧只推进 derived indexes rebuild cursor
+- payload restore 在 attach / rebuild 之后单独执行
+
+换句话说，scheduler 的“可中断装配”在新模型里应该服务于：
+
+- `authority -> derived indexes`
+
+而不应继续服务于：
+
+- `plain object -> chunk-local blockData`
 
 换句话说：
 
@@ -1273,6 +1403,16 @@ send side 必须明确：
 - `blockDataToNumberKeys(this.blockData)` 一类操作在新模型下只允许被视为 worker 消息边界 codec
 - 它的存在不应重新引入 `blockDataSnapshot` / parked snapshot / unload holder 语义
 - consolidation send side 允许 clone 一次，但这个 clone 只能服务于当前 worker 任务
+- 对 shared authority slice 的这次 serialization 应被理解为 **point-in-time snapshot / best-effort snapshot**
+  - 它不锁定 live authority
+  - 不要求为 consolidation send side 引入暂停玩家修改或显式加锁机制
+  - 这里的 `best-effort` 指的是“发送给 worker 后可立刻过时”，而不是主线程遍历过程中需要处理多线程撕裂
+- 因此，send side 不负责维持“worker 回包时刻仍然与 live authority 强一致”
+  - 这一点必须由 receive side 的 `authority version`
+  - `assembly epoch`
+  - `deletedBlockTombstones`
+  - 玩家后续修改优先级
+  共同兜底
 
 #### 7.4.3.2 Consolidation Receive-Side Contract
 
