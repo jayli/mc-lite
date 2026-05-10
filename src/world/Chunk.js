@@ -3498,6 +3498,10 @@ export class Chunk {
       const code = Chunk.encodeCoord(block.x, block.y, block.z);
       if (this.deletedBlockTombstones.has(code)) continue;
 
+      // 若 authority 中已存在该方块（如 scatter 先写了未加载目标 chunk），
+      // 跳过 store mutation 防止重复 version bump 与 stats 放大
+      if (this.blockData.has(code)) continue;
+
       const entry = block.orientation !== 0 ? { type: block.type, orientation: block.orientation } : block.type;
       patches.set(code, entry);
     }

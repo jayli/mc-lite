@@ -63,6 +63,25 @@ export class WorldChunkRegistry {
   }
 
   /**
+   * 通用标记 chunk 为已知存在，根据 source 自动选择 state
+   * scatter 写入 → 'generated'；cold-import → 'imported'
+   * 若已标记过则跳过，避免覆盖已有 state
+   * @param {number} cx
+   * @param {number} cz
+   * @param {object} [meta]
+   */
+  markChunkKnown(cx, cz, meta = {}) {
+    const key = this.chunkKey(cx, cz);
+    if (this._entries.has(key)) return; // 已标记过，不覆盖
+    const state = meta.source === 'cold-import' ? 'imported' : 'generated';
+    this._entries.set(key, {
+      state,
+      generatedAt: meta.generatedAt || Date.now(),
+      generatorVersion: meta.generatorVersion || 0
+    });
+  }
+
+  /**
    * 获取 chunk 的 presence state
    * @param {number} cx
    * @param {number} cz

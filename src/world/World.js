@@ -428,10 +428,10 @@ export class World {
           }
         }
 
-        // 5. runtimeEntities 通过 _pendingChunkRecord 传递（供 assembleRuntimeHydratePhase 消费）
+        // 5. runtimeEntities 直接注入 shadow store，不再回退到旧 cold-import 注入分支
+        //    避免重新执行 blockData 注入和 staticEntities 重复恢复
         if (result.chunkRecord.runtimeEntities) {
-          chunk._pendingChunkRecord = result.chunkRecord;
-          chunk._isAuthorityAttached = false; // 走 cold import 路径让 assembleRuntimeHydratePhase 处理 entities
+          specialEntitiesShadowStore.deserializeAndMerge(chunk.cx, chunk.cz, result.chunkRecord.runtimeEntities);
         }
 
         chunk.awaitingStoreRecord = false;
