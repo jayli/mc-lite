@@ -1,21 +1,14 @@
 export function extendChunk(Chunk) {
   /**
-   * 防抖保存区块数据
+   * @deprecated runtime 自动持久化已退出热路径，authority 由 WorldBlockDataStore 持有。
+   * 保留为 no-op shell，仅供未来手动保存/导出入口复用。
+   * 不再实际写 IndexedDB / WorldStore。
    */
   Chunk.prototype.saveDebounced = function() {
-    if (this.saveTimeout) clearTimeout(this.saveTimeout);
-    this.saveTimeout = setTimeout(() => {
-      const runtime = this.world?.worldRuntime;
-      if (runtime?.flushChunk) {
-        runtime.flushChunk(this.cx, this.cz).catch((error) => {
-          console.warn(`[ChunkPersistence] flushChunk failed for ${this.cx},${this.cz}:`, error);
-        });
-        this.saveTimeout = null;
-        return;
-      }
-
-      console.warn(`[ChunkPersistence] Missing worldRuntime for ${this.cx},${this.cz}, skip legacy save path`);
+    // no-op：runtime 正确性不再依赖防抖保存
+    if (this.saveTimeout) {
+      clearTimeout(this.saveTimeout);
       this.saveTimeout = null;
-    }, 500);
+    }
   };
 }

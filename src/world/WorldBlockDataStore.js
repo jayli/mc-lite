@@ -43,6 +43,13 @@ export class WorldBlockDataStore {
       hits: 0,
       misses: 0
     };
+
+    // 迁移期调用点统计：追踪 deprecated / fallback 路径命中次数
+    this._callStats = {
+      replaceOnAttached: 0,   // 对 attached slice 的 replace 尝试
+      nonMapReplace: 0,       // 非 Map 类型的 replace 尝试
+      integrityWarn: 0        // _verifySliceIntegrity 触发的告警
+    };
   }
 
   // ============================================================
@@ -122,8 +129,7 @@ export class WorldBlockDataStore {
    */
   setBlockEntry(cx, cz, code, entry) {
     const key = this.chunkKey(cx, cz);
-    const slice = this._slices.get(key);
-    if (!slice) return;
+    const slice = this.ensureChunkSlice(cx, cz);
 
     const normalized = typeof entry === 'string' ? { type: entry, orientation: 0 } : { ...entry };
     slice.set(code, normalized);
@@ -143,8 +149,7 @@ export class WorldBlockDataStore {
    */
   deleteBlockEntry(cx, cz, code) {
     const key = this.chunkKey(cx, cz);
-    const slice = this._slices.get(key);
-    if (!slice) return;
+    const slice = this.ensureChunkSlice(cx, cz);
 
     slice.delete(code);
 
@@ -163,8 +168,7 @@ export class WorldBlockDataStore {
    */
   applyChunkPatch(cx, cz, patches) {
     const key = this.chunkKey(cx, cz);
-    const slice = this._slices.get(key);
-    if (!slice) return;
+    const slice = this.ensureChunkSlice(cx, cz);
 
     for (const [code, entry] of patches) {
       if (entry === null || entry === undefined) {
@@ -200,6 +204,7 @@ export class WorldBlockDataStore {
 
     // guard：已 attach 的 slice 不允许直接 replace
     if (this._attached.has(key)) {
+      this._callStats.replaceOnAttached++;
       console.warn(
         `[WorldBlockDataStore] replaceChunkSlice(${cx},${cz}) called on attached slice ` +
         `(source: ${_callSource}). Use detach -> replace -> reattach protocol.`
@@ -208,6 +213,7 @@ export class WorldBlockDataStore {
     }
 
     if (!(blockData instanceof Map)) {
+      this._callStats.nonMapReplace++;
       console.warn(
         `[WorldBlockDataStore] replaceChunkSlice(${cx},${cz}) received non-Map input ` +
         `(source: ${_callSource}). Runtime authority must use Map<number, entry>.`
@@ -342,13 +348,47 @@ export class WorldBlockDataStore {
     const key = this.chunkKey(cx, cz);
     const slice = this._slices.get(key);
     if (!slice) {
+      this._callStats.integrityWarn++;
       console.warn(`[WorldBlockDataStore] _verifySliceIntegrity(${cx},${cz}) from ${caller}: slice is null/missing`);
       return false;
     }
     if (!(slice instanceof Map)) {
+      this._callStats.integrityWarn++;
       console.warn(`[WorldBlockDataStore] _verifySliceIntegrity(${cx},${cz}) from ${caller}: slice is not a Map`);
       return false;
     }
     return true;
+  }
+
+  /**
+   * 开发期断言：检查 chunk slice 当前是否处于 attached 状态
+   * 在直接操作 _attached Map 前验证调用方是否理解当前生命周期阶段
+   * @param {number} cx
+   * @param {number} cz
+   * @param {string} caller - 调用点标识
+   * @returns {boolean} true 表示处于 attached 状态（需走 detach -> 操作 -> reattach）
+   */
+  _assertNotAttached(cx, cz, caller = 'unknown') {
+    const key = this.chunkKey(cx, cz);
+    if (this._attached.has(key)) {
+      console.warn(
+        `[WorldBlockDataStore] _assertNotAttached(${cx},${cz}) from ${caller}: ` +
+        `slice is currently attached. Direct mutation outside store primitives is unsafe.`
+      );
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * 获取迁移期调用点统计（含 deprecated 路径命中次数）
+   * @returns {object}
+   */
+  getCallStats() {
+    return {
+      ...this._callStats,
+      sliceCount: this._slices.size,
+      attachedCount: this._attached.size
+    };
   }
 }

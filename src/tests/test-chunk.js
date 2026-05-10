@@ -559,7 +559,7 @@ describe('Chunk 真实类测试', (test) => {
     teardownEnvironment();
   });
 
-  test('saveDebounced - bootstrapping 下应通过 worldRuntime 写回而不是旧 saveChunkData', async () => {
+  test('saveDebounced - bootstrapping 下已退化为 no-op，不再触发任何写回', async () => {
     setupEnvironment();
     await new Promise(resolve => setTimeout(resolve, 650));
     mockPersistenceService.calls = [];
@@ -581,10 +581,8 @@ describe('Chunk 真实类测试', (test) => {
       call.method === 'saveChunkData'
     );
 
-    assertEqual(saveCall, undefined, 'bootstrapping 下不应再通过旧 saveChunkData 写 world_deltas');
-    assertEqual(flushCalls.length, 1, 'bootstrapping 下应通过 worldRuntime.flushChunk 写回');
-    assertEqual(flushCalls[0].cx, 0, 'flushChunk 应写回正确 cx');
-    assertEqual(flushCalls[0].cz, 0, 'flushChunk 应写回正确 cz');
+    assertEqual(saveCall, undefined, 'saveDebounced 不再写旧 saveChunkData');
+    assertEqual(flushCalls.length, 0, 'saveDebounced 退化为 no-op，不应触发 worldRuntime.flushChunk');
 
     teardownEnvironment();
   });

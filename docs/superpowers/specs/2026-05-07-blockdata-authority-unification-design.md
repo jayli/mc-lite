@@ -2038,3 +2038,45 @@ shared authority `Map` 是本次改造中最容易“代码能跑，但语义又
 7. 持久化层即使暂时缺席，也不影响 runtime 正确性
 8. `Chunk` 的 attach / hydrate / rebuild 语义明确，不再把“复制 blockData 到 chunk 本地”误当成权威接入
 9. 所有热路径写入都经过统一 mutation 原语，不再允许隐式直写共享 `Map`
+
+## 15. Follow-up Phase: 入口统一与旧热路径退出
+
+> 本补充阶段（2026-05-10 follow-up）是首轮 authority unification 的收尾收口。首轮已建立 world-level authority 容器与共享 Map 装配协议，但仍有部分写入口、cold import 入口、scatter 未加载 chunk 写入路径未完全收编，且 deprecated flush/save 链路仍在热路径实际执行。
+
+### 15.1 Follow-up 阶段边界
+
+**重点：**
+- 收拢剩余 blockData 写入口到统一 mutation primitive
+- 让 scatter / cross-chunk patch 在目标 chunk 未加载时也先写入 world-level authority
+- 让 cold import / `loadFromRecord()` 路径先入 authority，再 attach / rebuild
+- 让 deprecated flush/save 链路退出 runtime 热路径
+- 增加 shared authority guardrail、观测与退出型测试
+
+**不交付：**
+- 新的 IndexedDB 持久化架构
+- 手动存档/手动读档的完整 authority-based rewrite
+- TypedArray authority 存储
+- AO / mesh / face culling 的新一轮性能优化
+
+本轮仍允许保留 deferred shell，但不允许继续实际参与 runtime 热路径。
+
+### 15.2 Cold Import / Scatter / Unloaded-Target Patch 统一语义
+
+**cold import 路径：**
+- cold import 必须先入 authority，再 attach/rebuild
+- `ensureChunkData()` / `loadFromRecord()` 返回的 chunkRecord 不再直接注入 chunk-local truth
+- plain object `blockData` 先走 codec 转换为 `Map`，写入 `WorldBlockDataStore`，同时写入 `WorldChunkPayloadRegistry`，标记 `WorldChunkRegistry.markChunkImported()`
+
+**scatter / cross-chunk patch 路径：**
+- scatter 对未加载目标 chunk 也必须先写 authority
+- pending buffer 只能表示"派生层/渲染补刷未完成"，不能表示"truth 尚未写入"
+- `pendingCrossChunkPatchBuffers` 改为 authority patch 调度容器或派生层装配延迟队列
+- 目标 chunk 未来加载时，不依赖 source chunk 再次生成也能 attach/rebuild
+
+### 15.3 Deprecated Shell 允许边界
+
+- `flushChunk()` / `flushBeforeUnload()` / `flushAllDirty()` 若保留，只能服务 future export / manual save，且必须要求显式调用来源
+- `saveDebounced()` 不能再驱动 runtime 正确性，改为 no-op 或 dirty marker shell
+- `RegionCache.blockData` 不能再被 shell 当作 live truth fallback
+- 旧 shell 即使保留，也不能再把 `RegionCache.blockData` 当 live truth 回写覆盖 authority
+- 关闭 `flushChunk()` 后，edit -> unload -> reload 在当前会话内仍需保持正确

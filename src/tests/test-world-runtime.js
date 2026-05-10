@@ -2,6 +2,7 @@
 import { describe } from './runner.js';
 import { assertDeepEqual, assertEqual, assertFalse, assertNotEqual, assertTrue } from './assert.js';
 import { WorldRuntime } from '../world/WorldRuntime.js';
+import { WorldBlockDataStore } from '../world/WorldBlockDataStore.js';
 import { encodeCoord } from '../utils/CoordEncoding.js';
 
 describe('WorldRuntime 运行时工作集测试', (test) => {
@@ -139,7 +140,7 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     globalThis._worldStore = originalWorldStore;
   });
 
-  test('markChunkDirty - 应触发防抖 flush 并清除脏标记', async () => {
+  test('markChunkDirty - 仅标记 dirty 状态，不再自动触发防抖 flush', async () => {
     const originalWorldStore = globalThis._worldStore;
     const flushCalls = [];
     globalThis._worldStore = {
@@ -165,22 +166,16 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
 
     await new Promise((resolve) => setTimeout(resolve, 650));
 
-    assertEqual(flushCalls.length, 1, '防抖 flush 应写回一次');
-    assertEqual(flushCalls[0].cx, 0, 'flush 应写回正确的 cx');
-    assertEqual(flushCalls[0].cz, 0, 'flush 应写回正确的 cz');
-    assertFalse(runtime.isChunkDirty(0, 0), 'flush 后应清除 dirty 状态');
+    assertEqual(flushCalls.length, 0, 'markChunkDirty 不再触发防抖 flush，flush 应由 authority 层管控');
+    assertTrue(runtime.isChunkDirty(0, 0), 'dirty 状态保留，由 authority 层在持久化时清除');
 
     globalThis._worldStore = originalWorldStore;
   });
 
-  test('markChunkDirty - 已调度的 flush 不应受后续全局 worldStore 替换影响', async () => {
+  test('markChunkDirty - 仅标记 dirty，不涉及 worldStore 调度绑定', async () => {
     const originalWorldStore = globalThis._worldStore;
-    const storeACalls = [];
-    const storeBCalls = [];
-
     globalThis._worldStore = {
       putChunkRecord: async (cx, cz, record) => {
-        storeACalls.push({ cx, cz, record });
         return true;
       }
     };
@@ -197,9 +192,9 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     });
     runtimeA.markChunkDirty(0, 0);
 
+    // 替换全局 worldStore
     globalThis._worldStore = {
       putChunkRecord: async (cx, cz, record) => {
-        storeBCalls.push({ cx, cz, record });
         return true;
       }
     };
@@ -216,14 +211,110 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     });
     runtimeB.markChunkDirty(1, 0);
 
-    await new Promise((resolve) => setTimeout(resolve, 650));
-
-    assertEqual(storeACalls.length, 1, 'runtimeA 应继续写回创建时绑定的 worldStore');
-    assertEqual(storeACalls[0].cx, 0, 'runtimeA 应写回正确 chunk');
-    assertEqual(storeBCalls.length, 1, 'runtimeB 应只写回到新的 worldStore');
-    assertEqual(storeBCalls[0].cx, 1, 'runtimeB 应写回正确 chunk');
+    // markChunkDirty 不再调度 flush，dirty 标志不受 worldStore 替换影响
+    assertTrue(runtimeA.isChunkDirty(0, 0), 'runtimeA 的 dirty 状态独立保留');
+    assertTrue(runtimeB.isChunkDirty(1, 0), 'runtimeB 的 dirty 状态独立保留');
 
     globalThis._worldStore = originalWorldStore;
+  });
+
+  test('callStats - 迁移期 deprecated shell 调用计数正确递增', () => {
+    const runtime = new WorldRuntime();
+    runtime.setWorld({
+      chunks: new Map([
+        ['0,0', {
+          blockData: new Map([[123, { type: 'stone', orientation: 0 }]]),
+          staticEntities: [],
+          runtimeSeedData: {}
+        }]
+      ])
+    });
+
+    // 初始状态：所有调用计数为 0
+    const initial = runtime.getStats().callStats;
+    assertEqual(initial.recordBlockMutation, 0, '初始 recordBlockMutation');
+    assertEqual(initial.flushChunk, 0, '初始 flushChunk');
+    assertEqual(initial.flushAllDirty, 0, '初始 flushAllDirty');
+    assertEqual(initial.flushBeforeUnload, 0, '初始 flushBeforeUnload');
+    assertEqual(initial.scheduleFlush, 0, '初始 scheduleFlush');
+
+    // markChunkDirty 不应再触发 scheduleFlush
+    runtime.markChunkDirty(0, 0);
+    const afterMarkDirty = runtime.getStats().callStats;
+    assertEqual(afterMarkDirty.scheduleFlush, 0,
+      'markChunkDirty 不应触发 _scheduleFlush（已退出热路径）');
+
+    // 显式调用 deprecated shell 应递增计数
+    runtime._scheduleFlush(0, 0, 1);
+    const afterSchedule = runtime.getStats().callStats;
+    assertEqual(afterSchedule.scheduleFlush, 1,
+      '显式 _scheduleFlush 应递增 scheduleFlush 计数');
+  });
+
+  test('store guardrail - replaceChunkSlice 对 attached slice 拒绝写入并递增计数器', () => {
+    const store = new WorldBlockDataStore();
+    const slice = store.ensureChunkSlice(0, 0);
+    store.markAttached(0, 0);
+
+    // 保存告警以便恢复
+    const warnCalls = [];
+    const originalWarn = console.warn;
+    console.warn = (...args) => { warnCalls.push(args); };
+
+    const newSlice = new Map([[123, { type: 'dirt', orientation: 0 }]]);
+    store.replaceChunkSlice(0, 0, newSlice, 'test-guardrail');
+
+    console.warn = originalWarn;
+
+    // replace 被拒绝，slice 未变化
+    assertTrue(store._slices.get('0,0') === slice,
+      'attached slice 不应被 replace（身份不变）');
+    assertEqual(store._callStats.replaceOnAttached, 1,
+      'replaceOnAttached 计数应递增');
+    assertTrue(warnCalls.length >= 1,
+      '应输出 guardrail 告警');
+  });
+
+  test('store guardrail - replaceChunkSlice 对 non-Map 输入拒绝并递增计数器', () => {
+    const store = new WorldBlockDataStore();
+    store.ensureChunkSlice(0, 0);
+
+    const warnCalls = [];
+    const originalWarn = console.warn;
+    console.warn = (...args) => { warnCalls.push(args); };
+
+    store.replaceChunkSlice(0, 0, { 123: 'stone' }, 'test-nonmap');
+
+    console.warn = originalWarn;
+
+    assertEqual(store._callStats.nonMapReplace, 1,
+      'nonMapReplace 计数应递增');
+    assertTrue(warnCalls.length >= 1,
+      '应输出 non-Map 告警');
+  });
+
+  test('store _verifySliceIntegrity - 异常切片触发 integrityWarn 计数', () => {
+    const store = new WorldBlockDataStore();
+
+    // 缺失 slice
+    const ok1 = store._verifySliceIntegrity(0, 0, 'test-integrity');
+    assertTrue(!ok1, '缺失切片应返回 false');
+    assertEqual(store._callStats.integrityWarn, 1,
+      '缺失切片应触发 integrityWarn');
+
+    // 非 Map slice（模拟异常状态）
+    store._slices.set('0,0', { foo: 'bar' });
+    const ok2 = store._verifySliceIntegrity(0, 0, 'test-integrity');
+    assertTrue(!ok2, '非 Map 切片应返回 false');
+    assertEqual(store._callStats.integrityWarn, 2,
+      '非 Map 切片应再次触发 integrityWarn');
+
+    // 正常 slice
+    store._slices.set('0,0', new Map());
+    const ok3 = store._verifySliceIntegrity(0, 0, 'test-integrity');
+    assertTrue(ok3, '正常切片应返回 true');
+    assertEqual(store._callStats.integrityWarn, 2,
+      '正常切片不应再递增 integrityWarn');
   });
 
   test('recordBlockMutation - 只标记 runtime dirty，不再构造 blockDataSnapshot', () => {

@@ -788,6 +788,9 @@ export class Game {
 
   /**
    * 将保存的快照数据应用到当前游戏实例
+   * @deferred 手动读档链路延后恢复。当前从 worldStore/IndexedDB 读取，
+   *   后续应迁移到基于 WorldBlockDataStore authority 的重新注入。
+   *   本方法不是当前 runtime correctness 的组成部分。
    */
   async applySaveData(saveData) {
     if (!saveData) return;

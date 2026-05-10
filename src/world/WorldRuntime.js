@@ -45,11 +45,14 @@ export class WorldRuntime {
       lastElapsedMs: 0,
       lastProcessedAt: 0
     };
-    // 迁移期调用点统计
+    // 迁移期调用点统计：追踪 authority mutation / deprecated shell / fallback 路径命中次数
     this._callStats = {
-      recordBlockMutation: 0,
-      flushChunk: 0,
-      flushBeforeUnload: 0
+      recordBlockMutation: 0,    // block 变更记录（标记 runtime dirty）
+      flushChunk: 0,             // deprecated flush 单 chunk 调用
+      flushAllDirty: 0,          // deprecated flush 全量调用
+      flushBeforeUnload: 0,      // deprecated flush unload 前调用
+      scheduleFlush: 0,          // deprecated _scheduleFlush 调度次数
+      regionCacheFallback: 0     // RegionCache 作为 live truth fallback 的命中次数
     };
   }
 
@@ -159,12 +162,13 @@ export class WorldRuntime {
 
   /**
    * 标记 chunk 为脏（玩家放置/破坏方块后调用）
+   * runtime dirty 仅用于观测和导出标记，不再自动调度 flush/save
    * @param {number} cx
    * @param {number} cz
    */
   markChunkDirty(cx, cz) {
     this._ensureDirtyChunkEntry(cx, cz).dirty = true;
-    this._scheduleFlush(cx, cz);
+    // flush 已退出 runtime 热路径，不再自动调度
   }
 
   /**
@@ -263,6 +267,7 @@ export class WorldRuntime {
    * 保留此方法仅供未来手动保存时导出到 IndexedDB。
    */
   async flushAllDirty() {
+    this._callStats.flushAllDirty++;
     const dirtyKeys = this.getDirtyChunkKeys();
     const pendingUnloadKeys = Array.from(this.pendingUnloadFlushQueue.keys());
     if (dirtyKeys.length === 0 && pendingUnloadKeys.length === 0) return;
@@ -981,7 +986,12 @@ export class WorldRuntime {
     return null;
   }
 
+  /**
+   * @deprecated 已从 runtime 热路径解绑，仅保留供显式调用场景（retry on error、future manual save）。
+   * markChunkDirty() 不再自动调度此方法。
+   */
   _scheduleFlush(cx, cz, delayMs = 500) {
+    this._callStats.scheduleFlush++;
     const key = this._chunkKey(cx, cz);
     this._clearScheduledFlush(cx, cz);
     const timer = globalThis.setTimeout(() => {
@@ -1046,7 +1056,8 @@ export class WorldRuntime {
     return {
       cachedRegions: this._regionCache.size,
       dirtyChunks: this._dirtyChunks.size,
-      maxRegions: this._regionCache._maxRegions
+      maxRegions: this._regionCache._maxRegions,
+      callStats: { ...this._callStats }
     };
   }
 }

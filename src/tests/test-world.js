@@ -18,6 +18,7 @@ import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 import { mockFaceCullingSystem, mockMaterials, mockBlockData } from './test-mocks.js';
 import { Chunk } from '../world/Chunk.js';
 import { ChunkAssemblyScheduler } from '../world/ChunkAssemblyScheduler.js';
+import { WorldBlockDataStore } from '../world/WorldBlockDataStore.js';
 
 // ============================================
 // Worker 模拟 - 在导入 World 之前设置
@@ -1521,6 +1522,115 @@ describe('World 真实类测试', (test) => {
     assertEqual(Math.floor(16 / CHUNK_SIZE), 1, 'x=16 在区块 1');
     assertEqual(Math.floor(-1 / CHUNK_SIZE), -1, 'x=-1 在区块 -1');
     assertEqual(Math.floor(-16 / CHUNK_SIZE), -1, 'x=-16 在区块 -1');
+  });
+
+  // ============================================================
+  // authority 语义测试：WorldBlockDataStore 作为 blockData 唯一权威
+  // ============================================================
+
+  test('authority - deserializeBlockData / serializeBlockData codec 往返', () => {
+    const plain = { '123': 'stone', '456': { type: 'dirt', orientation: 2 }, '789': 'air' };
+    const map = WorldBlockDataStore.deserializeBlockData(plain);
+    assertTrue(map instanceof Map, 'deserialize 应返回 Map');
+    assertEqual(map.size, 3, '应包含 3 个 entry');
+    assertEqual(map.get(123).type, 'stone', 'string value 应规范化为 entry');
+    assertEqual(map.get(123).orientation, 0, 'string value 默认 orientation=0');
+    assertEqual(map.get(456).type, 'dirt', 'object entry 保留 type');
+    assertEqual(map.get(456).orientation, 2, 'object entry 保留 orientation');
+    assertEqual(map.get(789).type, 'air', 'air 类型也保留');
+
+    const roundtrip = WorldBlockDataStore.serializeBlockData(map);
+    assertEqual(typeof roundtrip, 'object', 'serialize 应返回 plain object');
+    assertEqual(roundtrip['123'].type, 'stone', '往返后 type 保留');
+    assertEqual(roundtrip['456'].orientation, 2, '往返后 orientation 保留');
+
+    // 空输入
+    const emptyMap = WorldBlockDataStore.deserializeBlockData(null);
+    assertEqual(emptyMap.size, 0, 'null 应返回空 Map');
+    const emptyObj = WorldBlockDataStore.serializeBlockData(null);
+    assertEqual(Object.keys(emptyObj).length, 0, 'null 应返回空 object');
+  });
+
+  test('authority - setBlockEntry / deleteBlockEntry 递增 version', () => {
+    const store = new WorldBlockDataStore();
+
+    assertEqual(store.getAuthorityVersion(0, 0), 0, '未创建 slice 时 version=0');
+
+    store.setBlockEntry(0, 0, 123, 'stone');
+    assertEqual(store.getAuthorityVersion(0, 0), 1, '首次 set 后 version=1');
+    assertEqual(store.peekChunkSlice(0, 0).get(123).type, 'stone', 'entry 已写入');
+
+    store.deleteBlockEntry(0, 0, 123);
+    assertEqual(store.getAuthorityVersion(0, 0), 2, 'delete 后 version=2');
+    assertTrue(!store.peekChunkSlice(0, 0).has(123), 'entry 已删除');
+
+    assertEqual(store.stats.totalMutations, 2, 'mutations 统计正确');
+  });
+
+  test('authority - applyChunkPatch 批量写入只递增一次 version', () => {
+    const store = new WorldBlockDataStore();
+    const patches = new Map([
+      [111, 'stone'],
+      [222, { type: 'dirt', orientation: 1 }],
+      [333, null]  // null 表示删除（在尚未创建 slice 时不执行删除）
+    ]);
+
+    store.applyChunkPatch(0, 0, patches);
+    assertEqual(store.getAuthorityVersion(0, 0), 1, '批量 patch 只递增一次 version');
+    assertEqual(store.peekChunkSlice(0, 0).size, 2, '2 个有效写入（null 不写入）');
+    assertEqual(store.peekChunkSlice(0, 0).get(111).type, 'stone', 'patch 1 写入');
+    assertEqual(store.peekChunkSlice(0, 0).get(222).orientation, 1, 'patch 2 写入');
+    assertEqual(store.stats.totalMutations, 1, 'batch mutation 计数为 1');
+  });
+
+  test('authority - attach/detach 生命周期与身份一致性', () => {
+    const store = new WorldBlockDataStore();
+    const slice = store.ensureChunkSlice(0, 0);
+    slice.set(123, { type: 'stone', orientation: 0 });
+
+    assertFalse(store.isAttached(0, 0), '初始未 attach');
+
+    store.markAttached(0, 0);
+    assertTrue(store.isAttached(0, 0), 'markAttached 后应返回 true');
+
+    // attached 状态下 replace 被拒绝
+    const newSlice = new Map([[456, { type: 'dirt', orientation: 0 }]]);
+    store.replaceChunkSlice(0, 0, newSlice, 'test-attach-guard');
+    assertTrue(store.peekChunkSlice(0, 0) === slice, 'attached 状态下 replace 被拒绝，slice 身份不变');
+
+    store.markDetached(0, 0);
+    assertFalse(store.isAttached(0, 0), 'markDetached 后应返回 false');
+
+    // detach 后 replace 允许
+    store.replaceChunkSlice(0, 0, newSlice, 'test-attach');
+    assertTrue(store.peekChunkSlice(0, 0) === newSlice, 'detach 后 replace 生效');
+  });
+
+  test('authority - stats 统计完整反映 authority 生命周期', () => {
+    const store = new WorldBlockDataStore();
+
+    store.ensureChunkSlice(0, 0);
+    store.ensureChunkSlice(1, 0);
+    store.peekChunkSlice(2, 0);  // miss
+
+    const stats = store.getStats();
+    assertEqual(stats.sliceCount, 2, '2 个 slice');
+    assertEqual(stats.writes, 2, '2 次 ensure 写入');
+    assertEqual(stats.misses, 1, '1 次 peek miss');
+    assertEqual(stats.attachedCount, 0, '无 attach');
+  });
+
+  test('authority - _verifySliceIntegrity 检测异常切片状态', () => {
+    const store = new WorldBlockDataStore();
+
+    // 缺失
+    assertFalse(store._verifySliceIntegrity(0, 0, 'test'), '缺失 slice 返回 false');
+    assertEqual(store._callStats.integrityWarn, 1, '缺失触发告警计数');
+
+    // 正常
+    store.ensureChunkSlice(0, 0);
+    assertTrue(store._verifySliceIntegrity(0, 0, 'test'), '正常 slice 返回 true');
+    assertEqual(store._callStats.integrityWarn, 1, '正常不递增告警计数');
   });
 
 });
