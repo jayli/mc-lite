@@ -894,11 +894,47 @@ export class Chunk {
       invocationMs: Math.max(2, maxMs),
       budgetExhaustedMs: Math.max(2, maxMs)
     };
+    const pushTopSlowItem = (list, item, limit = 3) => {
+      list.push(item);
+      list.sort((a, b) => b.durationMs - a.durationMs);
+      if (list.length > limit) list.length = limit;
+    };
+    const createInvocationStats = () => ({
+      stageAtStart: null,
+      iterateScannedEntries: 0,
+      iterateEmittedBlocks: 0,
+      convertBatchCount: 0,
+      convertBlocksProcessed: 0,
+      convertCompletedGroups: 0,
+      convertCompletedTypes: [],
+      convertSlowGroups: [],
+      visiblePassCount: 0,
+      visibleBlocksProcessed: 0,
+      visibleSlowPasses: [],
+      visibleMaxPassMs: 0,
+      buildMeshesMs: 0
+    });
+    const resetBuildMeshProgressState = (progress, sourceEpoch) => {
+      progress.subStage = 'iterate';
+      progress.cursor = 0;
+      progress.blocks.length = 0;
+      progress.meshData = null;
+      progress.groupedByType = null;
+      progress.groupKeys = null;
+      progress.groupCursor = 0;
+      progress.groupInnerCursor = 0;
+      progress._cachedEntries = null;
+      progress._cachedEntriesEpoch = -1;
+      progress._cachedEntriesSize = -1;
+      progress._currentGroup = null;
+      progress._sourceEpoch = sourceEpoch;
+    };
 
     // 首次调用：初始化 progress
     if (!this._assemblyProgress) {
       this._assemblyProgress = {};
     }
+    const currentEpoch = this._assemblyEpoch || 0;
     if (!this._assemblyProgress.buildMesh) {
       this._assemblyProgress.buildMesh = {
         subStage: 'iterate',
@@ -911,10 +947,16 @@ export class Chunk {
         groupCursor: 0,
         groupInnerCursor: 0,
         // 临时状态
+        _cachedEntries: null,
+        _cachedEntriesEpoch: -1,
+        _cachedEntriesSize: -1,
         _currentGroup: null,
+        _sourceEpoch: currentEpoch,
+        _invocationStats: createInvocationStats(),
         metrics: {
           invocationCount: 0,
           slowInvocationCount: 0,
+          staleRestartCount: 0,
           budgetExhaustedCount: 0,
           iteratePasses: 0,
           iterateSnapshotMs: 0,
@@ -945,8 +987,15 @@ export class Chunk {
     }
 
     const p = this._assemblyProgress.buildMesh;
+    if (p._sourceEpoch !== currentEpoch) {
+      p.metrics.staleRestartCount++;
+      resetBuildMeshProgressState(p, currentEpoch);
+      this.visibleKeys.clear();
+    }
     p.metrics.invocationCount++;
     const invocationIndex = p.metrics.invocationCount;
+    p._invocationStats = createInvocationStats();
+    p._invocationStats.stageAtStart = p.subStage;
     const finishInvocation = (result, extra = {}) => {
       const invocationMs = (globalThis.performance?.now?.() ?? Date.now()) - start;
       const isDone = result === 'done';
@@ -969,6 +1018,7 @@ export class Chunk {
           groupInnerCursor: p.groupInnerCursor,
           blocksBuffered: p.blocks.length,
           meshGroups: p.meshData?.length || 0,
+          invocationProfile: { ...p._invocationStats },
           metrics: { ...p.metrics },
           ...extra
         }, { thresholdMs: 0 });
@@ -981,7 +1031,17 @@ export class Chunk {
         case 'iterate': {
           const iterateStartedAt = globalThis.performance?.now?.() ?? Date.now();
           const snapshotStartedAt = globalThis.performance?.now?.() ?? Date.now();
-          const entries = [...this.blockData.entries()];
+          const iterateEpoch = this._assemblyEpoch || 0;
+          const currentSize = this.blockData?.size || 0;
+          if (!p._cachedEntries || p._cachedEntriesEpoch !== iterateEpoch || p._cachedEntriesSize !== currentSize) {
+            // 快照已失效，整段 iterate 必须重启，避免旧快照前半段和新快照后半段混用
+            p.cursor = 0;
+            p.blocks.length = 0;
+            p._cachedEntries = [...this.blockData.entries()];
+            p._cachedEntriesEpoch = iterateEpoch;
+            p._cachedEntriesSize = currentSize;
+          }
+          const entries = p._cachedEntries;
           const snapshotMs = (globalThis.performance?.now?.() ?? Date.now()) - snapshotStartedAt;
           const cursorStart = p.cursor;
           const end = Math.min(p.cursor + 128, entries.length);
@@ -1013,6 +1073,8 @@ export class Chunk {
           p.metrics.iterateSnapshotMs += snapshotMs;
           p.metrics.iterateLoopMs += iterateLoopMs;
           p.metrics.iterateBlocks += emittedBlocks;
+          p._invocationStats.iterateScannedEntries += end - cursorStart;
+          p._invocationStats.iterateEmittedBlocks += emittedBlocks;
           const iterateMs = (globalThis.performance?.now?.() ?? Date.now()) - iterateStartedAt;
           p.metrics.iterateMaxMs = Math.max(p.metrics.iterateMaxMs, iterateMs);
           if (iterateMs >= stageThresholds.iteratePassMs) {
@@ -1034,6 +1096,7 @@ export class Chunk {
           if (p.cursor < entries.length) return finishInvocation('continue', { exitReason: 'iterate-partial' });
           p.subStage = 'convert-group';
           p.cursor = 0;
+          p._cachedEntries = null;  // 释放快照数组，节省内存
           break;
         }
 
@@ -1084,7 +1147,14 @@ export class Chunk {
                 aoLow: new Float32Array(count),
                 aoHigh: new Float32Array(count),
                 orientation: new Float32Array(count),
-                instanceIndexMap: {}
+                instanceIndexMap: {},
+                perf: {
+                  startedAt: globalThis.performance?.now?.() ?? Date.now(),
+                  processedBlocks: 0,
+                  batchCount: 0,
+                  totalBatchMs: 0,
+                  maxBatchMs: 0
+                }
               };
             }
 
@@ -1118,6 +1188,12 @@ export class Chunk {
             p.metrics.convertBatchMs += batchMs;
             p.metrics.convertBlocks += gEnd - p.groupInnerCursor;
             p.metrics.convertBatchMaxMs = Math.max(p.metrics.convertBatchMaxMs, batchMs);
+            p._invocationStats.convertBatchCount++;
+            p._invocationStats.convertBlocksProcessed += gEnd - p.groupInnerCursor;
+            group.perf.processedBlocks += gEnd - p.groupInnerCursor;
+            group.perf.batchCount++;
+            group.perf.totalBatchMs += batchMs;
+            group.perf.maxBatchMs = Math.max(group.perf.maxBatchMs, batchMs);
             if (batchMs >= stageThresholds.convertBatchMs) {
               p.metrics.convertBatchSlowCount++;
               recordChunkPerf('chunk.build-mesh.convert-group.batch', batchMs, {
@@ -1129,6 +1205,11 @@ export class Chunk {
                 groupInnerCursorEnd: gEnd,
                 groupSize: count,
                 processedBlocks: gEnd - p.groupInnerCursor,
+                groupProcessedTotal: group.perf.processedBlocks,
+                groupRemaining: count - gEnd,
+                groupBatchCount: group.perf.batchCount,
+                groupTotalBatchMs: group.perf.totalBatchMs,
+                groupMaxBatchMs: group.perf.maxBatchMs,
                 matrixCopyCount,
                 matrixComputeCount
               }, { thresholdMs: 0 });
@@ -1141,6 +1222,20 @@ export class Chunk {
             });
 
             // 组完成
+            const groupElapsedMs = (globalThis.performance?.now?.() ?? Date.now()) - group.perf.startedAt;
+            const groupSummary = {
+              type,
+              blockCount: count,
+              batchCount: group.perf.batchCount,
+              totalBatchMs: group.perf.totalBatchMs,
+              maxBatchMs: group.perf.maxBatchMs,
+              durationMs: groupElapsedMs
+            };
+            p._invocationStats.convertCompletedGroups++;
+            if (p._invocationStats.convertCompletedTypes.length < 6) {
+              p._invocationStats.convertCompletedTypes.push(type);
+            }
+            pushTopSlowItem(p._invocationStats.convertSlowGroups, groupSummary);
             p.meshData.push(group);
             p._currentGroup = null;
             p.groupCursor++;
@@ -1165,16 +1260,27 @@ export class Chunk {
           p.metrics.visiblePasses++;
           p.metrics.visibleMs += visibleMs;
           p.metrics.visibleBlocks += end - cursorStart;
+          p._invocationStats.visiblePassCount++;
+          p._invocationStats.visibleBlocksProcessed += end - cursorStart;
+          p._invocationStats.visibleMaxPassMs = Math.max(p._invocationStats.visibleMaxPassMs, visibleMs);
           p.metrics.visibleMaxMs = Math.max(p.metrics.visibleMaxMs, visibleMs);
           if (visibleMs >= stageThresholds.visiblePassMs) {
             p.metrics.visibleSlowPasses++;
+            pushTopSlowItem(p._invocationStats.visibleSlowPasses, {
+              cursorStart,
+              cursorEnd: end,
+              processedBlocks: end - cursorStart,
+              durationMs: visibleMs
+            });
             recordChunkPerf('chunk.build-mesh.visible-pass', visibleMs, {
               chunkKey,
               invocationIndex,
               cursorStart,
               cursorEnd: end,
               processedBlocks: end - cursorStart,
-              totalBlocks: p.blocks.length
+              totalBlocks: p.blocks.length,
+              visibleProcessedTotal: p._invocationStats.visibleBlocksProcessed,
+              visibleRemaining: p.blocks.length - end
             }, { thresholdMs: 0 });
           }
           if (p.cursor < p.blocks.length) return finishInvocation('continue', { exitReason: 'visible-partial' });
@@ -1186,6 +1292,7 @@ export class Chunk {
           const buildMeshesStartedAt = globalThis.performance?.now?.() ?? Date.now();
           this.buildMeshes(p.meshData);
           const buildMeshesMs = (globalThis.performance?.now?.() ?? Date.now()) - buildMeshesStartedAt;
+          p._invocationStats.buildMeshesMs = buildMeshesMs;
           p.metrics.buildMeshesCount++;
           p.metrics.buildMeshesMs += buildMeshesMs;
           p.metrics.buildMeshesMaxMs = Math.max(p.metrics.buildMeshesMaxMs, buildMeshesMs);
@@ -1216,7 +1323,8 @@ export class Chunk {
           subStage: p.subStage,
           cursor: p.cursor,
           groupCursor: p.groupCursor,
-          blocksProcessed: p.blocks.length
+          blocksProcessed: p.blocks.length,
+          invocationProfile: { ...p._invocationStats }
         }, { thresholdMs: 0 });
       }
       return finishInvocation('continue', {
@@ -1455,6 +1563,8 @@ export class Chunk {
         this.blockData.set(code, entry);
       }
     }
+    // 任何运行时 blockData 变更都必须使进行中的装配快照失效
+    this._assemblyEpoch = (this._assemblyEpoch || 0) + 1;
 
     if (type === 'air') {
       this.deletedBlockTombstones.add(code);
