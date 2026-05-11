@@ -1627,6 +1627,84 @@ describe('Chunk 真实类测试', (test) => {
     }
   });
 
+  test('_refreshAOFromStableSource 在 AO 关闭时应跳过 fullSync 与 flush', () => {
+    setupEnvironment();
+
+    mockMaterials.setAOEnabled(false);
+
+    const mockFullSyncCalls = [];
+    const mockFlushCalls = [];
+    const originalAoBridge = globalThis._aoBridge;
+    globalThis._aoBridge = {
+      fullSync(chunkKey, blockData) {
+        mockFullSyncCalls.push({ chunkKey, blockDataSize: blockData?.size });
+      },
+      flush() {
+        mockFlushCalls.push(true);
+      }
+    };
+
+    try {
+      const world = createMockWorld();
+      const chunk = new Chunk(0, 0, world);
+      chunk.worldY = 0;
+      chunk.addBlockDynamic(5, 5, 5, 'stone', 0);
+      chunk.isReady = true;
+
+      chunk._refreshAOFromStableSource({ fullRefresh: true });
+
+      assertEqual(mockFullSyncCalls.length, 0, 'AO 关闭时不应 fullSync 到 Worker');
+      assertEqual(mockFlushCalls.length, 0, 'AO 关闭时不应发送 AO flush');
+      assertEqual(chunk.dirtyAOPositions.size, 0, 'AO 关闭时应清空当前 chunk 的脏 AO');
+    } finally {
+      mockMaterials.setAOEnabled(true);
+      if (originalAoBridge === undefined) delete globalThis._aoBridge;
+      else globalThis._aoBridge = originalAoBridge;
+      teardownEnvironment();
+    }
+  });
+
+  test('_applyAOResults 在 AO 关闭时不应覆写 attribute', () => {
+    setupEnvironment();
+
+    mockMaterials.setAOEnabled(false);
+
+    try {
+      const world = createMockWorld();
+      const chunk = new Chunk(0, 0, world);
+      chunk.isReady = true;
+
+      const code = Chunk.encodeCoord(4, 5, 6);
+      chunk.blockData.set(code, 'stone');
+      chunk.instanceIndexMap = {
+        stone: new Map([[code, 0]])
+      };
+
+      const aoLowArray = new Float32Array([11]);
+      const aoHighArray = new Float32Array([22]);
+      const geometry = new THREE.InstancedBufferGeometry();
+      geometry.setAttribute('aAoLow', new THREE.InstancedBufferAttribute(aoLowArray, 1));
+      geometry.setAttribute('aAoHigh', new THREE.InstancedBufferAttribute(aoHighArray, 1));
+      chunk.group = {
+        children: [{
+          isInstancedMesh: true,
+          userData: { type: 'stone' },
+          geometry
+        }]
+      };
+
+      chunk.dirtyAOPositions.add(code);
+      chunk._applyAOResults([{ x: 4, y: 5, z: 6, aoLow: 99, aoHigh: 77 }], new Set([code]));
+
+      assertEqual(aoLowArray[0], 11, 'AO 关闭时不应改写 aoLow');
+      assertEqual(aoHighArray[0], 22, 'AO 关闭时不应改写 aoHigh');
+      assertEqual(chunk.dirtyAOPositions.size, 0, 'AO 关闭时应清理本次已发送的脏标记');
+    } finally {
+      mockMaterials.setAOEnabled(true);
+      teardownEnvironment();
+    }
+  });
+
   test('_applyConsolidateResult 应保留 dirty 可见方块的旧 AO，避免合并后闪烁', () => {
     setupEnvironment();
 

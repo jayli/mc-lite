@@ -472,13 +472,10 @@ export class MaterialManager {
   }
 
   /**
-   * 切换 AO 着色开关
+   * 同步 AO 开关到所有材质 shader
+   * @param {boolean} enabled - 是否启用 AO
    */
-  toggleAO() {
-    this.aoEnabled = !this.aoEnabled;
-    const enabled = this.aoEnabled;
-    console.log(`[MaterialManager] AO 着色已${enabled ? '开启' : '关闭'}`);
-
+  _syncAOShaderState(enabled) {
     // 更新合批材质（ShaderMaterial）
     for (const mat of this.batchedMaterials.values()) {
       if (mat && mat.uniforms && mat.uniforms.uAoEnabled) {
@@ -498,6 +495,28 @@ export class MaterialManager {
   }
 
   /**
+   * 通知世界系统：AO 开关已变化
+   * @param {boolean} enabled - 是否启用 AO
+   */
+  _notifyAOSettingChanged(enabled) {
+    const world = globalThis.game?.world;
+    if (world && typeof world.onAOSettingChanged === 'function') {
+      world.onAOSettingChanged(enabled);
+    }
+  }
+
+  /**
+   * 切换 AO 着色开关
+   */
+  toggleAO() {
+    this.aoEnabled = !this.aoEnabled;
+    const enabled = this.aoEnabled;
+    console.log(`[MaterialManager] AO 着色已${enabled ? '开启' : '关闭'}`);
+    this._syncAOShaderState(enabled);
+    this._notifyAOSettingChanged(enabled);
+  }
+
+  /**
    * 设置 AO 着色状态
    * @param {boolean} enabled - 是否启用 AO
    */
@@ -505,23 +524,8 @@ export class MaterialManager {
     if (this.aoEnabled === enabled) return;
     this.aoEnabled = enabled;
     console.log(`[MaterialManager] AO 着色已${enabled ? '开启' : '关闭'}`);
-
-    // 更新合批材质（ShaderMaterial）
-    for (const mat of this.batchedMaterials.values()) {
-      if (mat && mat.uniforms && mat.uniforms.uAoEnabled) {
-        mat.uniforms.uAoEnabled.value = enabled ? 1.0 : 0.0;
-      }
-    }
-
-    // 更新普通材质（MeshStandardMaterial）- 通过存储的 shader 引用
-    for (const matOrMats of this.materials.values()) {
-      const mats = Array.isArray(matOrMats) ? matOrMats : [matOrMats];
-      for (const mat of mats) {
-        if (mat && mat._aoShader && mat._aoShader.uniforms) {
-          mat._aoShader.uniforms.uAoEnabled.value = enabled ? 1.0 : 0.0;
-        }
-      }
-    }
+    this._syncAOShaderState(enabled);
+    this._notifyAOSettingChanged(enabled);
   }
 
   /**

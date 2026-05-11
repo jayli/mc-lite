@@ -818,6 +818,31 @@ export class World {
     this.chunkAssemblyScheduler.enqueue(chunk, 'finalize', this._computeChunkAssemblyPriority(chunk));
   }
 
+  onAOSettingChanged(enabled) {
+    for (const chunk of this.chunks.values()) {
+      if (!chunk) continue;
+
+      if (!enabled) {
+        if (chunk.aoRefreshTimer) {
+          clearTimeout(chunk.aoRefreshTimer);
+          chunk.aoRefreshTimer = null;
+        }
+        chunk.dirtyAOPositions?.clear?.();
+        if (Array.isArray(chunk._aoOperationQueue)) {
+          chunk._aoOperationQueue.length = 0;
+        }
+        continue;
+      }
+
+      if (chunk.isReady && !chunk.isConsolidating) {
+        chunk._refreshAOFromStableSource?.({
+          fullRefresh: true,
+          reason: 'ao-toggle-enabled'
+        });
+      }
+    }
+  }
+
   onChunkAOSourceStable(chunk, options = {}) {
     if (!chunk) return;
 

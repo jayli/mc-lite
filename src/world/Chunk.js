@@ -884,6 +884,16 @@ export class Chunk {
     const cz = this.cz;
     const minX = cx * CHUNK_SIZE;
     const minZ = cz * CHUNK_SIZE;
+    const chunkKey = `${cx},${cz}`;
+    const stageThresholds = {
+      iteratePassMs: 2,
+      convertInitMs: 1,
+      convertBatchMs: 1,
+      visiblePassMs: 1,
+      buildMeshesMs: 2,
+      invocationMs: Math.max(2, maxMs),
+      budgetExhaustedMs: Math.max(2, maxMs)
+    };
 
     // 首次调用：初始化 progress
     if (!this._assemblyProgress) {
@@ -901,30 +911,127 @@ export class Chunk {
         groupCursor: 0,
         groupInnerCursor: 0,
         // 临时状态
-        _currentGroup: null
+        _currentGroup: null,
+        metrics: {
+          invocationCount: 0,
+          slowInvocationCount: 0,
+          budgetExhaustedCount: 0,
+          iteratePasses: 0,
+          iterateSnapshotMs: 0,
+          iterateLoopMs: 0,
+          iterateBlocks: 0,
+          iterateSlowPasses: 0,
+          iterateMaxMs: 0,
+          convertInitMs: 0,
+          convertInitCount: 0,
+          convertInitSlowCount: 0,
+          convertInitMaxMs: 0,
+          convertBatches: 0,
+          convertBatchMs: 0,
+          convertBlocks: 0,
+          convertBatchSlowCount: 0,
+          convertBatchMaxMs: 0,
+          visiblePasses: 0,
+          visibleMs: 0,
+          visibleBlocks: 0,
+          visibleSlowPasses: 0,
+          visibleMaxMs: 0,
+          buildMeshesMs: 0,
+          buildMeshesCount: 0,
+          buildMeshesSlowCount: 0,
+          buildMeshesMaxMs: 0
+        }
       };
     }
 
     const p = this._assemblyProgress.buildMesh;
+    p.metrics.invocationCount++;
+    const invocationIndex = p.metrics.invocationCount;
+    const finishInvocation = (result, extra = {}) => {
+      const invocationMs = (globalThis.performance?.now?.() ?? Date.now()) - start;
+      const isDone = result === 'done';
+      const isSlowInvocation = invocationMs >= stageThresholds.invocationMs;
+      const isBudgetExhausted = extra.exitReason === 'budget-exhausted';
+      if (isSlowInvocation) {
+        p.metrics.slowInvocationCount++;
+      }
+      if (isBudgetExhausted) {
+        p.metrics.budgetExhaustedCount++;
+      }
+      if (isDone || isSlowInvocation || isBudgetExhausted) {
+        recordChunkPerf('chunk.build-mesh.increment.summary', invocationMs, {
+          chunkKey,
+          invocationIndex,
+          result,
+          subStage: p.subStage,
+          cursor: p.cursor,
+          groupCursor: p.groupCursor,
+          groupInnerCursor: p.groupInnerCursor,
+          blocksBuffered: p.blocks.length,
+          meshGroups: p.meshData?.length || 0,
+          metrics: { ...p.metrics },
+          ...extra
+        }, { thresholdMs: 0 });
+      }
+      return result;
+    };
 
     while ((globalThis.performance?.now?.() ?? Date.now()) - start < maxMs) {
       switch (p.subStage) {
         case 'iterate': {
+          const iterateStartedAt = globalThis.performance?.now?.() ?? Date.now();
+          const snapshotStartedAt = globalThis.performance?.now?.() ?? Date.now();
           const entries = [...this.blockData.entries()];
+          const snapshotMs = (globalThis.performance?.now?.() ?? Date.now()) - snapshotStartedAt;
+          const cursorStart = p.cursor;
           const end = Math.min(p.cursor + 128, entries.length);
+          let emittedBlocks = 0;
+          let outOfRangeCount = 0;
+          let airCount = 0;
+          const iterateLoopStartedAt = globalThis.performance?.now?.() ?? Date.now();
           for (let i = p.cursor; i < end; i++) {
             const [code, entry] = entries[i];
             const decoded = Chunk.decodeCoord(Number(code));
             const localX = decoded.x - minX;
             const localZ = decoded.z - minZ;
-            if (localX < 0 || localX >= CHUNK_SIZE || localZ < 0 || localZ >= CHUNK_SIZE) continue;
+            if (localX < 0 || localX >= CHUNK_SIZE || localZ < 0 || localZ >= CHUNK_SIZE) {
+              outOfRangeCount++;
+              continue;
+            }
             const type = typeof entry === 'string' ? entry : entry.type;
-            if (type === 'air') continue;
+            if (type === 'air') {
+              airCount++;
+              continue;
+            }
             const orientation = typeof entry === 'object' ? (entry.orientation || 0) : 0;
             p.blocks.push({ x: decoded.x, y: decoded.y, z: decoded.z, type, orientation });
+            emittedBlocks++;
           }
+          const iterateLoopMs = (globalThis.performance?.now?.() ?? Date.now()) - iterateLoopStartedAt;
           p.cursor = end;
-          if (p.cursor < entries.length) return 'continue';
+          p.metrics.iteratePasses++;
+          p.metrics.iterateSnapshotMs += snapshotMs;
+          p.metrics.iterateLoopMs += iterateLoopMs;
+          p.metrics.iterateBlocks += emittedBlocks;
+          const iterateMs = (globalThis.performance?.now?.() ?? Date.now()) - iterateStartedAt;
+          p.metrics.iterateMaxMs = Math.max(p.metrics.iterateMaxMs, iterateMs);
+          if (iterateMs >= stageThresholds.iteratePassMs) {
+            p.metrics.iterateSlowPasses++;
+            recordChunkPerf('chunk.build-mesh.iterate-pass', iterateMs, {
+              chunkKey,
+              invocationIndex,
+              cursorStart,
+              cursorEnd: end,
+              entriesLength: entries.length,
+              scannedEntries: end - cursorStart,
+              emittedBlocks,
+              outOfRangeCount,
+              airCount,
+              snapshotMs,
+              iterateLoopMs
+            }, { thresholdMs: 0 });
+          }
+          if (p.cursor < entries.length) return finishInvocation('continue', { exitReason: 'iterate-partial' });
           p.subStage = 'convert-group';
           p.cursor = 0;
           break;
@@ -933,6 +1040,7 @@ export class Chunk {
         case 'convert-group': {
           // 首次：按 type 分组
           if (!p.groupedByType) {
+            const initStartedAt = globalThis.performance?.now?.() ?? Date.now();
             p.groupedByType = {};
             for (const block of p.blocks) {
               const type = block.type;
@@ -941,6 +1049,19 @@ export class Chunk {
             }
             p.groupKeys = Object.keys(p.groupedByType);
             p.meshData = [];
+            const initMs = (globalThis.performance?.now?.() ?? Date.now()) - initStartedAt;
+            p.metrics.convertInitCount++;
+            p.metrics.convertInitMs += initMs;
+            p.metrics.convertInitMaxMs = Math.max(p.metrics.convertInitMaxMs, initMs);
+            if (initMs >= stageThresholds.convertInitMs) {
+              p.metrics.convertInitSlowCount++;
+              recordChunkPerf('chunk.build-mesh.convert-group.init', initMs, {
+                chunkKey,
+                invocationIndex,
+                blocksBuffered: p.blocks.length,
+                groupCount: p.groupKeys.length
+              }, { thresholdMs: 0 });
+            }
           }
 
           // 逐组处理
@@ -969,17 +1090,22 @@ export class Chunk {
 
             const group = p._currentGroup;
             const batchSize = 128;
+            const batchStartedAt = globalThis.performance?.now?.() ?? Date.now();
             const gEnd = Math.min(p.groupInnerCursor + batchSize, count);
+            let matrixCopyCount = 0;
+            let matrixComputeCount = 0;
             for (let i = p.groupInnerCursor; i < gEnd; i++) {
               const b = blocks[i];
               if (b.matrix) {
                 group.matrices.set(b.matrix, i * 16);
+                matrixCopyCount++;
               } else {
                 const mx = b.x + 0.5;
                 const my = b.y + 0.5;
                 const mz = b.z + 0.5;
                 const rot = getRotationAngle(b.orientation || 0);
                 Chunk._computeTransformMatrix(mx, my, mz, rot, group.matrices, i * 16);
+                matrixComputeCount++;
               }
               group.aoLow[i] = b.aoLow ?? 1;
               group.aoHigh[i] = b.aoHigh ?? 1;
@@ -987,9 +1113,32 @@ export class Chunk {
               const code = Chunk.encodeCoord(b.x, b.y, b.z);
               group.instanceIndexMap[code] = i;
             }
+            const batchMs = (globalThis.performance?.now?.() ?? Date.now()) - batchStartedAt;
+            p.metrics.convertBatches++;
+            p.metrics.convertBatchMs += batchMs;
+            p.metrics.convertBlocks += gEnd - p.groupInnerCursor;
+            p.metrics.convertBatchMaxMs = Math.max(p.metrics.convertBatchMaxMs, batchMs);
+            if (batchMs >= stageThresholds.convertBatchMs) {
+              p.metrics.convertBatchSlowCount++;
+              recordChunkPerf('chunk.build-mesh.convert-group.batch', batchMs, {
+                chunkKey,
+                invocationIndex,
+                type,
+                groupCursor: p.groupCursor,
+                groupInnerCursorStart: p.groupInnerCursor,
+                groupInnerCursorEnd: gEnd,
+                groupSize: count,
+                processedBlocks: gEnd - p.groupInnerCursor,
+                matrixCopyCount,
+                matrixComputeCount
+              }, { thresholdMs: 0 });
+            }
             p.groupInnerCursor = gEnd;
 
-            if (p.groupInnerCursor < count) return 'continue';
+            if (p.groupInnerCursor < count) return finishInvocation('continue', {
+              exitReason: 'convert-group-partial',
+              activeType: type
+            });
 
             // 组完成
             p.meshData.push(group);
@@ -1004,40 +1153,78 @@ export class Chunk {
         }
 
         case 'visible': {
+          const visibleStartedAt = globalThis.performance?.now?.() ?? Date.now();
+          const cursorStart = p.cursor;
           const end = Math.min(p.cursor + 256, p.blocks.length);
           for (let i = p.cursor; i < end; i++) {
             const block = p.blocks[i];
             this.visibleKeys.add(Chunk.encodeCoord(block.x, block.y, block.z));
           }
+          const visibleMs = (globalThis.performance?.now?.() ?? Date.now()) - visibleStartedAt;
           p.cursor = end;
-          if (p.cursor < p.blocks.length) return 'continue';
+          p.metrics.visiblePasses++;
+          p.metrics.visibleMs += visibleMs;
+          p.metrics.visibleBlocks += end - cursorStart;
+          p.metrics.visibleMaxMs = Math.max(p.metrics.visibleMaxMs, visibleMs);
+          if (visibleMs >= stageThresholds.visiblePassMs) {
+            p.metrics.visibleSlowPasses++;
+            recordChunkPerf('chunk.build-mesh.visible-pass', visibleMs, {
+              chunkKey,
+              invocationIndex,
+              cursorStart,
+              cursorEnd: end,
+              processedBlocks: end - cursorStart,
+              totalBlocks: p.blocks.length
+            }, { thresholdMs: 0 });
+          }
+          if (p.cursor < p.blocks.length) return finishInvocation('continue', { exitReason: 'visible-partial' });
           p.subStage = 'build-mesh';
           break;
         }
 
         case 'build-mesh': {
+          const buildMeshesStartedAt = globalThis.performance?.now?.() ?? Date.now();
           this.buildMeshes(p.meshData);
+          const buildMeshesMs = (globalThis.performance?.now?.() ?? Date.now()) - buildMeshesStartedAt;
+          p.metrics.buildMeshesCount++;
+          p.metrics.buildMeshesMs += buildMeshesMs;
+          p.metrics.buildMeshesMaxMs = Math.max(p.metrics.buildMeshesMaxMs, buildMeshesMs);
+          if (buildMeshesMs >= stageThresholds.buildMeshesMs) {
+            p.metrics.buildMeshesSlowCount++;
+            recordChunkPerf('chunk.build-mesh.build-mesh', buildMeshesMs, {
+              chunkKey,
+              invocationIndex,
+              meshGroups: p.meshData?.length || 0,
+              blocksBuffered: p.blocks.length
+            }, { thresholdMs: 0 });
+          }
           p.subStage = 'done';
           break;
         }
 
         case 'done':
-          return 'done';
+          return finishInvocation('done');
       }
     }
 
     // 预算耗尽
     if (p.subStage !== 'done') {
-      recordChunkPerf('chunk.build-mesh-increment.partial', (globalThis.performance?.now?.() ?? Date.now()) - start, {
-        chunkKey: `${cx},${cz}`,
-        subStage: p.subStage,
-        cursor: p.cursor,
-        groupCursor: p.groupCursor,
-        blocksProcessed: p.blocks.length
-      }, { thresholdMs: 0 });
-      return 'continue';
+      const elapsedMs = (globalThis.performance?.now?.() ?? Date.now()) - start;
+      if (elapsedMs >= stageThresholds.budgetExhaustedMs) {
+        recordChunkPerf('chunk.build-mesh-increment.partial', elapsedMs, {
+          chunkKey,
+          subStage: p.subStage,
+          cursor: p.cursor,
+          groupCursor: p.groupCursor,
+          blocksProcessed: p.blocks.length
+        }, { thresholdMs: 0 });
+      }
+      return finishInvocation('continue', {
+        exitReason: 'budget-exhausted',
+        elapsedMs
+      });
     }
-    return 'done';
+    return finishInvocation('done');
   }
 
   /**
@@ -1683,6 +1870,25 @@ export class Chunk {
     // 因为方块操作后需要先 consolidation 生成 InstancedMesh，才能写入 AO attribute。
   }
 
+  _isAOSystemEnabled() {
+    const activeMaterials = getMaterials();
+    if (activeMaterials && typeof activeMaterials.isAOEnabled === 'function') {
+      return activeMaterials.isAOEnabled();
+    }
+    return activeMaterials?.aoEnabled !== false;
+  }
+
+  _clearPendingAOState() {
+    if (this.aoRefreshTimer) {
+      clearTimeout(this.aoRefreshTimer);
+      this.aoRefreshTimer = null;
+    }
+    this.dirtyAOPositions?.clear?.();
+    if (Array.isArray(this._aoOperationQueue)) {
+      this._aoOperationQueue.length = 0;
+    }
+  }
+
   /**
    * 将单个坐标添加到脏集（自动处理跨 chunk）
    * @private
@@ -1721,6 +1927,11 @@ export class Chunk {
     const startedAt = performance.now();
     let markMs = 0;
     let fullSyncMs = 0;
+
+    if (!this._isAOSystemEnabled()) {
+      this._clearPendingAOState();
+      return;
+    }
 
     if (options.fullRefresh) {
       const markStartedAt = performance.now();
@@ -1991,6 +2202,11 @@ export class Chunk {
    * 执行 AO 刷新：先处理操作队列，再收集脏集发送给 AOWorker
    */
   _executeAORefresh() {
+    if (!this._isAOSystemEnabled()) {
+      this._clearPendingAOState();
+      return;
+    }
+
     // 先处理操作队列：基于最新 blockData 重新计算所有操作的邻居脏位
     this._flushAOOperationQueue();
 
@@ -2063,6 +2279,15 @@ export class Chunk {
    */
   _applyAOResults(results, sentKeys) {
     const applyStartedAt = performance.now();
+
+    if (!this._isAOSystemEnabled()) {
+      if (sentKeys) {
+        for (const key of sentKeys) {
+          this.dirtyAOPositions.delete(key);
+        }
+      }
+      return;
+    }
 
     if (!results || results.length === 0) {
       // 即使无结果，也要清除已发送的脏标记

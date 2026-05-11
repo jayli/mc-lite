@@ -16,12 +16,22 @@ export const mockFaceCullingSystem = {
 };
 
 export const mockMaterials = {
+  aoEnabled: true,
   getMaterial: () => {
     const material = {
       clone: () => ({ ...material }),
       dispose: () => {}
     };
     return material;
+  },
+  toggleAO() {
+    this.aoEnabled = !this.aoEnabled;
+  },
+  setAOEnabled(enabled) {
+    this.aoEnabled = enabled;
+  },
+  isAOEnabled() {
+    return this.aoEnabled;
   },
   dispose: () => {}
 };

@@ -866,6 +866,83 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('onAOSettingChanged(false) 应清理已加载 chunk 的 AO 脏状态与定时器', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    let clearedTimer = 0;
+    const chunkA = {
+      dirtyAOPositions: new Set([1, 2]),
+      aoRefreshTimer: { id: 'a' }
+    };
+    const chunkB = {
+      dirtyAOPositions: new Set([3]),
+      aoRefreshTimer: null
+    };
+
+    const originalClearTimeout = globalThis.clearTimeout;
+    globalThis.clearTimeout = () => { clearedTimer++; };
+
+    try {
+      world.chunks.set('0,0', chunkA);
+      world.chunks.set('1,0', chunkB);
+
+      world.onAOSettingChanged(false);
+
+      assertEqual(chunkA.dirtyAOPositions.size, 0, '关闭 AO 时应清空 chunkA 的脏 AO');
+      assertEqual(chunkB.dirtyAOPositions.size, 0, '关闭 AO 时应清空 chunkB 的脏 AO');
+      assertEqual(chunkA.aoRefreshTimer, null, '关闭 AO 时应清掉 chunkA 的 AO 定时器引用');
+      assertEqual(clearedTimer, 1, '关闭 AO 时应清理已有 AO 定时器');
+    } finally {
+      globalThis.clearTimeout = originalClearTimeout;
+      teardownEnvironment();
+    }
+  });
+
+  test('onAOSettingChanged(true) 应对已就绪且非合并中的 chunk 触发全量 AO 刷新', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    let readyRefreshes = 0;
+    let consolidatingRefreshes = 0;
+    let notReadyRefreshes = 0;
+
+    world.chunks.set('0,0', {
+      isReady: true,
+      isConsolidating: false,
+      _refreshAOFromStableSource(options = {}) {
+        readyRefreshes++;
+        assertTrue(options.fullRefresh, '重新开启 AO 时应触发 fullRefresh');
+      }
+    });
+    world.chunks.set('1,0', {
+      isReady: true,
+      isConsolidating: true,
+      _refreshAOFromStableSource() {
+        consolidatingRefreshes++;
+      }
+    });
+    world.chunks.set('2,0', {
+      isReady: false,
+      isConsolidating: false,
+      _refreshAOFromStableSource() {
+        notReadyRefreshes++;
+      }
+    });
+
+    world.onAOSettingChanged(true);
+
+    assertEqual(readyRefreshes, 1, '已就绪且非合并中的 chunk 应全量刷新 AO');
+    assertEqual(consolidatingRefreshes, 0, '合并中的 chunk 不应立即刷新 AO');
+    assertEqual(notReadyRefreshes, 0, '未就绪 chunk 不应立即刷新 AO');
+
+    teardownEnvironment();
+  });
+
   test('延迟 finalize 队列 - 流式加载活跃时不应执行纯新 runtime chunk 的后置任务', () => {
     setupEnvironment();
 
