@@ -1551,19 +1551,24 @@ export class Chunk {
         // 清空数组位置
         const oldId = this.blockDataArray[blockIndex];
         if (oldId !== 0) {
-          this.solidBlockIds.delete(oldId);
           this.blockDataArray[blockIndex] = 0;
+          // 仅当该 blockId 不再被任何其他位置引用时才从 solidBlockIds 移除
+          if (!this.blockDataArray.includes(oldId)) {
+            this.solidBlockIds.delete(oldId);
+          }
         }
       } else {
         // 获取或创建 blockId
         const blockId = this._getOrCreateBlockId(entry);
-        // 清空旧 id
         const oldId = this.blockDataArray[blockIndex];
-        if (oldId !== 0 && oldId !== blockId) {
-          this.solidBlockIds.delete(oldId);
-        }
-        // 设置新 id
+        // 先写入新 id，再检查旧 id 是否还被引用
+        // （必须先写，否则 includes(oldId) 会命中当前位置，永远返回 true）
         this.blockDataArray[blockIndex] = blockId;
+        if (oldId !== 0 && oldId !== blockId) {
+          if (!this.blockDataArray.includes(oldId)) {
+            this.solidBlockIds.delete(oldId);
+          }
+        }
         // 如果是实心方块，加入 solid set
         if (props.isSolid) {
           this.solidBlockIds.add(blockId);
@@ -2626,7 +2631,9 @@ export class Chunk {
         const oldBlockId = this.blockDataArray[blockIndex];
         if (oldBlockId !== 0) {
           this.blockDataArray[blockIndex] = 0;
-          this.solidBlockIds.delete(oldBlockId);
+          if (!this.blockDataArray.includes(oldBlockId)) {
+            this.solidBlockIds.delete(oldBlockId);
+          }
         }
       }
     });
@@ -3965,7 +3972,23 @@ export class Chunk {
 
     // 同步数组存储；跨 chunk 流式补片不立即抢占 WorldWorker 合并队列
     this.dirtyBlocks += appendedCount;
-    this._initArrayStorageFromBlockData();
+    for (const [code] of patches) {
+      const actualEntry = this.blockData.get(code);
+      if (!actualEntry) continue;
+      const parsed = parseBlockEntry(actualEntry);
+      const type = parsed.type;
+      if (!type || type === 'air') continue;
+      const { x, y, z } = Chunk.decodeCoord(code);
+      const lx = x - this.cx * CHUNK_SIZE;
+      const ly = y - this.worldY;
+      const lz = z - this.cz * CHUNK_SIZE;
+      if (lx < 0 || lx >= CHUNK_SIZE || ly < 0 || ly >= CHUNK_SIZE || lz < 0 || lz >= CHUNK_SIZE) continue;
+      const blockIndex = (ly << 8) | (lz << 4) | lx;
+      const blockId = this._getOrCreateBlockId(actualEntry);
+      this.blockDataArray[blockIndex] = blockId;
+      const props = getBlockProps(type);
+      if (props.isSolid) this.solidBlockIds.add(blockId);
+    }
     const t2 = globalThis.performance?.now?.() ?? Date.now();
     recordChunkPerf('chunk.append-scattered-blocks', t2 - t0, {
       chunkKey: `${this.cx},${this.cz}`,

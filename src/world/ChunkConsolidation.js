@@ -457,8 +457,6 @@ export function extendChunk(Chunk) {
     this._unregisterLightSources();
     this._registerLightSources();
 
-    // 重建数组存储，确保 blockDataArray 与 blockData 权威源同步
-    this._initArrayStorageFromBlockData();
     const t7 = performance.now();
 
     // 重置状态

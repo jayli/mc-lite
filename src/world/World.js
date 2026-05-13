@@ -400,6 +400,9 @@ export class World {
           this.worldBlockDataStore?.ensureChunkSlice(chunk.cx, chunk.cz);
         }
 
+        // 释放 chunkRecord 对 rawBlockData 的引用，无论是否为空
+        result.chunkRecord.blockData = null;
+
         // 2. 写入 payload registry
         if (staticEntities?.length > 0 || runtimeSeedData) {
           this.worldChunkPayloadRegistry?.mergeChunkPayload(chunk.cx, chunk.cz, {
@@ -701,6 +704,13 @@ export class World {
           }
         }
       }
+    }
+  }
+
+  _rebuildStaticTreeTerrainBoostChunkKeys() {
+    this._staticTreeTerrainBoostChunkKeys.clear();
+    for (const [, ch] of this.chunks) {
+      this._markStaticTreeTerrainBoostFromChunk(ch);
     }
   }
 
@@ -1108,7 +1118,10 @@ export class World {
           chunk.batchFaceCullingTimer = null;
         }
 
-        // 5. 释放显存并从活动 chunk 集合移除
+        // 5. 清理 runtime 残留（dirty + pendingUnload + flushTimer）
+        this.worldRuntime?.clearChunkRuntimeResidue?.(chunk.cx, chunk.cz);
+
+        // 6. 释放显存并从活动 chunk 集合移除
         chunk.dispose();
         this.chunks.delete(key);
         chunkTopologyChanged = true;
@@ -1119,6 +1132,7 @@ export class World {
       this.runtimeIdleScheduler?.markBusy('chunk-topology-changed');
       this.clearBlockLookupCaches();
       this.requestShadowMapUpdate('chunk-topology-changed');
+      this._rebuildStaticTreeTerrainBoostChunkKeys();
     }
 
     // Chunk 就绪数量变化时执行一次去重，避免历史重复 owner 长期存在

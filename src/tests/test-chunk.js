@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import { Chunk } from '../world/Chunk.js';
 import { worldWorker, workerCallbacks } from '../world/ChunkConsolidation.js';
 import { mockFaceCullingSystem, mockMaterials, mockBlockData } from './test-mocks.js';
+import { WorldBlockDataStore } from '../world/WorldBlockDataStore.js';
 
 // 模拟 WorldWorker
 class MockWorldWorker {
@@ -1765,6 +1766,312 @@ describe('Chunk 真实类测试', (test) => {
     } finally {
       teardownEnvironment();
     }
+  });
+
+  test('appendScatteredBlocks - 追加方块后应增量更新 blockDataArray 而非全量重建', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const chunk = new Chunk(0, 0, world);
+
+    // 预填充一些方块
+    const baseCode = Chunk.encodeCoord(1, 1, 1);
+    chunk.blockData.set(baseCode, 'stone');
+    chunk._initArrayStorageFromBlockData();
+
+    const baseIndex = (1 << 8) | (1 << 4) | 1;
+    const baseBlockId = chunk.blockDataArray[baseIndex];
+    assertTrue(baseBlockId > 0, '预填充方块应有 blockId');
+
+    // spy 全量重建
+    let fullRebuildCalled = false;
+    const original = chunk._initArrayStorageFromBlockData.bind(chunk);
+    chunk._initArrayStorageFromBlockData = () => {
+      fullRebuildCalled = true;
+      original();
+    };
+
+    // 追加实心方块
+    const appended = chunk.appendScatteredBlocks(
+      [{ x: 5, y: 2, z: 5, type: 'dirt', orientation: 0 }],
+      new Set([Chunk.encodeCoord(5, 2, 5)]),
+      [],
+      { deferConsolidation: true }
+    );
+
+    assertEqual(appended, 1, '应追加 1 个方块');
+    assertFalse(fullRebuildCalled, '不应调用全量 _initArrayStorageFromBlockData');
+
+    // 行为断言：新方块已写入 blockDataArray
+    const newIndex = (2 << 8) | (5 << 4) | 5;
+    assertTrue(chunk.blockDataArray[newIndex] > 0, '新方块应有 blockId');
+
+    // 行为断言：旧方块未被破坏
+    assertEqual(chunk.blockDataArray[baseIndex], baseBlockId, '预填充方块 blockId 不应被清除');
+
+    // 行为断言：solidBlockIds 包含实心方块
+    const newBlockId = chunk.blockDataArray[newIndex];
+    assertTrue(chunk.solidBlockIds.has(newBlockId), '实心方块应加入 solidBlockIds');
+
+    teardownEnvironment();
+  });
+
+  test('appendScatteredBlocks - 追加非实心方块不应加入 solidBlockIds', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const chunk = new Chunk(0, 0, world);
+    chunk._initArrayStorageFromBlockData();
+
+    // 追加非实心方块（glass_block 在 test-mocks 中定义为非 solid）
+    chunk.appendScatteredBlocks(
+      [{ x: 3, y: 1, z: 3, type: 'glass_block', orientation: 0 }],
+      new Set([Chunk.encodeCoord(3, 1, 3)]),
+      [],
+      { deferConsolidation: true }
+    );
+
+    const blockIndex = (1 << 8) | (3 << 4) | 3;
+    const blockId = chunk.blockDataArray[blockIndex];
+    assertTrue(blockId > 0, '非实心方块也应有 blockId');
+    assertFalse(chunk.solidBlockIds.has(blockId), '非实心方块不应加入 solidBlockIds');
+
+    teardownEnvironment();
+  });
+
+  test('appendScatteredBlocks - 带 orientation 方块应正确写入 blockDataArray', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const chunk = new Chunk(0, 0, world);
+    chunk._initArrayStorageFromBlockData();
+
+    chunk.appendScatteredBlocks(
+      [{ x: 7, y: 3, z: 7, type: 'wood', orientation: 2 }],
+      new Set([Chunk.encodeCoord(7, 3, 7)]),
+      [],
+      { deferConsolidation: true }
+    );
+
+    const blockIndex = (3 << 8) | (7 << 4) | 7;
+    const blockId = chunk.blockDataArray[blockIndex];
+    assertTrue(blockId > 0, '带 orientation 方块应有 blockId');
+
+    // 验证 palette 中存储了完整 entry（含 orientation）
+    const entry = chunk.blockPalette.get(blockId);
+    assertTrue(typeof entry === 'object' && entry.orientation === 2,
+      'palette 应保留 orientation 信息');
+
+    teardownEnvironment();
+  });
+
+  test('appendScatteredBlocks - 通过 authority store 路径追加方块后 blockDataArray 与 store slice 一致', () => {
+    setupEnvironment();
+
+    const store = new WorldBlockDataStore();
+
+    const world = createMockWorld();
+    world.worldBlockDataStore = store;
+    const chunk = new Chunk(0, 0, world);
+
+    // attach authority slice — 使用 ensureChunkSlice 获取或创建 slice
+    store.replaceChunkSlice(0, 0, new Map(), 'test-setup');
+    chunk.blockData = store.ensureChunkSlice(0, 0);
+    chunk._initArrayStorageFromBlockData();
+
+    // spy 全量重建
+    let fullRebuildCalled = false;
+    chunk._initArrayStorageFromBlockData = () => { fullRebuildCalled = true; };
+
+    chunk.appendScatteredBlocks(
+      [{ x: 4, y: 2, z: 4, type: 'stone', orientation: 0 }],
+      new Set([Chunk.encodeCoord(4, 2, 4)]),
+      [],
+      { deferConsolidation: true }
+    );
+
+    assertFalse(fullRebuildCalled, 'authority store 路径也不应触发全量重建');
+
+    // store slice 应已包含新方块
+    const code = Chunk.encodeCoord(4, 2, 4);
+    assertTrue(chunk.blockData.has(code), 'authority store slice 应包含追加的方块');
+
+    // blockDataArray 应与 slice 一致
+    const blockIndex = (2 << 8) | (4 << 4) | 4;
+    assertTrue(chunk.blockDataArray[blockIndex] > 0, 'blockDataArray 应已更新');
+
+    teardownEnvironment();
+  });
+
+  test('_updateBlockState - 两块同类型方块共享 blockId，删除其中一块后另一块仍应在 solidBlockIds 中', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const chunk = new Chunk(0, 0, world);
+
+    // 放置两块 stone（共享同一 blockId）
+    const code1 = Chunk.encodeCoord(5, 1, 5);
+    const code2 = Chunk.encodeCoord(6, 1, 6);
+    chunk.blockData.set(code1, 'stone');
+    chunk.blockData.set(code2, 'stone');
+    chunk._initArrayStorageFromBlockData();
+
+    const idx1 = (1 << 8) | (5 << 4) | 5;
+    const idx2 = (1 << 8) | (6 << 4) | 6;
+    const stoneBlockId = chunk.blockDataArray[idx1];
+    assertTrue(stoneBlockId > 0, 'stone 应有 blockId');
+    assertEqual(chunk.blockDataArray[idx2], stoneBlockId, '两块 stone 应共享同一 blockId');
+    assertTrue(chunk.solidBlockIds.has(stoneBlockId), 'stone blockId 应在 solidBlockIds 中');
+
+    // 删除第一块 stone（设为 air）
+    chunk.blockData.set(code1, 'air');
+    chunk._updateBlockState(5, 1, 5, 'air', 'air');
+
+    // 另一块 stone 仍在，其 blockId 应仍在 solidBlockIds 中
+    assertTrue(chunk.solidBlockIds.has(stoneBlockId),
+      '删除共享 blockId 的一块后，另一块仍存在，solidBlockIds 不应移除该 id');
+
+    teardownEnvironment();
+  });
+
+  test('_updateBlockState - 两块同类型方块共享 blockId，替换其中一块为其他类型，另一块仍 solid', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const chunk = new Chunk(0, 0, world);
+
+    // 放置两块 stone（共享同一 blockId）
+    const code1 = Chunk.encodeCoord(5, 1, 5);
+    const code2 = Chunk.encodeCoord(6, 1, 6);
+    chunk.blockData.set(code1, 'stone');
+    chunk.blockData.set(code2, 'stone');
+    chunk._initArrayStorageFromBlockData();
+
+    const idx1 = (1 << 8) | (5 << 4) | 5;
+    const stoneBlockId = chunk.blockDataArray[idx1];
+    assertTrue(stoneBlockId > 0, 'stone 应有 blockId');
+    assertTrue(chunk.solidBlockIds.has(stoneBlockId), 'stone blockId 应在 solidBlockIds 中');
+
+    // 替换第一块 stone 为 glass_block（非实心）
+    chunk.blockData.set(code1, 'glass_block');
+    chunk._updateBlockState(5, 1, 5, 'glass_block', 'glass_block');
+
+    // 另一块 stone 仍在，其 blockId 应仍在 solidBlockIds 中
+    assertTrue(chunk.solidBlockIds.has(stoneBlockId),
+      '替换共享 blockId 的一块后，另一块仍存在，solidBlockIds 不应移除该 id');
+
+    teardownEnvironment();
+  });
+
+  test('_updateBlockState - 替换唯一一块方块后旧 blockId 应从 solidBlockIds 中移除', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const chunk = new Chunk(0, 0, world);
+
+    // 放置一块 stone
+    const code1 = Chunk.encodeCoord(5, 1, 5);
+    chunk.blockData.set(code1, 'stone');
+    chunk._initArrayStorageFromBlockData();
+
+    const stoneBlockId = chunk.blockDataArray[(1 << 8) | (5 << 4) | 5];
+    assertTrue(stoneBlockId > 0, 'stone 应有 blockId');
+    assertTrue(chunk.solidBlockIds.has(stoneBlockId), 'stone blockId 应在 solidBlockIds 中');
+
+    // 替换成 glass_block（非实心）
+    chunk.blockData.set(code1, 'glass_block');
+    chunk._updateBlockState(5, 1, 5, 'glass_block', 'glass_block');
+
+    // stone blockId 不再被任何位置引用，应从 solidBlockIds 移除
+    assertTrue(!chunk.solidBlockIds.has(stoneBlockId),
+      '替换后旧 stone blockId 不应继续留在 solidBlockIds 中');
+
+    teardownEnvironment();
+  });
+
+  test('_registerSpecialEntityCollision - 实体占位覆盖方块后，其他同类型方块的 blockId 仍应在 solidBlockIds 中', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const chunk = new Chunk(0, 0, world);
+
+    // 放置两块 stone
+    const code1 = Chunk.encodeCoord(5, 1, 5);
+    const code2 = Chunk.encodeCoord(6, 1, 6);
+    chunk.blockData.set(code1, 'stone');
+    chunk.blockData.set(code2, 'stone');
+    chunk._initArrayStorageFromBlockData();
+
+    const stoneBlockId = chunk.blockDataArray[(1 << 8) | (5 << 4) | 5];
+    assertTrue(stoneBlockId > 0, 'stone 应有 blockId');
+    assertTrue(chunk.solidBlockIds.has(stoneBlockId), 'stone blockId 应在 solidBlockIds 中');
+
+    // 通过生产代码路径注册实体碰撞，覆盖 (5,1,5) 位置的 stone
+    chunk._registerSpecialEntityCollision('modGunMan', { id: 'test-entity', x: 5, y: 1, z: 5 });
+
+    // 另一块 stone 仍在，其 blockId 应仍在 solidBlockIds 中
+    assertTrue(chunk.solidBlockIds.has(stoneBlockId),
+      '_registerSpecialEntityCollision 覆盖一块后，另一块同类型的 blockId 不应被误删');
+
+    teardownEnvironment();
+  });
+
+  test('_applyConsolidateResult - 不应调用 _initArrayStorageFromBlockData 且数据保持一致', () => {
+    setupEnvironment();
+
+    const world = createMockWorld();
+    const chunk = new Chunk(0, 0, world);
+
+    // 预填充方块并初始化 blockDataArray
+    const code1 = Chunk.encodeCoord(5, 1, 5);
+    const code2 = Chunk.encodeCoord(6, 2, 6);
+    chunk.blockData.set(code1, 'stone');
+    chunk.blockData.set(code2, 'dirt');
+    chunk._initArrayStorageFromBlockData();
+    chunk.solidBlocks.add(code1);
+    chunk.solidBlocks.add(code2);
+    chunk.visibleKeys.add(code1);
+    chunk.visibleKeys.add(code2);
+
+    // 记录 consolidation 前的 blockDataArray 值
+    const idx1 = (1 << 8) | (5 << 4) | 5;
+    const idx2 = (2 << 8) | (6 << 4) | 6;
+    const preBlockId1 = chunk.blockDataArray[idx1];
+    const preBlockId2 = chunk.blockDataArray[idx2];
+    assertTrue(preBlockId1 > 0, 'stone 应有 blockId');
+    assertTrue(preBlockId2 > 0, 'dirt 应有 blockId');
+
+    // spy 全量重建
+    let fullRebuildCalled = false;
+    chunk._initArrayStorageFromBlockData = () => {
+      fullRebuildCalled = true;
+    };
+
+    // 模拟 consolidation 回包
+    chunk.isConsolidating = true;
+    chunk.dirtyBlocks = 1;
+    chunk._applyConsolidateResult(
+      {
+        scatteredBlocks: [
+          { x: 5, y: 1, z: 5, type: 'stone', orientation: 0 },
+          { x: 6, y: 2, z: 6, type: 'dirt', orientation: 0 }
+        ],
+        meshData: [],
+        visibleKeys: ['5,1,5', '6,2,6'],
+        solidBlocks: ['5,1,5', '6,2,6'],
+        structureCenters: []
+      },
+      1,
+      new Set()
+    );
+
+    assertFalse(fullRebuildCalled, 'consolidation 不改 authority，不应触发全量 _initArrayStorageFromBlockData');
+
+    // 行为断言：blockDataArray 未被清零（因为没有调用全量重建，值应保持）
+    assertEqual(chunk.blockDataArray[idx1], preBlockId1, 'consolidation 后 stone 的 blockId 应保持');
+    assertEqual(chunk.blockDataArray[idx2], preBlockId2, 'consolidation 后 dirt 的 blockId 应保持');
+
+    teardownEnvironment();
   });
 
 });

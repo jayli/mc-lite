@@ -1578,6 +1578,171 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('chunk unload 后 runtime 残留（dirty/pendingUnload/flushTimer）不应残留', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.bootstrapState.phase = 'runtime-streaming';
+
+    // 模拟 worldRuntime，注入 dirty / pendingUnload / flushTimer 三种残留
+    const dirtyChunks = new Map();
+    dirtyChunks.set('0,0', { cx: 0, cz: 0, dirty: true });
+    const pendingUnloadFlushQueue = new Map();
+    pendingUnloadFlushQueue.set('0,0', { chunkKey: '0,0' });
+    const flushTimers = new Map();
+    const stubTimerId = setTimeout(() => {}, 0);
+    clearTimeout(stubTimerId);
+    flushTimers.set('0,0', stubTimerId);
+
+    let clearTimeoutCalledWith = null;
+    world.worldRuntime = {
+      _dirtyChunks: dirtyChunks,
+      pendingUnloadFlushQueue,
+      _flushTimers: flushTimers,
+      _chunkKey(cx, cz) { return `${cx},${cz}`; },
+      clearChunkRuntimeResidue(cx, cz) {
+        const key = this._chunkKey(cx, cz);
+        this._dirtyChunks.delete(key);
+        this.pendingUnloadFlushQueue.delete(key);
+        const timer = this._flushTimers.get(key);
+        if (timer !== undefined) {
+          clearTimeoutCalledWith = timer;
+          clearTimeout(timer);
+          this._flushTimers.delete(key);
+        }
+      },
+      ensureChunkData() {
+        return Promise.resolve({ status: 'missing-region' });
+      },
+      prefetchRegions() {}
+    };
+
+    // 移动到远处触发 unload
+    world.update(new THREE.Vector3(200, 10, 200), 0.016);
+
+    assertFalse(world.chunks.has('0,0'), 'chunk 应已卸载');
+    assertFalse(dirtyChunks.has('0,0'), 'unload 后 _dirtyChunks 不应残留');
+    assertFalse(pendingUnloadFlushQueue.has('0,0'), 'unload 后 pendingUnloadFlushQueue 不应残留');
+    assertFalse(flushTimers.has('0,0'), 'unload 后 _flushTimers 不应残留');
+
+    teardownEnvironment();
+  });
+
+  test('chunk topology 变化后 _staticTreeTerrainBoostChunkKeys 应从已加载 chunks 重建', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.bootstrapState.phase = 'runtime-streaming';
+
+    // 手动注入一个过期 boost key（模拟已卸载 chunk 遗留）
+    world._staticTreeTerrainBoostChunkKeys.add('99,99');
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('99,99'), '应已注入过期 key');
+
+    world.worldRuntime = {
+      ensureChunkData() {
+        return Promise.resolve({ status: 'missing-region' });
+      },
+      prefetchRegions() {},
+      clearChunkRuntimeResidue() {}
+    };
+
+    // 移动到远处触发 unload（会触发 chunkTopologyChanged）
+    world.update(new THREE.Vector3(200, 10, 200), 0.016);
+
+    assertFalse(world._staticTreeTerrainBoostChunkKeys.has('99,99'),
+      'topology 变化后过期 boost key 不应残留');
+
+    teardownEnvironment();
+  });
+
+  test('chunk topology 重建时多源 chunk 产生的重叠 boost key 应保留', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.bootstrapState.phase = 'runtime-streaming';
+
+    // 确保两个源 chunk 都已加载（防止断言被静默跳过）
+    const chunk00 = world.chunks.get('0,0');
+    const chunk10 = world.chunks.get('1,0');
+    assertTrue(!!chunk00, '测试前提：chunk 0,0 应已加载');
+    assertTrue(!!chunk10, '测试前提：chunk 1,0 应已加载');
+
+    // 模拟两个源 chunk 都有 static_tree，且 boost 覆盖范围重叠于 '1,0'
+    chunk00.structureCenters = [
+      { type: 'static_tree', x: 14, y: 10, z: 8 }
+    ];
+    chunk10.structureCenters = [
+      { type: 'static_tree', x: 18, y: 10, z: 8 }
+    ];
+
+    // 注入过期 key，然后通过生产代码 helper 重建
+    world._staticTreeTerrainBoostChunkKeys.add('99,99');
+    world._rebuildStaticTreeTerrainBoostChunkKeys();
+
+    // '1,0' 应存在（被两个源 chunk 共同标记），过期 key 应清除
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('1,0'),
+      '多源 overlap 的 boost key 应在重建后保留');
+    assertFalse(world._staticTreeTerrainBoostChunkKeys.has('99,99'),
+      '过期 boost key 应被清除');
+
+    teardownEnvironment();
+  });
+
+  test('卸载一个源 chunk 后，另一个源产生的 boost key 仍应存在', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.bootstrapState.phase = 'runtime-streaming';
+
+    const chunk00 = world.chunks.get('0,0');
+    const chunk10 = world.chunks.get('1,0');
+    assertTrue(!!chunk00, '测试前提：chunk 0,0 应已加载');
+    assertTrue(!!chunk10, '测试前提：chunk 1,0 应已加载');
+
+    // 两个源 chunk 都标记 '1,0' 为 boost target
+    chunk00.structureCenters = [
+      { type: 'static_tree', x: 14, y: 10, z: 8 }
+    ];
+    chunk10.structureCenters = [
+      { type: 'static_tree', x: 18, y: 10, z: 8 }
+    ];
+
+    // 通过生产代码 helper 初始重建，确认 '1,0' 存在
+    world._rebuildStaticTreeTerrainBoostChunkKeys();
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('1,0'),
+      '初始重建后 1,0 应存在');
+
+    // 模拟卸载 chunk 0,0（移除后通过生产代码 helper 重建）
+    world.chunks.delete('0,0');
+    world._rebuildStaticTreeTerrainBoostChunkKeys();
+
+    // chunk 1,0 仍在，它自身的 structureCenters 仍应标记 '1,0'
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('1,0'),
+      '卸载一个源后，另一个源产生的 boost key 仍应存在');
+
+    teardownEnvironment();
+  });
+
   test('dispose - 应尽力 flush WorldRuntime 的待处理写回工作', async () => {
     setupEnvironment();
 

@@ -43,7 +43,7 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
 
     const cachedRegion = runtime._regionCache.get('0,0');
     assertTrue(!!cachedRegion, '读取 chunk 后应向运行时 region cache 注入最小基线');
-    assertDeepEqual(cachedRegion.chunks['0,0'].blockData, chunkRecord.blockData, '缓存中的 chunkRecord 应与读取结果一致');
+    assertTrue(cachedRegion.chunks['0,0'].blockData === undefined, 'RegionCache 不应保留 blockData 冗余副本');
 
     globalThis._worldStore = originalWorldStore;
   });
@@ -870,7 +870,7 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     globalThis._worldStore = originalWorldStore;
   });
 
-  test('flushBeforeUnload - region-cache 来源时应复用已缓存 blockData，不在队列中复制整块数据', async () => {
+  test('flushBeforeUnload - region-cache 来源时应复用已存 blockData，不在队列中复制整块数据', async () => {
     const originalWorldStore = globalThis._worldStore;
     const cachedBlockCode = encodeCoord(1, 2, 3);
     const cachedBlockData = {
@@ -882,6 +882,7 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     };
 
     const runtime = new WorldRuntime();
+    // 手动设置 cache（含 blockData）：此测试验证 deprecated flushBeforeUnload 路径
     runtime._regionCache.set('0,0', {
       regionKey: '0,0',
       rx: 0,
@@ -907,7 +908,7 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     assertTrue(!!queuedRecord, '应生成 unload queue 记录');
     assertEqual(queuedRecord.preserveStoredBlockData, true, 'region-cache 来源时应标记复用已存 blockData');
     assertEqual(queuedRecord.chunkRecord.blockData, null, '队列里不应再复制整块 blockData');
-    assertEqual(runtime._regionCache.get('0,0').chunks['0,0'].blockData, cachedBlockData, 'region cache 仍应继续复用原 blockData 引用');
+    assertTrue(runtime._regionCache.get('0,0').chunks['0,0'].blockData === undefined, 'M1 后 RegionCache 不应保留 blockData');
 
     globalThis._worldStore = originalWorldStore;
   });
@@ -969,6 +970,55 @@ describe('WorldRuntime 运行时工作集测试', (test) => {
     assertTrue(!!savedRegions[0].region.chunks['0,0'], '应包含 dirty chunk 的结果');
     assertTrue(!!savedRegions[0].region.chunks['1,0'], '应包含 pending unload chunk 的结果');
     assertEqual(runtime.pendingUnloadFlushQueue.size, 0, '退出 flush 后应清空 unload 队列');
+
+    globalThis._worldStore = originalWorldStore;
+  });
+
+  test('clearChunkRuntimeResidue - 应清理 dirtyChunks / pendingUnloadFlushQueue / _flushTimers', () => {
+    const originalWorldStore = globalThis._worldStore;
+    globalThis._worldStore = { getChunkRecord: async () => null };
+
+    const runtime = new WorldRuntime();
+    runtime._dirtyChunks.set('0,0', { cx: 0, cz: 0, dirty: true });
+    runtime.pendingUnloadFlushQueue.set('0,0', { chunkKey: '0,0' });
+    const stubTimerId = setTimeout(() => {}, 0);
+    clearTimeout(stubTimerId);
+    runtime._flushTimers.set('0,0', stubTimerId);
+
+    runtime.clearChunkRuntimeResidue(0, 0);
+
+    assertFalse(runtime._dirtyChunks.has('0,0'), '_dirtyChunks 应已清理');
+    assertFalse(runtime.pendingUnloadFlushQueue.has('0,0'), 'pendingUnloadFlushQueue 应已清理');
+    assertFalse(runtime._flushTimers.has('0,0'), '_flushTimers 应已清理');
+
+    // 不存在的 chunk 调用不应报错
+    runtime.clearChunkRuntimeResidue(99, 99);
+
+    globalThis._worldStore = originalWorldStore;
+  });
+
+  test('_upsertRegionCacheChunkRecord - 存入 RegionCache 的 chunkRecord 不应包含 blockData', async () => {
+    const originalWorldStore = globalThis._worldStore;
+    globalThis._worldStore = { getChunkRecord: async () => null };
+
+    const runtime = new WorldRuntime();
+    const chunkRecord = {
+      cx: 0, cz: 0,
+      blockData: { 123: 'stone', 456: 'dirt' },
+      staticEntities: [{ type: 'tree' }],
+      runtimeSeedData: { structureCenters: [] }
+    };
+
+    runtime._upsertRegionCacheChunkRecord(0, 0, chunkRecord);
+
+    const cachedRegion = runtime._regionCache.get('0,0');
+    assertTrue(!!cachedRegion, '应已注入 region cache');
+    const stored = cachedRegion.chunks['0,0'];
+    assertTrue(
+      stored.blockData === undefined,
+      '存入 RegionCache 的 chunkRecord 不应包含 blockData'
+    );
+    assertDeepEqual(stored.staticEntities, [{ type: 'tree' }], 'staticEntities 应保留');
 
     globalThis._worldStore = originalWorldStore;
   });
