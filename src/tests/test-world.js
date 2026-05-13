@@ -873,14 +873,23 @@ describe('World 真实类测试', (test) => {
     world = new World(scene);
 
     let clearedTimer = 0;
-    const chunkA = {
-      dirtyAOPositions: new Set([1, 2]),
-      aoRefreshTimer: { id: 'a' }
-    };
-    const chunkB = {
-      dirtyAOPositions: new Set([3]),
-      aoRefreshTimer: null
-    };
+    const makeMockChunk = (dirtyAO, timer) => ({
+      dirtyAOPositions: dirtyAO,
+      aoRefreshTimer: timer,
+      _aoOperationQueue: [],
+      _clearPendingAOState() {
+        if (this.aoRefreshTimer) {
+          clearTimeout(this.aoRefreshTimer);
+          this.aoRefreshTimer = null;
+        }
+        this.dirtyAOPositions?.clear?.();
+        if (Array.isArray(this._aoOperationQueue)) {
+          this._aoOperationQueue.length = 0;
+        }
+      }
+    });
+    const chunkA = makeMockChunk(new Set([1, 2]), { id: 'a' });
+    const chunkB = makeMockChunk(new Set([3]), null);
 
     const originalClearTimeout = globalThis.clearTimeout;
     globalThis.clearTimeout = () => { clearedTimer++; };

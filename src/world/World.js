@@ -823,14 +823,7 @@ export class World {
       if (!chunk) continue;
 
       if (!enabled) {
-        if (chunk.aoRefreshTimer) {
-          clearTimeout(chunk.aoRefreshTimer);
-          chunk.aoRefreshTimer = null;
-        }
-        chunk.dirtyAOPositions?.clear?.();
-        if (Array.isArray(chunk._aoOperationQueue)) {
-          chunk._aoOperationQueue.length = 0;
-        }
+        chunk._clearPendingAOState?.();
         continue;
       }
 
