@@ -36,6 +36,12 @@ export function extendChunk(Chunk) {
    */
   Chunk.prototype.dispose = function() {
     this.disposed = true;
+
+    // detach 共享 authority slice（blockData 引用解除，authority 数据保留）
+    if (this.detachAuthoritySlice) {
+      this.detachAuthoritySlice();
+    }
+
     this.world?.globalInstancedMeshManager?.removeChunk?.(`${this.cx},${this.cz}`);
 
     // 通知 AO Worker 清理 chunk 副本缓存

@@ -18,6 +18,7 @@ import { PERSISTENCE_CONFIG } from '../constants/PersistenceConfig.js';
 import { mockFaceCullingSystem, mockMaterials, mockBlockData } from './test-mocks.js';
 import { Chunk } from '../world/Chunk.js';
 import { ChunkAssemblyScheduler } from '../world/ChunkAssemblyScheduler.js';
+import { WorldBlockDataStore } from '../world/WorldBlockDataStore.js';
 
 // ============================================
 // Worker 模拟 - 在导入 World 之前设置
@@ -865,6 +866,92 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('onAOSettingChanged(false) 应清理已加载 chunk 的 AO 脏状态与定时器', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    let clearedTimer = 0;
+    const makeMockChunk = (dirtyAO, timer) => ({
+      dirtyAOPositions: dirtyAO,
+      aoRefreshTimer: timer,
+      _aoOperationQueue: [],
+      _clearPendingAOState() {
+        if (this.aoRefreshTimer) {
+          clearTimeout(this.aoRefreshTimer);
+          this.aoRefreshTimer = null;
+        }
+        this.dirtyAOPositions?.clear?.();
+        if (Array.isArray(this._aoOperationQueue)) {
+          this._aoOperationQueue.length = 0;
+        }
+      }
+    });
+    const chunkA = makeMockChunk(new Set([1, 2]), { id: 'a' });
+    const chunkB = makeMockChunk(new Set([3]), null);
+
+    const originalClearTimeout = globalThis.clearTimeout;
+    globalThis.clearTimeout = () => { clearedTimer++; };
+
+    try {
+      world.chunks.set('0,0', chunkA);
+      world.chunks.set('1,0', chunkB);
+
+      world.onAOSettingChanged(false);
+
+      assertEqual(chunkA.dirtyAOPositions.size, 0, '关闭 AO 时应清空 chunkA 的脏 AO');
+      assertEqual(chunkB.dirtyAOPositions.size, 0, '关闭 AO 时应清空 chunkB 的脏 AO');
+      assertEqual(chunkA.aoRefreshTimer, null, '关闭 AO 时应清掉 chunkA 的 AO 定时器引用');
+      assertEqual(clearedTimer, 1, '关闭 AO 时应清理已有 AO 定时器');
+    } finally {
+      globalThis.clearTimeout = originalClearTimeout;
+      teardownEnvironment();
+    }
+  });
+
+  test('onAOSettingChanged(true) 应对已就绪且非合并中的 chunk 触发全量 AO 刷新', () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    let readyRefreshes = 0;
+    let consolidatingRefreshes = 0;
+    let notReadyRefreshes = 0;
+
+    world.chunks.set('0,0', {
+      isReady: true,
+      isConsolidating: false,
+      _refreshAOFromStableSource(options = {}) {
+        readyRefreshes++;
+        assertTrue(options.fullRefresh, '重新开启 AO 时应触发 fullRefresh');
+      }
+    });
+    world.chunks.set('1,0', {
+      isReady: true,
+      isConsolidating: true,
+      _refreshAOFromStableSource() {
+        consolidatingRefreshes++;
+      }
+    });
+    world.chunks.set('2,0', {
+      isReady: false,
+      isConsolidating: false,
+      _refreshAOFromStableSource() {
+        notReadyRefreshes++;
+      }
+    });
+
+    world.onAOSettingChanged(true);
+
+    assertEqual(readyRefreshes, 1, '已就绪且非合并中的 chunk 应全量刷新 AO');
+    assertEqual(consolidatingRefreshes, 0, '合并中的 chunk 不应立即刷新 AO');
+    assertEqual(notReadyRefreshes, 0, '未就绪 chunk 不应立即刷新 AO');
+
+    teardownEnvironment();
+  });
+
   test('延迟 finalize 队列 - 流式加载活跃时不应执行纯新 runtime chunk 的后置任务', () => {
     setupEnvironment();
 
@@ -1491,6 +1578,171 @@ describe('World 真实类测试', (test) => {
     teardownEnvironment();
   });
 
+  test('chunk unload 后 runtime 残留（dirty/pendingUnload/flushTimer）不应残留', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.bootstrapState.phase = 'runtime-streaming';
+
+    // 模拟 worldRuntime，注入 dirty / pendingUnload / flushTimer 三种残留
+    const dirtyChunks = new Map();
+    dirtyChunks.set('0,0', { cx: 0, cz: 0, dirty: true });
+    const pendingUnloadFlushQueue = new Map();
+    pendingUnloadFlushQueue.set('0,0', { chunkKey: '0,0' });
+    const flushTimers = new Map();
+    const stubTimerId = setTimeout(() => {}, 0);
+    clearTimeout(stubTimerId);
+    flushTimers.set('0,0', stubTimerId);
+
+    let clearTimeoutCalledWith = null;
+    world.worldRuntime = {
+      _dirtyChunks: dirtyChunks,
+      pendingUnloadFlushQueue,
+      _flushTimers: flushTimers,
+      _chunkKey(cx, cz) { return `${cx},${cz}`; },
+      clearChunkRuntimeResidue(cx, cz) {
+        const key = this._chunkKey(cx, cz);
+        this._dirtyChunks.delete(key);
+        this.pendingUnloadFlushQueue.delete(key);
+        const timer = this._flushTimers.get(key);
+        if (timer !== undefined) {
+          clearTimeoutCalledWith = timer;
+          clearTimeout(timer);
+          this._flushTimers.delete(key);
+        }
+      },
+      ensureChunkData() {
+        return Promise.resolve({ status: 'missing-region' });
+      },
+      prefetchRegions() {}
+    };
+
+    // 移动到远处触发 unload
+    world.update(new THREE.Vector3(200, 10, 200), 0.016);
+
+    assertFalse(world.chunks.has('0,0'), 'chunk 应已卸载');
+    assertFalse(dirtyChunks.has('0,0'), 'unload 后 _dirtyChunks 不应残留');
+    assertFalse(pendingUnloadFlushQueue.has('0,0'), 'unload 后 pendingUnloadFlushQueue 不应残留');
+    assertFalse(flushTimers.has('0,0'), 'unload 后 _flushTimers 不应残留');
+
+    teardownEnvironment();
+  });
+
+  test('chunk topology 变化后 _staticTreeTerrainBoostChunkKeys 应从已加载 chunks 重建', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.bootstrapState.phase = 'runtime-streaming';
+
+    // 手动注入一个过期 boost key（模拟已卸载 chunk 遗留）
+    world._staticTreeTerrainBoostChunkKeys.add('99,99');
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('99,99'), '应已注入过期 key');
+
+    world.worldRuntime = {
+      ensureChunkData() {
+        return Promise.resolve({ status: 'missing-region' });
+      },
+      prefetchRegions() {},
+      clearChunkRuntimeResidue() {}
+    };
+
+    // 移动到远处触发 unload（会触发 chunkTopologyChanged）
+    world.update(new THREE.Vector3(200, 10, 200), 0.016);
+
+    assertFalse(world._staticTreeTerrainBoostChunkKeys.has('99,99'),
+      'topology 变化后过期 boost key 不应残留');
+
+    teardownEnvironment();
+  });
+
+  test('chunk topology 重建时多源 chunk 产生的重叠 boost key 应保留', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.bootstrapState.phase = 'runtime-streaming';
+
+    // 确保两个源 chunk 都已加载（防止断言被静默跳过）
+    const chunk00 = world.chunks.get('0,0');
+    const chunk10 = world.chunks.get('1,0');
+    assertTrue(!!chunk00, '测试前提：chunk 0,0 应已加载');
+    assertTrue(!!chunk10, '测试前提：chunk 1,0 应已加载');
+
+    // 模拟两个源 chunk 都有 static_tree，且 boost 覆盖范围重叠于 '1,0'
+    chunk00.structureCenters = [
+      { type: 'static_tree', x: 14, y: 10, z: 8 }
+    ];
+    chunk10.structureCenters = [
+      { type: 'static_tree', x: 18, y: 10, z: 8 }
+    ];
+
+    // 注入过期 key，然后通过生产代码 helper 重建
+    world._staticTreeTerrainBoostChunkKeys.add('99,99');
+    world._rebuildStaticTreeTerrainBoostChunkKeys();
+
+    // '1,0' 应存在（被两个源 chunk 共同标记），过期 key 应清除
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('1,0'),
+      '多源 overlap 的 boost key 应在重建后保留');
+    assertFalse(world._staticTreeTerrainBoostChunkKeys.has('99,99'),
+      '过期 boost key 应被清除');
+
+    teardownEnvironment();
+  });
+
+  test('卸载一个源 chunk 后，另一个源产生的 boost key 仍应存在', async () => {
+    setupEnvironment();
+
+    scene = new THREE.Scene();
+    world = new World(scene);
+
+    world.update(new THREE.Vector3(0, 10, 0), 0.016);
+    await waitForChunkReady(world, '0,0');
+
+    world.bootstrapState.phase = 'runtime-streaming';
+
+    const chunk00 = world.chunks.get('0,0');
+    const chunk10 = world.chunks.get('1,0');
+    assertTrue(!!chunk00, '测试前提：chunk 0,0 应已加载');
+    assertTrue(!!chunk10, '测试前提：chunk 1,0 应已加载');
+
+    // 两个源 chunk 都标记 '1,0' 为 boost target
+    chunk00.structureCenters = [
+      { type: 'static_tree', x: 14, y: 10, z: 8 }
+    ];
+    chunk10.structureCenters = [
+      { type: 'static_tree', x: 18, y: 10, z: 8 }
+    ];
+
+    // 通过生产代码 helper 初始重建，确认 '1,0' 存在
+    world._rebuildStaticTreeTerrainBoostChunkKeys();
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('1,0'),
+      '初始重建后 1,0 应存在');
+
+    // 模拟卸载 chunk 0,0（移除后通过生产代码 helper 重建）
+    world.chunks.delete('0,0');
+    world._rebuildStaticTreeTerrainBoostChunkKeys();
+
+    // chunk 1,0 仍在，它自身的 structureCenters 仍应标记 '1,0'
+    assertTrue(world._staticTreeTerrainBoostChunkKeys.has('1,0'),
+      '卸载一个源后，另一个源产生的 boost key 仍应存在');
+
+    teardownEnvironment();
+  });
+
   test('dispose - 应尽力 flush WorldRuntime 的待处理写回工作', async () => {
     setupEnvironment();
 
@@ -1521,6 +1773,115 @@ describe('World 真实类测试', (test) => {
     assertEqual(Math.floor(16 / CHUNK_SIZE), 1, 'x=16 在区块 1');
     assertEqual(Math.floor(-1 / CHUNK_SIZE), -1, 'x=-1 在区块 -1');
     assertEqual(Math.floor(-16 / CHUNK_SIZE), -1, 'x=-16 在区块 -1');
+  });
+
+  // ============================================================
+  // authority 语义测试：WorldBlockDataStore 作为 blockData 唯一权威
+  // ============================================================
+
+  test('authority - deserializeBlockData / serializeBlockData codec 往返', () => {
+    const plain = { '123': 'stone', '456': { type: 'dirt', orientation: 2 }, '789': 'air' };
+    const map = WorldBlockDataStore.deserializeBlockData(plain);
+    assertTrue(map instanceof Map, 'deserialize 应返回 Map');
+    assertEqual(map.size, 3, '应包含 3 个 entry');
+    assertEqual(map.get(123).type, 'stone', 'string value 应规范化为 entry');
+    assertEqual(map.get(123).orientation, 0, 'string value 默认 orientation=0');
+    assertEqual(map.get(456).type, 'dirt', 'object entry 保留 type');
+    assertEqual(map.get(456).orientation, 2, 'object entry 保留 orientation');
+    assertEqual(map.get(789).type, 'air', 'air 类型也保留');
+
+    const roundtrip = WorldBlockDataStore.serializeBlockData(map);
+    assertEqual(typeof roundtrip, 'object', 'serialize 应返回 plain object');
+    assertEqual(roundtrip['123'].type, 'stone', '往返后 type 保留');
+    assertEqual(roundtrip['456'].orientation, 2, '往返后 orientation 保留');
+
+    // 空输入
+    const emptyMap = WorldBlockDataStore.deserializeBlockData(null);
+    assertEqual(emptyMap.size, 0, 'null 应返回空 Map');
+    const emptyObj = WorldBlockDataStore.serializeBlockData(null);
+    assertEqual(Object.keys(emptyObj).length, 0, 'null 应返回空 object');
+  });
+
+  test('authority - setBlockEntry / deleteBlockEntry 递增 version', () => {
+    const store = new WorldBlockDataStore();
+
+    assertEqual(store.getAuthorityVersion(0, 0), 0, '未创建 slice 时 version=0');
+
+    store.setBlockEntry(0, 0, 123, 'stone');
+    assertEqual(store.getAuthorityVersion(0, 0), 1, '首次 set 后 version=1');
+    assertEqual(store.peekChunkSlice(0, 0).get(123).type, 'stone', 'entry 已写入');
+
+    store.deleteBlockEntry(0, 0, 123);
+    assertEqual(store.getAuthorityVersion(0, 0), 2, 'delete 后 version=2');
+    assertTrue(!store.peekChunkSlice(0, 0).has(123), 'entry 已删除');
+
+    assertEqual(store.stats.totalMutations, 2, 'mutations 统计正确');
+  });
+
+  test('authority - applyChunkPatch 批量写入只递增一次 version', () => {
+    const store = new WorldBlockDataStore();
+    const patches = new Map([
+      [111, 'stone'],
+      [222, { type: 'dirt', orientation: 1 }],
+      [333, null]  // null 表示删除（在尚未创建 slice 时不执行删除）
+    ]);
+
+    store.applyChunkPatch(0, 0, patches);
+    assertEqual(store.getAuthorityVersion(0, 0), 1, '批量 patch 只递增一次 version');
+    assertEqual(store.peekChunkSlice(0, 0).size, 2, '2 个有效写入（null 不写入）');
+    assertEqual(store.peekChunkSlice(0, 0).get(111).type, 'stone', 'patch 1 写入');
+    assertEqual(store.peekChunkSlice(0, 0).get(222).orientation, 1, 'patch 2 写入');
+    assertEqual(store.stats.totalMutations, 1, 'batch mutation 计数为 1');
+  });
+
+  test('authority - attach/detach 生命周期与身份一致性', () => {
+    const store = new WorldBlockDataStore();
+    const slice = store.ensureChunkSlice(0, 0);
+    slice.set(123, { type: 'stone', orientation: 0 });
+
+    assertFalse(store.isAttached(0, 0), '初始未 attach');
+
+    store.markAttached(0, 0);
+    assertTrue(store.isAttached(0, 0), 'markAttached 后应返回 true');
+
+    // attached 状态下 replace 被拒绝
+    const newSlice = new Map([[456, { type: 'dirt', orientation: 0 }]]);
+    store.replaceChunkSlice(0, 0, newSlice, 'test-attach-guard');
+    assertTrue(store.peekChunkSlice(0, 0) === slice, 'attached 状态下 replace 被拒绝，slice 身份不变');
+
+    store.markDetached(0, 0);
+    assertFalse(store.isAttached(0, 0), 'markDetached 后应返回 false');
+
+    // detach 后 replace 允许
+    store.replaceChunkSlice(0, 0, newSlice, 'test-attach');
+    assertTrue(store.peekChunkSlice(0, 0) === newSlice, 'detach 后 replace 生效');
+  });
+
+  test('authority - stats 统计完整反映 authority 生命周期', () => {
+    const store = new WorldBlockDataStore();
+
+    store.ensureChunkSlice(0, 0);
+    store.ensureChunkSlice(1, 0);
+    store.peekChunkSlice(2, 0);  // miss
+
+    const stats = store.getStats();
+    assertEqual(stats.sliceCount, 2, '2 个 slice');
+    assertEqual(stats.writes, 2, '2 次 ensure 写入');
+    assertEqual(stats.misses, 1, '1 次 peek miss');
+    assertEqual(stats.attachedCount, 0, '无 attach');
+  });
+
+  test('authority - _verifySliceIntegrity 检测异常切片状态', () => {
+    const store = new WorldBlockDataStore();
+
+    // 缺失
+    assertFalse(store._verifySliceIntegrity(0, 0, 'test'), '缺失 slice 返回 false');
+    assertEqual(store._callStats.integrityWarn, 1, '缺失触发告警计数');
+
+    // 正常
+    store.ensureChunkSlice(0, 0);
+    assertTrue(store._verifySliceIntegrity(0, 0, 'test'), '正常 slice 返回 true');
+    assertEqual(store._callStats.integrityWarn, 1, '正常不递增告警计数');
   });
 
 });

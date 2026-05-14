@@ -19,7 +19,9 @@ import { WorldAccessLayer } from './WorldAccessLayer.js';
 import { WorldBoundsController } from './WorldBoundsController.js';
 import { WorldGenerationService } from './WorldGenerationService.js';
 import { worldStore } from './WorldStore.js';
-import { MemoryWorldStore } from './MemoryWorldStore.js';
+import { WorldBlockDataStore } from './WorldBlockDataStore.js';
+import { WorldChunkRegistry } from './WorldChunkRegistry.js';
+import { WorldChunkPayloadRegistry } from './WorldChunkPayloadRegistry.js';
 import { specialEntitiesShadowStore } from './SpecialEntitiesShadowStore.js';
 
 // --- 依赖注入：允许测试环境通过 globalThis 覆盖 ---
@@ -169,7 +171,9 @@ export class World {
 
     // --- WorldStore 新架构初始化 ---
     this.worldStore = worldStore;
-    this.memoryWorldStore = new MemoryWorldStore();
+    this.worldBlockDataStore = new WorldBlockDataStore();
+    this.worldChunkRegistry = new WorldChunkRegistry();
+    this.worldChunkPayloadRegistry = new WorldChunkPayloadRegistry();
     this.worldRuntime = new WorldRuntime();
     this.worldRuntime.setWorld(this);
     this.worldAccessLayer = new WorldAccessLayer(this);
@@ -316,40 +320,62 @@ export class World {
     const memRequestStart = globalThis.performance?.now?.() ?? Date.now();
     const chunkKey = `${chunk.cx},${chunk.cz}`;
 
-    // 运行期优先从内存权威层读取
-    const chunkRecord = this.memoryWorldStore.getChunkRecord(chunk.cx, chunk.cz);
-    const memRequestEnd = globalThis.performance?.now?.() ?? Date.now();
-    recordChunkPerf('world.runtime-chunk-record-memory', memRequestEnd - memRequestStart, {
-      chunkKey,
-      status: chunkRecord ? 'ready' : 'missing-chunk',
-      hasBlockData: !!chunkRecord?.blockData,
-      blockDataSize: chunkRecord?.blockData ? Object.keys(chunkRecord.blockData).length : 0,
-      hasRuntimeEntities: !!(chunkRecord?.runtimeEntities)
-    });
+    // --- 新 authority 路径：优先检查 WorldChunkRegistry + WorldBlockDataStore ---
+    if (this.worldChunkRegistry?.hasKnownChunk(chunk.cx, chunk.cz)) {
+      const hasAuthoritySlice = this.worldBlockDataStore?.hasChunkSlice(chunk.cx, chunk.cz);
+      if (hasAuthoritySlice && !chunk.disposed) {
+        // 新 authority 流程：
+        //   1. attachAuthoritySlice() → this.blockData = store shared Map
+        //      + 设置 _isAuthorityAttached = true
+        //   2. rebuildDerivedIndexesFromAuthority() → 重建 blockDataArray/blockPalette/solidBlocks 等
+        //   3. 恢复 non-block payload（staticEntities, runtimeSeedData）
+        //   4. 设 record-ready 入调度管线：
+        //      runtime-hydrate（assembleRuntimeHydratePhase 通过 _isAuthorityAttached 识别
+        //        此路径，跳过 blockData 注入，仅处理 runtimeEntities 迁移）
+        //      → hydrated → runtime-build-mesh → terrain-built → runtime-finalize → finalize
+        //
+        // 注意：authority 路径不设置 _pendingChunkRecord，assembleRuntimeHydratePhase
+        // 通过显式 _isAuthorityAttached 标志区分路径，不再依赖 _pendingChunkRecord 为 null
+        // 的隐式巧合。
+        chunk.awaitingStoreRecord = false;
+        chunk.needsStoreRetry = false;
 
-    if (chunkRecord && !chunk.disposed) {
-      // 仍然走 WorldRuntime 的 region cache upsert 和 legacy entity 迁移
-      this.worldRuntime.ensureChunkData(chunk.cx, chunk.cz).then((result) => {
-        if (chunk.disposed) return;
-        if (result?.status === 'ready' && result.chunkRecord) {
-          chunk.loadFromRecord(result.chunkRecord);
-          return;
+        chunk.attachAuthoritySlice();
+        chunk.rebuildDerivedIndexesFromAuthority();
+
+        // 恢复 non-block payload
+        const payload = this.worldChunkPayloadRegistry?.getChunkPayload(chunk.cx, chunk.cz);
+        if (payload) {
+          if (payload.staticEntities?.length > 0) {
+            chunk._injectStaticEntities(payload.staticEntities);
+          }
+          if (payload.runtimeSeedData?.structureCenters) {
+            chunk.structureCenters = payload.runtimeSeedData.structureCenters;
+          }
         }
-        // 内存已有数据但 WorldRuntime 路径也返回了，使用 WorldRuntime 的结果
-        //（包含了 legacy entity  hydration）
-        if (!chunk.disposed) {
-          chunk.loadFromRecord(chunkRecord);
-        }
-      }).catch((_error) => {
-        // WorldRuntime 路径失败但内存有数据，仍可从内存加载
-        if (!chunk.disposed) {
-          chunk.loadFromRecord(chunkRecord);
-        }
-      });
-      return;
+
+        chunk.loadState = 'record-ready';
+        chunk.isReady = false;
+
+        this.chunkAssemblyScheduler.enqueue(
+          chunk,
+          'runtime-hydrate',
+          this._computeChunkAssemblyPriority(chunk)
+        );
+
+        const memRequestEnd = globalThis.performance?.now?.() ?? Date.now();
+        recordChunkPerf('world.runtime-chunk-record-authority', memRequestEnd - memRequestStart, {
+          chunkKey,
+          status: 'attached-from-authority',
+          hasBlockData: true,
+          blockDataSize: this.worldBlockDataStore.peekChunkSlice(chunk.cx, chunk.cz)?.size || 0
+        });
+        return;
+      }
     }
 
-    // 内存中没有数据，回退到 WorldRuntime 的 IndexedDB 路径（旧存档导入场景）
+    // 新 authority 未命中，回退到 WorldRuntime 的 IndexedDB 路径（旧存档导入场景）
+    // cold import 路径：plain object → authority → attach → rebuild
     this.worldRuntime.ensureChunkData(chunk.cx, chunk.cz).then((result) => {
       const dbRequestEnd = globalThis.performance?.now?.() ?? Date.now();
       recordChunkPerf('world.runtime-chunk-record-db', dbRequestEnd - memRequestStart, {
@@ -362,7 +388,73 @@ export class World {
 
       if (!result || chunk.disposed) return;
       if (result.status === 'ready' && result.chunkRecord) {
-        chunk.loadFromRecord(result.chunkRecord);
+        // cold import：先将 plain object 转为 authority，再 attach/rebuild
+        const { blockData: rawBlockData, staticEntities, runtimeSeedData, ...restRecord } = result.chunkRecord;
+
+        // 1. plain object → Map，写入 WorldBlockDataStore
+        if (rawBlockData && Object.keys(rawBlockData).length > 0) {
+          const blockDataMap = WorldBlockDataStore.deserializeBlockData(rawBlockData);
+          this.worldBlockDataStore?.replaceChunkSlice(chunk.cx, chunk.cz, blockDataMap, 'cold-import');
+        } else {
+          // 空 blockData 也建立 slice，标记 chunk 为 known empty
+          this.worldBlockDataStore?.ensureChunkSlice(chunk.cx, chunk.cz);
+        }
+
+        // 释放 chunkRecord 对 rawBlockData 的引用，无论是否为空
+        result.chunkRecord.blockData = null;
+
+        // 2. 写入 payload registry
+        if (staticEntities?.length > 0 || runtimeSeedData) {
+          this.worldChunkPayloadRegistry?.mergeChunkPayload(chunk.cx, chunk.cz, {
+            staticEntities: staticEntities || [],
+            runtimeSeedData: runtimeSeedData || {}
+          });
+        }
+
+        // 3. 标记 chunk registry 为 imported
+        this.worldChunkRegistry?.markChunkKnown(chunk.cx, chunk.cz, {
+          source: 'cold-import',
+          ...restRecord
+        });
+
+        // 4. attach + rebuild + restore payload（复用 authority 路径）
+        chunk.attachAuthoritySlice();
+        chunk.rebuildDerivedIndexesFromAuthority();
+
+        const payload = this.worldChunkPayloadRegistry?.getChunkPayload(chunk.cx, chunk.cz);
+        if (payload) {
+          if (payload.staticEntities?.length > 0) {
+            chunk._injectStaticEntities(payload.staticEntities);
+          }
+          if (payload.runtimeSeedData?.structureCenters) {
+            chunk.structureCenters = payload.runtimeSeedData.structureCenters;
+          }
+        }
+
+        // 5. runtimeEntities 直接注入 shadow store，不再回退到旧 cold-import 注入分支
+        //    避免重新执行 blockData 注入和 staticEntities 重复恢复
+        if (result.chunkRecord.runtimeEntities) {
+          specialEntitiesShadowStore.deserializeAndMerge(chunk.cx, chunk.cz, result.chunkRecord.runtimeEntities);
+        }
+
+        chunk.awaitingStoreRecord = false;
+        chunk.needsStoreRetry = false;
+        chunk.loadState = 'record-ready';
+        chunk.isReady = false;
+
+        this.chunkAssemblyScheduler.enqueue(
+          chunk,
+          'runtime-hydrate',
+          this._computeChunkAssemblyPriority(chunk)
+        );
+
+        const importEnd = globalThis.performance?.now?.() ?? Date.now();
+        recordChunkPerf('world.cold-import-to-authority', importEnd - dbRequestEnd, {
+          chunkKey,
+          blockDataSize: rawBlockData ? Object.keys(rawBlockData).length : 0,
+          hasStaticEntities: staticEntities?.length > 0,
+          hasRuntimeSeedData: !!runtimeSeedData
+        });
         return;
       }
 
@@ -615,6 +707,13 @@ export class World {
     }
   }
 
+  _rebuildStaticTreeTerrainBoostChunkKeys() {
+    this._staticTreeTerrainBoostChunkKeys.clear();
+    for (const [, ch] of this.chunks) {
+      this._markStaticTreeTerrainBoostFromChunk(ch);
+    }
+  }
+
   /**
    * 处理 Chunk 生成完成后的结果
    * 替代原有的 chunk.acceptWorkerResult 直接调用
@@ -727,6 +826,24 @@ export class World {
   onChunkConsolidationComplete(chunk) {
     if (!chunk) return;
     this.chunkAssemblyScheduler.enqueue(chunk, 'finalize', this._computeChunkAssemblyPriority(chunk));
+  }
+
+  onAOSettingChanged(enabled) {
+    for (const chunk of this.chunks.values()) {
+      if (!chunk) continue;
+
+      if (!enabled) {
+        chunk._clearPendingAOState?.();
+        continue;
+      }
+
+      if (chunk.isReady && !chunk.isConsolidating) {
+        chunk._refreshAOFromStableSource?.({
+          fullRefresh: true,
+          reason: 'ao-toggle-enabled'
+        });
+      }
+    }
   }
 
   onChunkAOSourceStable(chunk, options = {}) {
@@ -1001,7 +1118,10 @@ export class World {
           chunk.batchFaceCullingTimer = null;
         }
 
-        // 5. 释放显存并从活动 chunk 集合移除
+        // 5. 清理 runtime 残留（dirty + pendingUnload + flushTimer）
+        this.worldRuntime?.clearChunkRuntimeResidue?.(chunk.cx, chunk.cz);
+
+        // 6. 释放显存并从活动 chunk 集合移除
         chunk.dispose();
         this.chunks.delete(key);
         chunkTopologyChanged = true;
@@ -1012,6 +1132,7 @@ export class World {
       this.runtimeIdleScheduler?.markBusy('chunk-topology-changed');
       this.clearBlockLookupCaches();
       this.requestShadowMapUpdate('chunk-topology-changed');
+      this._rebuildStaticTreeTerrainBoostChunkKeys();
     }
 
     // Chunk 就绪数量变化时执行一次去重，避免历史重复 owner 长期存在

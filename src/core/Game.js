@@ -591,8 +591,11 @@ export class Game {
   }
 
   /**
-   * 收集当前游戏快照数据（从 worldStore 读取权威数据）
+   * 收集当前游戏快照数据
    * @returns {Promise<object>} 游戏快照对象
+   * @deferred 手动存档链路延后恢复。当前仍从 worldStore 读取，
+   *   后续应迁移到从 WorldBlockDataStore 统一导出。
+   *   本方法不是当前 runtime correctness 的组成部分。
    */
   async collectSnapshot() {
     const playerSnapshot = {
@@ -785,6 +788,9 @@ export class Game {
 
   /**
    * 将保存的快照数据应用到当前游戏实例
+   * @deferred 手动读档链路延后恢复。当前从 worldStore/IndexedDB 读取，
+   *   后续应迁移到基于 WorldBlockDataStore authority 的重新注入。
+   *   本方法不是当前 runtime correctness 的组成部分。
    */
   async applySaveData(saveData) {
     if (!saveData) return;

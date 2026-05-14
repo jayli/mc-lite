@@ -190,6 +190,9 @@ export class BlockScatterManager {
     // 记录本次触达的 chunk keys，替代原先 touchedBuffers 的反向查找
     const touchedKeys = new Set();
 
+    // 收集跨 chunk 未加载目标的 authority patches
+    const unloadedCrossChunkPatches = new Map(); // chunkKey -> Map<code, entry>
+
     // 1. 遍历所有逻辑方块，按坐标分发
     for (const block of blockDataBlocks) {
       const chunkCx = Math.floor(block.x / CHUNK_SIZE);
@@ -224,8 +227,37 @@ export class BlockScatterManager {
       if (visibleKeysSet?.has(blockKey)) {
         buffer.visibleBlockKeys.add(blockKey);
       }
+
+      // 跨 chunk 且目标未加载：同时收集到 authority patch Map
+      if (!isOwnChunk) {
+        const existingChunk = this.world.chunks.get(chunkKey);
+        if (!existingChunk || !existingChunk.isReady) {
+          const code = encodeCoord(block.x, block.y, block.z);
+          const entry = block.orientation !== 0 ? { type: block.type, orientation: block.orientation } : block.type;
+          let chunkPatches = unloadedCrossChunkPatches.get(chunkKey);
+          if (!chunkPatches) {
+            chunkPatches = new Map();
+            unloadedCrossChunkPatches.set(chunkKey, chunkPatches);
+          }
+          chunkPatches.set(code, entry);
+        }
+      }
     }
     const t1 = globalThis.performance?.now?.() ?? Date.now();
+
+    // 对未加载跨 chunk 目标，先写 authority（buffer 仍保留供未来渲染补刷）
+    const blockStore = this.world?.worldBlockDataStore;
+    if (blockStore && unloadedCrossChunkPatches.size > 0) {
+      for (const [chunkKey, patches] of unloadedCrossChunkPatches) {
+        const [tCx, tCz] = chunkKey.split(',').map(Number);
+        blockStore.applyChunkPatch(tCx, tCz, patches);
+        // 标记 chunk registry 为 known（若非空）
+        if (this.world.worldChunkRegistry && !this.world.worldChunkRegistry.hasKnownChunk(tCx, tCz)) {
+          this.world.worldChunkRegistry.markChunkKnown(tCx, tCz, { source: 'scatter' });
+        }
+      }
+    }
+    const t1b = globalThis.performance?.now?.() ?? Date.now();
 
     // 确保发起 Worker 的 chunk 即使没有方块，也有 buffer 承载 ready 状态和结构中心。
     const ownKey = `${cx},${cz}`;
@@ -250,7 +282,8 @@ export class BlockScatterManager {
     recordChunkPerf('block-scatter.scatter', t2 - t0, {
       sourceChunkKey: `${cx},${cz}`,
       distributeMs: t1 - t0,
-      flushReadyChunksMs: t2 - t1,
+      authorityWriteMs: t1b - t1,
+      flushReadyChunksMs: t2 - t1b,
       blockDataBlocks: blockDataBlocks.length,
       scatteredBlocks: scatteredBlocks.length,
       touchedKeys: touchedKeys.size,
@@ -412,7 +445,7 @@ export class BlockScatterManager {
       if (!buffer) continue;
 
       if (!chunk) {
-        // 目标 chunk 尚未加载，保留 pending buffer 等待加载
+        // 目标 chunk 尚未加载：authority 已在 scatter() 中写入，buffer 保留供未来渲染补刷
         continue;
       }
       if (chunk.disposed) {

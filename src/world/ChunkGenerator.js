@@ -69,6 +69,7 @@ export function extendChunk(Chunk) {
 
       // 注册 Worker 池回调
       workerCallbacks.set(taskId, (data) => {
+        if (this.disposed) return;
         this.world?._onChunkGenResult?.(this, data);
         resolve();
       });

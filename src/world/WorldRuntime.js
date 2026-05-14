@@ -45,6 +45,15 @@ export class WorldRuntime {
       lastElapsedMs: 0,
       lastProcessedAt: 0
     };
+    // 迁移期调用点统计：追踪 authority mutation / deprecated shell / fallback 路径命中次数
+    this._callStats = {
+      recordBlockMutation: 0,    // block 变更记录（标记 runtime dirty）
+      flushChunk: 0,             // deprecated flush 单 chunk 调用
+      flushAllDirty: 0,          // deprecated flush 全量调用
+      flushBeforeUnload: 0,      // deprecated flush unload 前调用
+      scheduleFlush: 0,          // deprecated _scheduleFlush 调度次数
+      regionCacheFallback: 0     // RegionCache 作为 live truth fallback 的命中次数
+    };
   }
 
   /**
@@ -92,12 +101,14 @@ export class WorldRuntime {
     if (!Array.isArray(existingRegion.chunkKeys)) existingRegion.chunkKeys = [];
 
     const chunkKey = this._chunkKey(cx, cz);
-    existingRegion.chunks[chunkKey] = chunkRecord;
-    if (!existingRegion.chunkKeys.includes(chunkKey)) {
-      existingRegion.chunkKeys.push(chunkKey);
-    }
-
-    this._regionCache.set(regionKey, existingRegion);
+    const newRegion = this._stripBlockDataFromRegionRecord({
+      ...existingRegion,
+      chunks: { ...existingRegion.chunks, [chunkKey]: chunkRecord },
+      chunkKeys: existingRegion.chunkKeys.includes(chunkKey)
+        ? existingRegion.chunkKeys
+        : [...existingRegion.chunkKeys, chunkKey]
+    });
+    this._regionCache.set(regionKey, newRegion);
   }
 
   // ============================================================
@@ -153,17 +164,19 @@ export class WorldRuntime {
 
   /**
    * 标记 chunk 为脏（玩家放置/破坏方块后调用）
+   * runtime dirty 仅用于观测和导出标记，不再自动调度 flush/save
    * @param {number} cx
    * @param {number} cz
    */
   markChunkDirty(cx, cz) {
     this._ensureDirtyChunkEntry(cx, cz).dirty = true;
-    this._scheduleFlush(cx, cz);
+    // flush 已退出 runtime 热路径，不再自动调度
   }
 
   /**
-   * 记录单个方块变更到 runtime 写回快照。
-   * 首次脏化时从当前 chunk.blockData 建一次序列化快照，之后只做增量更新。
+   * 记录方块变更为 runtime dirty（不再构造 blockDataSnapshot）
+   * authority 由 WorldBlockDataStore 统一持有，此处仅标记 runtime dirty
+   * blockDataSnapshot 语义已退出 runtime 正确性主链路
    * @param {number} cx
    * @param {number} cz
    * @param {number} x
@@ -172,18 +185,10 @@ export class WorldRuntime {
    * @param {string|object|null} typeOrEntry
    */
   recordBlockMutation(cx, cz, x, y, z, typeOrEntry) {
+    this._callStats.recordBlockMutation++;
     const dirtyEntry = this._ensureDirtyChunkEntry(cx, cz);
-    if (!dirtyEntry.blockDataSnapshot) {
-      dirtyEntry.blockDataSnapshot = this._createChunkSnapshotFromWorld(cx, cz);
-    }
-
-    const code = encodeCoord(Math.floor(x), Math.floor(y), Math.floor(z));
-    const entry = this._normalizeSerializedEntry(typeOrEntry);
-    if (!entry) {
-      delete dirtyEntry.blockDataSnapshot[code];
-      return;
-    }
-    dirtyEntry.blockDataSnapshot[code] = entry;
+    dirtyEntry.dirty = true;
+    // blockDataSnapshot 已不再构造，authority 由 WorldBlockDataStore 持有
   }
 
   /**
@@ -202,6 +207,38 @@ export class WorldRuntime {
   }
 
   /**
+   * 统一清理 chunk 卸载后的 runtime 残留
+   */
+  clearChunkRuntimeResidue(cx, cz) {
+    const key = this._chunkKey(cx, cz);
+    this._dirtyChunks.delete(key);
+    this.pendingUnloadFlushQueue.delete(key);
+    const timer = this._flushTimers.get(key);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      this._flushTimers.delete(key);
+    }
+  }
+
+  /**
+   * 从 region record 的各 chunk 中剥离 blockData 冗余副本。
+   * 返回可安全放入 _regionCache 的浅克隆，不修改原始对象。
+   */
+  _stripBlockDataFromRegionRecord(region) {
+    if (!region?.chunks) return region;
+    const cleaned = { ...region, chunks: {} };
+    for (const [ck, rec] of Object.entries(region.chunks)) {
+      if (rec && rec.blockData !== undefined) {
+        const { blockData: _dropped, ...rest } = rec;
+        cleaned.chunks[ck] = rest;
+      } else {
+        cleaned.chunks[ck] = rec;
+      }
+    }
+    return cleaned;
+  }
+
+  /**
    * 获取所有脏 chunk keys
    */
   getDirtyChunkKeys() {
@@ -217,6 +254,7 @@ export class WorldRuntime {
    * 保留此方法仅供未来手动保存时导出到 IndexedDB。
    */
   async flushChunk(cx, cz, blockDataSnapshot = null) {
+    this._callStats.flushChunk++;
     const key = this._chunkKey(cx, cz);
     const dirtyEntry = this._dirtyChunks.get(key);
     if (!dirtyEntry) return;
@@ -263,6 +301,7 @@ export class WorldRuntime {
    * 保留此方法仅供未来手动保存时导出到 IndexedDB。
    */
   async flushAllDirty() {
+    this._callStats.flushAllDirty++;
     const dirtyKeys = this.getDirtyChunkKeys();
     const pendingUnloadKeys = Array.from(this.pendingUnloadFlushQueue.keys());
     if (dirtyKeys.length === 0 && pendingUnloadKeys.length === 0) return;
@@ -314,10 +353,13 @@ export class WorldRuntime {
         regionGroups.set(rKey, { rx, rz, chunks: new Map() });
       }
       const group = regionGroups.get(rKey);
-      const cachedChunkRecord = this._getCachedChunkRecord(queueRecord.cx, queueRecord.cz);
       const chunkRecord = this._cloneSerializable(queueRecord.chunkRecord, null);
       if (queueRecord.preserveStoredBlockData === true) {
-        chunkRecord.blockData = cachedChunkRecord?.blockData || {};
+        // RegionCache 已剥离 blockData，不再从 cache 读取。
+        // 删除 chunkRecord 的 blockData，让写盘路径自然保留 IndexedDB 中已有数据：
+        // - patch 路径：chunkRecord 不含 blockData，已有数据不受影响
+        // - full-save 路径：从 getRegionRecord() 重读完整 region，merge 时无 blockData 属性不会覆盖
+        delete chunkRecord.blockData;
       }
       group.chunks.set(key, chunkRecord);
       const metrics = this._getSerializedBlockMetrics(chunkRecord.blockData);
@@ -338,14 +380,29 @@ export class WorldRuntime {
             const [cx, cz] = chunkKey.split(',').map(Number);
             this._updateRegionCacheChunkRecord(cx, cz, chunkRecord);
           }
-          this._regionCache.set(rKey, region);
+          this._regionCache.set(rKey, this._stripBlockDataFromRegionRecord(region));
         } else if (region) {
-          // 更新已有 region
-          for (const [chunkKey, chunkRecord] of group.chunks) {
-            region.chunks[chunkKey] = chunkRecord;
+          const chunkPatches = Array.from(group.chunks.entries()).map(([chunkKey, chunkRecord]) => ({
+            chunkKey,
+            chunkRecord: this._cloneSerializable(chunkRecord, null)
+          }));
+          if (typeof this._worldStore.applyRegionPatch === 'function') {
+            await this._worldStore.applyRegionPatch(group.rx, group.rz, { chunkPatches });
+          } else {
+            // 无 patch API — 从 worldStore 重读完整 region 再 merge，不用 stripped cache 做基底
+            const fullRegion = (typeof this._worldStore.getRegionRecord === 'function'
+              ? await this._worldStore.getRegionRecord(group.rx, group.rz)
+              : null) || region;
+            for (const [chunkKey, chunkRecord] of group.chunks) {
+              fullRegion.chunks[chunkKey] = { ...fullRegion.chunks[chunkKey], ...chunkRecord };
+            }
+            await this._worldStore.saveRegionRecord(group.rx, group.rz, fullRegion);
           }
-          await this._worldStore.saveRegionRecord(group.rx, group.rz, region);
-          this._regionCache.set(rKey, region);
+          // merge 新 chunkRecord 到 region cache（更新 staticEntities/runtimeSeedData 等元数据）
+          for (const [chunkKey, chunkRecord] of group.chunks) {
+            region.chunks[chunkKey] = { ...region.chunks[chunkKey], ...chunkRecord };
+          }
+          this._regionCache.set(rKey, this._stripBlockDataFromRegionRecord(region));
         } else {
           // 创建新 region（不应该发生，因为脏 chunk 必然有 region）
           const newRegion = {
@@ -358,7 +415,7 @@ export class WorldRuntime {
             generatorVersion: '1.0'
           };
           await this._worldStore.saveRegionRecord(group.rx, group.rz, newRegion);
-          this._regionCache.set(rKey, newRegion);
+          this._regionCache.set(rKey, this._stripBlockDataFromRegionRecord(newRegion));
         }
 
         // 清除已写回的脏标记
@@ -395,6 +452,7 @@ export class WorldRuntime {
    * @param {object|null} entitiesSnapshot
    */
   async flushBeforeUnload(cx, cz, blockDataSnapshot, entitiesSnapshot) {
+    this._callStats.flushBeforeUnload++;
     const startedAt = globalThis.performance?.now?.() ?? Date.now();
     const key = this._chunkKey(cx, cz);
     const chunk = this._world?.chunks?.get(key) || null;
@@ -526,7 +584,8 @@ export class WorldRuntime {
     }
 
     const key = this._chunkKey(cx, cz);
-    cachedRegion.chunks[key] = chunkRecord;
+    const { blockData: _dropped, ...cleanRecord } = chunkRecord;
+    cachedRegion.chunks[key] = cleanRecord;
 
     if (!Array.isArray(cachedRegion.chunkKeys)) {
       cachedRegion.chunkKeys = [];
@@ -635,6 +694,13 @@ export class WorldRuntime {
         }
       }
 
+      // Step 14.5: preserveStoredBlockData — 删除 blockData，让写盘路径自然保留已有数据
+      for (const entry of regionEntries) {
+        if (entry.preserveStoredBlockData) {
+          delete entry.chunkRecord.blockData;
+        }
+      }
+
       const chunkPatches = regionEntries.map((entry) => ({
         chunkKey: entry.chunkKey,
         preserveStoredBlockData: entry.preserveStoredBlockData === true,
@@ -644,37 +710,33 @@ export class WorldRuntime {
       if (typeof this._worldStore.applyRegionPatch === 'function') {
         await this._worldStore.applyRegionPatch(rx, rz, { chunkPatches });
       } else {
-        const region = this._cloneSerializable(
-          this._regionCache.get(regionKey),
-          {
-            regionKey,
-            rx,
-            rz,
-            chunkKeys: [],
-            chunks: {},
-            generatedAt: Date.now(),
-            generatorVersion: '1.0'
-          }
-        );
-        if (!region.chunks) region.chunks = {};
-        if (!Array.isArray(region.chunkKeys)) region.chunkKeys = [];
+        // 无 patch API — 从 worldStore 重读完整 region，不用 stripped cache 做基底
+        const fullRegion = (typeof this._worldStore.getRegionRecord === 'function'
+          ? await this._worldStore.getRegionRecord(rx, rz)
+          : null) || {
+          regionKey,
+          rx,
+          rz,
+          chunkKeys: [],
+          chunks: {},
+          generatedAt: Date.now(),
+          generatorVersion: '1.0'
+        };
+        if (!fullRegion.chunks) fullRegion.chunks = {};
+        if (!Array.isArray(fullRegion.chunkKeys)) fullRegion.chunkKeys = [];
 
         for (const entry of regionEntries) {
-          const currentChunk = region.chunks[entry.chunkKey] || {};
-          region.chunks[entry.chunkKey] = {
-            ...currentChunk,
-            ...entry.chunkRecord,
-            blockData: entry.preserveStoredBlockData
-              ? (currentChunk.blockData || {})
-              : entry.chunkRecord.blockData
-          };
-          if (!region.chunkKeys.includes(entry.chunkKey)) {
-            region.chunkKeys.push(entry.chunkKey);
+          const currentChunk = fullRegion.chunks[entry.chunkKey] || {};
+          // 纯属性 merge：preserveStoredBlockData 下 chunkRecord 已无 blockData，
+          // spread 自然保留 currentChunk 的 blockData
+          fullRegion.chunks[entry.chunkKey] = { ...currentChunk, ...entry.chunkRecord };
+          if (!fullRegion.chunkKeys.includes(entry.chunkKey)) {
+            fullRegion.chunkKeys.push(entry.chunkKey);
           }
         }
 
-        await this._worldStore.saveRegionRecord(rx, rz, region);
-        this._regionCache.set(regionKey, region);
+        await this._worldStore.saveRegionRecord(rx, rz, fullRegion);
+        this._regionCache.set(regionKey, this._stripBlockDataFromRegionRecord(fullRegion));
       }
 
       for (const entry of regionEntries) {
@@ -751,11 +813,12 @@ export class WorldRuntime {
     // 3. 发起新请求
     const loadPromise = this._worldStore.getRegionRecord(rx, rz)
       .then((record) => {
-        if (record) {
-          this._regionCache.set(regionKey, record);
+        const cleaned = record ? this._stripBlockDataFromRegionRecord(record) : record;
+        if (cleaned) {
+          this._regionCache.set(regionKey, cleaned);
         }
         this._regionLoadPromises.delete(regionKey);
-        return record;
+        return cleaned;
       })
       .catch((err) => {
         this._regionLoadPromises.delete(regionKey);
@@ -813,6 +876,8 @@ export class WorldRuntime {
       };
     }
 
+    // blockDataSnapshot 已退出 runtime 正确性链路
+    // 旧 dirtyEntry.blockDataSnapshot 路径保留为 deferred compatibility fallback
     if (dirtyEntry?.blockDataSnapshot) {
       return {
         blockData: dirtyEntry.blockDataSnapshot,
@@ -978,7 +1043,12 @@ export class WorldRuntime {
     return null;
   }
 
+  /**
+   * @deprecated 已从 runtime 热路径解绑，仅保留供显式调用场景（retry on error、future manual save）。
+   * markChunkDirty() 不再自动调度此方法。
+   */
   _scheduleFlush(cx, cz, delayMs = 500) {
+    this._callStats.scheduleFlush++;
     const key = this._chunkKey(cx, cz);
     this._clearScheduledFlush(cx, cz);
     const timer = globalThis.setTimeout(() => {
@@ -1043,7 +1113,8 @@ export class WorldRuntime {
     return {
       cachedRegions: this._regionCache.size,
       dirtyChunks: this._dirtyChunks.size,
-      maxRegions: this._regionCache._maxRegions
+      maxRegions: this._regionCache._maxRegions,
+      callStats: { ...this._callStats }
     };
   }
 }

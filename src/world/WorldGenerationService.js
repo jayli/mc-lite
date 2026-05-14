@@ -14,7 +14,7 @@
  * - 使用 region (8x8 chunk) 作为生成和存储的基本单元
  */
 import { worldStore } from './WorldStore.js';
-// MemoryWorldStore 通过 this._world.memoryWorldStore 访问，不直接导入
+import { WorldBlockDataStore } from './WorldBlockDataStore.js';
 // worldWorkerPool 预留，供未来批量生成优化使用
 // import { worldWorkerPool } from '../workers/WorldWorkerPool.js';
 import { WORLD_CONFIG } from '../utils/MathUtils.js';
@@ -346,9 +346,9 @@ export class WorldGenerationService {
           return;
         }
 
-        // 直写到内存权威层（运行期主路径）
-        if (this._world?.memoryWorldStore) {
-          this._writeRegionToMemoryStore(rx, rz, regionRecord);
+        // 直写到运行时权威层
+        if (this._world?.worldBlockDataStore) {
+          this._writeRegionToAuthorityStores(rx, rz, regionRecord);
         }
 
         // 收集跨 region overflow blocks
@@ -375,21 +375,36 @@ export class WorldGenerationService {
   }
 
   /**
-   * 将 region 中的每个 chunk 直写到内存权威层
+   * 将 region 中的每个 chunk 写入运行时权威层
    */
-  _writeRegionToMemoryStore(rx, rz, regionRecord) {
-    const memoryStore = this._world.memoryWorldStore;
-    if (!memoryStore) return;
+  _writeRegionToAuthorityStores(rx, rz, regionRecord) {
+    const world = this._world;
+    if (!world) return;
+
+    const blockDataStore = world.worldBlockDataStore;
+    const payloadRegistry = world.worldChunkPayloadRegistry;
+    const chunkRegistry = world.worldChunkRegistry;
 
     for (const [chunkKey, chunkData] of Object.entries(regionRecord.chunks)) {
       const [cx, cz] = chunkKey.split(',').map(Number);
-      memoryStore.createOrReplaceChunkRecord(cx, cz, {
-        blockData: chunkData.blockData || {},
-        staticEntities: chunkData.staticEntities || [],
-        runtimeSeedData: chunkData.runtimeSeedData || {},
-        runtimeEntities: chunkData.runtimeEntities || { turrets: [], zombieNests: [], minecarts: [] },
-        generatorVersion: regionRecord.generatorVersion
-      });
+
+      if (blockDataStore) {
+        const blockDataMap = WorldBlockDataStore.deserializeBlockData(chunkData.blockData || {});
+        blockDataStore.replaceChunkSlice(cx, cz, blockDataMap, 'WorldGenerationService._writeRegionToAuthorityStores');
+      }
+
+      if (payloadRegistry) {
+        payloadRegistry.setChunkPayload(cx, cz, {
+          runtimeSeedData: chunkData.runtimeSeedData || {},
+          staticEntities: chunkData.staticEntities || []
+        });
+      }
+
+      if (chunkRegistry) {
+        chunkRegistry.markChunkGenerated(cx, cz, {
+          generatorVersion: regionRecord.generatorVersion
+        });
+      }
     }
   }
 
