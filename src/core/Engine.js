@@ -787,12 +787,12 @@ export class Engine {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
   }
 
-  render() {
+  render(dt = 1 / 60) {
     if (this.faceCullingSystem && this.faceCullingSystem.isEnabled()) {
     }
 
     if (this.waterMaterial) {
-      this.waterMaterial.uniforms.uTime.value += 0.015;    // 更新时间变量，驱动水面波浪动画
+      this.waterMaterial.uniforms.uTime.value += 0.015 * dt * 60;
       this.waterMaterial.uniforms.uSeed.value = WORLD_CONFIG.SEED; // 同步世界种子，确保噪声函数的一致性
     }
 

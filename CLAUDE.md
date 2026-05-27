@@ -221,3 +221,10 @@ npm run lint
 
 ## 代码提交
 任何修改都不能自动提交代码，必须等待明确的指令才能提交。
+
+## Active Technologies
+- JavaScript (ES Modules, 无构建步骤) + Three.js 0.160.0 → 0.184.0 (CDN via jsdelivr) (001-upgrade-threejs-r184)
+- IndexedDB (持久化，本次升级不涉及) (001-upgrade-threejs-r184)
+
+## Recent Changes
+- 001-upgrade-threejs-r184: Added JavaScript (ES Modules, 无构建步骤) + Three.js 0.160.0 → 0.184.0 (CDN via jsdelivr)

@@ -429,7 +429,7 @@ export class Game {
     this.lastTime = frameStart;
 
     this.update(dt); // 更新游戏状态
-    this.render();   // 渲染场景
+    this.render(dt); // 渲染场景
 
     if (this.stats) this.stats.end();
 
@@ -574,9 +574,9 @@ export class Game {
   /**
     * 渲染游戏场景
     */
-  render() {
+  render(dt) {
     const t1 = performance.now();
-    this.engine.render(); // 调用引擎渲染方法
+    this.engine.render(dt); // 调用引擎渲染方法
     const t2 = performance.now();
     this.perfStats.render = t2 - t1;
   }

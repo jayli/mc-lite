@@ -880,21 +880,23 @@ export class PlayerInteraction {
     const isFullSpeed = inputSpeed > 0 && actualDist > expectedDist * 0.95;
     const shouldBob = isMoving && isFullSpeed && !this.player.jumping && !isObstructed;
 
+    const frameScale = dt * 60;
     if (shouldBob) {
-      this.player.bobbingTimer += this.player.bobbingSpeed;
-      this.player.bobAmount = THREE.MathUtils.lerp(this.player.bobAmount, this.player.bobbingIntensity, 0.1);
+      this.player.bobbingTimer += this.player.bobbingSpeed * frameScale;
+      this.player.bobAmount = THREE.MathUtils.lerp(this.player.bobAmount, this.player.bobbingIntensity, 1 - Math.pow(0.9, frameScale));
       this.playFootstepSound();
     } else {
       this.player.bobbingTimer = 0;
-      this.player.bobAmount = THREE.MathUtils.lerp(this.player.bobAmount, 0, 0.2);
+      this.player.bobAmount = THREE.MathUtils.lerp(this.player.bobAmount, 0, 1 - Math.pow(0.8, frameScale));
       audioManager.stopSound('running_land');
       audioManager.stopSound('running_water');
     }
 
     const bobX = Math.sin(this.player.bobbingTimer) * this.player.bobAmount;
     const bobY = Math.cos(this.player.bobbingTimer * 2) * this.player.bobAmount * 0.5;
-    this.player.bobOffset.x = THREE.MathUtils.lerp(this.player.bobOffset.x, bobX, 0.3);
-    this.player.bobOffset.y = THREE.MathUtils.lerp(this.player.bobOffset.y, bobY, 0.3);
+    const bobLerp = 1 - Math.pow(0.7, frameScale);
+    this.player.bobOffset.x = THREE.MathUtils.lerp(this.player.bobOffset.x, bobX, bobLerp);
+    this.player.bobOffset.y = THREE.MathUtils.lerp(this.player.bobOffset.y, bobY, bobLerp);
 
     this.player.camera.position.x += this.player.bobOffset.x;
     this.player.camera.position.y += this.player.bobOffset.y;

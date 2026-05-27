@@ -148,12 +148,7 @@ class TypeBuffer {
     if (this.dirtyMatrix) {
       const offset = this.dirtyStart * MATRIX_STRIDE;
       const count = (this.dirtyEnd - this.dirtyStart + 1) * MATRIX_STRIDE;
-      if (typeof this.mesh.instanceMatrix.addUpdateRange === 'function') {
-        this.mesh.instanceMatrix.addUpdateRange(offset, count);
-      } else {
-        this.mesh.instanceMatrix.updateRange.offset = offset;
-        this.mesh.instanceMatrix.updateRange.count = count;
-      }
+      this.mesh.instanceMatrix.addUpdateRange(offset, count);
       this.mesh.instanceMatrix.needsUpdate = true;
     }
 
