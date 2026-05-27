@@ -1,6 +1,6 @@
 # Feature Specification: Three.js r160 → r184 升级
 
-**Feature Branch**: `001-upgrade-threejs-r184`  
+**Feature Branch**: `031-upgrade-threejs-r184`  
 **Created**: 2026-05-27  
 **Status**: Draft  
 **Input**: 将项目的 Three.js 从 r160 (0.160.0) 升级到 r184 (0.184.0)

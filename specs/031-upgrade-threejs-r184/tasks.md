@@ -1,6 +1,6 @@
 # Tasks: Three.js r160 → r184 升级
 
-**Input**: Design documents from `/specs/001-upgrade-threejs-r184/`
+**Input**: Design documents from `/specs/031-upgrade-threejs-r184/`
 **Prerequisites**: plan.md, spec.md, research.md, quickstart.md
 
 **Tests**: 不新增测试任务，使用现有测试套件验证。
@@ -19,7 +19,7 @@
 
 **Purpose**: 创建分支，确认当前状态
 
-- [ ] T001 确认当前在 `001-upgrade-threejs-r184` 分支上且工作区干净
+- [ ] T001 确认当前在 `031-upgrade-threejs-r184` 分支上且工作区干净
 
 ---
 

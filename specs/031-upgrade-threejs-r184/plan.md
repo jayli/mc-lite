@@ -1,7 +1,7 @@
 # Implementation Plan: Three.js r160 → r184 升级
 
-**Branch**: `001-upgrade-threejs-r184` | **Date**: 2026-05-27 | **Spec**: [spec.md](./spec.md)
-**Input**: Feature specification from `/specs/001-upgrade-threejs-r184/spec.md`
+**Branch**: `031-upgrade-threejs-r184` | **Date**: 2026-05-27 | **Spec**: [spec.md](./spec.md)
+**Input**: Feature specification from `/specs/031-upgrade-threejs-r184/spec.md`
 
 ## Summary
 
@@ -39,7 +39,7 @@
 ### Documentation (this feature)
 
 ```text
-specs/001-upgrade-threejs-r184/
+specs/031-upgrade-threejs-r184/
 ├── plan.md              # This file
 ├── spec.md              # Feature specification
 ├── research.md          # Phase 0 output
