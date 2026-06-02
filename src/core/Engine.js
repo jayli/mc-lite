@@ -140,7 +140,7 @@ export class Engine {
 
     // 3. 渲染器初始化
     this.renderer = new THREE.WebGPURenderer({
-      forceWebGL: true,
+      forceWebGL: false,
       antialias: false,
       powerPreference: "high-performance"
     });
@@ -240,8 +240,21 @@ export class Engine {
   async initRenderer() {
     await this.renderer.init();
     this._rendererReady = true;
-    console.log(`[Engine] Renderer ready, backend: ${this.renderer.backend?.constructor?.name}`);
+    this._backendName = this.renderer.backend?.constructor?.name || 'Unknown';
+    this._isWebGPU = this._backendName === 'WebGPUBackend';
+    console.log(`[Engine] Renderer ready, backend: ${this._backendName} (${this._isWebGPU ? 'WebGPU' : 'WebGL fallback'})`);
     console.log(`[Engine] outputColorSpace: ${this.renderer.outputColorSpace}, toneMapping: ${this.renderer.toneMapping}, exposure: ${this.renderer.toneMappingExposure}`);
+  }
+
+  /**
+   * 获取当前渲染后端信息
+   * @returns {{ backend: string, isWebGPU: boolean }}
+   */
+  getBackendInfo() {
+    return {
+      backend: this._backendName || 'Not initialized',
+      isWebGPU: this._isWebGPU || false
+    };
   }
 
   /**
@@ -871,7 +884,7 @@ export class Engine {
       }
     }
 
-    this.renderer.render(this.scene, this.camera);
+    this.renderer.renderAsync(this.scene, this.camera);
   }
 
   /**
