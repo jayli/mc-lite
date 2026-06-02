@@ -1,5 +1,6 @@
 // 引入 Three.js 库
 import * as THREE from 'three';
+import { positionWorld, cameraPosition as tslCameraPosition, uniform, float, vec3, Fn, smoothstep, sin, cos, normalize, dot, max, pow, mix, length, Discard } from 'three/tsl';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 import { MTLLoader } from 'three/addons/loaders/MTLLoader.js';
@@ -138,10 +139,12 @@ export class Engine {
     this.scene.add(this.camera);
 
     // 3. 渲染器初始化
-    this.renderer = new THREE.WebGLRenderer({
-      antialias: false,               // 关闭抗锯齿以换取性能
-      powerPreference: "high-performance" // 提示浏览器使用高性能 GPU
+    this.renderer = new THREE.WebGPURenderer({
+      forceWebGL: true,
+      antialias: false,
+      powerPreference: "high-performance"
     });
+    this._rendererReady = false;
     this.renderer.shadowMap.enabled = true; // 启用阴影系统
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // 设置阴影映射类型为更柔和的 PCF 软阴影
     // 性能优化：关闭每帧自动更新阴影，仅在场景关键变化时按需刷新
@@ -185,7 +188,9 @@ export class Engine {
     moonLight.castShadow = false;
     this.scene.add(moonLight);
 
-    this.ambientLight = new THREE.AmbientLight(0xddeeff, 1);
+    // WebGPURenderer TSL 管线间接漫射比旧 chunk GLSL 暗，经验补偿系数
+    this._ambientBoost = 2.3;
+    this.ambientLight = new THREE.AmbientLight(0xddeeff, 1 * this._ambientBoost);
     this.scene.add(this.ambientLight);
 
     this.light = light;
@@ -230,6 +235,13 @@ export class Engine {
     if (temp < -1.5) return h * 0.5 + 2;
     if (temp > -1.5 && temp < -0.8 && hum > 0.5) return h * 0.3 - 2;
     return h;
+  }
+
+  async initRenderer() {
+    await this.renderer.init();
+    this._rendererReady = true;
+    console.log(`[Engine] Renderer ready, backend: ${this.renderer.backend?.constructor?.name}`);
+    console.log(`[Engine] outputColorSpace: ${this.renderer.outputColorSpace}, toneMapping: ${this.renderer.toneMapping}, exposure: ${this.renderer.toneMappingExposure}`);
   }
 
   /**
@@ -522,10 +534,10 @@ export class Engine {
       }
     }
 
-    if (this.waterMaterial) {
-      this.waterMaterial.uniforms.uFogColor.value.set(style.fogColor);
-      this.waterMaterial.uniforms.uFogNear.value = style.fogNear;
-      this.waterMaterial.uniforms.uFogFar.value = style.fogFar;
+    if (this._waterUniforms) {
+      this._waterUniforms.uFogColor.value.set(style.fogColor);
+      this._waterUniforms.uFogNear.value = style.fogNear;
+      this._waterUniforms.uFogFar.value = style.fogFar;
     }
 
     // 恢复对应风格的背景（修复：需处理所有背景模式）
@@ -554,7 +566,7 @@ export class Engine {
       this.moonLight.intensity = style.moonDirectionalLightIntensity ?? 0.02;
     }
     this.ambientLight.color.set(style.ambientLightColor);
-    this.ambientLight.intensity = style.ambientLightIntensity;
+    this.ambientLight.intensity = style.ambientLightIntensity * this._ambientBoost;
     if (Array.isArray(style.sunDirection) && style.sunDirection.length === 3) {
       this.sunDirection.set(style.sunDirection[0], style.sunDirection[1], style.sunDirection[2]).normalize();
       this.requestShadowMapUpdate();
@@ -604,111 +616,124 @@ export class Engine {
   createWaterPlane() {
     const waterGeo = new THREE.PlaneGeometry(800, 800);
 
-    this.waterMaterial = new THREE.ShaderMaterial({
-      uniforms: {
-        uTime: { value: 0 },                        // 时间变量，用于波浪动画
-        uColor: { value: new THREE.Color(WATER_COLOR) }, // 水面基础颜色
-        uSunDirection: { value: this.sunDirection }, // 太阳光照方向
-        uOpacity: { value: WATER_OPACITY },          // 水面透明度
-        uSeed: { value: WORLD_CONFIG.SEED },         // 世界种子，用于噪声函数一致性
-        uFogColor: { value: new THREE.Color(WATER_FOG_COLOR) }, // 水下雾的颜色
-        uFogNear: { value: 20 },                     // 水下雾的近距范围
-        uFogFar: { value: 70 }                      // 水下雾的远距范围
-      },
-      vertexShader: `
-        varying vec3 vWorldPosition;
-        varying float vDepth;
-        void main() {
-          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
-          vWorldPosition = worldPosition.xyz;
+    // TSL uniforms
+    const uTime = uniform(0.0);
+    const uColor = uniform(new THREE.Color(WATER_COLOR));
+    const uSunDirection = uniform(this.sunDirection);
+    const uOpacity = uniform(WATER_OPACITY);
+    const uSeed = uniform(WORLD_CONFIG.SEED);
+    const uFogColor = uniform(new THREE.Color(WATER_FOG_COLOR));
+    const uFogNear = uniform(20.0);
+    const uFogFar = uniform(70.0);
 
-          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-          vDepth = -mvPosition.z;
+    // 存储 uniform 引用，供外部更新
+    this._waterUniforms = {
+      uTime, uColor, uSunDirection, uOpacity, uSeed, uFogColor, uFogNear, uFogFar
+    };
 
-          gl_Position = projectionMatrix * mvPosition;
-        }
-      `,
-      fragmentShader: `
-        uniform float uTime;
-        uniform vec3 uColor;
-        uniform vec3 uSunDirection;
-        uniform float uOpacity;
-        uniform float uSeed;
-        uniform vec3 uFogColor;
-        uniform float uFogNear;
-        uniform float uFogFar;
-        varying vec3 vWorldPosition;
-        varying float vDepth;
+    const fadeStart = WATER_VISIBLE_DISTANCE - WATER_EDGE_FADE_BAND; // 65.0
+    const fadeEnd = WATER_VISIBLE_DISTANCE; // 80.0
 
-        // 简化的地形高度函数（仅用于水面遮罩）
-        float getTerrainHeight(float x, float z) {
-          float nx = x + uSeed, nz = z + uSeed;
-          return sin(nx * 0.08) * 2.0 + cos(nz * 0.08) * 2.0 + sin(nx * 0.02) * 6.0 + cos(nz * 0.02) * 6.0;
-        }
+    // 简化的地形高度函数（用于水面遮罩）
+    const getTerrainHeight = (x, z) => {
+      const nx = x.add(uSeed);
+      const nz = z.add(uSeed);
+      return sin(nx.mul(0.08)).mul(2.0)
+        .add(cos(nz.mul(0.08)).mul(2.0))
+        .add(sin(nx.mul(0.02)).mul(6.0))
+        .add(cos(nz.mul(0.02)).mul(6.0));
+    };
 
-        void main() {
-          vec2 pos = vWorldPosition.xz;
-          float dist = length(pos - cameraPosition.xz);
-          float waterFade = 1.0 - smoothstep(${(WATER_VISIBLE_DISTANCE - WATER_EDGE_FADE_BAND).toFixed(1)}, ${WATER_VISIBLE_DISTANCE.toFixed(1)}, dist);
-          if (waterFade <= 0.001) discard;
+    // colorNode: 计算水面最终颜色 (vec3 RGB)
+    const colorNode = Fn(() => {
+      const pos = positionWorld.xz;
+      const dist = length(pos.sub(tslCameraPosition.xz));
+      const waterFade = float(1.0).sub(smoothstep(float(fadeStart), float(fadeEnd), dist));
 
-          // 水域遮罩：只在靠近海洋的地方显示水面（切入岸边约4个方块）
-          if (dist < 100.0) {
-            float h = getTerrainHeight(pos.x, pos.y);
-            // 检查中心点和周围4个方向，确保在海岸附近
-            bool nearOcean = h < -0.8;
-            if (!nearOcean) {
-              const float offset = 3.5;
-              nearOcean = getTerrainHeight(pos.x + offset, pos.y) < -0.8 ||
-                          getTerrainHeight(pos.x - offset, pos.y) < -0.8 ||
-                          getTerrainHeight(pos.x, pos.y + offset) < -0.8 ||
-                          getTerrainHeight(pos.x, pos.y - offset) < -0.8;
-            }
-            if (!nearOcean) discard;
-          }
+      // 远距离淡出裁剪
+      Discard(waterFade.lessThanEqual(0.001));
 
-          // LOD：远距离减少计算
-          float detailMask = smoothstep(50.0, 25.0, dist);
+      // 水域遮罩：计算 nearOcean 掩码
+      const h0 = getTerrainHeight(pos.x, pos.y);
+      const offsetVal = float(3.5);
+      const h1 = getTerrainHeight(pos.x.add(offsetVal), pos.y);
+      const h2 = getTerrainHeight(pos.x.sub(offsetVal), pos.y);
+      const h3 = getTerrainHeight(pos.x, pos.y.add(offsetVal));
+      const h4 = getTerrainHeight(pos.x, pos.y.sub(offsetVal));
+      const threshold = float(-0.8);
+      // 任意一个采样点低于阈值即为 nearOcean
+      const nearOceanMask = max(
+        max(
+          max(
+            max(
+              float(1.0).sub(smoothstep(threshold.sub(0.01), threshold, h0)),
+              float(1.0).sub(smoothstep(threshold.sub(0.01), threshold, h1))
+            ),
+            float(1.0).sub(smoothstep(threshold.sub(0.01), threshold, h2))
+          ),
+          float(1.0).sub(smoothstep(threshold.sub(0.01), threshold, h3))
+        ),
+        float(1.0).sub(smoothstep(threshold.sub(0.01), threshold, h4))
+      );
+      // 仅在 dist < 100 时应用 nearOcean 检测，远处全部显示
+      const inRangeMask = smoothstep(float(100.0), float(99.0), dist); // 1 when dist < 99, 0 when dist > 100
+      const oceanMask = mix(float(1.0), nearOceanMask, inRangeMask);
+      Discard(oceanMask.lessThanEqual(0.001));
 
-          // 基础波纹（始终计算）
-          float waves = sin(pos.x * 1.5 + uTime * 5.5) * 0.1 + sin(pos.y * 1.3 - uTime * 3.2) * 0.1;
+      // LOD：远距离减少计算
+      const detailMask = smoothstep(float(50.0), float(25.0), dist);
 
-          // 细节波纹（仅近距离计算）
-          if (detailMask > 0.0) {
-             waves += sin(pos.x * 2.8 + pos.y * 2.2 + uTime * 3.5) * 0.08 * detailMask;
-             waves += sin(pos.x * -2.1 + pos.y * 3.7 + uTime * 2.8) * 0.06 * detailMask;
-          }
+      // 基础波纹
+      let waves = sin(pos.x.mul(1.5).add(uTime.mul(5.5))).mul(0.1)
+        .add(sin(pos.y.mul(1.3).sub(uTime.mul(3.2))).mul(0.1));
 
-          // 法线和视角方向
-          vec3 viewDir = normalize(cameraPosition - vWorldPosition);
-          vec3 normal = normalize(vec3(waves * 2.0, 1.0, waves * 2.0));
+      // 细节波纹（按 detailMask 混合）
+      const detailWaves = sin(pos.x.mul(2.8).add(pos.y.mul(2.2)).add(uTime.mul(3.5))).mul(0.08).mul(detailMask)
+        .add(sin(pos.x.mul(-2.1).add(pos.y.mul(3.7)).add(uTime.mul(2.8))).mul(0.06).mul(detailMask));
+      waves = waves.add(detailWaves);
 
-          // 太阳光镜面反射（Blinn-Phong）
-          vec3 halfDir = normalize(uSunDirection + viewDir);
-          float spec = pow(max(dot(normal, halfDir), 0.0), 100.0) * 8.0 * detailMask;
+      // 法线和视角方向
+      const normal = normalize(vec3(waves.mul(2.0), 1.0, waves.mul(2.0)));
+      const viewDir = normalize(tslCameraPosition.sub(positionWorld));
 
-          // 漫反射和环境散射
-          float diffuse = max(dot(normal, uSunDirection), 0.0) * 0.15 * detailMask;
-          float scatter = max(0.0, normal.y) * 0.08 * detailMask;
+      // 太阳光镜面反射（Blinn-Phong）
+      const halfDir = normalize(uSunDirection.add(viewDir));
+      const spec = pow(max(dot(normal, halfDir), 0.0), 100.0).mul(8.0).mul(detailMask);
 
-          // Fresnel 边缘高光
-          float fresnel = pow(1.0 - max(dot(vec3(0.0, 1.0, 0.0), viewDir), 0.0), 3.0);
+      // 漫反射和环境散射
+      const diffuse = max(dot(normal, uSunDirection), 0.0).mul(0.15).mul(detailMask);
+      const scatter = max(float(0.0), normal.y).mul(0.08).mul(detailMask);
 
-          // 合成颜色
-          vec3 highlightColor = vec3(0.95, 0.98, 1.0);
-          vec3 finalColor = uColor + highlightColor * (diffuse + scatter + spec + fresnel * 0.1);
+      // Fresnel 边缘高光
+      const fresnel = pow(float(1.0).sub(max(dot(vec3(0, 1, 0), viewDir), 0.0)), 3.0);
 
-          // 雾效
-          float fogFactor = smoothstep(uFogNear, uFogFar, vDepth);
-          vec3 colorWithFog = mix(finalColor, uFogColor, fogFactor);
+      // 合成颜色
+      const highlightColor = vec3(0.95, 0.98, 1.0);
+      const finalColor = uColor.add(highlightColor.mul(diffuse.add(scatter).add(spec).add(fresnel.mul(0.1))));
 
-          gl_FragColor = vec4(colorWithFog, uOpacity * waterFade);
-        }
-      `,
-      transparent: true,
-      depthWrite: false,
-      side: THREE.DoubleSide
-    });
+      // 雾效
+      const depth = length(tslCameraPosition.sub(positionWorld));
+      const fogFactor = smoothstep(uFogNear, uFogFar, depth);
+      const colorWithFog = mix(finalColor, uFogColor, fogFactor);
+
+      return colorWithFog;
+    })();
+
+    // opacityNode: 计算水面透明度 (float)
+    const opacityNode = Fn(() => {
+      const pos = positionWorld.xz;
+      const dist = length(pos.sub(tslCameraPosition.xz));
+      const waterFade = float(1.0).sub(smoothstep(float(fadeStart), float(fadeEnd), dist));
+      return uOpacity.mul(waterFade);
+    })();
+
+    // 创建 NodeMaterial
+    this.waterMaterial = new THREE.NodeMaterial();
+    this.waterMaterial.colorNode = colorNode;
+    this.waterMaterial.opacityNode = opacityNode;
+    this.waterMaterial.transparent = true;
+    this.waterMaterial.depthWrite = false;
+    this.waterMaterial.side = THREE.DoubleSide;
 
     this.waterPlane = new THREE.Mesh(waterGeo, this.waterMaterial);
     this.waterPlane.rotation.x = -Math.PI / 2;
@@ -788,12 +813,13 @@ export class Engine {
   }
 
   render(dt = 1 / 60) {
+    if (!this._rendererReady) return;
     if (this.faceCullingSystem && this.faceCullingSystem.isEnabled()) {
     }
 
-    if (this.waterMaterial) {
-      this.waterMaterial.uniforms.uTime.value += 0.015 * dt * 60;
-      this.waterMaterial.uniforms.uSeed.value = WORLD_CONFIG.SEED; // 同步世界种子，确保噪声函数的一致性
+    if (this._waterUniforms) {
+      this._waterUniforms.uTime.value += 0.015 * dt * 60;
+      this._waterUniforms.uSeed.value = WORLD_CONFIG.SEED; // 同步世界种子，确保噪声函数的一致性
     }
 
     if (this.waterPlane) {
@@ -832,10 +858,10 @@ export class Engine {
         this.scene.background = this._underwaterColor; // 使用预分配的颜色对象
         this.isUnderwater = true;              // 标记玩家处于水下状态
 
-        if (this.waterMaterial) {
-          this.waterMaterial.uniforms.uFogColor.value.set(0x103060); // 更新水面材质的水下雾颜色
-          this.waterMaterial.uniforms.uFogNear.value = 0.1;          // 更新水面材质的水下雾近距范围
-          this.waterMaterial.uniforms.uFogFar.value = 15;            // 更新水面材质的水下雾远距范围
+        if (this._waterUniforms) {
+          this._waterUniforms.uFogColor.value.set(0x103060); // 更新水面材质的水下雾颜色
+          this._waterUniforms.uFogNear.value = 0.1;          // 更新水面材质的水下雾近距范围
+          this._waterUniforms.uFogFar.value = 15;            // 更新水面材质的水下雾远距范围
         }
       }
     } else {

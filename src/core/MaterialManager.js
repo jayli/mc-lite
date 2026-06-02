@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { BatchedMaterial } from './BatchedMaterial.js';
 import { getBlockProperties } from '../constants/BlockData.js';
 import { DEFAULT_TEXTURE_BLUR_LEVEL } from '../constants/GameConfig.js';
+import { applyAOToMaterial, uAoEnabled } from './AONodeSystem.js';
 
 /**
  * 材质管理器类，负责管理游戏中的所有材质
@@ -22,7 +23,7 @@ export class MaterialManager {
     this.textureCache = new Map();     // 纹理缓存
     this.batchedMaterials = new Map(); // 合批材质缓存
     this.textureBlurLevel = DEFAULT_TEXTURE_BLUR_LEVEL; // 贴图模糊参数（0-1）
-    this.defaultMaterial = new THREE.MeshStandardMaterial({ color: 0xff00ff }); // 默认材质（洋红色，用于调试）
+    this.defaultMaterial = new THREE.MeshStandardNodeMaterial({ color: 0xff00ff }); // 默认材质（洋红色，用于调试）
     this.aoEnabled = true;             // AO 着色开关（用于性能对比调试）
   }
 
@@ -264,14 +265,14 @@ export class MaterialManager {
         this._applyTextureSampling(texture);
       }
 
-      const mat = new THREE.MeshStandardMaterial({
+      const mat = new THREE.MeshStandardNodeMaterial({
         map: texture,
         transparent: def.transparent || false,
         opacity: def.opacity || 1,
         side: def.side || THREE.FrontSide,
         alphaTest: def.alphaTest || 0
       });
-      if (useAO) this._applyShaderModifications(mat);
+      if (useAO) applyAOToMaterial(mat);
       return mat;
     }
 
@@ -294,7 +295,7 @@ export class MaterialManager {
       const texture = new THREE.CanvasTexture(canvas);
       this._applyTextureSampling(texture);
 
-      const mat = new THREE.MeshStandardMaterial({
+      const mat = new THREE.MeshStandardNodeMaterial({
         map: texture,
         transparent: def.transparent || false,
         opacity: def.opacity || 1,
@@ -303,195 +304,30 @@ export class MaterialManager {
         emissive: def.emissive || 0x000000,      // 自发光颜色
         emissiveIntensity: def.emissiveIntensity || 0  // 自发光强度
       });
-      if (useAO) this._applyShaderModifications(mat);
+      if (useAO) applyAOToMaterial(mat);
       return mat;
     }
 
     // 情况3：纯颜色材质（无纹理）
-    const mat = new THREE.MeshStandardMaterial({
+    const mat = new THREE.MeshStandardNodeMaterial({
       color: def.color || 0xffffff,
       transparent: def.transparent || false,
       opacity: def.opacity || 1,
       emissive: def.emissive || 0x000000,      // 自发光颜色
       emissiveIntensity: def.emissiveIntensity || 0  // 自发光强度
     });
-    if (useAO) this._applyShaderModifications(mat);
+    if (useAO) applyAOToMaterial(mat);
     return mat;
   }
 
-  /**
-   * 为材质注入 AO 着色器逻辑
-   * @param {THREE.Material} material
-   */
-  _applyShaderModifications(material) {
-    material.onBeforeCompile = (shader) => {
-      // 注入 AO 开关 uniform
-      shader.uniforms = {
-        ...shader.uniforms,
-        uAoEnabled: { value: this.aoEnabled ? 1.0 : 0.0 }
-      };
-
-      // 存储 shader 引用以便后续更新
-      material._aoShader = shader;
-
-      // 顶点着色器修改
-      shader.vertexShader = `
-        attribute float aVertexId;
-        attribute float aAoLow;
-        attribute float aAoHigh;
-        attribute float aOrientation;
-        varying float vAo;
-      ` + shader.vertexShader;
-
-      // 台阶底部阴影
-      shader.vertexShader = shader.vertexShader.replace(
-        '#include <common>',
-        `
-        #include <common>
-        float remapTopCorner(float corner, float orientationIdx) {
-          // orientation=0: [0,1,2,3]
-          if (orientationIdx < 0.5) return corner;
-          // orientation=1: [2,0,3,1]
-          if (orientationIdx < 1.5) {
-            if (corner < 0.5) return 2.0;
-            if (corner < 1.5) return 0.0;
-            if (corner < 2.5) return 3.0;
-            return 1.0;
-          }
-          // orientation=2: [3,2,1,0]
-          if (orientationIdx < 2.5) {
-            if (corner < 0.5) return 3.0;
-            if (corner < 1.5) return 2.0;
-            if (corner < 2.5) return 1.0;
-            return 0.0;
-          }
-          // orientation=3: [1,3,0,2]
-          if (corner < 0.5) return 1.0;
-          if (corner < 1.5) return 3.0;
-          if (corner < 2.5) return 0.0;
-          return 2.0;
-        }
-
-        float remapBottomCorner(float corner, float orientationIdx) {
-          // orientation=0: [0,1,2,3]
-          if (orientationIdx < 0.5) return corner;
-          // orientation=1: [1,3,0,2]
-          if (orientationIdx < 1.5) {
-            if (corner < 0.5) return 1.0;
-            if (corner < 1.5) return 3.0;
-            if (corner < 2.5) return 0.0;
-            return 2.0;
-          }
-          // orientation=2: [3,2,1,0]
-          if (orientationIdx < 2.5) {
-            if (corner < 0.5) return 3.0;
-            if (corner < 1.5) return 2.0;
-            if (corner < 2.5) return 1.0;
-            return 0.0;
-          }
-          // orientation=3: [2,0,3,1]
-          if (corner < 0.5) return 2.0;
-          if (corner < 1.5) return 0.0;
-          if (corner < 2.5) return 3.0;
-          return 1.0;
-        }
-
-        float remapSideFace(float face, float orientationIdx) {
-          // 将侧面归一化到顺序：+X(0), +Z(1), -X(2), -Z(3)
-          float sideIdx;
-          if (face < 0.5) sideIdx = 0.0;       // +X
-          else if (face < 1.5) sideIdx = 2.0;  // -X
-          else if (face < 4.5) sideIdx = 1.0;  // +Z
-          else sideIdx = 3.0;                  // -Z
-
-          // 与实例旋转保持一致：orientation=1 表示绕 Y 轴 +90°
-          float worldSideIdx = mod(sideIdx - orientationIdx + 4.0, 4.0);
-
-          // 还原到 AO 面索引：+X(0), -X(1), +Z(4), -Z(5)
-          if (worldSideIdx < 0.5) return 0.0;
-          if (worldSideIdx < 1.5) return 4.0;
-          if (worldSideIdx < 2.5) return 1.0;
-          return 5.0;
-        }
-
-        float remapAoVertexId(float vertexId, float orientation) {
-          float orientationIdx = mod(floor(orientation + 0.5), 4.0);
-          float face = floor(vertexId / 4.0);
-          float corner = mod(vertexId, 4.0);
-
-          // +Y
-          if (face > 1.5 && face < 2.5) {
-            return 8.0 + remapTopCorner(corner, orientationIdx);
-          }
-
-          // -Y
-          if (face > 2.5 && face < 3.5) {
-            return 12.0 + remapBottomCorner(corner, orientationIdx);
-          }
-
-          // 四个侧面角落顺序不变，仅重映射世界面
-          return remapSideFace(face, orientationIdx) * 4.0 + corner;
-        }
-
-        float getAo(float id, float low, float high) {
-          float remappedId = remapAoVertexId(id, aOrientation);
-          float aoRaw;
-          if (remappedId < 12.0) { // 前12个顶点（0-11）的AO数据存储在low中，后12个顶点（12-23）存储在high中
-            aoRaw = mod(floor(low / pow(4.0, remappedId)), 4.0); // 每个顶点AO值用2位存储（0-3），4.0表示4种可能值
-          } else {
-            aoRaw = mod(floor(high / pow(4.0, remappedId - 12.0)), 4.0);
-          }
-          return 1.0 - (3.0 - aoRaw) / 3.0 * 0.9; // 0.9 为阴影强度，3.0为最大AO值，将0-3映射到亮度系数
-        }
-        `
-      );
-
-      shader.vertexShader = shader.vertexShader.replace(
-        '#include <begin_vertex>',
-        `
-        #include <begin_vertex>
-        vAo = getAo(aVertexId, aAoLow, aAoHigh);
-        `
-      );
-
-      // 片元着色器修改
-      shader.fragmentShader = `
-        uniform float uAoEnabled;
-        varying float vAo;
-      ` + shader.fragmentShader;
-
-      shader.fragmentShader = shader.fragmentShader.replace(
-        '#include <color_fragment>',
-        `
-        #include <color_fragment>
-        // 根据 uAoEnabled 开关决定是否应用 AO
-        diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vAo, uAoEnabled);
-        `
-      );
-    };
-  }
 
   /**
    * 同步 AO 开关到所有材质 shader
+   * 所有材质共享 AONodeSystem 导出的 uAoEnabled uniform 实例，只需更新一次
    * @param {boolean} enabled - 是否启用 AO
    */
   _syncAOShaderState(enabled) {
-    // 更新合批材质（ShaderMaterial）
-    for (const mat of this.batchedMaterials.values()) {
-      if (mat && mat.uniforms && mat.uniforms.uAoEnabled) {
-        mat.uniforms.uAoEnabled.value = enabled ? 1.0 : 0.0;
-      }
-    }
-
-    // 更新普通材质（MeshStandardMaterial）- 通过存储的 shader 引用
-    for (const matOrMats of this.materials.values()) {
-      const mats = Array.isArray(matOrMats) ? matOrMats : [matOrMats];
-      for (const mat of mats) {
-        if (mat && mat._aoShader && mat._aoShader.uniforms) {
-          mat._aoShader.uniforms.uAoEnabled.value = enabled ? 1.0 : 0.0;
-        }
-      }
-    }
+    uAoEnabled.value = enabled ? 1.0 : 0.0;
   }
 
   /**

@@ -1,6 +1,7 @@
 // src/world/effects/RainEffect.js
 // 下雨效果 - 使用 LineSegments 实现始终垂直于地面的雨滴
 import * as THREE from 'three';
+import { positionLocal, attribute, uniform, vec3, mod, max } from 'three/tsl';
 
 /**
  * 下雨效果类
@@ -78,43 +79,37 @@ export class RainEffect {
     this.geometry.setAttribute('aIsBottomVertex', new THREE.BufferAttribute(this.isBottomVertex, 1));
     this.geometry.setAttribute('aMinY', new THREE.BufferAttribute(this.minYs, 1));
 
-    // 使用 ShaderMaterial 将雨滴下落计算移动到 GPU
-    this.material = new THREE.ShaderMaterial({
-      transparent: true,
-      depthWrite: false,
-      uniforms: {
-        uTime: { value: 0 },
-        uBaseSpeed: { value: this.speed },
-        uDropLength: { value: this.dropLength },
-        uCycleHeight: { value: this.cycleHeight },
-        uOpacity: { value: 0.6 }
-      },
-      vertexShader: `
-        uniform float uTime;
-        uniform float uBaseSpeed;
-        uniform float uDropLength;
-        uniform float uCycleHeight;
-        attribute float aPhase;
-        attribute float aSpeedScale;
-        attribute float aIsBottomVertex;
-        attribute float aMinY;
+    // 使用 NodeMaterial + TSL 将雨滴下落计算移动到 GPU
+    const uTime = uniform(0.0);
+    const uBaseSpeed = uniform(this.speed);
+    const uDropLength = uniform(this.dropLength);
+    const uCycleHeight = uniform(this.cycleHeight);
+    const uOpacity = uniform(0.6);
 
-        void main() {
-          vec3 transformed = position;
-          float fallDistance = mod((uTime * uBaseSpeed * aSpeedScale) + aPhase, uCycleHeight);
-          transformed.y = position.y - fallDistance - (aIsBottomVertex * uDropLength);
-          transformed.y = max(transformed.y, aMinY);
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(transformed, 1.0);
-        }
-      `,
-      fragmentShader: `
-        uniform float uOpacity;
+    // 存储 uniform 引用，供外部更新
+    this._rainUniforms = { uTime, uBaseSpeed, uDropLength, uCycleHeight, uOpacity };
 
-        void main() {
-          gl_FragColor = vec4(1.0, 1.0, 1.0, uOpacity);
-        }
-      `
-    });
+    // 读取自定义顶点属性
+    const aPhase = attribute('aPhase', 'float');
+    const aSpeedScale = attribute('aSpeedScale', 'float');
+    const aIsBottomVertex = attribute('aIsBottomVertex', 'float');
+    const aMinY = attribute('aMinY', 'float');
+
+    // 顶点位移：计算雨滴下落后的新 Y 坐标
+    const fallDistance = mod(uTime.mul(uBaseSpeed).mul(aSpeedScale).add(aPhase), uCycleHeight);
+    const newY = max(
+      positionLocal.y.sub(fallDistance).sub(aIsBottomVertex.mul(uDropLength)),
+      aMinY
+    );
+    const displacedPosition = vec3(positionLocal.x, newY, positionLocal.z);
+
+    // 创建 NodeMaterial
+    this.material = new THREE.NodeMaterial();
+    this.material.positionNode = displacedPosition;
+    this.material.colorNode = vec3(1.0, 1.0, 1.0);
+    this.material.opacityNode = uOpacity;
+    this.material.transparent = true;
+    this.material.depthWrite = false;
     this.material.linewidth = this.lineWidth;
 
     // 创建 LineSegments 并添加到场景
@@ -245,7 +240,7 @@ export class RainEffect {
     }
 
     this.elapsedTime += dt;
-    this.material.uniforms.uTime.value = this.elapsedTime;
+    this._rainUniforms.uTime.value = this.elapsedTime;
     this.processBatchedRefresh();
 
     // 位置刷新增量检查降频到 30Hz，避免每帧进行不必要的主线程判断

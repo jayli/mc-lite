@@ -359,6 +359,10 @@ export class Game {
     }, 2000);
   }
 
+  async initEngine() {
+    await this.engine.initRenderer();
+  }
+
   /**
   * 启动游戏循环
   */

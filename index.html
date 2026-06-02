@@ -192,7 +192,9 @@
     <script type="importmap">
        {
             "imports": {
-                "three": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.module.js",
+                "three": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.webgpu.js",
+                "three/tsl": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.tsl.js",
+                "three/webgpu": "https://cdn.jsdelivr.net/npm/three@0.184.0/build/three.webgpu.js",
                 "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/",
                 "stats": "https://cdn.jsdelivr.net/npm/three@0.184.0/examples/jsm/libs/stats.module.js"
             }
@@ -238,6 +240,7 @@ import { Game } from './src/core/Game.js';
                 }
 
                 const game = new Game();
+                await game.initEngine();
                 if (saveData) {
                   await game.applySaveData(saveData);
                 } else {
@@ -319,6 +322,7 @@ import { Game } from './src/core/Game.js';
               }
             } else {
               const game = new Game();
+              await game.initEngine();
               game.start();
               window.game = game; // Expose for debugging
             }
