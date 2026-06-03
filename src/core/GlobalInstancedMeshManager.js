@@ -8,6 +8,7 @@ import { recordChunkPerf } from '../utils/ChunkPerfMonitor.js';
 const DEFAULT_INITIAL_CAPACITY = 256;
 const DEFAULT_MUTATION_MAX_OPS = 600;
 const DEFAULT_MUTATION_MAX_MS = 2;
+const DISPOSAL_GRACE_FRAMES = 2;
 const MATRIX_STRIDE = 16;
 
 const isGlassType = (type) => typeof type === 'string' && type.includes('glass');
@@ -124,11 +125,8 @@ class TypeBuffer {
     if (nextAoHigh) nextAoHigh.needsUpdate = true;
     if (nextOrientation) nextOrientation.needsUpdate = true;
 
-    this.manager.scene.remove(oldMesh);
-    if (oldGeometry !== geomMap[getBlockProperties(this.type).geometryType] && oldGeometry !== geomMap.default) {
-      oldGeometry.dispose();
-    }
     this.manager.scene.add(this.mesh);
+    this.manager._deferMeshDisposal(oldMesh, oldGeometry, this.type);
   }
 
   markDirty(index, options = {}) {
@@ -222,6 +220,7 @@ export class GlobalInstancedMeshManager {
     this.scene = scene;
     this.materials = options.materials || defaultMaterials;
     this.initialCapacity = options.initialCapacity || DEFAULT_INITIAL_CAPACITY;
+    this.typeCapacityHints = options.typeCapacityHints || null;
     this.buffers = new Map();
     this.coordToRef = new Map();
     this.chunkToCoords = new Map();
@@ -233,6 +232,8 @@ export class GlobalInstancedMeshManager {
       lastProcessedBlocks: 0,
       lastFlushMs: 0
     };
+    this._pendingDisposal = [];
+    this._frameCounter = 0;
   }
 
   getRenderKey(type) {
@@ -243,7 +244,8 @@ export class GlobalInstancedMeshManager {
     const renderKey = this.getRenderKey(type);
     let buffer = this.buffers.get(renderKey);
     if (!buffer) {
-      buffer = new TypeBuffer(this, renderKey, type, this.initialCapacity);
+      const capacity = this.typeCapacityHints?.get(type) || this.initialCapacity;
+      buffer = new TypeBuffer(this, renderKey, type, capacity);
       this.buffers.set(renderKey, buffer);
       this.scene.add(buffer.mesh);
     }
@@ -648,6 +650,7 @@ export class GlobalInstancedMeshManager {
     }
 
     this.commitDirtyBuffers();
+    this.flushDisposal();
     const elapsedMs = now() - start;
     this.mutationStats.lastProcessedBlocks = processedBlocks;
     this.mutationStats.lastFlushMs = elapsedMs;
@@ -719,10 +722,43 @@ export class GlobalInstancedMeshManager {
     return committed;
   }
 
+  _deferMeshDisposal(mesh, geometry, type) {
+    mesh.visible = false;
+    this._pendingDisposal.push({ mesh, geometry, type, frame: this._frameCounter });
+  }
+
+  flushDisposal() {
+    this._frameCounter++;
+    if (this._pendingDisposal.length === 0) return;
+    const threshold = this._frameCounter - DISPOSAL_GRACE_FRAMES;
+    let i = 0;
+    while (i < this._pendingDisposal.length) {
+      const entry = this._pendingDisposal[i];
+      if (entry.frame <= threshold) {
+        this.scene.remove(entry.mesh);
+        const sharedGeo = geomMap[getBlockProperties(entry.type).geometryType] || geomMap.default;
+        if (entry.geometry && entry.geometry !== sharedGeo) {
+          entry.geometry.dispose();
+        }
+        this._pendingDisposal.splice(i, 1);
+      } else {
+        i++;
+      }
+    }
+  }
+
   dispose() {
     for (const buffer of this.buffers.values()) {
       buffer.dispose();
     }
+    for (const entry of this._pendingDisposal) {
+      this.scene.remove(entry.mesh);
+      const sharedGeo = geomMap[getBlockProperties(entry.type).geometryType] || geomMap.default;
+      if (entry.geometry && entry.geometry !== sharedGeo) {
+        entry.geometry.dispose();
+      }
+    }
+    this._pendingDisposal.length = 0;
     this.buffers.clear();
     this.coordToRef.clear();
     this.chunkToCoords.clear();

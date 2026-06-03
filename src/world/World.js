@@ -80,7 +80,24 @@ export class World {
     this.renderDistance = DEFAULT_RENDER_DIST;
     /** 存储当前加载的所有区块，Key 为 "cx,cz" 字符串 */
     this.chunks = new Map();
-    this.globalInstancedMeshManager = new GlobalInstancedMeshManager(this.scene);
+    this.globalInstancedMeshManager = new GlobalInstancedMeshManager(this.scene, {
+      typeCapacityHints: new Map([
+        ['leaves', 4096],
+        ['azalea_leaves', 4096],
+        ['azalea_flowers', 2048],
+        ['yellow_leaves', 4096],
+        ['sky_leaves', 4096],
+        ['snow_leaves', 4096],
+        ['swamp_leaves', 4096],
+        ['realistic_oak_leaves', 4096],
+        ['realistic_yellow_leaves', 4096],
+        ['grass_block', 2048],
+        ['dirt', 2048],
+        ['stone', 2048],
+        ['cobblestone', 2048],
+        ['sand', 2048],
+      ])
+    });
 
     // 初始化粒子系统，处理挖掘和爆炸的视觉效果
     const ParticleSystemClass = getParticleSystem();

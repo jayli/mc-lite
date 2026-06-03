@@ -149,7 +149,12 @@ describe('GlobalInstancedMeshManager', (test) => {
     const buffer = manager.buffers.get('stone');
     assertTrue(buffer.capacity >= 2, '容量应扩到可容纳两个实例');
     assertEqual(buffer.count, 2, '扩容后 count 应保留');
-    assertEqual(scene.children.length, 1, '扩容应替换 mesh 而不是增加 draw target');
+    assertEqual(scene.children.length, 2, '扩容后旧 mesh 延迟移除，暂时 scene 中有 2 个');
+    assertEqual(scene.children.filter(c => c.visible === false).length, 1, '旧 mesh 应标记为不可见');
+    manager.flushDisposal();
+    manager.flushDisposal();
+    manager.flushDisposal();
+    assertEqual(scene.children.length, 1, 'flushDisposal 后旧 mesh 应被移除');
     assertEqual(buffer.coordToIndex.get(a), 0, '旧坐标索引应保留');
     assertEqual(buffer.coordToIndex.get(b), 1, '新坐标索引应正确');
   });

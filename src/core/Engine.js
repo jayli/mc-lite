@@ -145,6 +145,7 @@ export class Engine {
       powerPreference: "high-performance"
     });
     this._rendererReady = false;
+    this._renderInFlight = false;
     this.renderer.shadowMap.enabled = true; // 启用阴影系统
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // 设置阴影映射类型为更柔和的 PCF 软阴影
     // 性能优化：关闭每帧自动更新阴影，仅在场景关键变化时按需刷新
@@ -884,7 +885,11 @@ export class Engine {
       }
     }
 
-    this.renderer.renderAsync(this.scene, this.camera);
+    if (this._renderInFlight) return;
+    this._renderInFlight = true;
+    this.renderer.renderAsync(this.scene, this.camera).then(() => {
+      this._renderInFlight = false;
+    });
   }
 
   /**
