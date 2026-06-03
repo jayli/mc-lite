@@ -870,6 +870,23 @@ export class Chunk {
   }
 
   /**
+   * 运行期网格构建阶段（快速同步版）
+   * 用于 runtime-streaming + authority 路径，blockData 已完整挂载，
+   * 跳过增量状态机，一次同步完成全部构建并入队 mutationQueue。
+   * @returns {'done' | boolean}
+   */
+  assembleRuntimeBuildMeshFast() {
+    if (this.loadState === 'finalized') return true;
+    if (this.loadState !== 'hydrated') {
+      return this.loadState === 'terrain-built' || this.loadState === 'entities-built';
+    }
+    this._buildMeshFromExistingBlockData();
+    this.loadState = 'terrain-built';
+    this.isReady = true;
+    return 'done';
+  }
+
+  /**
    * 可中断装配：分批构建 mesh 数据
    * 内部状态机：iterate → convert-group → visible → build-mesh
    * @param {number} maxMs - 时间预算（毫秒）

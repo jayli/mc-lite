@@ -147,6 +147,8 @@ export class World {
       finalizedChunkKeys: new Set()
     };
     this.chunkAssemblyScheduler = new ChunkAssemblyScheduler(this);
+    this._pendingChunkInitQueue = [];
+    this._chunkInitFrameCounter = 0;
     this.runtimeIdleScheduler = new RuntimeIdleScheduler({
       idleGraceMs: RUNTIME_IDLE_GRACE_MS,
       frameBudgetMs: RUNTIME_IDLE_FRAME_BUDGET_MS
@@ -917,6 +919,27 @@ export class World {
     }
   }
 
+  _processChunkInitQueue() {
+    if (this._pendingChunkInitQueue.length === 0) return;
+
+    // 每 4 帧处理 1 个 chunk，5 个 chunk 分摊到 ~20 帧
+    this._chunkInitFrameCounter++;
+    if (this._chunkInitFrameCounter < 4) return;
+    this._chunkInitFrameCounter = 0;
+
+    const playerCx = Math.floor(this._lastPlayerPos.x / CHUNK_SIZE);
+    const playerCz = Math.floor(this._lastPlayerPos.z / CHUNK_SIZE);
+    this._pendingChunkInitQueue.sort((a, b) => {
+      const distA = Math.abs(a.cx - playerCx) + Math.abs(a.cz - playerCz);
+      const distB = Math.abs(b.cx - playerCx) + Math.abs(b.cz - playerCz);
+      return distA - distB;
+    });
+
+    const chunk = this._pendingChunkInitQueue.shift();
+    if (!chunk || chunk.disposed) return;
+    this._requestRuntimeChunkRecord(chunk);
+  }
+
   async processAssemblyQueues() {
     if (this.chunkAssemblyScheduler.hasWork()) {
       this.runtimeIdleScheduler?.markBusy('chunk-assembly');
@@ -924,7 +947,7 @@ export class World {
     const isBootstrap = this.bootstrapState.phase === 'bootstrapping';
     await this.chunkAssemblyScheduler.processWithinBudget({
       budgetMs: isBootstrap ? 12 : 8,
-      maxTasks: isBootstrap ? 8 : 6
+      maxTasks: isBootstrap ? 8 : 20
     });
   }
 
@@ -1083,9 +1106,9 @@ export class World {
           this.scene.add(chunk.group);
           chunkTopologyChanged = true;
 
-          // runtime-streaming 阶段：尝试从 WorldStore 纯装载
+          // runtime-streaming：延迟初始化，分摊到后续帧
           if (this.bootstrapState.phase === 'runtime-streaming' && this.worldRuntime) {
-            this._requestRuntimeChunkRecord(chunk);
+            this._pendingChunkInitQueue.push(chunk);
           }
         }
       }
@@ -1121,7 +1144,11 @@ export class World {
         // 5. 清理 runtime 残留（dirty + pendingUnload + flushTimer）
         this.worldRuntime?.clearChunkRuntimeResidue?.(chunk.cx, chunk.cz);
 
-        // 6. 释放显存并从活动 chunk 集合移除
+        // 6. 从待初始化队列中移除
+        const initIdx = this._pendingChunkInitQueue.indexOf(chunk);
+        if (initIdx !== -1) this._pendingChunkInitQueue.splice(initIdx, 1);
+
+        // 7. 释放显存并从活动 chunk 集合移除
         chunk.dispose();
         this.chunks.delete(key);
         chunkTopologyChanged = true;
@@ -1170,6 +1197,7 @@ export class World {
       this.requestShadowMapUpdate('chunk-ready-count-changed');
     }
 
+    this._processChunkInitQueue();
     this.processAssemblyQueues();
     const flushBudget = this._computeGlobalInstanceFlushBudget(dt);
     const flushResult = this.globalInstancedMeshManager?.flushMutationQueue?.({

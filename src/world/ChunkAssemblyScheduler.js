@@ -130,7 +130,16 @@ export class ChunkAssemblyScheduler {
         if (stageResult === 'continue') {
           this.enqueue(chunk, stage, task.priority);
         } else if (stageResult === 'done' || stageResult === true) {
-          this.enqueue(chunk, 'runtime-build-mesh', task.priority);
+          const nextMeshStage = chunk._isPureLoadPath
+            ? 'runtime-build-mesh-fast'
+            : 'runtime-build-mesh';
+          this.enqueue(chunk, nextMeshStage, task.priority);
+        }
+        break;
+      case 'runtime-build-mesh-fast':
+        stageResult = chunk.assembleRuntimeBuildMeshFast();
+        if (stageResult === 'done' || stageResult === true) {
+          this.enqueue(chunk, 'runtime-finalize', task.priority);
         }
         break;
       case 'runtime-build-mesh':
