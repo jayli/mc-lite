@@ -322,26 +322,13 @@ git commit -m "perf(world): 废除 fast path，可中断 buildMesh 接受外部�
   test('同一 batch 内重复 coord 去重后 publish 无空洞', () => {
     const { manager } = createManager(8);
     const coord = encodeCoord(1, 2, 3);
-    // 构造含重复坐标的 meshData
-    const matrices = new Float32Array(2 * 16);
-    const obj = new THREE.Object3D();
-    obj.position.set(1.5, 2.5, 3.5); obj.updateMatrix();
-    matrices.set(obj.matrix.elements, 0);
-    matrices.set(obj.matrix.elements, 16);
-    const meshData = [{
-      type: 'stone', count: 2,
-      matrices,
-      aoLow: new Float32Array([1, 1]),
-      aoHigh: new Float32Array([1, 1]),
-      orientation: new Float32Array([0, 0]),
-      instanceIndexMap: { [coord]: 0, [coord]: 1 } // 同 key 会只保留后者，但模拟重复
-    }];
-    // 实际上 JS 对象同 key 只保留一个，所以用两条 meshData 模拟：
+    // 同一坐标出现在两个 meshData 条目中，模拟 batch 内重复
+    const mat = makeMatrix(1, 2, 3);
     const meshDataDup = [
-      { type: 'stone', count: 1, matrices: matrices.subarray(0, 16),
+      { type: 'stone', count: 1, matrices: new Float32Array(mat),
         aoLow: new Float32Array([1]), aoHigh: new Float32Array([1]),
         orientation: new Float32Array([0]), instanceIndexMap: { [coord]: 0 } },
-      { type: 'stone', count: 1, matrices: matrices.subarray(16, 32),
+      { type: 'stone', count: 1, matrices: new Float32Array(mat),
         aoLow: new Float32Array([1]), aoHigh: new Float32Array([1]),
         orientation: new Float32Array([0]), instanceIndexMap: { [coord]: 0 } }
     ];

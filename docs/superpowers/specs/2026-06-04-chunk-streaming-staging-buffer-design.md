@@ -1,7 +1,7 @@
-# Chunk 流式加载 Staging Buffer + 原子切换设计 (v4.3)
+# Chunk 流式加载 Staging Buffer + 原子切换设计 (v4.5)
 
 > 日期: 2026-06-04
-> 修订: v4.3 — finalize 完整顺序、空 chunk 处理、staging 背压
+> 修订: v4.5 — batch.cursor 防空洞、_assemblyPumpActive 防重入、finalize 完整顺序
 > 状态: approved
 > 目标: 消除奔跑过程中加载 chunk 的卡顿和画面闪烁
 
