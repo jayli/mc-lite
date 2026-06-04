@@ -1,10 +1,10 @@
-# Chunk 流式加载 Staging Buffer 实施计划 (v4)
+# Chunk 流式加载 Staging Buffer 实施计划 (v4.1)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 消除玩家奔跑过程中加载 chunk 时的卡顿和画面闪烁。Staging 数据与 TypeBuffer 完全隔离（独立 typed arrays），publish 时一帧写入。
 
-**Architecture:** Staging zone 持有独立的 per-chunk typed arrays，不写 TypeBuffer、不注册 coordToRef。prepare 阶段分帧将 meshDataArray 转为 compact batch。publish 阶段一帧内预扩容 + Float32Array.set 批量写入 + 注册索引 + count bump。chunk.isReady 仅在 publish 后设置。每帧最多 publish 1 个 chunk（~0.5-0.8ms）。
+**Architecture:** Staging zone 持有独立的 per-chunk 连续 Float32Array，不写 TypeBuffer、不注册 coordToRef。prepare 阶段分帧填充预分配的连续 Float32Array。publish 阶段一帧内预扩容 + `Float32Array.set` 连续拷贝 + 注册索引 + count bump + finalizeNonDeferredPhase。assembly 链路在 `runtime-finalize` 后中断，不 enqueue `finalize`/`non-deferred-finalize`，等 publish 后执行。`publishNextReadyChunk` 统一返回 `chunkKey | null`。
 
 **Tech Stack:** Three.js 0.184.0 (WebGPURenderer + TSL Node Material), ES Modules, Web Workers, Playwright
 
@@ -91,7 +91,18 @@
         }
         break;
       case 'runtime-finalize':
-        // ... unchanged ...
+        stageResult = chunk.assembleRuntimeFinalizePhase();
+        if (stageResult === 'continue') {
+          this.enqueue(chunk, stage, task.priority);
+        } else if (stageResult === 'done' || stageResult === true) {
+          // 关键变更：如果 chunk 处于 staged 状态，中断链路
+          // 不 enqueue finalize/non-deferred-finalize，等 publish 后执行
+          if (chunk.renderState === 'staged') {
+            chunk.loadState = 'awaiting-publish';
+          } else {
+            this.enqueue(chunk, 'finalize', task.priority);
+          }
+        }
         break;
     }
     // ... existing perf recording ...
@@ -279,7 +290,7 @@ Expected: FAIL
     for (const [chunkKey, staged] of this.stagingZone) {
       if (processed >= maxBlocks || now() - start >= maxMs) break;
       if (!staged.prepareState) {
-        staged.prepareState = { compactBatch: new Map(), dataCursor: 0, entryCursor: 0, complete: false };
+        this._initPrepareState(staged);
       }
       const ps = staged.prepareState;
       if (ps.complete) continue;
@@ -289,21 +300,24 @@ Expected: FAIL
         const { type, matrices, aoLow, aoHigh, orientation, instanceIndexMap } = data;
         const renderKey = this.getRenderKey(type);
         const entries = Object.entries(instanceIndexMap || {});
-
-        if (!ps.compactBatch.has(renderKey)) {
-          ps.compactBatch.set(renderKey, { type, coords: [], matrices: [], aoLow: [], aoHigh: [], orientation: [] });
-        }
         const batch = ps.compactBatch.get(renderKey);
+        if (!batch) { ps.dataCursor++; ps.entryCursor = 0; continue; }
 
         while (ps.entryCursor < entries.length && processed < maxBlocks && now() - start < maxMs) {
           const [coordText, sourceIndex] = entries[ps.entryCursor];
           const coord = Number(coordText);
+          const writePos = batch.cursor;
 
-          batch.coords.push(coord);
-          batch.matrices.push(matrices.subarray(sourceIndex * MATRIX_STRIDE, sourceIndex * MATRIX_STRIDE + MATRIX_STRIDE));
-          batch.aoLow.push(aoLow?.[sourceIndex] ?? 1);
-          batch.aoHigh.push(aoHigh?.[sourceIndex] ?? 1);
-          batch.orientation.push(orientation?.[sourceIndex] ?? 0);
+          // 写入预分配的连续 Float32Array
+          batch.coords[writePos] = coord;
+          batch.matrices.set(
+            matrices.subarray(sourceIndex * MATRIX_STRIDE, sourceIndex * MATRIX_STRIDE + MATRIX_STRIDE),
+            writePos * MATRIX_STRIDE
+          );
+          batch.aoLow[writePos] = aoLow?.[sourceIndex] ?? 1;
+          batch.aoHigh[writePos] = aoHigh?.[sourceIndex] ?? 1;
+          batch.orientation[writePos] = orientation?.[sourceIndex] ?? 0;
+          batch.cursor++;
 
           ps.entryCursor++;
           processed++;
@@ -317,11 +331,36 @@ Expected: FAIL
 
       if (ps.dataCursor >= staged.meshDataArray.length) {
         ps.complete = true;
-        // 释放 meshDataArray 引用，减少内存占用
         staged.meshDataArray = null;
       }
     }
     return processed;
+  }
+
+  _initPrepareState(staged) {
+    // 统计每个 renderKey 的总块数，预分配连续 Float32Array
+    const typeCounts = new Map();
+    for (const data of staged.meshDataArray) {
+      const renderKey = this.getRenderKey(data.type);
+      const entries = Object.entries(data.instanceIndexMap || {});
+      typeCounts.set(renderKey, (typeCounts.get(renderKey) || 0) + entries.length);
+    }
+
+    const compactBatch = new Map();
+    for (const [renderKey, count] of typeCounts) {
+      compactBatch.set(renderKey, {
+        type: renderKey,
+        coords: new Array(count),
+        matrices: new Float32Array(count * MATRIX_STRIDE),
+        aoLow: new Float32Array(count),
+        aoHigh: new Float32Array(count),
+        orientation: new Float32Array(count),
+        count,
+        cursor: 0
+      });
+    }
+
+    staged.prepareState = { compactBatch, dataCursor: 0, entryCursor: 0, complete: false };
   }
 
   publishPreparedChunk(chunkKey) {
@@ -330,32 +369,33 @@ Expected: FAIL
 
     const ps = staged.prepareState;
 
-    // 对每个 type：预扩容 + 批量写入 + 注册索引
     if (!this.chunkToCoords.has(chunkKey)) this.chunkToCoords.set(chunkKey, new Set());
     const chunkCoords = this.chunkToCoords.get(chunkKey);
 
     for (const [renderKey, batch] of ps.compactBatch) {
       const buffer = this.getOrCreateBuffer(batch.type);
-      const batchCount = batch.coords.length;
+      const batchCount = batch.count;
 
       // 预扩容
       buffer.ensureCapacity(buffer.count + batchCount);
 
-      // 批量写入 matrix
       const baseIndex = buffer.count;
+
+      // 连续批量拷贝 matrices（单次 set，非逐块）
+      buffer.mesh.instanceMatrix.array.set(batch.matrices, baseIndex * MATRIX_STRIDE);
+
+      // 连续批量拷贝 AO / orientation
+      const attrAoLow = buffer.mesh.geometry.getAttribute('aAoLow');
+      const attrAoHigh = buffer.mesh.geometry.getAttribute('aAoHigh');
+      const attrOrientation = buffer.mesh.geometry.getAttribute('aOrientation');
+      if (attrAoLow) attrAoLow.array.set(batch.aoLow, baseIndex);
+      if (attrAoHigh) attrAoHigh.array.set(batch.aoHigh, baseIndex);
+      if (attrOrientation) attrOrientation.array.set(batch.orientation, baseIndex);
+
+      // 注册索引（逐坐标，无法批量化）
       for (let i = 0; i < batchCount; i++) {
-        const writeIndex = baseIndex + i;
-        buffer.mesh.instanceMatrix.array.set(batch.matrices[i], writeIndex * MATRIX_STRIDE);
-
-        const attrAoLow = buffer.mesh.geometry.getAttribute('aAoLow');
-        const attrAoHigh = buffer.mesh.geometry.getAttribute('aAoHigh');
-        const attrOrientation = buffer.mesh.geometry.getAttribute('aOrientation');
-        if (attrAoLow) attrAoLow.array[writeIndex] = batch.aoLow[i];
-        if (attrAoHigh) attrAoHigh.array[writeIndex] = batch.aoHigh[i];
-        if (attrOrientation) attrOrientation.array[writeIndex] = batch.orientation[i];
-
-        // 注册索引
         const coord = batch.coords[i];
+        const writeIndex = baseIndex + i;
         buffer.coordToIndex.set(coord, writeIndex);
         buffer.indexToCoord[writeIndex] = coord;
         this.coordToRef.set(coord, { renderKey, index: writeIndex, chunkKey });
@@ -379,6 +419,10 @@ Expected: FAIL
     return true;
   }
 
+  /**
+   * 每帧调用，最多 publish 1 个距离最近的 ready chunk。
+   * @returns {string|null} 被 publish 的 chunkKey，或 null
+   */
   publishNextReadyChunk(playerCx, playerCz) {
     let bestKey = null;
     let bestDist = Infinity;
@@ -387,8 +431,9 @@ Expected: FAIL
       const dist = this._getChunkDistance(chunkKey, playerCx, playerCz);
       if (dist < bestDist) { bestDist = dist; bestKey = chunkKey; }
     }
-    if (!bestKey) return false;
-    return this.publishPreparedChunk(bestKey);
+    if (!bestKey) return null;
+    const success = this.publishPreparedChunk(bestKey);
+    return success ? bestKey : null;
   }
 
   removeStagedChunk(chunkKey) {
@@ -506,14 +551,17 @@ git commit -m "feat(core): 独立 staging arrays + prepare + publish 两阶段�
 ```javascript
   _publishNextReadyChunk() {
     if (!this.globalInstancedMeshManager) return;
-    if (!this.frameBudgetScheduler.hasTimeFor(0.5)) return;
+    if (!this.frameBudgetScheduler.hasTimeFor(0.8)) return;
     const playerCx = Math.floor(this._lastPlayerPos.x / CHUNK_SIZE);
     const playerCz = Math.floor(this._lastPlayerPos.z / CHUNK_SIZE);
-    const published = this.globalInstancedMeshManager.publishNextReadyChunk(playerCx, playerCz);
-    if (published) {
-      // 找到对应 chunk，标记为 published + isReady
-      // publishNextReadyChunk 返回了 chunkKey（需要改接口返回 chunkKey）
-      // 或者遍历 chunks 找 renderState==='staged' + 刚被 publish 的
+    const publishedKey = this.globalInstancedMeshManager.publishNextReadyChunk(playerCx, playerCz);
+    if (publishedKey) {
+      const chunk = this.chunks.get(publishedKey);
+      if (chunk && !chunk.disposed) {
+        chunk.renderState = 'published';
+        // publish 后执行 finalize（设置 isReady=true, loadState='finalized'）
+        chunk.finalizeNonDeferredPhase();
+      }
       this._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
       this.runtimeIdleScheduler?.markBusy('chunk-published');
       this.requestShadowMapUpdate('chunk-published');
@@ -533,12 +581,12 @@ git commit -m "feat(core): 独立 staging arrays + prepare + publish 两阶段�
   }
 ```
 
-World 中：
+World 中（与 Task 3 Step 5 中的定义一致）：
 
 ```javascript
   _publishNextReadyChunk() {
     if (!this.globalInstancedMeshManager) return;
-    if (!this.frameBudgetScheduler.hasTimeFor(0.5)) return;
+    if (!this.frameBudgetScheduler.hasTimeFor(0.8)) return;
     const playerCx = Math.floor(this._lastPlayerPos.x / CHUNK_SIZE);
     const playerCz = Math.floor(this._lastPlayerPos.z / CHUNK_SIZE);
     const publishedKey = this.globalInstancedMeshManager.publishNextReadyChunk(playerCx, playerCz);
@@ -546,8 +594,7 @@ World 中：
       const chunk = this.chunks.get(publishedKey);
       if (chunk && !chunk.disposed) {
         chunk.renderState = 'published';
-        chunk.isReady = true;
-        this.onChunkFinalized(chunk, { deferAORefresh: true });
+        chunk.finalizeNonDeferredPhase();
       }
       this._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
       this.runtimeIdleScheduler?.markBusy('chunk-published');
@@ -739,8 +786,7 @@ constructor 追加：
       const chunk = this.chunks.get(publishedKey);
       if (chunk && !chunk.disposed) {
         chunk.renderState = 'published';
-        chunk.isReady = true;
-        this.onChunkFinalized(chunk, { deferAORefresh: true });
+        chunk.finalizeNonDeferredPhase();
       }
       this._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
       this.runtimeIdleScheduler?.markBusy('chunk-published');
@@ -959,7 +1005,7 @@ git commit -m "test(perf): 自动化奔跑压测 — p95/p99 + long task 统计"
 
 1. **Staging 与 TypeBuffer 完全隔离**：staging 数据是独立 JS arrays，不写 TypeBuffer、不注册 coordToRef。所有现有 add/remove/patch/updateAO/resolveHit 方法完全不知道 staging 的存在。
 
-2. **isReady 仅在 publish 后设置**：buildMeshes 完成后 chunk 进入 `renderState='staged'`，`isReady` 仍为 false。World 在 `_publishNextReadyChunk` 成功后设置 `chunk.isReady = true` 并调用 `onChunkFinalized`。
+2. **isReady 仅在 publish 后设置**：buildMeshes 完成后 chunk 进入 `renderState='staged'`，assembly 链路在 `runtime-finalize` 后中断（不 enqueue `finalize`/`non-deferred-finalize`）。World 在 `_publishNextReadyChunk` 成功后调用 `chunk.finalizeNonDeferredPhase()`（设置 isReady=true、loadState='finalized'、onChunkFinalized）。
 
 3. **每帧最多 publish 1 个 chunk**：`publishNextReadyChunk` 按距离排序只返回 1 个 chunkKey。受 FrameBudgetScheduler 剩余时间 ≥ 0.8ms 门槛控制。
 

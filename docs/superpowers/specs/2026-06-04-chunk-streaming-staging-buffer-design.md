@@ -1,7 +1,7 @@
-# Chunk 流式加载 Staging Buffer + 原子切换设计 (v4)
+# Chunk 流式加载 Staging Buffer + 原子切换设计 (v4.1)
 
 > 日期: 2026-06-04
-> 修订: v4 — 放弃 shared buffer reservation，改为独立 staging arrays
+> 修订: v4.1 — 修复 finalize 状态机、compact batch、接口一致性
 > 状态: approved
 > 目标: 消除奔跑过程中加载 chunk 的卡顿和画面闪烁
 
@@ -40,13 +40,19 @@
 ```
 创建 → 数据加载 → hydrate → 可中断 buildMesh(分帧) → meshData 就绪
                                                           ↓
-                                              写入独立 Staging Arrays (不可见，chunk.renderState='staged')
+                                              写入独立 Staging Arrays (chunk.renderState='staged')
                                                           ↓
-                                              分帧 prepare：构建 compact write batch
+                                              runtime-finalize（实体恢复，不涉及渲染）
                                                           ↓
-                                              publish(一帧)：预扩容 + 写入 TypeBuffer + count bump
+                                              *** 链路中断：不 enqueue finalize/non-deferred-finalize ***
                                                           ↓
-                                              chunk.renderState='published', isReady=true
+                                              分帧 prepare：构建 compact Float32Array batch
+                                                          ↓
+                                              publish(一帧)：预扩容 + Float32Array.set + 注册索引 + count bump
+                                                          ↓
+                                              chunk.renderState='published'
+                                                          ↓
+                                              执行 finalizeNonDeferredPhase → isReady=true, loadState='finalized'
                                                           ↓
                                               雾内自然渐显
 ```
@@ -56,7 +62,11 @@
 - `'staged'` — meshData 已就绪，在 staging arrays 中等待 publish
 - `'published'` — 已提交到 TypeBuffer，渲染可见
 
-**`isReady` 语义变更**：`isReady = true` 仅在 `renderState === 'published'` 之后设置。在 `buildMeshes` 完成但未 publish 时，`isReady` 保持 false。这确保 AO refresh、shadow update、交互逻辑不会误认为 chunk 已可见。
+**`isReady` / finalize 状态机闭环**：
+- `assembleRuntimeFinalizePhase()`（实体恢复）完成后，如果 `renderState === 'staged'`，**不 enqueue `finalize`/`non-deferred-finalize`**
+- `isReady = true` 和 `loadState = 'finalized'` 仅在 publish 后执行
+- World 在 `_publishNextReadyChunk` 成功后调用 `chunk.finalizeNonDeferredPhase()`
+- 这确保 AO refresh、shadow update、交互逻辑不会误认为 chunk 已可见
 
 ### 核心概念 1: 独立 Staging Arrays（不写 TypeBuffer）
 
@@ -85,22 +95,29 @@
 - `addVisibleBlock`/`removeVisibleBlock`/`updateAO` 等方法完全不知道 staging 的存在
 - 活跃区的所有操作（add/remove/swap-remove/patch/consolidation）正常运行，不受影响
 
-### 核心概念 2: Prepare 阶段（分帧，构建 compact batch）
+### 核心概念 2: Prepare 阶段（分帧，构建 compact Float32Array）
 
-Prepare 将原始 meshDataArray 转换为按 type 分组的连续 TypedArray batch：
+Prepare 将原始 meshDataArray 转换为按 type 分组的**连续 Float32Array**：
 
 ```javascript
-// prepare 输出：每个 type 一个 compact batch
+// prepare 输出：每个 type 一个 compact batch（真正的连续 TypedArray）
 compactBatch = Map<renderKey, {
-  coords: number[],         // 坐标列表
-  entries: object[],        // { type, orientation }
-  matrices: Float32Array,   // 连续 16*n floats
-  aoLow: Float32Array,
+  coords: number[],           // 坐标列表
+  type: string,               // 方块类型
+  matrices: Float32Array,     // 预分配连续 Float32Array(count * 16)
+  aoLow: Float32Array,        // 预分配连续 Float32Array(count)
   aoHigh: Float32Array,
   orientation: Float32Array,
-  count: number
+  count: number,              // 方块数
+  cursor: number              // 分帧填充进度
 }>
 ```
+
+**工作方式**：
+1. 首次访问某 chunk 的 prepare：预分配目标大小的连续 Float32Array
+2. 分帧填充：每帧在预算内向 Float32Array 中逐块写入数据，推进 cursor
+3. cursor === count 时标记该 batch 完成
+4. publish 时直接 `buffer.instanceMatrix.array.set(batch.matrices, baseIndex * 16)`（单次连续拷贝）
 
 Prepare 可跨帧（受预算限制），因为它只操作 staging 自己的数据结构。
 
@@ -108,18 +125,22 @@ Prepare 可跨帧（受预算限制），因为它只操作 staging 自己的数
 
 Publish 在单帧内完成：
 1. **预扩容**：对每个 type 的 buffer，`ensureCapacity(count + batch.count)`
-2. **批量写入**：使用 `TypedArray.set()` 批量拷贝 matrices 到 TypeBuffer
-3. **注册索引**：写入 coordToRef/chunkToCoords/coordToIndex/indexToCoord
-4. **Bump count**：`buffer.count += batch.count; mesh.count = buffer.count`
-5. **标记 needsUpdate**
+2. **批量写入**：`buffer.instanceMatrix.array.set(batch.matrices, baseIndex * 16)` — 单次连续拷贝
+3. **AO/orientation**：同样 `Float32Array.set(batch.aoLow, baseIndex)` 连续拷贝
+4. **注册索引**：逐坐标 `coordToRef.set`、`coordToIndex.set`、`chunkToCoords.add`
+5. **Bump count**：`buffer.count += batch.count; mesh.count = buffer.count`
+6. **标记 needsUpdate**
+7. **执行 finalizeNonDeferredPhase**：设置 isReady=true、loadState='finalized'
 
 **Publish 成本预估**：
-- 预扩容：0ms（通常 capacity 足够）或 0.2ms（一次 mesh 替换）
-- 批量写入：`Float32Array.set()` 对 3000 块 ≈ 0.15ms
+- 预扩容：0ms（通常 capacity 足够，因 hints 已调大）
+- 批量写入：`Float32Array.set()` 连续拷贝 3000*16 floats ≈ 0.05ms
+- AO/orientation set：3 × `Float32Array.set()` ≈ 0.02ms
 - 索引注册：3000 × Map.set ≈ 0.3ms
-- 总计：~0.5-0.8ms/chunk
+- finalizeNonDeferredPhase：~0.1ms
+- 总计：~0.5ms/chunk
 
-**每帧最多 publish 1 个 chunk**，受 FrameBudgetScheduler 剩余时间控制。
+**每帧最多 publish 1 个 chunk**，受 `FrameBudgetScheduler.hasTimeFor(0.8)` 控制。
 
 ### 核心概念 4: 实时帧预算 Scheduler
 
