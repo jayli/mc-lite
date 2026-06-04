@@ -1,4 +1,4 @@
-# Chunk 流式加载 Staging Buffer 实施计划 (v4.3)
+# Chunk 流式加载 Staging Buffer 实施计划 (v4.5)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -319,6 +319,40 @@ git commit -m "perf(world): 废除 fast path，可中断 buildMesh 接受外部�
     assertEqual(manager.getStagedChunkKeys().length, 0, '不进入 staging zone');
   });
 
+  test('同一 batch 内重复 coord 去重后 publish 无空洞', () => {
+    const { manager } = createManager(8);
+    const coord = encodeCoord(1, 2, 3);
+    // 构造含重复坐标的 meshData
+    const matrices = new Float32Array(2 * 16);
+    const obj = new THREE.Object3D();
+    obj.position.set(1.5, 2.5, 3.5); obj.updateMatrix();
+    matrices.set(obj.matrix.elements, 0);
+    matrices.set(obj.matrix.elements, 16);
+    const meshData = [{
+      type: 'stone', count: 2,
+      matrices,
+      aoLow: new Float32Array([1, 1]),
+      aoHigh: new Float32Array([1, 1]),
+      orientation: new Float32Array([0, 0]),
+      instanceIndexMap: { [coord]: 0, [coord]: 1 } // 同 key 会只保留后者，但模拟重复
+    }];
+    // 实际上 JS 对象同 key 只保留一个，所以用两条 meshData 模拟：
+    const meshDataDup = [
+      { type: 'stone', count: 1, matrices: matrices.subarray(0, 16),
+        aoLow: new Float32Array([1]), aoHigh: new Float32Array([1]),
+        orientation: new Float32Array([0]), instanceIndexMap: { [coord]: 0 } },
+      { type: 'stone', count: 1, matrices: matrices.subarray(16, 32),
+        aoLow: new Float32Array([1]), aoHigh: new Float32Array([1]),
+        orientation: new Float32Array([0]), instanceIndexMap: { [coord]: 0 } }
+    ];
+    manager.stageMeshDataForChunk('0,0', meshDataDup);
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+    manager.publishPreparedChunk('0,0');
+
+    assertEqual(manager.buffers.get('stone').count, 1, '去重后只有 1 个实例');
+    assertEqual(manager.coordToRef.size, 1, 'coordToRef 只有 1 个');
+  });
+
   test('publishNextReadyChunk 每次只 publish 1 个', () => {
     const { manager } = createManager(16);
     manager.stageMeshDataForChunk('0,0', makeMeshData([{ x: 1, y: 2, z: 3 }]));
@@ -470,8 +504,11 @@ Expected: FAIL
     const chunkCoords = this.chunkToCoords.get(chunkKey);
 
     for (const [renderKey, batch] of ps.compactBatch) {
+      // 使用 cursor（实际写入数）而非 count（预估数），去重后可能 cursor < count
+      const batchCount = batch.cursor;
+      if (batchCount === 0) continue;
+
       const buffer = this.getOrCreateBuffer(batch.type);
-      const batchCount = batch.count;
 
       // 冲突处理：如果 batch 中的坐标已存在于活跃区，先移除旧实例
       for (let i = 0; i < batchCount; i++) {
@@ -481,21 +518,23 @@ Expected: FAIL
         }
       }
 
-      // 预扩容（在冲突处理后，count 可能已变化）
+      // 预扩容（在冲突处理后，buffer.count 可能已变化）
       buffer.ensureCapacity(buffer.count + batchCount);
 
       const baseIndex = buffer.count;
 
-      // 连续批量拷贝 matrices（单次 set，非逐块）
-      buffer.mesh.instanceMatrix.array.set(batch.matrices, baseIndex * MATRIX_STRIDE);
+      // 连续批量拷贝（只拷贝 cursor 范围，不含尾部未填充区域）
+      buffer.mesh.instanceMatrix.array.set(
+        batch.matrices.subarray(0, batchCount * MATRIX_STRIDE),
+        baseIndex * MATRIX_STRIDE
+      );
 
-      // 连续批量拷贝 AO / orientation
       const attrAoLow = buffer.mesh.geometry.getAttribute('aAoLow');
       const attrAoHigh = buffer.mesh.geometry.getAttribute('aAoHigh');
       const attrOrientation = buffer.mesh.geometry.getAttribute('aOrientation');
-      if (attrAoLow) attrAoLow.array.set(batch.aoLow, baseIndex);
-      if (attrAoHigh) attrAoHigh.array.set(batch.aoHigh, baseIndex);
-      if (attrOrientation) attrOrientation.array.set(batch.orientation, baseIndex);
+      if (attrAoLow) attrAoLow.array.set(batch.aoLow.subarray(0, batchCount), baseIndex);
+      if (attrAoHigh) attrAoHigh.array.set(batch.aoHigh.subarray(0, batchCount), baseIndex);
+      if (attrOrientation) attrOrientation.array.set(batch.orientation.subarray(0, batchCount), baseIndex);
 
       // 注册索引（逐坐标，无法批量化）
       for (let i = 0; i < batchCount; i++) {
@@ -822,6 +861,7 @@ import { FrameBudgetScheduler } from '../core/FrameBudgetScheduler.js';
 constructor 追加：
 ```javascript
     this.frameBudgetScheduler = new FrameBudgetScheduler({ targetFps: 100, safetyMarginMs: 2 });
+    this._assemblyPumpActive = false;
 ```
 
 - [ ] **Step 2: 新增调度方法**
@@ -842,6 +882,16 @@ constructor 追加：
     const chunk = this._pendingChunkInitQueue.shift();
     if (!chunk || chunk.disposed) return;
     this._requestRuntimeChunkRecord(chunk);
+  }
+
+  _processAssemblyBudgeted() {
+    if (this._assemblyPumpActive) return;
+    this._assemblyPumpActive = true;
+    const budgetMs = Math.min(this.frameBudgetScheduler.getRemainingMs() * 0.4, 3);
+    void this.chunkAssemblyScheduler
+      .processWithinBudget({ budgetMs, maxTasks: 20 })
+      .catch(err => console.warn('[World] assembly pump error', err))
+      .finally(() => { this._assemblyPumpActive = false; });
   }
 
   _processStagingPrepare() {
@@ -892,8 +942,7 @@ constructor 追加：
       }
 
       if (!isStagingBackpressured && this.frameBudgetScheduler.hasTimeFor(1.0)) {
-        const budgetMs = Math.min(this.frameBudgetScheduler.getRemainingMs() * 0.4, 3);
-        this.chunkAssemblyScheduler.processWithinBudget({ budgetMs, maxTasks: 20 });
+        this._processAssemblyBudgeted();
       }
 
       if (this.frameBudgetScheduler.hasTimeFor(0.5)) {
