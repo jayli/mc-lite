@@ -1,4 +1,4 @@
-# Chunk 流式加载 Staging Buffer 实施计划 (v4.1)
+# Chunk 流式加载 Staging Buffer 实施计划 (v4.3)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -291,6 +291,32 @@ git commit -m "perf(world): 废除 fast path，可中断 buildMesh 接受外部�
     // 不应有重复：count 仍然是 1
     assertEqual(manager.buffers.get('stone').count, 1, 'publish 后无重复实例');
     assertEqual(manager.coordToRef.get(coord).chunkKey, '0,0', 'ref 应更新为新 chunkKey');
+  });
+
+  test('publish 处理不同 type 的坐标冲突', () => {
+    const { manager } = createManager(8);
+    const coord = encodeCoord(1, 2, 3);
+    // 活跃区：dirt
+    manager.addVisibleBlock(coord, { type: 'dirt', orientation: 0 }, '1,1', {
+      matrix: makeMatrix(1, 2, 3), aoLow: 1, aoHigh: 1, orientation: 0
+    });
+    assertEqual(manager.buffers.get('dirt').count, 1, 'dirt buffer 初始 1');
+
+    // staging：同坐标但 stone
+    manager.stageMeshDataForChunk('0,0', makeMeshData([{ x: 1, y: 2, z: 3 }], 'stone'));
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+    manager.publishPreparedChunk('0,0');
+
+    assertEqual(manager.buffers.get('dirt').count, 0, 'dirt 旧实例应被移除');
+    assertEqual(manager.buffers.get('stone').count, 1, 'stone 新实例应存在');
+    assertEqual(manager.coordToRef.get(coord).renderKey, 'stone', 'ref 应指向 stone');
+  });
+
+  test('空 meshDataArray staging 返回 0，chunk 可正常 finalize', () => {
+    const { manager } = createManager(8);
+    const result = manager.stageMeshDataForChunk('0,0', []);
+    assertEqual(result, 0, '空数据返回 0');
+    assertEqual(manager.getStagedChunkKeys().length, 0, '不进入 staging zone');
   });
 
   test('publishNextReadyChunk 每次只 publish 1 个', () => {
@@ -596,7 +622,10 @@ git commit -m "feat(core): 独立 staging arrays + prepare + publish 两阶段�
       let result;
       if (isInitialBuild) {
         result = this.world.globalInstancedMeshManager.stageMeshDataForChunk(chunkKey, meshDataArray);
-        this.renderState = 'staged';
+        // 只有有可渲染方块时才设 staged；空 chunk 走原 finalize 链路
+        if (result > 0) {
+          this.renderState = 'staged';
+        }
       } else {
         result = this.world.globalInstancedMeshManager.patchChunkVisibleBlocks(chunkKey, meshDataArray);
       }
@@ -633,8 +662,9 @@ git commit -m "feat(core): 独立 staging arrays + prepare + publish 两阶段�
       const chunk = this.chunks.get(publishedKey);
       if (chunk && !chunk.disposed) {
         chunk.renderState = 'published';
-        // 同步执行 finalize（finalizeNonDeferredPhase 虽标 async 但内部全同步）
-        chunk.finalizeNonDeferredPhase(); // fire-and-forget: 立即 resolve，无实际 await
+        chunk.loadState = 'entities-built'; // 恢复，使 finalizeAssemblyPhase 检查通过
+        chunk.finalizeAssemblyPhase(); // 清理 dirtyBlocks/timer/deferred flags
+        void chunk.finalizeNonDeferredPhase().catch(() => {}); // 设 isReady/finalized
       }
       this._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
       this.runtimeIdleScheduler?.markBusy('chunk-published');
@@ -827,6 +857,11 @@ constructor 追加：
   _processChunkInitBudgeted() {
     if (this._pendingChunkInitQueue.length === 0) return;
     if (!this.frameBudgetScheduler.hasTimeFor(0.3)) return;
+
+    // 背压：staging 积压过多时暂停 init，等消化
+    const MAX_STAGED_CHUNKS = 6;
+    const stagedCount = this.globalInstancedMeshManager?.getStagedChunkKeys().length || 0;
+    if (stagedCount >= MAX_STAGED_CHUNKS) return;
 
     const playerCx = Math.floor(this._lastPlayerPos.x / CHUNK_SIZE);
     const playerCz = Math.floor(this._lastPlayerPos.z / CHUNK_SIZE);
@@ -1080,6 +1115,8 @@ git commit -m "test(perf): 自动化奔跑压测 — p95/p99 + long task 统计"
 ## 注意事项
 
 1. **Staging 与 TypeBuffer 完全隔离**：staging 数据是独立 JS arrays，不写 TypeBuffer、不注册 coordToRef。所有现有 add/remove/patch/updateAO/resolveHit 方法完全不知道 staging 的存在。
+
+0. **processWithinBudget async 说明**：`ChunkAssemblyScheduler.processWithinBudget()` 标记为 `async`，当前 World.update() 也不 await 它（现有行为）。这是安全的：while 循环内的 `await _runTask()` 对于 staged chunk 路径全部是同步（runtime-hydrate/runtime-build-mesh/runtime-finalize 都是同步方法），Promise 立即 resolve。唯一真正 async 的 `non-deferred-finalize` stage 在 staged 路径中不再被 enqueue。对 bootstrap 路径保持现有行为不变。
 
 2. **isReady 仅在 publish 后设置**：buildMeshes 完成后 chunk 进入 `renderState='staged'`，assembly 链路在 `runtime-finalize` 后中断（不 enqueue `finalize`/`non-deferred-finalize`）。World 在 `_publishNextReadyChunk` 成功后调用 `chunk.finalizeNonDeferredPhase()`（设置 isReady=true、loadState='finalized'、onChunkFinalized）。
 

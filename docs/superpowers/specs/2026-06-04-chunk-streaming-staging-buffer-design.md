@@ -1,7 +1,7 @@
-# Chunk 流式加载 Staging Buffer + 原子切换设计 (v4.1)
+# Chunk 流式加载 Staging Buffer + 原子切换设计 (v4.3)
 
 > 日期: 2026-06-04
-> 修订: v4.1 — 修复 finalize 状态机、compact batch、接口一致性
+> 修订: v4.3 — finalize 完整顺序、空 chunk 处理、staging 背压
 > 状态: approved
 > 目标: 消除奔跑过程中加载 chunk 的卡顿和画面闪烁
 
@@ -50,7 +50,9 @@
                                                           ↓
                                               publish(一帧)：预扩容 + Float32Array.set + 注册索引 + count bump
                                                           ↓
-                                              chunk.renderState='published'
+                                              chunk.renderState='published', loadState 恢复为 'entities-built'
+                                                          ↓
+                                              执行 finalizeAssemblyPhase (清理 dirtyBlocks/timer)
                                                           ↓
                                               执行 finalizeNonDeferredPhase → isReady=true, loadState='finalized'
                                                           ↓
@@ -63,10 +65,24 @@
 - `'published'` — 已提交到 TypeBuffer，渲染可见
 
 **`isReady` / finalize 状态机闭环**：
-- `assembleRuntimeFinalizePhase()`（实体恢复）完成后，如果 `renderState === 'staged'`，**不 enqueue `finalize`/`non-deferred-finalize`**
+- `assembleRuntimeFinalizePhase()`（实体恢复）完成后，如果 `renderState === 'staged'`，设 `loadState = 'awaiting-publish'`，**不 enqueue `finalize`/`non-deferred-finalize`**
 - `isReady = true` 和 `loadState = 'finalized'` 仅在 publish 后执行
-- World 在 `_publishNextReadyChunk` 成功后调用 `chunk.finalizeNonDeferredPhase()`
+- World 在 `_publishNextReadyChunk` 成功后：
+  1. `chunk.renderState = 'published'`
+  2. `chunk.loadState = 'entities-built'`（恢复，使 finalizeAssemblyPhase 检查通过）
+  3. `chunk.finalizeAssemblyPhase()`（清理 dirtyBlocks/timer、deferred flags）
+  4. `void chunk.finalizeNonDeferredPhase()`（设 isReady=true、loadState='finalized'、触发 onChunkFinalized）
 - 这确保 AO refresh、shadow update、交互逻辑不会误认为 chunk 已可见
+
+**空 chunk 处理**：
+- 如果 `stageMeshDataForChunk` 返回 0（无可渲染方块），不设 `renderState='staged'`
+- 此时 scheduler 正常 enqueue `finalize`/`non-deferred-finalize`，走原链路
+- 空 chunk 最终正常 `isReady=true`（只是没有可见方块）
+
+**Staging 背压**：
+- 当 staging zone 中积压超过 `MAX_STAGED_CHUNKS`（默认 6）时，暂停 chunk init 和 assembly
+- 这防止 worker/assembly 产出速度快于 prepare+publish 的消费速度
+- staging 消化后自动恢复
 
 ### 核心概念 1: 独立 Staging Arrays（不写 TypeBuffer）
 
