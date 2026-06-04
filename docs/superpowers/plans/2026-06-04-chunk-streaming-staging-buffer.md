@@ -8,6 +8,8 @@
 
 **Tech Stack:** Three.js 0.184.0 (WebGPURenderer + TSL Node Material), ES Modules, Web Workers, Playwright
 
+**Task 依赖顺序说明：** Task 1 先落地 `renderState` 字段（供后续 Task 中 scheduler 链路中断判断使用），Task 2 实现 staging/prepare/publish，Task 3 将 buildMeshes 对接到 staging 并设 renderState='staged'。
+
 ---
 
 ## 文件结构
@@ -27,11 +29,19 @@
 
 ---
 
-### Task 1: [P0] 废除 fast path + 可中断路径接受外部预算
+### Task 1: [P0] 状态机基础 + 废除 fast path + 可中断路径接受外部预算
 
 **Files:**
 - Modify: `src/world/Chunk.js:858-887`
 - Modify: `src/world/ChunkAssemblyScheduler.js:49-152`
+
+- [ ] **Step 0: Chunk 新增 renderState 字段（Task 1 先落地，供后续 step 使用）**
+
+在 `Chunk` constructor 中（`this.isReady = false` 附近）追加：
+
+```javascript
+    this.renderState = 'none'; // 'none' | 'staged' | 'published'
+```
 
 - [ ] **Step 1: 修改 assembleRuntimeBuildMeshPhase 接受外部 maxMs**
 
@@ -227,6 +237,62 @@ git commit -m "perf(world): 废除 fast path，可中断 buildMesh 接受外部�
     assertEqual(manager.coordToRef.size, 0, '无 coordToRef 残留');
   });
 
+  test('分帧 prepare：cursor 跨帧正确推进', () => {
+    const { manager } = createManager(8);
+    const blocks = [
+      { x: 1, y: 2, z: 3 }, { x: 2, y: 2, z: 3 },
+      { x: 3, y: 2, z: 3 }, { x: 4, y: 2, z: 3 }
+    ];
+    manager.stageMeshDataForChunk('0,0', makeMeshData(blocks));
+
+    // 第一帧：只 prepare 2 个
+    manager.prepareStagedBlocks({ maxBlocks: 2, maxMs: 100 });
+    assertEqual(manager.isPrepareComplete('0,0'), false, '应未完成');
+
+    // 第二帧：prepare 剩余 2 个
+    manager.prepareStagedBlocks({ maxBlocks: 2, maxMs: 100 });
+    assertEqual(manager.isPrepareComplete('0,0'), true, '应已完成');
+
+    // publish 验证全部方块
+    manager.publishPreparedChunk('0,0');
+    assertEqual(manager.coordToRef.size, 4, '4 个方块都应可见');
+  });
+
+  test('publish 前 staged 坐标对 resolveHit/updateAO/remove 不可见', () => {
+    const { manager } = createManager(8);
+    manager.stageMeshDataForChunk('0,0', makeMeshData([{ x: 1, y: 2, z: 3 }]));
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+
+    const coord = encodeCoord(1, 2, 3);
+    assertEqual(manager.coordToRef.has(coord), false, 'staged coord 不在 coordToRef');
+    assertEqual(manager.updateAO(coord, 0.5, 0.5), false, 'updateAO 应返回 false');
+    assertEqual(manager.removeVisibleBlock(coord), false, 'remove 应返回 false');
+
+    // publish 后可见
+    manager.publishPreparedChunk('0,0');
+    assertTrue(manager.coordToRef.has(coord), 'publish 后应可见');
+    assertEqual(manager.updateAO(coord, 0.5, 0.5), true, 'publish 后 updateAO 应成功');
+  });
+
+  test('publish 处理已存在坐标冲突', () => {
+    const { manager } = createManager(8);
+    const coord = encodeCoord(1, 2, 3);
+    // 先通过活跃区添加该坐标
+    manager.addVisibleBlock(coord, { type: 'stone', orientation: 0 }, '1,1', {
+      matrix: makeMatrix(1, 2, 3), aoLow: 0.5, aoHigh: 0.5, orientation: 0
+    });
+    assertEqual(manager.buffers.get('stone').count, 1, '活跃区 1 个');
+
+    // staging 同一坐标（新数据）
+    manager.stageMeshDataForChunk('0,0', makeMeshData([{ x: 1, y: 2, z: 3, aoLow: 0.9, aoHigh: 0.9 }]));
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+    manager.publishPreparedChunk('0,0');
+
+    // 不应有重复：count 仍然是 1
+    assertEqual(manager.buffers.get('stone').count, 1, 'publish 后无重复实例');
+    assertEqual(manager.coordToRef.get(coord).chunkKey, '0,0', 'ref 应更新为新 chunkKey');
+  });
+
   test('publishNextReadyChunk 每次只 publish 1 个', () => {
     const { manager } = createManager(16);
     manager.stageMeshDataForChunk('0,0', makeMeshData([{ x: 1, y: 2, z: 3 }]));
@@ -376,7 +442,15 @@ Expected: FAIL
       const buffer = this.getOrCreateBuffer(batch.type);
       const batchCount = batch.count;
 
-      // 预扩容
+      // 冲突处理：如果 batch 中的坐标已存在于活跃区，先移除旧实例
+      for (let i = 0; i < batchCount; i++) {
+        const coord = batch.coords[i];
+        if (this.coordToRef.has(coord)) {
+          this.removeVisibleBlock(coord, { commit: false });
+        }
+      }
+
+      // 预扩容（在冲突处理后，count 可能已变化）
       buffer.ensureCapacity(buffer.count + batchCount);
 
       const baseIndex = buffer.count;
@@ -559,8 +633,8 @@ git commit -m "feat(core): 独立 staging arrays + prepare + publish 两阶段�
       const chunk = this.chunks.get(publishedKey);
       if (chunk && !chunk.disposed) {
         chunk.renderState = 'published';
-        // publish 后执行 finalize（设置 isReady=true, loadState='finalized'）
-        chunk.finalizeNonDeferredPhase();
+        // 同步执行 finalize（finalizeNonDeferredPhase 虽标 async 但内部全同步）
+        chunk.finalizeNonDeferredPhase(); // fire-and-forget: 立即 resolve，无实际 await
       }
       this._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
       this.runtimeIdleScheduler?.markBusy('chunk-published');
@@ -980,7 +1054,9 @@ describe('Streaming Performance', (test) => {
     const longTasks = frameTimes.filter(t => t > 16.7).length;
 
     console.log(`[perf] frames=${frameTimes.length} p95=${p95.toFixed(1)}ms p99=${p99.toFixed(1)}ms longTasks=${longTasks}`);
-    assertTrue(p95 < 20, `p95=${p95.toFixed(1)}ms should be < 20ms`);
+    assertTrue(p95 < 16, `p95=${p95.toFixed(1)}ms should be < 16ms`);
+    assertTrue(p99 < 20, `p99=${p99.toFixed(1)}ms should be < 20ms`);
+    assertTrue(longTasks < frameTimes.length * 0.05, `longTasks=${longTasks} should be < 5% of frames`);
   });
 });
 ```
