@@ -4,7 +4,7 @@
 
 **Goal:** 消除玩家奔跑过程中加载 chunk 时的卡顿和画面闪烁。Staging 数据与 TypeBuffer 完全隔离（独立 typed arrays），publish 时一帧写入。
 
-**Architecture:** Staging zone 持有独立的 per-chunk 连续 Float32Array，不写 TypeBuffer、不注册 coordToRef。prepare 阶段分帧填充预分配的连续 Float32Array。publish 阶段一帧内预扩容 + `Float32Array.set` 连续拷贝 + 注册索引 + count bump + finalizeNonDeferredPhase。assembly 链路在 `runtime-finalize` 后中断，不 enqueue `finalize`/`non-deferred-finalize`，等 publish 后执行。`publishNextReadyChunk` 统一返回 `chunkKey | null`。
+**Architecture:** Staging zone 持有独立的 per-chunk 连续 Float32Array，不写 TypeBuffer、不注册 coordToRef。prepare 阶段分帧填充预分配的连续 Float32Array（含 seenCoords 去重）。publish 阶段一帧内预扩容 + `Float32Array.set` 连续拷贝 + 冲突处理 + 注册索引 + count bump + finalizeAssemblyPhase + finalizeNonDeferredPhase。assembly 链路在 `runtime-finalize` 后中断，不 enqueue `finalize`/`non-deferred-finalize`，等 publish 后执行。staging 背压统一暂停 init 和 assembly。`publishNextReadyChunk` 返回 `chunkKey | null`。
 
 **Tech Stack:** Three.js 0.184.0 (WebGPURenderer + TSL Node Material), ES Modules, Web Workers, Playwright
 
@@ -398,6 +398,11 @@ Expected: FAIL
         while (ps.entryCursor < entries.length && processed < maxBlocks && now() - start < maxMs) {
           const [coordText, sourceIndex] = entries[ps.entryCursor];
           const coord = Number(coordText);
+
+          // 去重：同一 batch 内重复坐标跳过（上游通常唯一，此为防御性检查）
+          if (ps.seenCoords.has(coord)) { ps.entryCursor++; continue; }
+          ps.seenCoords.add(coord);
+
           const writePos = batch.cursor;
 
           // 写入预分配的连续 Float32Array
@@ -452,7 +457,7 @@ Expected: FAIL
       });
     }
 
-    staged.prepareState = { compactBatch, dataCursor: 0, entryCursor: 0, complete: false };
+    staged.prepareState = { compactBatch, dataCursor: 0, entryCursor: 0, complete: false, seenCoords: new Set() };
   }
 
   publishPreparedChunk(chunkKey) {
@@ -673,39 +678,7 @@ git commit -m "feat(core): 独立 staging arrays + prepare + publish 两阶段�
   }
 ```
 
-为了让 World 知道哪个 chunk 被 publish 了，修改 `publishNextReadyChunk` 返回值：
-
-```javascript
-  // GlobalInstancedMeshManager 中
-  publishNextReadyChunk(playerCx, playerCz) {
-    // ... find bestKey ...
-    if (!bestKey) return null;
-    const success = this.publishPreparedChunk(bestKey);
-    return success ? bestKey : null;
-  }
-```
-
-World 中（与 Task 3 Step 5 中的定义一致）：
-
-```javascript
-  _publishNextReadyChunk() {
-    if (!this.globalInstancedMeshManager) return;
-    if (!this.frameBudgetScheduler.hasTimeFor(0.8)) return;
-    const playerCx = Math.floor(this._lastPlayerPos.x / CHUNK_SIZE);
-    const playerCz = Math.floor(this._lastPlayerPos.z / CHUNK_SIZE);
-    const publishedKey = this.globalInstancedMeshManager.publishNextReadyChunk(playerCx, playerCz);
-    if (publishedKey) {
-      const chunk = this.chunks.get(publishedKey);
-      if (chunk && !chunk.disposed) {
-        chunk.renderState = 'published';
-        chunk.finalizeNonDeferredPhase();
-      }
-      this._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
-      this.runtimeIdleScheduler?.markBusy('chunk-published');
-      this.requestShadowMapUpdate('chunk-published');
-    }
-  }
-```
+注：`publishNextReadyChunk` 返回 `chunkKey | null` 已在 Task 2 Step 4 中定义。`_publishNextReadyChunk` 的完整实现见 Step 5 上方。此处不再重复。
 
 - [ ] **Step 6: 运行测试**
 
@@ -857,11 +830,7 @@ constructor 追加：
   _processChunkInitBudgeted() {
     if (this._pendingChunkInitQueue.length === 0) return;
     if (!this.frameBudgetScheduler.hasTimeFor(0.3)) return;
-
-    // 背压：staging 积压过多时暂停 init，等消化
-    const MAX_STAGED_CHUNKS = 6;
-    const stagedCount = this.globalInstancedMeshManager?.getStagedChunkKeys().length || 0;
-    if (stagedCount >= MAX_STAGED_CHUNKS) return;
+    // 注意：背压检查已在 update() 调用处统一判断，此处无需重复
 
     const playerCx = Math.floor(this._lastPlayerPos.x / CHUNK_SIZE);
     const playerCz = Math.floor(this._lastPlayerPos.z / CHUNK_SIZE);
@@ -895,7 +864,9 @@ constructor 追加：
       const chunk = this.chunks.get(publishedKey);
       if (chunk && !chunk.disposed) {
         chunk.renderState = 'published';
-        chunk.finalizeNonDeferredPhase();
+        chunk.loadState = 'entities-built';
+        chunk.finalizeAssemblyPhase();
+        void chunk.finalizeNonDeferredPhase().catch(() => {});
       }
       this._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
       this.runtimeIdleScheduler?.markBusy('chunk-published');
@@ -912,9 +883,15 @@ constructor 追加：
     if (this.bootstrapState.phase === 'runtime-streaming') {
       this.frameBudgetScheduler.beginFrame();
 
-      this._processChunkInitBudgeted();
+      // 统一背压判断
+      const isStagingBackpressured =
+        (this.globalInstancedMeshManager?.getStagedChunkKeys().length || 0) >= 6;
 
-      if (this.frameBudgetScheduler.hasTimeFor(1.0)) {
+      if (!isStagingBackpressured) {
+        this._processChunkInitBudgeted();
+      }
+
+      if (!isStagingBackpressured && this.frameBudgetScheduler.hasTimeFor(1.0)) {
         const budgetMs = Math.min(this.frameBudgetScheduler.getRemainingMs() * 0.4, 3);
         this.chunkAssemblyScheduler.processWithinBudget({ budgetMs, maxTasks: 20 });
       }
@@ -1052,7 +1029,7 @@ import { describe } from './runner.js';
 import { assertTrue } from './assert.js';
 
 describe('Streaming Performance', (test) => {
-  test('持续移动 10 秒帧率 p95 < 20ms', async () => {
+  test('持续移动 10 秒帧率 p95 < 16ms, p99 < 20ms', async () => {
     const game = window.game;
     if (!game?.world?.bootstrapState) { console.warn('[perf] skip'); return; }
 
@@ -1116,9 +1093,13 @@ git commit -m "test(perf): 自动化奔跑压测 — p95/p99 + long task 统计"
 
 1. **Staging 与 TypeBuffer 完全隔离**：staging 数据是独立 JS arrays，不写 TypeBuffer、不注册 coordToRef。所有现有 add/remove/patch/updateAO/resolveHit 方法完全不知道 staging 的存在。
 
-0. **processWithinBudget async 说明**：`ChunkAssemblyScheduler.processWithinBudget()` 标记为 `async`，当前 World.update() 也不 await 它（现有行为）。这是安全的：while 循环内的 `await _runTask()` 对于 staged chunk 路径全部是同步（runtime-hydrate/runtime-build-mesh/runtime-finalize 都是同步方法），Promise 立即 resolve。唯一真正 async 的 `non-deferred-finalize` stage 在 staged 路径中不再被 enqueue。对 bootstrap 路径保持现有行为不变。
+0. **processWithinBudget async 近似同步说明**：`ChunkAssemblyScheduler.processWithinBudget()` 标记为 `async`，World.update() 不 await 它（现有行为保持不变）。在 staged 路径中所有 task 方法（runtime-hydrate/runtime-build-mesh/runtime-finalize）都是同步的，但 `await _runTask()` 仍会把后续循环迭代推入 microtask，导致帧预算精度略有偏差。当前方案的处理：
+   - staged 路径中 `non-deferred-finalize` 不再被 enqueue，消除了唯一的真正 async stage
+   - 帧预算是近似值而非精确保证（安全余量 2ms 已覆盖 microtask 延迟）
+   - 加 `_assemblyPumpActive` 防重入标志，避免连续帧的 processWithinBudget 并发执行
+   - 后续如果帧预算精度成为瓶颈，可将 runtime-streaming 路径改为纯同步的 `processRuntimeSync()` 方法
 
-2. **isReady 仅在 publish 后设置**：buildMeshes 完成后 chunk 进入 `renderState='staged'`，assembly 链路在 `runtime-finalize` 后中断（不 enqueue `finalize`/`non-deferred-finalize`）。World 在 `_publishNextReadyChunk` 成功后调用 `chunk.finalizeNonDeferredPhase()`（设置 isReady=true、loadState='finalized'、onChunkFinalized）。
+2. **isReady 仅在 publish 后设置**：buildMeshes 完成后 chunk 进入 `renderState='staged'`，assembly 链路在 `runtime-finalize` 后中断（不 enqueue `finalize`/`non-deferred-finalize`）。World 在 `_publishNextReadyChunk` 成功后执行完整 finalize 顺序：`loadState='entities-built'` → `finalizeAssemblyPhase()` → `finalizeNonDeferredPhase()`。
 
 3. **每帧最多 publish 1 个 chunk**：`publishNextReadyChunk` 按距离排序只返回 1 个 chunkKey。受 FrameBudgetScheduler 剩余时间 ≥ 0.8ms 门槛控制。
 
