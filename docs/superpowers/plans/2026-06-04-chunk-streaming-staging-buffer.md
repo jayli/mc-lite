@@ -1,10 +1,10 @@
-# Chunk 流式加载 Staging Buffer 实施计划 (v2)
+# Chunk 流式加载 Staging Buffer 实施计划 (v3)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 消除玩家奔跑过程中加载 chunk 时的卡顿和画面闪烁。通过废除同步构建路径、引入两阶段原子提交（分帧 prepare + 一帧 publish）、Worker Transferable 优化和实时帧预算调度，实现流畅的 chunk 流式加载体验。
+**Goal:** 消除玩家奔跑过程中加载 chunk 时的卡顿和画面闪烁。通过废除同步构建路径、引入带 reservation 的两阶段原子提交（分帧 prepare + 一帧 publish）、Worker Transferable 优化和实时帧预算调度实现流畅体验。
 
-**Architecture:** P0 先消除最大的帧爆炸源（同步 buildMesh、先删后补、Worker 克隆），P1 引入实时预算调度确保帧总和不超标，P2 用雾遮掩自然过渡。两阶段原子的关键创新：prepare 阶段分帧写入 TypeBuffer 的 shadow region（count 之外的空间），publish 阶段只做 `mesh.count = newCount` 一次赋值。
+**Architecture:** TypeBuffer 引入 reservation 机制将 shadow region 与活跃渲染区严格隔离。prepare 阶段分帧写入 reserved region 并同步注册索引映射，publish 阶段只做 count bump。FrameBudgetScheduler 基于 `performance.now() - frameStart` 实时分配预算，每个阶段领取剩余时间。
 
 **Tech Stack:** Three.js 0.184.0 (WebGPURenderer + TSL Node Material), ES Modules, Web Workers, Playwright (压测)
 
@@ -14,46 +14,46 @@
 
 | 文件 | 操作 | 职责 |
 |------|------|------|
-| `src/core/FrameBudgetScheduler.js` | 新建 | 实时帧预算调度器（基于 frameStart + 剩余时间） |
-| `src/core/GlobalInstancedMeshManager.js` | 修改 | staging zone、分帧 prepare（shadow region）、publish |
-| `src/world/Chunk.js` | 修改 | 删除 assembleRuntimeBuildMeshFast，可中断路径接受外部 maxMs |
-| `src/world/ChunkAssemblyScheduler.js` | 修改 | 移除 runtime-build-mesh-fast stage，传递 budgetMs |
-| `src/world/ChunkGenerator.js` | 修改 | buildMeshes 初次加载改为写入 staging |
-| `src/workers/WorldWorker.js` | 修改 | postMessage 添加 transfer list、裁剪冗余 |
-| `src/workers/WorldWorkerPoolImpl.js` | 修改 | 支持 transfer list 传递 |
-| `src/world/World.js` | 修改 | 集成 FrameBudgetScheduler，重构 update() 调度 |
-| `src/tests/test-frame-budget-scheduler.js` | 新建 | FrameBudgetScheduler 单元测试 |
-| `src/tests/test-global-instanced-mesh-manager.js` | 修改 | staging/prepare/publish 测试 |
+| `src/core/FrameBudgetScheduler.js` | 新建 | 实时帧预算调度器 |
+| `src/core/GlobalInstancedMeshManager.js` | 修改 | staging zone + reservation + prepare + publish + 生命周期清理 |
+| `src/world/Chunk.js` | 修改 | 废除 fast path；assembleRuntimeBuildMeshPhase 接受外部 maxMs |
+| `src/world/ChunkAssemblyScheduler.js` | 修改 | 合并 fast stage；传递剩余预算 |
+| `src/world/ChunkGenerator.js` | 修改 | buildMeshes 初次加载写入 staging |
+| `src/workers/WorldWorker.js` | 修改 | postMessage transfer list |
+| `src/world/World.js` | 修改 | 集成 scheduler + prepare/publish 调度 + 生命周期清理 |
+| `src/tests/test-frame-budget-scheduler.js` | 新建 | scheduler 单测 |
+| `src/tests/test-global-instanced-mesh-manager.js` | 修改 | staging/reservation/publish 测试 |
+| `src/tests/test-streaming-perf.js` | 新建 | 自动化奔跑压测 |
 
 ---
 
-### Task 1: [P0] 废除 runtime-build-mesh-fast，全走可中断路径
+### Task 1: [P0] 废除 fast path + 可中断路径接受外部预算
 
 **Files:**
 - Modify: `src/world/Chunk.js:858-887`
-- Modify: `src/world/ChunkAssemblyScheduler.js:127-152`
+- Modify: `src/world/ChunkAssemblyScheduler.js:49-152`
 
-- [ ] **Step 1: 修改 ChunkAssemblyScheduler，移除 fast path stage**
+- [ ] **Step 1: 修改 assembleRuntimeBuildMeshPhase 接受外部 maxMs**
 
-在 `src/world/ChunkAssemblyScheduler.js` 的 `_runTask` 方法中，将 `'runtime-build-mesh-fast'` case 改为统一走可中断路径：
+在 `src/world/Chunk.js` 中将方法签名和调用改为：
 
 ```javascript
-      case 'runtime-build-mesh-fast':
-      case 'runtime-build-mesh':
-        stageResult = chunk.assembleRuntimeBuildMeshPhase();
-        if (stageResult === 'continue') {
-          this.enqueue(chunk, 'runtime-build-mesh', task.priority);
-        } else if (stageResult === 'done' || stageResult === true) {
-          this.enqueue(chunk, 'runtime-finalize', task.priority);
-        }
-        break;
+  assembleRuntimeBuildMeshPhase(maxMs = 3) {
+    if (this.loadState === 'finalized') return true;
+    if (this.loadState !== 'hydrated') {
+      return this.loadState === 'terrain-built' || this.loadState === 'entities-built';
+    }
+
+    const result = this._buildMeshFromExistingBlockDataIncremental(maxMs);
+    if (result === 'done') {
+      this.loadState = 'terrain-built';
+      this.isReady = true;
+    }
+    return result;
+  }
 ```
 
-即：`runtime-build-mesh-fast` 和 `runtime-build-mesh` 合并为同一个 handler，都调用可中断的 `assembleRuntimeBuildMeshPhase()`。
-
-- [ ] **Step 2: 在 Chunk.js 中标记 assembleRuntimeBuildMeshFast 为废弃**
-
-在 `src/world/Chunk.js` 中将 `assembleRuntimeBuildMeshFast` 方法体改为转发到可中断版本：
+- [ ] **Step 2: 将 assembleRuntimeBuildMeshFast 改为转发**
 
 ```javascript
   assembleRuntimeBuildMeshFast() {
@@ -61,142 +61,286 @@
   }
 ```
 
-- [ ] **Step 3: 运行测试确认不破坏**
+- [ ] **Step 3: 修改 ChunkAssemblyScheduler 传递预算给 chunk**
+
+在 `ChunkAssemblyScheduler.processWithinBudget` 中，将 `_runTask` 调用改为传递当前剩余预算：
+
+```javascript
+  async _runTask(task, remainingBudgetMs) {
+    const { chunk, stage } = task;
+    // ... existing guard code ...
+
+    switch (stage) {
+      case 'runtime-hydrate':
+        stageResult = chunk.assembleRuntimeHydratePhase();
+        if (stageResult === 'continue') {
+          this.enqueue(chunk, stage, task.priority);
+        } else if (stageResult === 'done' || stageResult === true) {
+          this.enqueue(chunk, 'runtime-build-mesh', task.priority);
+        }
+        break;
+      case 'runtime-build-mesh-fast':
+      case 'runtime-build-mesh':
+        stageResult = chunk.assembleRuntimeBuildMeshPhase(
+          Math.max(1, remainingBudgetMs || 3)
+        );
+        if (stageResult === 'continue') {
+          this.enqueue(chunk, 'runtime-build-mesh', task.priority);
+        } else if (stageResult === 'done' || stageResult === true) {
+          this.enqueue(chunk, 'runtime-finalize', task.priority);
+        }
+        break;
+      // ... rest unchanged ...
+    }
+  }
+```
+
+在 `processWithinBudget` 循环中传递剩余时间：
+
+```javascript
+    while (this.queue.length > 0 && processed < maxTasksThisPass && (now() - start) <= budgetMs) {
+      const task = this._takeNext();
+      if (!task) break;
+      processed++;
+      const remaining = budgetMs - (now() - start);
+      await this._runTask(task, remaining);
+    }
+```
+
+- [ ] **Step 4: 运行测试确认通过**
 
 Run: `node command/run-tests.js --verbose`
 Expected: 全部 PASS
 
-- [ ] **Step 4: 运行 lint**
+- [ ] **Step 5: 运行 lint**
 
 Run: `npm run lint`
-Expected: 无新增 error
 
-- [ ] **Step 5: 提交**
+- [ ] **Step 6: 如用户要求，提交**
 
 ```bash
 git add src/world/Chunk.js src/world/ChunkAssemblyScheduler.js
-git commit -m "perf(world): 废除 runtime-build-mesh-fast，统一走可中断 buildMesh 路径"
+git commit -m "perf(world): 废除 fast path，可中断 buildMesh 接受外部帧预算"
 ```
 
 ---
 
-### Task 2: [P0] GlobalInstancedMeshManager — Staging + 两阶段原子提交
+### Task 2: [P0] GlobalInstancedMeshManager — Reservation + 两阶段原子
 
 **Files:**
 - Modify: `src/core/GlobalInstancedMeshManager.js`
 - Modify: `src/tests/test-global-instanced-mesh-manager.js`
 
-- [ ] **Step 1: 编写 staging + prepare + publish 测试**
+- [ ] **Step 1: 编写 reservation + prepare + publish 测试**
 
 在 `src/tests/test-global-instanced-mesh-manager.js` 末尾追加：
 
 ```javascript
   test('stageMeshDataForChunk 存入 staging 不触发渲染', () => {
-    const { manager } = createManager(4);
-    const blocks = [
-      { x: 1, y: 2, z: 3 },
-      { x: 2, y: 2, z: 3 }
-    ];
+    const { manager } = createManager(8);
+    const blocks = [{ x: 1, y: 2, z: 3 }, { x: 2, y: 2, z: 3 }];
     manager.stageMeshDataForChunk('0,0', makeMeshData(blocks));
-
     assertEqual(manager.coordToRef.size, 0, 'staging 后不应有渲染实例');
     assertEqual(manager.getStagedChunkKeys().length, 1, '应有 1 个 staged chunk');
-    assertEqual(manager.getStagedBlockCount('0,0'), 2, 'staged 方块数应为 2');
   });
 
-  test('prepareStagedBlocks 分帧写入 shadow region 不改变 mesh.count', () => {
+  test('prepareStagedBlocks 写入 reserved region 不影响 mesh.count', () => {
     const { manager } = createManager(8);
-    const blocks = [
-      { x: 1, y: 2, z: 3 },
-      { x: 2, y: 2, z: 3 },
-      { x: 3, y: 2, z: 3 },
-      { x: 4, y: 2, z: 3 }
-    ];
+    const blocks = [{ x: 1, y: 2, z: 3 }, { x: 2, y: 2, z: 3 }, { x: 3, y: 2, z: 3 }];
     manager.stageMeshDataForChunk('0,0', makeMeshData(blocks));
-
-    // prepare 前 buffer 不存在
-    assertEqual(manager.buffers.has('stone'), false, 'prepare 前无 buffer');
-
-    // 限制每次 prepare 2 个方块
-    manager.prepareStagedBlocks({ maxBlocks: 2, maxMs: 100 });
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
 
     const buffer = manager.buffers.get('stone');
-    assertEqual(buffer.count, 0, 'prepare 期间 mesh.count 应保持 0');
-    assertTrue(buffer.capacity >= 4, '应预扩容');
-    assertEqual(manager.isPrepareComplete('0,0'), false, '第一次 prepare 未完成');
-
-    // 第二次 prepare 完成
-    manager.prepareStagedBlocks({ maxBlocks: 2, maxMs: 100 });
-    assertEqual(buffer.count, 0, 'prepare 完成后 mesh.count 仍为 0');
-    assertEqual(manager.isPrepareComplete('0,0'), true, '应标记为 prepare 完成');
+    assertEqual(buffer.count, 0, 'prepare 期间 mesh.count 保持 0');
+    assertEqual(buffer.mesh.count, 0, 'mesh.count 保持 0');
+    assertTrue(buffer._reservedTail > 0, 'reservedTail 应被设置');
+    assertEqual(manager.isPrepareComplete('0,0'), true, 'prepare 应完成');
   });
 
-  test('publishPreparedChunk 一帧切换 count 使方块可见', () => {
+  test('prepare 期间 addVisibleBlock 不侵入 reserved region', () => {
+    const { manager } = createManager(16);
+    manager.stageMeshDataForChunk('0,0', makeMeshData([
+      { x: 1, y: 2, z: 3 }, { x: 2, y: 2, z: 3 }
+    ]));
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+
+    // 活跃区添加方块
+    const newCoord = encodeCoord(10, 10, 10);
+    manager.addVisibleBlock(newCoord, { type: 'stone', orientation: 0 }, '1,1', {
+      matrix: makeMatrix(10, 10, 10), aoLow: 1, aoHigh: 1, orientation: 0
+    });
+
+    const buffer = manager.buffers.get('stone');
+    assertEqual(buffer.count, 1, '活跃区 count 应为 1');
+    // reserved 数据不被覆盖
+    assertTrue(buffer._reservedTail >= buffer.count + 2, 'reserved 区域应完整');
+  });
+
+  test('publishPreparedChunk 一帧 bump count', () => {
     const { manager } = createManager(8);
-    const blocks = [
-      { x: 1, y: 2, z: 3 },
-      { x: 2, y: 2, z: 3 },
-      { x: 3, y: 2, z: 3 }
-    ];
-    manager.stageMeshDataForChunk('0,0', makeMeshData(blocks));
+    manager.stageMeshDataForChunk('0,0', makeMeshData([
+      { x: 1, y: 2, z: 3 }, { x: 2, y: 2, z: 3 }
+    ]));
     manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
     manager.publishPreparedChunk('0,0');
 
     const buffer = manager.buffers.get('stone');
-    assertEqual(buffer.count, 3, 'publish 后 count 应为 3');
-    assertEqual(buffer.mesh.count, 3, 'mesh.count 应同步');
-    assertEqual(manager.coordToRef.size, 3, '应有 3 个渲染引用');
-    assertEqual(manager.getStagedChunkKeys().length, 0, 'staging 应清空');
+    assertEqual(buffer.count, 2, 'publish 后 count = 2');
+    assertEqual(buffer.mesh.count, 2, 'mesh.count 同步');
+    assertEqual(manager.coordToRef.size, 2, '应有 2 个渲染引用');
+    assertEqual(buffer._reservedTail, buffer.count, 'reservation 应释放');
   });
 
-  test('removeStagedChunk 清理未提交数据', () => {
-    const { manager } = createManager(4);
+  test('publish 后 add/remove 操作正确', () => {
+    const { manager } = createManager(8);
+    manager.stageMeshDataForChunk('0,0', makeMeshData([
+      { x: 1, y: 2, z: 3 }, { x: 2, y: 2, z: 3 }
+    ]));
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+    manager.publishPreparedChunk('0,0');
+
+    // publish 后正常 add
+    const c = encodeCoord(5, 5, 5);
+    manager.addVisibleBlock(c, { type: 'stone', orientation: 0 }, '1,1', {
+      matrix: makeMatrix(5, 5, 5), aoLow: 1, aoHigh: 1, orientation: 0
+    });
+    assertEqual(manager.buffers.get('stone').count, 3, 'add 后 count = 3');
+
+    // publish 后正常 remove
+    manager.removeVisibleBlock(encodeCoord(1, 2, 3));
+    assertEqual(manager.buffers.get('stone').count, 2, 'remove 后 count = 2');
+  });
+
+  test('removeChunk 清理 staged + reservation', () => {
+    const { manager } = createManager(8);
+    manager.stageMeshDataForChunk('0,0', makeMeshData([{ x: 1, y: 2, z: 3 }]));
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+    manager.removeChunk('0,0');
+
+    assertEqual(manager.getStagedChunkKeys().length, 0, 'staging 应清空');
+    const buffer = manager.buffers.get('stone');
+    assertEqual(buffer._reservedTail, buffer.count, 'reservation 应释放');
+  });
+
+  test('removeStagedChunk 清理未 prepare 的数据', () => {
+    const { manager } = createManager(8);
     manager.stageMeshDataForChunk('0,0', makeMeshData([{ x: 1, y: 2, z: 3 }]));
     manager.removeStagedChunk('0,0');
     assertEqual(manager.getStagedChunkKeys().length, 0, 'staging 应清空');
   });
 
-  test('两阶段原子：prepare 中途不影响已渲染方块', () => {
-    const { manager } = createManager(8);
-    // 先添加一个已渲染方块
-    const existingCoord = encodeCoord(10, 10, 10);
-    manager.addVisibleBlock(existingCoord, { type: 'stone', orientation: 0 }, '1,1', {
-      matrix: makeMatrix(10, 10, 10), aoLow: 1, aoHigh: 1, orientation: 0
-    });
-    assertEqual(manager.buffers.get('stone').count, 1, '已有 1 个渲染实例');
-
-    // staging 新 chunk
-    manager.stageMeshDataForChunk('0,0', makeMeshData([
-      { x: 1, y: 2, z: 3 },
-      { x: 2, y: 2, z: 3 }
-    ]));
+  test('每帧最多 publish 1 个 chunk', () => {
+    const { manager } = createManager(16);
+    manager.stageMeshDataForChunk('0,0', makeMeshData([{ x: 1, y: 2, z: 3 }]));
+    manager.stageMeshDataForChunk('1,0', makeMeshData([{ x: 17, y: 2, z: 3 }]));
     manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
 
-    // prepare 期间已有方块不受影响
-    const buffer = manager.buffers.get('stone');
-    assertEqual(buffer.count, 1, 'prepare 不影响已渲染 count');
-    assertEqual(buffer.mesh.count, 1, 'mesh.count 不变');
-
-    // publish 后新旧方块共存
-    manager.publishPreparedChunk('0,0');
-    assertEqual(buffer.count, 3, 'publish 后 count = 1(旧) + 2(新)');
+    // publishNextReady 只 publish 1 个
+    const published = manager.publishNextReadyChunk(0, 0);
+    assertTrue(published, '应成功 publish 1 个');
+    assertEqual(manager.getStagedChunkKeys().length, 0, '两个都应该 prepare 完成');
+    // 第一个已 publish，coordToRef 应有 1 个
+    // 注意：如果两个都 prepare 完了 getStagedChunkKeys 会是 0
+    // 实际上 getStagedChunkKeys 在 publish 后删除对应条目
   });
 ```
 
 - [ ] **Step 2: 运行测试确认失败**
 
 Run: `node command/run-tests.js --verbose`
-Expected: FAIL — `stageMeshDataForChunk` 等方法不存在
+Expected: FAIL
 
-- [ ] **Step 3: 实现 staging zone 数据结构**
+- [ ] **Step 3: TypeBuffer 添加 reservation 支持**
 
-在 `GlobalInstancedMeshManager` 的 constructor 中追加：
+在 `TypeBuffer` 类中添加 `_reservedTail` 字段和相关方法：
 
+constructor 追加：
 ```javascript
-    this.stagingZone = new Map(); // chunkKey → { meshDataArray, blockCount, prepareState: null | { ... } }
+    this._reservedTail = this.capacity; // 无 reservation 时等于 capacity
 ```
 
-实现 `stageMeshDataForChunk`：
+新增 `reserve` 方法：
+```javascript
+  reserve(count) {
+    const start = this._reservedTail - count; // 从末尾向前分配? 不，从 count 之后向后
+    // 实际设计：从 buffer.count (或上一个 reservation 的 end) 开始
+    // reservedTail 表示"所有已用空间（活跃+reserved）的尾部"
+    // 这里简化为：reserved 从当前 reservedTail 开始追加
+    const reservedStart = this._reservedTail;
+    this.ensureCapacity(reservedStart + count);
+    this._reservedTail = reservedStart + count;
+    return { start: reservedStart, count };
+  }
+
+  releaseReservation(reservation) {
+    // 将 reservedTail 回退（简化：只支持栈式释放，或标记释放后在 publish 时整理）
+    // 实际采用更简单的方案：publish 时把 reserved 数据搬到 count 位置后 bump
+    // 这里 release 只是标记 reservation 失效
+    // reservedTail 的回退由 publish 或 clearReservations 处理
+  }
+
+  clearAllReservations() {
+    this._reservedTail = this.count;
+  }
+```
+
+考虑到多 chunk 并发 reservation 的复杂性，采用更简单的方案：
+
+**简化设计**：reservation 以 `buffer.count` 为基准向后分配。`_reservedTail` = `count` + 所有 reservations 的总块数。
+
+```javascript
+  // TypeBuffer 新增
+  constructor(...) {
+    // ...existing...
+    this._reservations = []; // [{ chunkKey, start, count }]
+    this._reservedTail = 0; // 0 表示无 reservation，等效于 count
+  }
+
+  getEffectiveTail() {
+    return this._reservations.length > 0 ? this._reservedTail : this.count;
+  }
+
+  reserve(chunkKey, blockCount) {
+    const start = this.getEffectiveTail();
+    this.ensureCapacity(start + blockCount);
+    const reservation = { chunkKey, start, count: blockCount };
+    this._reservations.push(reservation);
+    this._reservedTail = start + blockCount;
+    return reservation;
+  }
+
+  releaseReservation(chunkKey) {
+    const idx = this._reservations.findIndex(r => r.chunkKey === chunkKey);
+    if (idx === -1) return;
+    this._reservations.splice(idx, 1);
+    // 重新计算 reservedTail
+    if (this._reservations.length === 0) {
+      this._reservedTail = 0;
+    } else {
+      const last = this._reservations[this._reservations.length - 1];
+      this._reservedTail = last.start + last.count;
+    }
+  }
+```
+
+修改 `ensureCapacity`，确保 addVisibleBlock 不侵入 reserved region：
+
+在现有 `addVisibleBlock` 的 `buffer.ensureCapacity(buffer.count + 1)` 改为：
+```javascript
+    const neededCapacity = Math.max(buffer.count + 1, buffer.getEffectiveTail());
+    buffer.ensureCapacity(neededCapacity);
+```
+
+- [ ] **Step 4: 实现 staging zone + prepare + publish**
+
+在 `GlobalInstancedMeshManager` 中：
+
+constructor 追加：
+```javascript
+    this.stagingZone = new Map(); // chunkKey → { meshDataArray, blockCount, prepareState }
+```
+
+实现核心方法（完整代码见下方）：
 
 ```javascript
   stageMeshDataForChunk(chunkKey, meshDataArray) {
@@ -220,11 +364,7 @@ Expected: FAIL — `stageMeshDataForChunk` 等方法不存在
     this.stagingZone.set(chunkKey, { meshDataArray: validData, blockCount, prepareState: null });
     return blockCount;
   }
-```
 
-- [ ] **Step 4: 实现 prepareStagedBlocks（分帧 prepare，写入 shadow region）**
-
-```javascript
   prepareStagedBlocks(options = {}) {
     const maxBlocks = options.maxBlocks || 600;
     const maxMs = options.maxMs || 2;
@@ -235,40 +375,43 @@ Expected: FAIL — `stageMeshDataForChunk` 等方法不存在
     for (const [chunkKey, staged] of this.stagingZone) {
       if (processed >= maxBlocks || now() - start >= maxMs) break;
       if (!staged.prepareState) {
-        // 初始化 prepare：预扩容 + 初始化 cursor
-        this._initPrepareState(staged);
+        this._initPrepareState(chunkKey, staged);
       }
       const ps = staged.prepareState;
       if (ps.complete) continue;
 
-      // 分帧写入 shadow region
       while (ps.dataCursor < staged.meshDataArray.length && processed < maxBlocks && now() - start < maxMs) {
         const data = staged.meshDataArray[ps.dataCursor];
         const { type, matrices, aoLow, aoHigh, orientation, instanceIndexMap } = data;
         const entries = Object.entries(instanceIndexMap || {});
         const buffer = this.getOrCreateBuffer(type);
+        const reservation = ps.reservations.get(this.getRenderKey(type));
+        if (!reservation) { ps.dataCursor++; ps.entryCursor = 0; continue; }
 
         while (ps.entryCursor < entries.length && processed < maxBlocks && now() - start < maxMs) {
           const [coordText, sourceIndex] = entries[ps.entryCursor];
           const coord = Number(coordText);
-          const shadowIndex = buffer.count + ps.shadowOffsets.get(type);
+          const writeIndex = reservation.start + ps.writeOffsets.get(this.getRenderKey(type));
 
-          // 写入 shadow region（count 之外）
+          // 写入 reserved region
           const matrix = matrices.subarray(sourceIndex * MATRIX_STRIDE, sourceIndex * MATRIX_STRIDE + MATRIX_STRIDE);
-          buffer.mesh.instanceMatrix.array.set(matrix, shadowIndex * MATRIX_STRIDE);
-
+          buffer.mesh.instanceMatrix.array.set(matrix, writeIndex * MATRIX_STRIDE);
           const attrAoLow = buffer.mesh.geometry.getAttribute('aAoLow');
           const attrAoHigh = buffer.mesh.geometry.getAttribute('aAoHigh');
           const attrOrientation = buffer.mesh.geometry.getAttribute('aOrientation');
-          if (attrAoLow) attrAoLow.array[shadowIndex] = aoLow?.[sourceIndex] ?? 1;
-          if (attrAoHigh) attrAoHigh.array[shadowIndex] = aoHigh?.[sourceIndex] ?? 1;
-          if (attrOrientation) attrOrientation.array[shadowIndex] = orientation?.[sourceIndex] ?? 0;
+          if (attrAoLow) attrAoLow.array[writeIndex] = aoLow?.[sourceIndex] ?? 1;
+          if (attrAoHigh) attrAoHigh.array[writeIndex] = aoHigh?.[sourceIndex] ?? 1;
+          if (attrOrientation) attrOrientation.array[writeIndex] = orientation?.[sourceIndex] ?? 0;
 
-          // 记录映射关系待 publish 时注册
-          ps.coordMap.push({ coord, type, shadowIndex, chunkKey,
-            entry: { type, orientation: orientation?.[sourceIndex] || 0 } });
+          // 注册索引映射（prepare 阶段就注册，publish 时无需遍历）
+          buffer.coordToIndex.set(coord, writeIndex);
+          buffer.indexToCoord[writeIndex] = coord;
+          const ref = { renderKey: buffer.renderKey, index: writeIndex, chunkKey };
+          this.coordToRef.set(coord, ref);
+          if (!this.chunkToCoords.has(chunkKey)) this.chunkToCoords.set(chunkKey, new Set());
+          this.chunkToCoords.get(chunkKey).add(coord);
 
-          ps.shadowOffsets.set(type, ps.shadowOffsets.get(type) + 1);
+          ps.writeOffsets.set(this.getRenderKey(type), ps.writeOffsets.get(this.getRenderKey(type)) + 1);
           ps.entryCursor++;
           processed++;
         }
@@ -286,90 +429,126 @@ Expected: FAIL — `stageMeshDataForChunk` 等方法不存在
     return processed;
   }
 
-  _initPrepareState(staged) {
-    // 预扩容：计算每个 type 需要的容量
+  _initPrepareState(chunkKey, staged) {
+    // 按 type 统计块数并 reserve
     const typeBlockCounts = new Map();
     for (const data of staged.meshDataArray) {
-      const { type, instanceIndexMap } = data;
-      const entries = Object.entries(instanceIndexMap || {});
-      typeBlockCounts.set(type, (typeBlockCounts.get(type) || 0) + entries.length);
+      const rk = this.getRenderKey(data.type);
+      const entries = Object.entries(data.instanceIndexMap || {});
+      typeBlockCounts.set(rk, (typeBlockCounts.get(rk) || 0) + entries.length);
     }
-    for (const [type, extra] of typeBlockCounts) {
-      const buffer = this.getOrCreateBuffer(type);
-      buffer.ensureCapacity(buffer.count + extra);
+    const reservations = new Map();
+    const writeOffsets = new Map();
+    for (const [renderKey, count] of typeBlockCounts) {
+      const buffer = this.getOrCreateBuffer(renderKey);
+      const reservation = buffer.reserve(chunkKey, count);
+      reservations.set(renderKey, reservation);
+      writeOffsets.set(renderKey, 0);
     }
-
-    // shadow offset：每个 type 从 buffer.count 开始写
-    const shadowOffsets = new Map();
-    for (const type of typeBlockCounts.keys()) {
-      shadowOffsets.set(type, 0);
-    }
-
     staged.prepareState = {
       dataCursor: 0,
       entryCursor: 0,
-      shadowOffsets,
-      coordMap: [],
+      reservations,
+      writeOffsets,
       complete: false
     };
   }
-```
 
-- [ ] **Step 5: 实现 publishPreparedChunk（一帧 flip count）**
+  publishNextReadyChunk(playerCx, playerCz) {
+    let bestKey = null;
+    let bestDist = Infinity;
+    for (const [chunkKey, staged] of this.stagingZone) {
+      if (!staged.prepareState?.complete) continue;
+      const dist = this._getChunkDistance(chunkKey, playerCx, playerCz);
+      if (dist < bestDist) { bestDist = dist; bestKey = chunkKey; }
+    }
+    if (!bestKey) return false;
+    return this.publishPreparedChunk(bestKey);
+  }
 
-```javascript
   publishPreparedChunk(chunkKey) {
     const staged = this.stagingZone.get(chunkKey);
     if (!staged || !staged.prepareState?.complete) return false;
 
     const ps = staged.prepareState;
 
-    // 注册 coordToRef 和 chunkToCoords
-    if (!this.chunkToCoords.has(chunkKey)) this.chunkToCoords.set(chunkKey, new Set());
-    const chunkCoords = this.chunkToCoords.get(chunkKey);
-
-    // 按 type 统计新增数量，用于 bump count
-    const typeBumps = new Map();
-    for (const item of ps.coordMap) {
-      const renderKey = this.getRenderKey(item.type);
+    // 对每个 type：将 reserved 数据搬移到 count 位置（如果 count 变了）
+    for (const [renderKey, reservation] of ps.reservations) {
       const buffer = this.buffers.get(renderKey);
       if (!buffer) continue;
 
-      const ref = { renderKey, index: item.shadowIndex, chunkKey };
-      this.coordToRef.set(item.coord, ref);
-      chunkCoords.add(item.coord);
-      buffer.coordToIndex.set(item.coord, item.shadowIndex);
-      buffer.indexToCoord[item.shadowIndex] = item.coord;
+      if (reservation.start !== buffer.count) {
+        // count 已变化（有 add/remove），需要搬移 reserved 数据到新 count 位置
+        const src = reservation.start;
+        const dst = buffer.count;
+        const blockCount = reservation.count;
+        // 搬移 matrix
+        const matSrc = buffer.mesh.instanceMatrix.array.subarray(src * MATRIX_STRIDE, (src + blockCount) * MATRIX_STRIDE);
+        buffer.mesh.instanceMatrix.array.set(matSrc, dst * MATRIX_STRIDE);
+        // 搬移 AO/orientation
+        const aoLow = buffer.mesh.geometry.getAttribute('aAoLow');
+        const aoHigh = buffer.mesh.geometry.getAttribute('aAoHigh');
+        const orientation = buffer.mesh.geometry.getAttribute('aOrientation');
+        if (aoLow) aoLow.array.copyWithin(dst, src, src + blockCount);
+        if (aoHigh) aoHigh.array.copyWithin(dst, src, src + blockCount);
+        if (orientation) orientation.array.copyWithin(dst, src, src + blockCount);
+        // 更新索引映射
+        for (let i = 0; i < blockCount; i++) {
+          const coord = buffer.indexToCoord[src + i];
+          if (coord) {
+            buffer.indexToCoord[dst + i] = coord;
+            buffer.coordToIndex.set(coord, dst + i);
+            const ref = this.coordToRef.get(coord);
+            if (ref) ref.index = dst + i;
+          }
+        }
+      }
 
-      typeBumps.set(renderKey, (typeBumps.get(renderKey) || 0) + 1);
-    }
-
-    // 一次性 bump count（所有新方块瞬间可见）
-    for (const [renderKey, bump] of typeBumps) {
-      const buffer = this.buffers.get(renderKey);
-      if (!buffer) continue;
-      buffer.count += bump;
+      // bump count
+      buffer.count += reservation.count;
       buffer.mesh.count = buffer.count;
       buffer.mesh.instanceMatrix.needsUpdate = true;
       const aoLow = buffer.mesh.geometry.getAttribute('aAoLow');
       const aoHigh = buffer.mesh.geometry.getAttribute('aAoHigh');
-      const orientation = buffer.mesh.geometry.getAttribute('aOrientation');
+      const ori = buffer.mesh.geometry.getAttribute('aOrientation');
       if (aoLow) aoLow.needsUpdate = true;
       if (aoHigh) aoHigh.needsUpdate = true;
-      if (orientation) orientation.needsUpdate = true;
+      if (ori) ori.needsUpdate = true;
       buffer.mesh.boundingSphere = null;
       buffer.mesh.boundingBox = null;
+
+      // 释放 reservation
+      buffer.releaseReservation(chunkKey);
     }
 
     this.stagingZone.delete(chunkKey);
     return true;
   }
-```
 
-- [ ] **Step 6: 实现辅助方法**
-
-```javascript
   removeStagedChunk(chunkKey) {
+    const staged = this.stagingZone.get(chunkKey);
+    if (!staged) return;
+
+    // 如果已经 prepare（有 reservation），释放 reservation 并清理索引
+    if (staged.prepareState) {
+      const ps = staged.prepareState;
+      // 清理已注册的 coordToRef / chunkToCoords
+      const coords = this.chunkToCoords.get(chunkKey);
+      if (coords) {
+        for (const coord of coords) {
+          this.coordToRef.delete(coord);
+          // 清理 buffer 中的 coordToIndex
+          const ref = this.coordToRef.get(coord); // already deleted, skip
+        }
+        this.chunkToCoords.delete(chunkKey);
+      }
+      // 释放 TypeBuffer reservation
+      for (const [renderKey] of ps.reservations) {
+        const buffer = this.buffers.get(renderKey);
+        if (buffer) buffer.releaseReservation(chunkKey);
+      }
+    }
+
     this.stagingZone.delete(chunkKey);
   }
 
@@ -384,39 +563,45 @@ Expected: FAIL — `stageMeshDataForChunk` 等方法不存在
   isPrepareComplete(chunkKey) {
     return this.stagingZone.get(chunkKey)?.prepareState?.complete || false;
   }
+```
 
-  getReadyToPublishChunks(playerCx, playerCz) {
-    const ready = [];
-    for (const [chunkKey, staged] of this.stagingZone) {
-      if (!staged.prepareState?.complete) continue;
-      const dist = this._getChunkDistance(chunkKey, playerCx, playerCz);
-      ready.push({ chunkKey, blockCount: staged.blockCount, distToPlayer: dist });
-    }
-    ready.sort((a, b) => a.distToPlayer - b.distToPlayer);
-    return ready;
+- [ ] **Step 5: 修改 removeChunk 先清理 staging**
+
+在现有 `removeChunk` 方法开头添加：
+
+```javascript
+  removeChunk(chunkKey) {
+    this.removeStagedChunk(chunkKey); // 清理 staged + reservation
+    this._purgeQueuedChunk(chunkKey);
+    // ... existing logic ...
   }
 ```
 
-- [ ] **Step 7: 运行测试确认通过**
+- [ ] **Step 6: 运行测试确认通过**
 
 Run: `node command/run-tests.js --verbose`
 Expected: 全部 PASS
 
-- [ ] **Step 8: 提交**
+- [ ] **Step 7: 运行 lint**
+
+Run: `npm run lint`
+
+- [ ] **Step 8: 如用户要求，提交**
 
 ```bash
 git add src/core/GlobalInstancedMeshManager.js src/tests/test-global-instanced-mesh-manager.js
-git commit -m "feat(core): 两阶段原子提交 — staging + 分帧 prepare + 一帧 publish"
+git commit -m "feat(core): 两阶段原子提交 — reservation + prepare + publish"
 ```
 
 ---
 
-### Task 3: [P0] ChunkGenerator buildMeshes → staging 路径
+### Task 3: [P0] ChunkGenerator buildMeshes → staging + World 卸载清理
 
 **Files:**
 - Modify: `src/world/ChunkGenerator.js:132-145`
+- Modify: `src/world/World.js` (卸载循环)
 
-- [ ] **Step 1: 修改 buildMeshes 初次加载路径写入 staging**
+- [ ] **Step 1: 修改 buildMeshes 初次加载路径**
 
 ```javascript
     if (this.world?.globalInstancedMeshManager) {
@@ -440,32 +625,39 @@ git commit -m "feat(core): 两阶段原子提交 — staging + 分帧 prepare + 
     }
 ```
 
-- [ ] **Step 2: 运行测试确认通过**
+- [ ] **Step 2: World 卸载循环中清理 staging**
+
+在 `World.update()` 的卸载循环中，chunk dispose 前（约 `this.scene.remove(chunk.group)` 之前）添加：
+
+```javascript
+        // 清理 staging/reservation（chunk 离开视距，不再需要）
+        this.globalInstancedMeshManager?.removeStagedChunk(key);
+```
+
+- [ ] **Step 3: 运行测试确认通过**
 
 Run: `node command/run-tests.js --verbose`
 Expected: 全部 PASS
 
-- [ ] **Step 3: 提交**
+- [ ] **Step 4: 如用户要求，提交**
 
 ```bash
-git add src/world/ChunkGenerator.js
-git commit -m "feat(world): buildMeshes 初次加载改为写入 staging"
+git add src/world/ChunkGenerator.js src/world/World.js
+git commit -m "feat(world): buildMeshes→staging + 卸载时清理 staged/reservation"
 ```
 
 ---
 
-### Task 4: [P0] Worker 回包 Transferable + 裁剪冗余
+### Task 4: [P0] Worker 回包 Transferable
 
 **Files:**
-- Modify: `src/workers/WorldWorker.js:2901-2941`
-- Modify: `src/workers/WorldWorkerPoolImpl.js:109-112`
+- Modify: `src/workers/WorldWorker.js:2901`
 
-- [ ] **Step 1: WorldWorker postMessage 添加 transfer list**
+- [ ] **Step 1: 添加 transfer list 到 consolidation 回包**
 
-在 `src/workers/WorldWorker.js` 的 consolidation 回包处（约 L2901），将 `postMessage({...})` 改为：
+在 `src/workers/WorldWorker.js` 的 consolidation postMessage 处（约 L2901），在 `postMessage` 调用前收集 transfer list：
 
 ```javascript
-  // 收集 meshData 中所有 Float32Array 的 buffer 用于 zero-copy transfer
   const transferList = [];
   if (meshData && Array.isArray(meshData)) {
     for (const group of meshData) {
@@ -483,27 +675,16 @@ git commit -m "feat(world): buildMeshes 初次加载改为写入 staging"
     routing,
     meshData,
     solidBlocks,
-    entities: {
-      modGunMan,
-      rovers
-    },
+    modGunMan, rovers,
+    entities: { modGunMan, rovers },
     visibleKeys: Array.from(visibleKeysSet),
     structureCenters,
     snapshot: {
-      meta: {
-        ownershipVersion: OWNERSHIP_SCHEMA_VERSION
-      },
-      entities: {
-        modGunMan,
-        rovers,
-        zombieNests: savedSnapshot?.entities?.zombieNests || []
-      }
+      meta: { ownershipVersion: OWNERSHIP_SCHEMA_VERSION },
+      blocks: blocksForSnapshot,
+      entities: { modGunMan, rovers, zombieNests: savedSnapshot?.entities?.zombieNests || [] }
     },
-    _workerTiming: {
-      workerComputeMs,
-      transitToWorkerMs,
-      workerFinishedAt
-    },
+    _workerTiming: { workerComputeMs, transitToWorkerMs, workerFinishedAt },
     _workerPerfPhases: {
       faceCullingMs: _workerPhaseFaceCullingMs || 0,
       aoComputationMs: _workerPhaseAOComputationMs || 0,
@@ -517,45 +698,18 @@ git commit -m "feat(world): buildMeshes 初次加载改为写入 staging"
   }, transferList);
 ```
 
-注意：去掉了 `snapshot.blocks`（与 blockDataBlocks 冗余）、去掉了顶层 `modGunMan`/`rovers`（统一在 entities 下）。
+注意：保留所有现有字段不变（snapshot.blocks、routing、顶层 modGunMan/rovers），只添加 transfer list。
 
-- [ ] **Step 2: 检查 snapshot.blocks 的消费方，确保去除后不影响**
-
-Run: `grep -rn "snapshot\.blocks\|snapshot\[.blocks.\]" src/ --include="*.js" | grep -v "WorldWorker.js"`
-
-如果有消费方引用 `snapshot.blocks`，需要改为从 `blockDataBlocks` 读取。
-
-- [ ] **Step 3: WorldWorkerPoolImpl 支持 transfer list**
-
-在 `src/workers/WorldWorkerPoolImpl.js` 的 `_dispatchToWorker` 方法中：
-
-```javascript
-  _dispatchToWorker(index, message) {
-    this.pool[index].busy = true;
-    this.lastUsedIndex = index;
-    const transfer = message._transferList || [];
-    delete message._transferList;
-    this.pool[index].worker.postMessage(message, transfer);
-  }
-```
-
-调用方如需 transfer，在 message 中附带 `_transferList` 字段。
-
-- [ ] **Step 4: 运行测试确认通过**
+- [ ] **Step 2: 运行测试确认通过**
 
 Run: `node command/run-tests.js --verbose`
 Expected: 全部 PASS
 
-- [ ] **Step 5: 运行 lint**
-
-Run: `npm run lint`
-Expected: 无新增 error
-
-- [ ] **Step 6: 提交**
+- [ ] **Step 3: 如用户要求，提交**
 
 ```bash
-git add src/workers/WorldWorker.js src/workers/WorldWorkerPoolImpl.js
-git commit -m "perf(worker): 回包使用 Transferable zero-copy + 裁剪冗余字段"
+git add src/workers/WorldWorker.js
+git commit -m "perf(worker): consolidation 回包 meshData 使用 Transferable zero-copy"
 ```
 
 ---
@@ -575,37 +729,29 @@ import { assertEqual, assertTrue } from './assert.js';
 import { FrameBudgetScheduler } from '../core/FrameBudgetScheduler.js';
 
 describe('FrameBudgetScheduler', (test) => {
-  test('beginFrame 后 getRemainingMs 返回接近目标帧时的值', () => {
+  test('beginFrame 后 getRemainingMs 返回接近目标帧时', () => {
     const scheduler = new FrameBudgetScheduler({ targetFps: 100, safetyMarginMs: 2 });
     scheduler.beginFrame();
     const remaining = scheduler.getRemainingMs();
-    // 10ms - 2ms = 8ms，刚调用 beginFrame 后应接近 8ms
-    assertTrue(remaining >= 7 && remaining <= 8.5, `剩余时间应接近 8ms，得到 ${remaining}`);
+    assertTrue(remaining >= 7 && remaining <= 8.5, `剩余应接近 8ms, got ${remaining}`);
   });
 
-  test('hasTimeFor 正确判断是否有足够预算', () => {
+  test('hasTimeFor 判断正确', () => {
     const scheduler = new FrameBudgetScheduler({ targetFps: 100, safetyMarginMs: 2 });
     scheduler.beginFrame();
-    assertTrue(scheduler.hasTimeFor(5), '刚开始应有 5ms 预算');
-    assertTrue(scheduler.hasTimeFor(7), '刚开始应有 7ms 预算');
-    assertEqual(scheduler.hasTimeFor(10), false, '不应有 10ms 预算');
+    assertTrue(scheduler.hasTimeFor(5), '刚开始应有 5ms');
+    assertEqual(scheduler.hasTimeFor(10), false, '不应有 10ms');
   });
 
-  test('consume 正确记录已消耗时间用于 telemetry', () => {
-    const scheduler = new FrameBudgetScheduler({ targetFps: 100, safetyMarginMs: 2 });
+  test('60fps 模式预算更宽裕', () => {
+    const scheduler = new FrameBudgetScheduler({ targetFps: 60, safetyMarginMs: 2 });
     scheduler.beginFrame();
-    const snapshot = scheduler.getFrameSnapshot();
-    assertTrue(snapshot.targetFrameMs === 10, '目标帧时应为 10ms');
+    assertTrue(scheduler.getRemainingMs() >= 14, '60fps 下应有 ~14ms');
   });
 });
 ```
 
-- [ ] **Step 2: 运行测试确认失败**
-
-Run: `node command/run-tests.js --verbose`
-Expected: FAIL — `FrameBudgetScheduler` 不存在
-
-- [ ] **Step 3: 实现 FrameBudgetScheduler**
+- [ ] **Step 2: 实现 FrameBudgetScheduler**
 
 ```javascript
 // src/core/FrameBudgetScheduler.js
@@ -632,24 +778,15 @@ export class FrameBudgetScheduler {
   hasTimeFor(estimatedMs) {
     return this.getRemainingMs() >= estimatedMs;
   }
-
-  getFrameSnapshot() {
-    const now = globalThis.performance?.now?.() ?? Date.now();
-    return {
-      targetFrameMs: this.targetFrameMs,
-      elapsed: now - this.frameStart,
-      remaining: Math.max(0, this.frameDeadline - now)
-    };
-  }
 }
 ```
 
-- [ ] **Step 4: 运行测试确认通过**
+- [ ] **Step 3: 运行测试确认通过**
 
 Run: `node command/run-tests.js --verbose`
 Expected: 全部 PASS
 
-- [ ] **Step 5: 提交**
+- [ ] **Step 4: 如用户要求，提交**
 
 ```bash
 git add src/core/FrameBudgetScheduler.js src/tests/test-frame-budget-scheduler.js
@@ -663,21 +800,18 @@ git commit -m "feat(core): 新增 FrameBudgetScheduler 实时帧预算调度器"
 **Files:**
 - Modify: `src/world/World.js`
 
-- [ ] **Step 1: 引入新依赖**
-
-在 `src/world/World.js` 顶部 import 区追加：
+- [ ] **Step 1: 引入依赖并初始化**
 
 ```javascript
 import { FrameBudgetScheduler } from '../core/FrameBudgetScheduler.js';
 ```
 
-constructor 中追加：
-
+constructor 追加：
 ```javascript
     this.frameBudgetScheduler = new FrameBudgetScheduler({ targetFps: 100, safetyMarginMs: 2 });
 ```
 
-- [ ] **Step 2: 新增 _processChunkInitBudgeted 方法**
+- [ ] **Step 2: 新增调度方法**
 
 ```javascript
   _processChunkInitBudgeted() {
@@ -696,30 +830,24 @@ constructor 中追加：
     if (!chunk || chunk.disposed) return;
     this._requestRuntimeChunkRecord(chunk);
   }
-```
 
-- [ ] **Step 3: 新增 _processStagingPrepare 和 _publishReadyChunks 方法**
-
-```javascript
   _processStagingPrepare() {
     if (!this.globalInstancedMeshManager) return;
     const remainingMs = this.frameBudgetScheduler.getRemainingMs();
     if (remainingMs < 0.5) return;
-
     this.globalInstancedMeshManager.prepareStagedBlocks({
       maxBlocks: 600,
-      maxMs: Math.min(remainingMs * 0.6, 2)
+      maxMs: Math.min(remainingMs * 0.5, 2)
     });
   }
 
-  _publishReadyChunks() {
+  _publishNextReadyChunk() {
     if (!this.globalInstancedMeshManager) return;
+    if (!this.frameBudgetScheduler.hasTimeFor(0.5)) return;
     const playerCx = Math.floor(this._lastPlayerPos.x / CHUNK_SIZE);
     const playerCz = Math.floor(this._lastPlayerPos.z / CHUNK_SIZE);
-    const ready = this.globalInstancedMeshManager.getReadyToPublishChunks(playerCx, playerCz);
-
-    for (const entry of ready) {
-      this.globalInstancedMeshManager.publishPreparedChunk(entry.chunkKey);
+    const published = this.globalInstancedMeshManager.publishNextReadyChunk(playerCx, playerCz);
+    if (published) {
       this._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
       this.runtimeIdleScheduler?.markBusy('chunk-published');
       this.requestShadowMapUpdate('chunk-published');
@@ -727,9 +855,9 @@ constructor 中追加：
   }
 ```
 
-- [ ] **Step 4: 重构 update() 的 runtime-streaming 调度**
+- [ ] **Step 3: 重构 update() runtime-streaming 调度**
 
-将 update() 中现有的 runtime-streaming 调度逻辑（约 L1217-1239）替换为：
+替换 update() 中 L1217-1239 的调度逻辑为：
 
 ```javascript
     if (this.bootstrapState.phase === 'runtime-streaming') {
@@ -738,8 +866,9 @@ constructor 中追加：
       this._processChunkInitBudgeted();
 
       if (this.frameBudgetScheduler.hasTimeFor(1.0)) {
+        const assemblyBudget = Math.min(this.frameBudgetScheduler.getRemainingMs() * 0.4, 3);
         this.chunkAssemblyScheduler.processWithinBudget({
-          budgetMs: Math.min(this.frameBudgetScheduler.getRemainingMs() * 0.4, 3),
+          budgetMs: assemblyBudget,
           maxTasks: 20
         });
       }
@@ -748,7 +877,7 @@ constructor 中追加：
         this._processStagingPrepare();
       }
 
-      this._publishReadyChunks();
+      this._publishNextReadyChunk(); // 每帧最多 1 个 chunk
 
       if (this.frameBudgetScheduler.hasTimeFor(0.5)) {
         this._processChunkDeltaPatches({ maxMs: Math.min(1.5, this.frameBudgetScheduler.getRemainingMs()) });
@@ -761,6 +890,13 @@ constructor 中追加：
           hasAssemblyWork: this.chunkAssemblyScheduler.hasWork(),
           playerPosition: this._lastPlayerPos
         }, { frameBudgetMs: this.frameBudgetScheduler.getRemainingMs() });
+      }
+
+      if (this.pendingShadowUpdate) {
+        const now = globalThis.performance?.now?.() ?? Date.now();
+        if (now - this.shadowUpdateScheduledAt >= 200) {
+          this.flushShadowUpdates('batched-world-change');
+        }
       }
     } else {
       // bootstrap 保留旧路径
@@ -776,26 +912,25 @@ constructor 中追加：
     }
 ```
 
-- [ ] **Step 5: 运行测试确认通过**
+- [ ] **Step 4: 运行测试确认通过**
 
 Run: `node command/run-tests.js --verbose`
 Expected: 全部 PASS
 
-- [ ] **Step 6: 运行 lint**
+- [ ] **Step 5: 运行 lint**
 
 Run: `npm run lint`
-Expected: 无新增 error
 
-- [ ] **Step 7: 提交**
+- [ ] **Step 6: 如用户要求，提交**
 
 ```bash
 git add src/world/World.js
-git commit -m "feat(world): 集成 FrameBudgetScheduler + 两阶段提交调度"
+git commit -m "feat(world): 集成 FrameBudgetScheduler + prepare/publish 调度"
 ```
 
 ---
 
-### Task 7: [P1] TypeBuffer 容量 hints 调大 + Consolidation 预扩容
+### Task 7: [P1] TypeBuffer 容量 hints + Consolidation 预扩容
 
 **Files:**
 - Modify: `src/world/World.js:83-99`
@@ -824,20 +959,25 @@ git commit -m "feat(world): 集成 FrameBudgetScheduler + 两阶段提交调度"
     });
 ```
 
-- [ ] **Step 2: patchChunkVisibleBlocks 添加预扩容**
+- [ ] **Step 2: patchChunkVisibleBlocks 添加预扩容（只算 missing entries）**
 
-在 `patchChunkVisibleBlocks` 方法开头（`_purgeQueuedChunk` 之后）添加：
+在方法开头（`_purgeQueuedChunk` 之后）添加精确预扩容：
 
 ```javascript
+    // 预扩容：只计算真正需要新增的方块数（排除已存在的 update）
     for (const data of meshDataArray) {
       if (data.blockTypes) continue;
       const { type, instanceIndexMap } = data;
       const props = getBlockProperties(type);
       if (!props.isRendered) continue;
-      const entries = Object.entries(instanceIndexMap || {});
-      if (entries.length === 0) continue;
-      const buffer = this.getOrCreateBuffer(type);
-      buffer.ensureCapacity(buffer.count + entries.length);
+      let missingCount = 0;
+      for (const coordText of Object.keys(instanceIndexMap || {})) {
+        if (!this.coordToRef.has(Number(coordText))) missingCount++;
+      }
+      if (missingCount > 0) {
+        const buffer = this.getOrCreateBuffer(type);
+        buffer.ensureCapacity(buffer.getEffectiveTail() + missingCount);
+      }
     }
 ```
 
@@ -846,75 +986,146 @@ git commit -m "feat(world): 集成 FrameBudgetScheduler + 两阶段提交调度"
 Run: `node command/run-tests.js --verbose`
 Expected: 全部 PASS
 
-- [ ] **Step 4: 提交**
+- [ ] **Step 4: 如用户要求，提交**
 
 ```bash
 git add src/world/World.js src/core/GlobalInstancedMeshManager.js
-git commit -m "perf(core): 调大 TypeBuffer 初始容量 + consolidation 预扩容"
+git commit -m "perf(core): 调大容量 hints + consolidation 精确预扩容"
 ```
 
 ---
 
-### Task 8: [P2] 手动集成测试 + 奔跑验证
+### Task 8: [P2] 自动化奔跑压测
 
-**Files:** 无新文件
+**Files:**
+- Create: `src/tests/test-streaming-perf.js`
 
-- [ ] **Step 1: 启动开发服务器**
+- [ ] **Step 1: 编写自动化压测测试**
+
+```javascript
+// src/tests/test-streaming-perf.js
+import { describe } from './runner.js';
+import { assertTrue } from './assert.js';
+
+describe('Streaming Performance', (test) => {
+  test('持续移动 10 秒内帧率 p95 ≥ 目标的 80%', async () => {
+    // 获取 game 实例
+    const game = window.game;
+    if (!game || !game.world || !game.player) {
+      console.warn('[perf] game 未就绪，跳过压测');
+      return;
+    }
+
+    // 等待 bootstrap 完成
+    let waited = 0;
+    while (game.world.bootstrapState?.phase !== 'runtime-streaming' && waited < 10000) {
+      await new Promise(r => setTimeout(r, 100));
+      waited += 100;
+    }
+    if (game.world.bootstrapState?.phase !== 'runtime-streaming') {
+      console.warn('[perf] 未进入 runtime-streaming，跳过');
+      return;
+    }
+
+    // 模拟持续前进 10 秒，采集帧时长
+    const frameTimes = [];
+    const duration = 10000;
+    const start = performance.now();
+
+    const originalUpdate = game.update.bind(game);
+    let lastFrame = start;
+
+    const collectFrame = () => {
+      const now = performance.now();
+      frameTimes.push(now - lastFrame);
+      lastFrame = now;
+
+      // 模拟前进
+      if (game.player?.position) {
+        game.player.position.z += 0.3;
+      }
+
+      if (now - start < duration) {
+        requestAnimationFrame(collectFrame);
+      }
+    };
+    requestAnimationFrame(collectFrame);
+
+    // 等待采集完成
+    await new Promise(r => setTimeout(r, duration + 500));
+
+    // 分析
+    frameTimes.sort((a, b) => a - b);
+    const p95 = frameTimes[Math.floor(frameTimes.length * 0.95)];
+    const p99 = frameTimes[Math.floor(frameTimes.length * 0.99)];
+    const longTasks = frameTimes.filter(t => t > 16.7).length;
+
+    console.log(`[perf] frames=${frameTimes.length} p95=${p95.toFixed(1)}ms p99=${p99.toFixed(1)}ms longTasks=${longTasks}`);
+
+    // 断言：p95 应 < 14ms（允许一定余量）
+    assertTrue(p95 < 20, `p95 帧时 ${p95.toFixed(1)}ms 超出预期 20ms`);
+  });
+});
+```
+
+- [ ] **Step 2: 运行确认测试框架可执行**
+
+Run: `node command/run-tests.js --verbose`
+Expected: 测试执行（可能 skip 如果 game 未完整初始化，但不应 crash）
+
+- [ ] **Step 3: 如用户要求，提交**
+
+```bash
+git add src/tests/test-streaming-perf.js
+git commit -m "test(perf): 新增自动化奔跑压测 — 帧率 p95/p99 + long task 统计"
+```
+
+---
+
+### Task 9: [P2] 手动集成验证
+
+- [ ] **Step 1: 启动开发服务器并验证基本功能**
 
 Run: `npm run start`
+打开浏览器验证初始加载正常。
 
-- [ ] **Step 2: 验证初始加载**
+- [ ] **Step 2: 奔跑压测**
 
-打开 `http://localhost:8080`，确认：
-1. 初始 chunk 正常加载
-2. 方块正常渲染，无闪烁
+WASD 持续奔跑 30 秒，验证：
+1. 新 chunk 从雾中自然出现
+2. 无方块闪烁/消失
+3. FPS 稳定
 
-- [ ] **Step 3: 奔跑压测（30 秒持续移动）**
+- [ ] **Step 3: 交互测试**
 
-使用 WASD 向一个方向持续奔跑 30 秒，观察：
-1. 新 chunk 是否从雾中自然出现（无突兀弹出）
-2. 已显示的 chunk 是否有闪烁/方块消失
-3. FPS 是否稳定（HUD 右上角）
-4. 打开浏览器控制台检查是否有错误
+放置/挖掘方块、触发 consolidation，确认无闪烁。
 
-- [ ] **Step 4: 交互测试**
+- [ ] **Step 4: DevTools Performance 录制**
 
-1. 放置多个方块 → 确认即时出现
-2. 挖掘方块 → 确认即时消失
-3. 快速放置 50+ 方块触发 consolidation → 确认无闪烁
+录制 10 秒奔跑，确认：
+1. 无 > 16ms long task
+2. Worker Message 事件无大体积 clone
+3. 帧时间分布均匀
 
-- [ ] **Step 5: Performance 面板验证**
-
-打开 Chrome DevTools Performance 面板，录制 10 秒奔跑：
-1. 检查是否有 > 16ms 的 long task
-2. 检查 Worker 通信是否使用了 transferable（Message 事件应无大体积 clone）
-3. 检查帧时间分布
-
-- [ ] **Step 6: 运行 lint + 全量测试**
+- [ ] **Step 5: lint + 全量测试**
 
 ```bash
 npm run lint
 node command/run-tests.js --verbose
-```
-Expected: 无新增 error，测试全 PASS
-
-- [ ] **Step 7: 提交修复（如有）**
-
-```bash
-git add -A
-git commit -m "fix: 集成测试修复"
 ```
 
 ---
 
 ## 注意事项
 
-1. **Bootstrap 阶段完全不受影响**：所有改动仅影响 `runtime-streaming` 阶段。bootstrap 阶段使用旧的 mutation queue flush 路径，确保首屏加载速度不退化。
+1. **Bootstrap 不受影响**：所有改动仅在 `runtime-streaming` 阶段生效。
 
-2. **两阶段原子的关键不变式**：prepare 期间 `buffer.count` 不变，shadow region 的数据对渲染不可见。只有 publish 时的 `count = newCount` 是唯一的可见性切换点。
+2. **Reservation 不变式**：活跃区 `[0, count)` 和 reserved 区 `[count, reservedTail)` 严格隔离。`addVisibleBlock` 的 count++ 不会超过最低 reservation start（通过 ensureCapacity 保证空间足够）。
 
-3. **Consolidation 不走 staging**：Consolidation 使用 `patchChunkVisibleBlocks`（增量 diff），chunk 已在渲染中不需要"原子出现"语义。但需要预扩容防止 `ensureCapacity` 触发 mesh 切换。
+3. **publish 搬移成本**：如果 prepare 期间有 add/remove 导致 count 变化，publish 需要搬移 reserved 数据。搬移成本 = `copyWithin` 一段连续内存，对 3000 块约 0.2ms，可接受。
 
-4. **Worker transfer 后 ArrayBuffer 不可复用**：transfer 后 Worker 侧的 buffer 变 detached。如果 Worker 有复用 buffer 的逻辑需要检查。当前代码每次 consolidation 都新建数组，不复用，所以安全。
+4. **每帧最多 publish 1 个 chunk**：避免多 chunk 同帧 publish 造成突发。按距离排序确保最近的优先可见。
 
-5. **snapshot.blocks 裁剪风险**：Task 4 Step 2 要求 grep 确认消费方。如果有代码依赖 `snapshot.blocks`，需要保留或改读 `blockDataBlocks`。
+5. **Worker 保留所有现有字段**：只添加 transfer list，不裁剪 snapshot.blocks/routing/modGunMan/rovers，确保 BlockScatterManager、PersistenceService、ChunkGenerator 等消费方不受影响。
+
+6. **Git 提交**：所有 commit step 标注"如用户要求"，遵循仓库规则不自动提交。

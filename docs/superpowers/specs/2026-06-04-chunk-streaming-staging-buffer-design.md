@@ -1,7 +1,7 @@
-# Chunk 流式加载 Staging Buffer + 原子切换设计 (v2)
+# Chunk 流式加载 Staging Buffer + 原子切换设计 (v3)
 
 > 日期: 2026-06-04
-> 修订: 2026-06-04 v2 — 根据审阅反馈全面修订
+> 修订: v3 — 修复 shadow region 竞态、staged 生命周期、Worker 裁剪兼容
 > 状态: approved
 > 目标: 消除奔跑过程中加载 chunk 的卡顿和画面闪烁
 
@@ -18,7 +18,7 @@
 2. `enqueueMeshDataForChunk()` — 将新数据入队 mutation queue
 3. 后续帧通过 `flushMutationQueue` 分帧写入
 
-步骤 1 和步骤 3 之间存在**多帧可见空窗**：方块已被删除但新数据尚未写入。当新 chunk 的方块大量涌入 mutation queue 时，leaves/grass_block 类型的 TypeBuffer 在 `addVisibleBlock` → `ensureCapacity` 时触发扩容，旧 mesh 被标记 `visible=false`、新 mesh 加入场景，如果 WebGPU buffer upload 存在延迟，该类型所有方块瞬间消失。
+步骤 1 和步骤 3 之间存在**多帧可见空窗**：方块已被删除但新数据尚未写入。
 
 **来源 B：`TypeBuffer.ensureCapacity` 的 mesh 替换**
 
@@ -34,237 +34,149 @@
 1. **`assembleRuntimeBuildMeshFast()` 无预算同步构建**：遍历 3000+ blockData 条目、按类型分组、计算可见性和 AO、生成 meshData —— 全部同步完成，单次 5-15ms
 2. **Worker 回包结构化克隆**：`postMessage` 没有 transfer list，Float32Array（matrices 每 chunk ~192KB）在主线程反序列化时阻塞
 3. **各子系统预算独立无协调**：assembly 8ms + flush 3ms + delta 1.5ms + idle 2ms，总和 14.5ms 超出 10ms/帧目标
-4. **governor 缺失实时剩余时间检查**：即使有预算分配，拓扑遍历、卸载、shadow、粒子等无预算操作仍然在同帧执行
+4. **缺失实时剩余时间检查**：即使有预算分配，拓扑遍历、卸载、shadow request、粒子等无预算操作仍然在同帧执行
 
 ## 性能目标
 
 - 高刷 macOS (ProMotion): 稳定 100fps（帧预算 10ms）
 - 标准显示器: 不低于 60fps（帧预算 16.7ms）
 - 奔跑加载远方 chunk 时零卡顿、零闪烁
-- 新 chunk 平滑过渡出现（雾遮掩/dither，不使用真透明）
+- 新 chunk 平滑过渡出现（雾遮掩，不使用真透明）
 
 ## 架构设计
 
 ### Chunk 生命周期（新）
 
 ```
-创建 → 数据加载 → hydrate → 可中断 buildMesh(分帧) → 写入 Staging Buffer(不渲染)
-                                                           ↓
-                               全量就绪 → 分帧 prepare(写入 shadow region) → 一帧 publish(flip visibility)
-                                                                                ↓
-                                                                         雾内淡入(距离渐显)
+创建 → 数据加载 → hydrate → 可中断 buildMesh(分帧，接受外部预算) → 写入 Staging Buffer(不渲染)
+                                                                          ↓
+                     全量就绪 → reserve 空间 → 分帧 prepare(写入 reserved region) → 一帧 publish(flip count)
+                                                                                      ↓
+                                                                                雾内自然渐显
 ```
 
-### 核心概念 1: 两阶段原子提交
+### 核心概念 1: 两阶段原子提交（带 Reservation）
 
-取代 v1 的"一帧原子 commit 所有方块"，避免制造新的 CPU 峰值：
+**关键不变式**：prepare 写入的区域通过 reservation 机制与活跃渲染区域隔离，任何并发的 add/remove/patch 操作不会覆盖 reserved region。
 
-**阶段 1 — 分帧 Prepare（跨多帧）**：
-- 在 TypeBuffer 中预分配 shadow region（count 之外的空间）
-- 分帧将方块数据写入 shadow region（每帧 300-600 块，约 0.5-1ms）
-- 此时 `mesh.count` 不变，shadow region 对渲染不可见
-
-**阶段 2 — 一帧 Publish（单帧 < 0.1ms）**：
-- 全部 prepare 完成后，一帧内做：
-  - `mesh.count = newCount`（O(1)，极低成本）
-  - `mesh.instanceMatrix.needsUpdate = true`
-  - 标记 chunk 进入"雾内淡入"状态
-- 从"不存在"到"完整可见"在一帧内完成，无中间态暴露
-
+**TypeBuffer 内存布局**：
 ```
-┌────────────────────────────────────────────────────────────────┐
-│  TypeBuffer 内存布局                                           │
-│                                                                │
-│  [0 ─── count ───][count ─── prepareEnd ───][─── capacity ──] │
-│   ↑ 已渲染区域     ↑ shadow region (写入中)    ↑ 空闲          │
-│                                                                │
-│  Publish: count = prepareEnd  (一次赋值，所有新方块立即可见)    │
-└────────────────────────────────────────────────────────────────┘
-```
-
-### 核心概念 2: 实时帧预算 Scheduler
-
-取代 v1 的"固定分配表"模式：
-
-```javascript
-// 每帧开始时记录 frameStart
-const frameStart = performance.now();
-const frameDeadline = frameStart + targetFrameMs - safetyMarginMs;
-
-// 每个阶段在执行前检查剩余时间
-function getRemainingMs() {
-  return Math.max(0, frameDeadline - performance.now());
-}
-
-// 阶段按优先级顺序执行，时间不够则跳过
-if (getRemainingMs() > 0.5) processChunkInit();
-if (getRemainingMs() > 1.0) processAssembly();
-if (getRemainingMs() > 0.5) processPrepare();
-if (getRemainingMs() > 0.3) processDeferred();
+┌──────────────────────────────────────────────────────────────────────┐
+│  [0 ─── count ───][count ─── reservedTail ───][─── capacity ───]    │
+│   ↑ 活跃渲染区域   ↑ reserved region(各 chunk 分段占用)   ↑ 空闲     │
+│                                                                      │
+│  活跃区操作 (add/remove/patch):                                      │
+│    - add 写入 index=count, count++                                   │
+│    - remove 用 swap-remove，只操作 [0, count) 范围                   │
+│    - 不会触及 [count, reservedTail) 的 reserved region               │
+│                                                                      │
+│  Prepare 操作:                                                       │
+│    - 写入 [reservedStart, reservedStart + reservedCount) 固定位置    │
+│    - reservedStart 在 init 时锁定，不受后续 count 变化影响           │
+│                                                                      │
+│  Publish 操作:                                                       │
+│    - 将 reserved chunk 的方块"嫁接"到活跃区                         │
+│    - 方法：把 reserved 数据搬移到 count 位置（如果 count 变化了）    │
+│    - 然后 count += reservedCount                                     │
+│    - 释放 reservation                                                │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-### 核心概念 3: Worker Transfer 优化
+**Reservation 生命周期**：
+1. `reserveForChunk(chunkKey, typeBlockCounts)` — 为每个 type 在 TypeBuffer 末尾分配固定段
+2. 返回 `{ type → { start, count } }` 映射，在整个 prepare 期间不变
+3. prepare 写入只能写 `[start, start + count)` 范围
+4. publish 时如果 buffer.count 已变化（有 add/remove），先将 reserved 数据搬到新的 count 位置再 bump
+5. 释放 reservation：`reservedTail -= reservedCount`
 
-Worker 回包的 Float32Array（matrices、aoLow、aoHigh、orientation）使用 Transferable 零拷贝传输：
+**竞态安全**：
+- 活跃区的 add 操作：写入 index=count，但 count < reservedStart，不会碰到 reserved 区域
+  - 等等，这不对。如果 add 操作把 count 推到了 reservedStart 怎么办？
+  - 解决：`addVisibleBlock` 中的 `ensureCapacity(count + 1)` 改为 `ensureCapacity(reservedTail + 1)`
+  - 且 add 时 count++ 不能超过最低的 reservedStart
+  - 实际上更简单的方案：add 操作在 count++ 后如果 count == 某个 reservation 的 start，触发冲突处理（搬移 reservation）
+  - **最终方案**：`reservedTail` 是全 buffer 的硬边界，`addVisibleBlock` 在 count 达到 reservedTail 时触发扩容（而非达到 capacity），这样 count 永远不会侵入 reserved region
 
-```javascript
-// Worker 侧
-const transfer = [matrices.buffer, aoLow.buffer, aoHigh.buffer, orientation.buffer];
-postMessage({ meshData, ... }, transfer);
+```
+ensureCapacity 改造：
+  - 旧: if (required <= this.capacity) return;
+  - 新: if (required <= this.capacity && required <= this.reservedTail) return;
+  - reservedTail 默认等于 capacity（无 reservation 时不影响行为）
 ```
 
-主线程收到后 ArrayBuffer 直接可用，无反序列化成本。
+- 活跃区的 remove 操作：swap-remove 只操作 [0, count) 范围，不影响 reserved region
+- 活跃区的 patch 操作：只更新已有实例的 matrix/AO，不改变 count
 
-### 核心概念 4: 雾遮掩代替真透明
+### 核心概念 2: Staged Chunk 生命周期与清理
 
-新 chunk publish 后通过距离雾自然过渡，不引入 per-instance opacity：
-- chunk 在 fog far 附近出现时，雾本身就遮住了方块
-- 随玩家靠近，方块自然从雾中"走出来"
-- 无需 `material.transparent`、无排序问题、无 depthWrite 冲突
-- 对于玩家身边突然加载的 chunk（极端情况），用 chunk group visibility toggle + 1-2 帧 delay 避免突兀
+Staged chunk 必须与现有 chunk 生命周期正确联动：
 
-## 模块设计
+**清理触发点**：
+1. `GlobalInstancedMeshManager.removeChunk(chunkKey)` — 先清理 staged/reservation
+2. `World.update()` 卸载循环 — chunk dispose 前清理 staging
+3. `chunk.dispose()` — 如果 chunk 被废弃，对应 staging 必须清除
+4. 玩家瞬移导致大量 chunk 同时卸载 — 批量释放 reservation
 
-### 1. [P0] 废除 runtime-build-mesh-fast，全走可中断路径
+**不变式**：
+- staging zone 中的 chunkKey 必须对应一个活跃的（未 dispose 的）chunk
+- reservation 释放后 reservedTail 回退，释放空间给后续使用
+- 多个 staged chunk 的 reservation 不重叠（每个 type 依次分配）
 
-**当前问题**：`assembleRuntimeBuildMeshFast()` (Chunk.js:878) 调用 `_buildMeshFromExistingBlockData()` (Chunk.js:1316) 同步完成全量构建。
-
-**改造**：
-- 删除 `assembleRuntimeBuildMeshFast` 方法
-- `ChunkAssemblyScheduler._runTask` 中 `'runtime-build-mesh-fast'` stage 改为 `'runtime-build-mesh'`（使用可中断的 `_buildMeshFromExistingBlockDataIncremental(maxMs)`）
-- 可中断路径的 `maxMs` 参数不再硬编码为 3ms，改为从 scheduler 传入的当前帧剩余预算
-
-### 2. [P0] Staging Buffer + 两阶段原子提交
-
-在 `GlobalInstancedMeshManager` 中实现：
-
-**staging 入口**：`stageMeshDataForChunk(chunkKey, meshDataArray)`
-- 解析 meshDataArray，按 type 分组存入 `this.stagingZone`
-- 不触发任何 GPU 操作
-
-**分帧 prepare**：`prepareStagedBlocks(options)`
-- 每帧调用，受时间预算约束
-- 对每个 staged chunk：在目标 TypeBuffer 的 shadow region 写入 matrix/AO 数据
-- 维护 `prepareProgress` 状态：当前 chunk 已 prepare 到哪个位置
-- 预扩容在 prepare 开始前一次性完成（检查 capacity 是否足够容纳 count + staged）
-
-**一帧 publish**：`publishPreparedChunk(chunkKey)`
-- 条件：chunk 的所有方块已 prepare 完毕
-- 操作：各 TypeBuffer `mesh.count = newCount`，`instanceMatrix.needsUpdate = true`
-- 注册 chunkKey 到 chunkToCoords
-- 更新 coordToRef 索引
-- 成本：O(1) per buffer + O(n) coordToRef 写入（n = 方块数，但只是 Map.set，约 0.3ms/3000块）
-
-**publish 的 coordToRef 写入优化**：
-- prepare 阶段就写入 coordToRef（标记为 staged 状态），publish 时只翻转标记
-- 或 publish 阶段的 Map.set 本身足够快（<0.5ms），无需额外优化
-
-### 3. [P0] Worker 回包 Transferable + 裁剪
-
-**Transfer List**：
-- `WorldWorker.js` 的 `postMessage` 添加第二参数，传输 meshData 中所有 Float32Array 的 buffer
-- `WorldWorkerPoolImpl._dispatchToWorker` 传递 transfer list
-
-**裁剪冗余字段**：
-- 回包中 `snapshot.blocks` 与 `blockDataBlocks` 内容重叠，去掉 `snapshot.blocks`
-- `entities.modGunMan` 和顶层 `modGunMan` 重复，统一为一个
-- `routing` 字段在 runtime-streaming 阶段不需要（仅 bootstrap 用），条件性发送
-
-**Worker callback 消费预算化**：
-- worker onmessage 收到回包后不立即处理全部数据
-- 将 meshData 存入 staging，其余元数据立即处理（成本很低）
-- 避免 callback 内同步执行 buildMeshes 造成尖峰
-
-### 4. [P1] 实时帧预算 Scheduler (FrameBudgetScheduler)
-
-取代 v1 的 FrameBudgetGovernor：
+### 核心概念 3: 实时帧预算 Scheduler
 
 ```javascript
 class FrameBudgetScheduler {
-  constructor(options) {
-    this.targetFrameMs = 1000 / (options.targetFps || 100);
-    this.safetyMarginMs = options.safetyMarginMs || 2; // 留给渲染的安全余量
-    this.frameStart = 0;
-  }
-
-  beginFrame() {
-    this.frameStart = performance.now();
-  }
-
-  getRemainingMs() {
-    return Math.max(0, this.frameStart + this.targetFrameMs - this.safetyMarginMs - performance.now());
-  }
-
-  hasTimeFor(estimatedMs) {
-    return this.getRemainingMs() >= estimatedMs;
-  }
+  beginFrame() { this.frameStart = performance.now(); }
+  getRemainingMs() { return max(0, frameStart + targetFrameMs - safetyMargin - now()); }
+  hasTimeFor(ms) { return getRemainingMs() >= ms; }
 }
 ```
 
-World.update() 使用：
+每个阶段在执行前检查剩余时间，不够则跳过。总和自动不超标。
+
+### 核心概念 4: 可中断 buildMesh 接受外部预算
+
+`assembleRuntimeBuildMeshPhase(maxMs)` 参数从 scheduler 剩余时间传入，不再硬编码 3ms。ChunkAssemblyScheduler 在调用 chunk 方法时传递当前帧剩余预算。
+
+### 核心概念 5: Worker Transfer 优化
+
+Worker 回包的 meshData 中 Float32Array 使用 Transferable 零拷贝传输：
+
 ```javascript
-update(playerPos, dt) {
-  this.frameBudgetScheduler.beginFrame();
-  
-  this._updateChunkTopology(playerPos); // 无预算，必须执行
-  
-  if (this.frameBudgetScheduler.hasTimeFor(0.5))
-    this._processChunkInit(this.frameBudgetScheduler.getRemainingMs());
-  
-  if (this.frameBudgetScheduler.hasTimeFor(1.0))
-    this._processAssembly(this.frameBudgetScheduler.getRemainingMs() * 0.5);
-  
-  if (this.frameBudgetScheduler.hasTimeFor(0.5))
-    this._processPrepare(this.frameBudgetScheduler.getRemainingMs() * 0.5);
-  
-  this._publishReadyChunks(); // 极低成本，始终执行
-  
-  if (this.frameBudgetScheduler.hasTimeFor(0.3))
-    this._processDeferred(this.frameBudgetScheduler.getRemainingMs());
-  
-  this.particles.update(dt);
+// Worker 侧 — postMessage 第二参数传递 transfer list
+const transferList = [];
+for (const group of meshData) {
+  if (group.matrices?.buffer) transferList.push(group.matrices.buffer);
+  if (group.aoLow?.buffer) transferList.push(group.aoLow.buffer);
+  if (group.aoHigh?.buffer) transferList.push(group.aoHigh.buffer);
+  if (group.orientation?.buffer) transferList.push(group.orientation.buffer);
 }
+postMessage(payload, transferList);
 ```
 
-### 5. [P1] 分帧 Prepare 细化
+**不裁剪的字段**（有活跃消费方）：
+- `snapshot.blocks` — ChunkGenerator.js:79, PersistenceService.js:236/249/266
+- `routing` — BlockScatterManager.js:84/175 (scatter 和 overflow 依赖)
+- 顶层 `modGunMan`/`rovers` — Chunk.js 解构使用
 
-Prepare 阶段将 staged 方块分帧写入 TypeBuffer shadow region：
+**仅做 transfer**，不做结构裁剪，避免破坏现有功能。
 
-- 每帧预算从 scheduler 获取（通常 1-2ms）
-- 按 chunk 距离排序，最近的 chunk 优先 prepare
-- 单 chunk prepare 可跨帧（维护 cursor）
-- 预计 3000 方块 / 600 块每帧 = 5 帧完成一个 chunk 的 prepare
-- Publish 只在 prepare 完成后的下一帧执行
+### 核心概念 6: 雾遮掩代替真透明
 
-### 6. [P2] 雾遮掩淡入
-
-不修改材质系统，利用现有 fog 机制：
-- chunk publish 后立即可见
-- 远处 chunk 被 fog 自然遮盖
-- 现有 FOG_NEAR=30, FOG_FAR=70 已经提供渐变
-- 渲染距离 2-3 chunks（32-48 blocks），大部分新 chunk 在 fog 区域内出现
-
-对于极端情况（玩家瞬移或 chunk 在身边加载）：
-- publish 前检查距离，如果 < FOG_NEAR，delay 1-2 帧 publish（让玩家远离一点）
-- 或使用 chunk group 的 `visible` toggle + requestAnimationFrame 微延迟
-
-### 7. [P2] 奔跑压测验证
-
-使用 Playwright 自动化：
-- 模拟玩家持续一方向移动 30 秒
-- 每帧采集 `performance.now()` diff（frameMs）
-- 统计 p50/p95/p99 和 long task（>16ms）计数
-- 截图检测整类方块消失（像素对比连续帧）
+新 chunk publish 后通过距离雾自然过渡：
+- chunk 在 fog far 附近出现时，雾本身遮住方块
+- 随玩家靠近，方块从雾中"走出来"
+- 无需 `material.transparent`、无排序/depthWrite/shadow 问题
+- 对于身边突然加载的 chunk：publish 受帧预算控制（每帧最多 1 个），加上 prepare 分帧的自然延迟，极端情况也有数帧缓冲
 
 ## 文件变更清单
 
 | 文件 | 变更类型 | 职责 |
 |------|----------|------|
-| `src/world/Chunk.js` | 修改 | 删除 `assembleRuntimeBuildMeshFast`，可中断路径接受外部预算 |
-| `src/world/ChunkAssemblyScheduler.js` | 修改 | 移除 `runtime-build-mesh-fast` stage |
-| `src/core/GlobalInstancedMeshManager.js` | 修改 | staging zone、分帧 prepare、publish、预扩容 |
-| `src/workers/WorldWorker.js` | 修改 | postMessage 添加 transfer list、裁剪冗余字段 |
-| `src/workers/WorldWorkerPoolImpl.js` | 修改 | _dispatchToWorker 传递 transfer list |
+| `src/world/Chunk.js` | 修改 | 废除 fast path；`assembleRuntimeBuildMeshPhase` 接受外部 maxMs |
+| `src/world/ChunkAssemblyScheduler.js` | 修改 | 合并 fast stage；传递剩余预算给 chunk |
+| `src/core/GlobalInstancedMeshManager.js` | 修改 | staging zone、reservation、prepare、publish、生命周期清理 |
+| `src/workers/WorldWorker.js` | 修改 | postMessage 添加 transfer list |
 | `src/world/ChunkGenerator.js` | 修改 | buildMeshes 初次加载改为 staging |
 | `src/world/World.js` | 修改 | 集成 FrameBudgetScheduler，重构 update() |
 | `src/core/FrameBudgetScheduler.js` | 新增 | 实时帧预算调度器 |
@@ -272,8 +184,10 @@ Prepare 阶段将 staged 方块分帧写入 TypeBuffer shadow region：
 ## 验收标准
 
 1. 玩家持续奔跑 30 秒，frameMs p99 ≤ 目标帧时的 120%（100fps 下 p99 ≤ 12ms）
-2. 奔跑过程中无任何方块闪烁/消失/重现现象（Playwright 截图验证）
+2. 奔跑过程中无任何方块闪烁/消失/重现现象
 3. 新 chunk 从雾中自然出现，无突兀跳变
-4. 现有交互功能（放置/挖掘方块、consolidation）不受影响
-5. Worker 回包传输使用 Transferable，主线程 onmessage 回调耗时 < 1ms
+4. 现有交互功能（放置/挖掘方块、consolidation、特殊实体、scatter routing）不受影响
+5. Worker 回包传输使用 Transferable，主线程 onmessage 无大体积克隆
 6. 单帧内不存在 > 4ms 的同步 chunk 构建操作
+7. chunk 卸载时 staging/reservation 正确清理，无幽灵方块
+8. 自动化压测可重复验证帧率和闪烁
