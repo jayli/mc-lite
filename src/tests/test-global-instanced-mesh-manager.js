@@ -290,6 +290,45 @@ describe('GlobalInstancedMeshManager', (test) => {
     assertEqual(manager.coordToRef.has(add), true, '新增坐标 flush 后应出现');
   });
 
+  test('publishPreparedChunk 更新已有坐标时不先删除再追加，避免发布空窗', () => {
+    const { manager } = createManager(4);
+    const existing = encodeCoord(1, 2, 3);
+    const otherChunk = encodeCoord(32, 2, 3);
+    const added = encodeCoord(2, 2, 3);
+
+    manager.addVisibleBlock(existing, { type: 'stone', orientation: 0 }, '0,0', {
+      matrix: makeMatrix(1, 2, 3),
+      aoLow: 1,
+      aoHigh: 1,
+      orientation: 0
+    });
+    manager.addVisibleBlock(otherChunk, { type: 'stone', orientation: 0 }, '2,0', {
+      matrix: makeMatrix(32, 2, 3),
+      aoLow: 1,
+      aoHigh: 1,
+      orientation: 0
+    });
+
+    const originalExistingIndex = manager.coordToRef.get(existing).index;
+    const originalOtherIndex = manager.coordToRef.get(otherChunk).index;
+
+    manager.stageMeshDataForChunk('0,0', makeMeshData([
+      { x: 1, y: 2, z: 3, aoLow: 7, aoHigh: 8 },
+      { x: 2, y: 2, z: 3, aoLow: 9, aoHigh: 10 }
+    ]));
+    manager.prepareStagedBlocks({ maxBlocks: 10, maxMs: 100 });
+
+    assertTrue(manager.publishPreparedChunk('0,0'), '准备完成的 staged chunk 应发布成功');
+    assertEqual(manager.coordToRef.get(existing).index, originalExistingIndex, '已有坐标应原地更新，不应被删除后追加');
+    assertEqual(manager.coordToRef.get(otherChunk).index, originalOtherIndex, '其他 chunk 的实例索引不应被 staged 发布扰动');
+    assertEqual(manager.coordToRef.has(added), true, '新增坐标应在发布时追加');
+
+    const buffer = manager.buffers.get('stone');
+    const existingIndex = manager.coordToRef.get(existing).index;
+    assertEqual(buffer.mesh.geometry.getAttribute('aAoLow').array[existingIndex], 7, '已有坐标 AO 应更新');
+    assertEqual(buffer.count, 3, '发布后应保留两个旧实例并追加一个新实例');
+  });
+
   test('patch 批量更新同一 buffer 时只提交一次矩阵 update range', () => {
     const { manager } = createManager(4);
     manager.replaceChunkVisibleBlocks('0,0', makeMeshData([

@@ -13,7 +13,7 @@ import { faceCullingSystem } from '../core/FaceCullingSystem.js';
 import { getBlockProperties, createBlockPropsResolver } from '../constants/BlockData.js';
 import { getRotationAngle, parseBlockEntry } from '../utils/OrientationUtils.js';
 import { getStructureRenderDist } from '../utils/StructureUtils.js';
-import { createOcclusionChecker, computeBlockAOPacked, packAOData } from '../utils/AOUtils.js';
+import { createOcclusionChecker, computeBlockAOPacked, packAOData, calculateAOForBlock, isAOApplicable } from '../utils/AOUtils.js';
 import { createChunkNeighborSampler } from './ChunkNeighborUtils.js';
 import { extendChunk as extendWithConsolidation, CHUNK_SIZE, geomMap } from './ChunkConsolidation.js';
 import { extendChunk as extendWithGenerator } from './ChunkGenerator.js';
@@ -1070,6 +1070,16 @@ export class Chunk {
               p.groupedByType[type].push(block);
             }
             p.groupKeys = Object.keys(p.groupedByType);
+            // 创建 AO 遮挡检测器，用于 convert-group 阶段内联计算 AO
+            if (this.world && typeof createOcclusionChecker === 'function') {
+              p._aoOcclusionChecker = createOcclusionChecker(
+                { chunk: this, chunks: this.world.chunks },
+                CHUNK_SIZE,
+                getBlockProperties
+              );
+            } else {
+              p._aoOcclusionChecker = null;
+            }
             p.meshData = [];
             const initMs = (globalThis.performance?.now?.() ?? Date.now()) - initStartedAt;
             p.metrics.convertInitCount++;
@@ -1136,8 +1146,15 @@ export class Chunk {
                 Chunk._computeTransformMatrix(mx, my, mz, rot, group.matrices, i * 16);
                 matrixComputeCount++;
               }
-              group.aoLow[i] = b.aoLow ?? 1;
-              group.aoHigh[i] = b.aoHigh ?? 1;
+              // 内联计算 AO，避免流式加载 chunk 以全亮状态发布后再延迟修正
+              if (p._aoOcclusionChecker && isAOApplicable(b.type)) {
+                const ao = calculateAOForBlock(b.x, b.y, b.z, p._aoOcclusionChecker);
+                group.aoLow[i] = ao.aoLow;
+                group.aoHigh[i] = ao.aoHigh;
+              } else {
+                group.aoLow[i] = b.aoLow ?? 1;
+                group.aoHigh[i] = b.aoHigh ?? 1;
+              }
               group.orientation[i] = b.orientation;
               const code = Chunk.encodeCoord(b.x, b.y, b.z);
               group.instanceIndexMap[code] = i;
@@ -2409,8 +2426,9 @@ export class Chunk {
     if (this.world?.globalInstancedMeshManager) {
       for (const r of results) {
         const code = Chunk.encodeCoord(r.x, r.y, r.z);
-        this.world.globalInstancedMeshManager.updateAO(code, r.aoLow, r.aoHigh);
+        this.world.globalInstancedMeshManager.updateAO(code, r.aoLow, r.aoHigh, { commit: false });
       }
+      this.world.globalInstancedMeshManager.commitDirtyBuffers();
     }
 
     // 只清除本次已发送的脏标记，保留后续新增的
@@ -3061,8 +3079,6 @@ export class Chunk {
   runDeferredFinalizePhase() {
     if (this.disposed || !this.hasDeferredFinalizeWork) return true;
 
-    let aoRefreshTriggeredThisPass = false;
-
     // 分帧恢复运行时实体：每帧最多恢复 MAX_ENTITIES_PER_FRAME 个
     if (this._needsDeferredRuntimeEntityRestore) {
       const MAX_ENTITIES_PER_FRAME = 3;
@@ -3113,11 +3129,10 @@ export class Chunk {
 
     if (this._needsDeferredAOStabilization) {
       this.world?.onChunkAOSourceStable?.(this, {
-        fullRefresh: true,
+        fullRefresh: false,
         markNeighborBoundaries: true,
         reason: 'deferred-finalize-ao-stable'
       });
-      aoRefreshTriggeredThisPass = true;
       this._needsDeferredAOStabilization = false;
     }
 
@@ -3126,15 +3141,6 @@ export class Chunk {
       this._needsDeferredLightRegistration ||
       this._needsDeferredAOStabilization
     );
-
-    // 所有延迟工作完成后，触发 AO 刷新（避免同一轮重复触发）
-    if (!this.hasDeferredFinalizeWork && !aoRefreshTriggeredThisPass) {
-      this.world?.onChunkAOSourceStable?.(this, {
-        fullRefresh: true,
-        markNeighborBoundaries: true,
-        reason: 'deferred-finalize-done'
-      });
-    }
 
     return !this.hasDeferredFinalizeWork;
   }

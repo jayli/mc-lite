@@ -41,7 +41,7 @@ const MAX_RENDER_DIST = 3;
 /** runtime 阶段延迟 finalize 的空闲等待时间（ms），超时后才开始执行 */
 const RUNTIME_DEFERRED_FINALIZE_IDLE_GRACE_MS = 800;
 /** runtime 阶段每帧最多 finalize 的区块数量 */
-const RUNTIME_DEFERRED_FINALIZE_MAX_CHUNKS = 2;
+const RUNTIME_DEFERRED_FINALIZE_MAX_CHUNKS = 1;
 /** runtime 阶段进入 idle 状态前的空闲等待时间（ms），超时后才触发 idle 任务 */
 const RUNTIME_IDLE_GRACE_MS = 100;
 /** runtime 阶段延迟合并的空闲等待时间（ms） */

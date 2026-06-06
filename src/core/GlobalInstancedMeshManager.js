@@ -87,7 +87,6 @@ class TypeBuffer {
 
   ensureCapacity(required) {
     if (required <= this.capacity) return;
-
     let nextCapacity = this.capacity;
     while (nextCapacity < required) {
       nextCapacity = Math.max(nextCapacity + 1, Math.ceil(nextCapacity * 1.5));
@@ -120,10 +119,15 @@ class TypeBuffer {
     }
 
     this.mesh.count = this.count;
-    this.mesh.instanceMatrix.needsUpdate = true;
-    if (nextAoLow) nextAoLow.needsUpdate = true;
-    if (nextAoHigh) nextAoHigh.needsUpdate = true;
-    if (nextOrientation) nextOrientation.needsUpdate = true;
+    // 标记全量范围为 dirty，让 commitDirty 的 addUpdateRange 覆盖整个 buffer，
+    // 避免后续 addUpdateRange 只上传部分范围导致旧数据丢失（闪烁）
+    if (this.count > 0) {
+      this.dirtyStart = 0;
+      this.dirtyEnd = this.count - 1;
+      this.dirtyMatrix = true;
+      this.dirtyAO = true;
+      this.dirtyBounds = true;
+    }
 
     this.manager.scene.add(this.mesh);
     this.manager._deferMeshDisposal(oldMesh, oldGeometry, this.type);
@@ -235,6 +239,7 @@ export class GlobalInstancedMeshManager {
     this._pendingDisposal = [];
     this._frameCounter = 0;
     this.stagingZone = new Map();
+    this._deferredChunkRemovals = [];
   }
 
   getRenderKey(type) {
@@ -367,6 +372,29 @@ export class GlobalInstancedMeshManager {
     }
     this.chunkToCoords.delete(chunkKey);
     this.commitDirtyBuffers();
+    return removed;
+  }
+
+  deferRemoveChunk(chunkKey) {
+    this.removeStagedChunk(chunkKey);
+    this._purgeQueuedChunk(chunkKey);
+    if (this.chunkToCoords.has(chunkKey)) {
+      this._deferredChunkRemovals.push(chunkKey);
+    }
+  }
+
+  _flushDeferredChunkRemovals() {
+    if (this._deferredChunkRemovals.length === 0) return 0;
+    let removed = 0;
+    for (const chunkKey of this._deferredChunkRemovals) {
+      const coords = this.chunkToCoords.get(chunkKey);
+      if (!coords) continue;
+      for (const coord of coords) {
+        if (this.removeVisibleBlock(coord, { commit: false })) removed++;
+      }
+      this.chunkToCoords.delete(chunkKey);
+    }
+    this._deferredChunkRemovals.length = 0;
     return removed;
   }
 
@@ -618,11 +646,7 @@ export class GlobalInstancedMeshManager {
   }
 
   flushMutationQueue(options = {}) {
-    if (this.mutationQueue.length === 0) {
-      this.mutationStats.lastProcessedBlocks = 0;
-      this.mutationStats.lastFlushMs = 0;
-      return { didWork: false, processedBlocks: 0, remainingBlocks: 0, elapsedMs: 0 };
-    }
+    this.flushDisposal();
 
     const maxOps = Number.isFinite(options.maxOps) ? options.maxOps : DEFAULT_MUTATION_MAX_OPS;
     const maxMs = Number.isFinite(options.maxMs) ? options.maxMs : DEFAULT_MUTATION_MAX_MS;
@@ -635,14 +659,11 @@ export class GlobalInstancedMeshManager {
     while (this.mutationQueue.length > 0 && processedBlocks < maxOps) {
       if (processedBlocks > 0 && now() - start >= maxMs) break;
 
-      // 优化：按距离选出最近的任务后，批量消费该任务的多个条目，
-      // 避免每处理一个 block 就重新扫描整个队列
       const taskIndex = this._selectNextMutationTaskIndex(playerCx, playerCz);
       const task = this.mutationQueue[taskIndex];
       const { data, entries, chunkKey } = task;
       const { type, matrices, aoLow, aoHigh, orientation } = data;
 
-      // 批量消费当前任务的条目，直到预算耗尽或任务完成
       while (processedBlocks < maxOps && now() - start < maxMs && task.cursor < entries.length) {
         const [coordText, sourceIndex] = entries[task.cursor];
         const coord = Number(coordText);
@@ -661,19 +682,18 @@ export class GlobalInstancedMeshManager {
         this.mutationStats.queuedBlocks = Math.max(0, this.mutationStats.queuedBlocks - 1);
       }
 
-      // 当前任务已消费完毕或预算耗尽，移除已完成的任务
       if (task.cursor >= entries.length) {
         this.mutationQueue.splice(taskIndex, 1);
       }
     }
 
+    const deferredRemoved = this._flushDeferredChunkRemovals();
     this.commitDirtyBuffers();
-    this.flushDisposal();
     const elapsedMs = now() - start;
     this.mutationStats.lastProcessedBlocks = processedBlocks;
     this.mutationStats.lastFlushMs = elapsedMs;
     return {
-      didWork: processedBlocks > 0,
+      didWork: processedBlocks > 0 || deferredRemoved > 0,
       processedBlocks,
       remainingBlocks: this.mutationStats.queuedBlocks,
       elapsedMs
@@ -899,6 +919,7 @@ export class GlobalInstancedMeshManager {
     if (!staged || !staged.prepareState?.complete) return false;
 
     const ps = staged.prepareState;
+    const _pubTypes = [];
 
     if (!this.chunkToCoords.has(chunkKey)) this.chunkToCoords.set(chunkKey, new Set());
     const chunkCoords = this.chunkToCoords.get(chunkKey);
@@ -906,46 +927,66 @@ export class GlobalInstancedMeshManager {
     for (const [, batch] of ps.compactBatch) {
       const batchCount = batch.cursor;
       if (batchCount === 0) continue;
+      _pubTypes.push(`${batch.type}:+${batchCount}`);
 
       const buffer = this.getOrCreateBuffer(batch.type);
+      const appendSourceIndices = [];
 
       for (let i = 0; i < batchCount; i++) {
         const coord = batch.coords[i];
+        const renderData = {
+          matrix: batch.matrices.subarray(i * MATRIX_STRIDE, i * MATRIX_STRIDE + MATRIX_STRIDE),
+          aoLow: batch.aoLow?.[i] ?? 1,
+          aoHigh: batch.aoHigh?.[i] ?? 1,
+          orientation: batch.orientation?.[i] ?? 0
+        };
         if (this.coordToRef.has(coord)) {
-          this.removeVisibleBlock(coord, { commit: false });
+          this.updateVisibleBlock(coord, { type: batch.type, orientation: renderData.orientation }, renderData, { commit: false });
+          const ref = this.coordToRef.get(coord);
+          if (ref && ref.chunkKey !== chunkKey) {
+            const previousCoords = this.chunkToCoords.get(ref.chunkKey);
+            previousCoords?.delete(coord);
+            if (previousCoords?.size === 0) this.chunkToCoords.delete(ref.chunkKey);
+            ref.chunkKey = chunkKey;
+          }
+          chunkCoords.add(coord);
+        } else {
+          appendSourceIndices.push(i);
         }
       }
 
-      buffer.ensureCapacity(buffer.count + batchCount);
+      const appendCount = appendSourceIndices.length;
+      if (appendCount === 0) continue;
+
+      buffer.ensureCapacity(buffer.count + appendCount);
 
       const baseIndex = buffer.count;
-
-      buffer.mesh.instanceMatrix.array.set(
-        batch.matrices.subarray(0, batchCount * MATRIX_STRIDE),
-        baseIndex * MATRIX_STRIDE
-      );
 
       const attrAoLow = buffer.mesh.geometry.getAttribute('aAoLow');
       const attrAoHigh = buffer.mesh.geometry.getAttribute('aAoHigh');
       const attrOrientation = buffer.mesh.geometry.getAttribute('aOrientation');
-      if (attrAoLow) attrAoLow.array.set(batch.aoLow.subarray(0, batchCount), baseIndex);
-      if (attrAoHigh) attrAoHigh.array.set(batch.aoHigh.subarray(0, batchCount), baseIndex);
-      if (attrOrientation) attrOrientation.array.set(batch.orientation.subarray(0, batchCount), baseIndex);
-
-      for (let i = 0; i < batchCount; i++) {
-        const coord = batch.coords[i];
+      for (let i = 0; i < appendCount; i++) {
+        const sourceIndex = appendSourceIndices[i];
+        const coord = batch.coords[sourceIndex];
         const writeIndex = baseIndex + i;
+        buffer.mesh.instanceMatrix.array.set(
+          batch.matrices.subarray(sourceIndex * MATRIX_STRIDE, sourceIndex * MATRIX_STRIDE + MATRIX_STRIDE),
+          writeIndex * MATRIX_STRIDE
+        );
+        if (attrAoLow) attrAoLow.array[writeIndex] = batch.aoLow?.[sourceIndex] ?? 1;
+        if (attrAoHigh) attrAoHigh.array[writeIndex] = batch.aoHigh?.[sourceIndex] ?? 1;
+        if (attrOrientation) attrOrientation.array[writeIndex] = batch.orientation?.[sourceIndex] ?? 0;
         buffer.coordToIndex.set(coord, writeIndex);
         buffer.indexToCoord[writeIndex] = coord;
         this.coordToRef.set(coord, { renderKey: batch.type, index: writeIndex, chunkKey });
         chunkCoords.add(coord);
       }
 
-      buffer.count += batchCount;
+      buffer.count += appendCount;
       buffer.mesh.count = buffer.count;
 
       buffer.dirtyStart = Math.min(buffer.dirtyStart, baseIndex);
-      buffer.dirtyEnd = Math.max(buffer.dirtyEnd, baseIndex + batchCount - 1);
+      buffer.dirtyEnd = Math.max(buffer.dirtyEnd, baseIndex + appendCount - 1);
       buffer.dirtyMatrix = true;
       buffer.dirtyAO = true;
       buffer.dirtyBounds = true;

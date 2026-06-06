@@ -42,7 +42,7 @@ export function extendChunk(Chunk) {
       this.detachAuthoritySlice();
     }
 
-    this.world?.globalInstancedMeshManager?.removeChunk?.(`${this.cx},${this.cz}`);
+    this.world?.globalInstancedMeshManager?.deferRemoveChunk?.(`${this.cx},${this.cz}`);
 
     // 通知 AO Worker 清理 chunk 副本缓存
     import('../core/AOBridge.js').then(({ aoBridge }) => {
