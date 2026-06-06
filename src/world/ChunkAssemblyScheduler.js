@@ -58,7 +58,8 @@ export class ChunkAssemblyScheduler {
       const task = this._takeNext();
       if (!task) break;
       processed++;
-      await this._runTask(task);
+      const remaining = budgetMs - (now() - start);
+      await this._runTask(task, remaining);
     }
 
     if (processed > 0 || initialQueueLength > 0 || this.queue.length > 0) {
@@ -104,7 +105,7 @@ export class ChunkAssemblyScheduler {
     return this.queue.splice(bestIndex, 1)[0];
   }
 
-  async _runTask(task) {
+  async _runTask(task, remainingBudgetMs) {
     const { chunk, stage } = task;
     const start = now();
 
@@ -130,22 +131,16 @@ export class ChunkAssemblyScheduler {
         if (stageResult === 'continue') {
           this.enqueue(chunk, stage, task.priority);
         } else if (stageResult === 'done' || stageResult === true) {
-          const nextMeshStage = chunk._isPureLoadPath
-            ? 'runtime-build-mesh-fast'
-            : 'runtime-build-mesh';
-          this.enqueue(chunk, nextMeshStage, task.priority);
+          this.enqueue(chunk, 'runtime-build-mesh', task.priority);
         }
         break;
       case 'runtime-build-mesh-fast':
-        stageResult = chunk.assembleRuntimeBuildMeshFast();
-        if (stageResult === 'done' || stageResult === true) {
-          this.enqueue(chunk, 'runtime-finalize', task.priority);
-        }
-        break;
       case 'runtime-build-mesh':
-        stageResult = chunk.assembleRuntimeBuildMeshPhase();
+        stageResult = chunk.assembleRuntimeBuildMeshPhase(
+          Math.max(1, remainingBudgetMs || 3)
+        );
         if (stageResult === 'continue') {
-          this.enqueue(chunk, stage, task.priority);
+          this.enqueue(chunk, 'runtime-build-mesh', task.priority);
         } else if (stageResult === 'done' || stageResult === true) {
           this.enqueue(chunk, 'runtime-finalize', task.priority);
         }
@@ -155,7 +150,11 @@ export class ChunkAssemblyScheduler {
         if (stageResult === 'continue') {
           this.enqueue(chunk, stage, task.priority);
         } else if (stageResult === 'done' || stageResult === true) {
-          this.enqueue(chunk, 'finalize', task.priority);
+          if (chunk.renderState === 'staged') {
+            chunk.loadState = 'awaiting-publish';
+          } else {
+            this.enqueue(chunk, 'finalize', task.priority);
+          }
         }
         break;
       case 'runtime-build':

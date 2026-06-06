@@ -169,6 +169,7 @@ export class Chunk {
     this.world = world;
     this.group = new THREE.Group();
     this.isReady = false;
+    this.renderState = 'none'; // 'none' | 'staged' | 'published'
     this.loadState = 'created';
     this.spawnReason = world?.bootstrapState?.phase === 'runtime-streaming' ? 'runtime-streaming' : 'bootstrap';
     this.awaitingStoreRecord = this.spawnReason === 'runtime-streaming';
@@ -855,35 +856,21 @@ export class Chunk {
    * 运行期网格构建阶段（可中断）
    * @returns {'done' | 'continue' | boolean}
    */
-  assembleRuntimeBuildMeshPhase() {
+  assembleRuntimeBuildMeshPhase(maxMs = 3) {
     if (this.loadState === 'finalized') return true;
     if (this.loadState !== 'hydrated') {
       return this.loadState === 'terrain-built' || this.loadState === 'entities-built';
     }
 
-    const result = this._buildMeshFromExistingBlockDataIncremental(3);
+    const result = this._buildMeshFromExistingBlockDataIncremental(maxMs);
     if (result === 'done') {
       this.loadState = 'terrain-built';
-      this.isReady = true;
     }
     return result;
   }
 
-  /**
-   * 运行期网格构建阶段（快速同步版）
-   * 用于 runtime-streaming + authority 路径，blockData 已完整挂载，
-   * 跳过增量状态机，一次同步完成全部构建并入队 mutationQueue。
-   * @returns {'done' | boolean}
-   */
   assembleRuntimeBuildMeshFast() {
-    if (this.loadState === 'finalized') return true;
-    if (this.loadState !== 'hydrated') {
-      return this.loadState === 'terrain-built' || this.loadState === 'entities-built';
-    }
-    this._buildMeshFromExistingBlockData();
-    this.loadState = 'terrain-built';
-    this.isReady = true;
-    return 'done';
+    return this.assembleRuntimeBuildMeshPhase();
   }
 
   /**

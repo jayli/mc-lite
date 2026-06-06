@@ -343,4 +343,190 @@ describe('GlobalInstancedMeshManager', (test) => {
     assertEqual(buffer.mesh.userData.chests[0]?.open, true, 'swap-remove 后应保留被移动 chest 的开启状态');
     assertEqual(buffer.mesh.userData.chests[1], undefined, '尾部旧 chest 状态应被清理');
   });
+
+  // ==================== Staging Zone Tests ====================
+
+  test('stageMeshDataForChunk 不注册到 coordToRef', () => {
+    const { manager } = createManager(8);
+    const blocks = [{ x: 1, y: 2, z: 3 }, { x: 2, y: 2, z: 3 }];
+    manager.stageMeshDataForChunk('0,0', makeMeshData(blocks));
+
+    assertEqual(manager.coordToRef.size, 0, 'staging 不注册 coordToRef');
+    assertEqual(manager.chunkToCoords.has('0,0'), false, 'staging 不注册 chunkToCoords');
+    assertEqual(manager.getStagedChunkKeys().length, 1, '应有 1 个 staged chunk');
+  });
+
+  test('prepareStagedBlocks 构建 compact batch 不写 TypeBuffer', () => {
+    const { manager } = createManager(8);
+    const blocks = [{ x: 1, y: 2, z: 3 }, { x: 2, y: 2, z: 3 }, { x: 3, y: 2, z: 3 }];
+    manager.stageMeshDataForChunk('0,0', makeMeshData(blocks));
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+
+    assertEqual(manager.buffers.has('stone'), false, 'prepare 不创建 buffer');
+    assertEqual(manager.coordToRef.size, 0, 'prepare 不注册 coordToRef');
+    assertEqual(manager.isPrepareComplete('0,0'), true, 'prepare 应完成');
+  });
+
+  test('prepare 期间活跃区操作不受影响', () => {
+    const { manager } = createManager(8);
+    manager.stageMeshDataForChunk('0,0', makeMeshData([{ x: 1, y: 2, z: 3 }]));
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+
+    const coord = encodeCoord(10, 10, 10);
+    manager.addVisibleBlock(coord, { type: 'stone', orientation: 0 }, '1,1', {
+      matrix: makeMatrix(10, 10, 10), aoLow: 1, aoHigh: 1, orientation: 0
+    });
+    assertEqual(manager.buffers.get('stone').count, 1, '活跃区 add 正常');
+    assertEqual(manager.coordToRef.size, 1, 'coordToRef 只有活跃区的');
+  });
+
+  test('publishPreparedChunk 写入 TypeBuffer 并注册索引', () => {
+    const { manager } = createManager(8);
+    const blocks = [{ x: 1, y: 2, z: 3 }, { x: 2, y: 2, z: 3 }];
+    manager.stageMeshDataForChunk('0,0', makeMeshData(blocks));
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+    const published = manager.publishPreparedChunk('0,0');
+
+    assertTrue(published, 'publish 应返回 true');
+    const buffer = manager.buffers.get('stone');
+    assertEqual(buffer.count, 2, 'count 应为 2');
+    assertEqual(buffer.mesh.count, 2, 'mesh.count 同步');
+    assertEqual(manager.coordToRef.size, 2, '应注册 2 个 coordToRef');
+    assertTrue(manager.chunkToCoords.has('0,0'), 'chunkToCoords 应注册');
+    assertEqual(manager.getStagedChunkKeys().length, 0, 'staging 应清空');
+  });
+
+  test('publish 后 add/remove 正常工作', () => {
+    const { manager } = createManager(8);
+    manager.stageMeshDataForChunk('0,0', makeMeshData([{ x: 1, y: 2, z: 3 }]));
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+    manager.publishPreparedChunk('0,0');
+
+    const newCoord = encodeCoord(5, 5, 5);
+    manager.addVisibleBlock(newCoord, { type: 'stone', orientation: 0 }, '1,1', {
+      matrix: makeMatrix(5, 5, 5), aoLow: 1, aoHigh: 1, orientation: 0
+    });
+    assertEqual(manager.buffers.get('stone').count, 2, 'publish 后 add 正常');
+
+    manager.removeVisibleBlock(encodeCoord(1, 2, 3));
+    assertEqual(manager.buffers.get('stone').count, 1, 'publish 后 remove 正常');
+  });
+
+  test('removeChunk 清理 staged 数据', () => {
+    const { manager } = createManager(8);
+    manager.stageMeshDataForChunk('0,0', makeMeshData([{ x: 1, y: 2, z: 3 }]));
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+    manager.removeChunk('0,0');
+
+    assertEqual(manager.getStagedChunkKeys().length, 0, 'staging 应清空');
+    assertEqual(manager.coordToRef.size, 0, '无 coordToRef 残留');
+  });
+
+  test('分帧 prepare：cursor 跨帧正确推进', () => {
+    const { manager } = createManager(8);
+    const blocks = [
+      { x: 1, y: 2, z: 3 }, { x: 2, y: 2, z: 3 },
+      { x: 3, y: 2, z: 3 }, { x: 4, y: 2, z: 3 }
+    ];
+    manager.stageMeshDataForChunk('0,0', makeMeshData(blocks));
+
+    manager.prepareStagedBlocks({ maxBlocks: 2, maxMs: 100 });
+    assertEqual(manager.isPrepareComplete('0,0'), false, '应未完成');
+
+    manager.prepareStagedBlocks({ maxBlocks: 2, maxMs: 100 });
+    assertEqual(manager.isPrepareComplete('0,0'), true, '应已完成');
+
+    manager.publishPreparedChunk('0,0');
+    assertEqual(manager.coordToRef.size, 4, '4 个方块都应可见');
+  });
+
+  test('publish 前 staged 坐标对 updateAO/remove 不可见', () => {
+    const { manager } = createManager(8);
+    manager.stageMeshDataForChunk('0,0', makeMeshData([{ x: 1, y: 2, z: 3 }]));
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+
+    const coord = encodeCoord(1, 2, 3);
+    assertEqual(manager.coordToRef.has(coord), false, 'staged coord 不在 coordToRef');
+    assertEqual(manager.updateAO(coord, 0.5, 0.5), false, 'updateAO 应返回 false');
+    assertEqual(manager.removeVisibleBlock(coord), false, 'remove 应返回 false');
+
+    manager.publishPreparedChunk('0,0');
+    assertTrue(manager.coordToRef.has(coord), 'publish 后应可见');
+    assertEqual(manager.updateAO(coord, 0.5, 0.5), true, 'publish 后 updateAO 应成功');
+  });
+
+  test('publish 处理已存在坐标冲突', () => {
+    const { manager } = createManager(8);
+    const coord = encodeCoord(1, 2, 3);
+    manager.addVisibleBlock(coord, { type: 'stone', orientation: 0 }, '1,1', {
+      matrix: makeMatrix(1, 2, 3), aoLow: 0.5, aoHigh: 0.5, orientation: 0
+    });
+    assertEqual(manager.buffers.get('stone').count, 1, '活跃区 1 个');
+
+    manager.stageMeshDataForChunk('0,0', makeMeshData([{ x: 1, y: 2, z: 3, aoLow: 0.9, aoHigh: 0.9 }]));
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+    manager.publishPreparedChunk('0,0');
+
+    assertEqual(manager.buffers.get('stone').count, 1, 'publish 后无重复实例');
+    assertEqual(manager.coordToRef.get(coord).chunkKey, '0,0', 'ref 应更新为新 chunkKey');
+  });
+
+  test('publish 处理不同 type 的坐标冲突', () => {
+    const { manager } = createManager(8);
+    const coord = encodeCoord(1, 2, 3);
+    manager.addVisibleBlock(coord, { type: 'dirt', orientation: 0 }, '1,1', {
+      matrix: makeMatrix(1, 2, 3), aoLow: 1, aoHigh: 1, orientation: 0
+    });
+    assertEqual(manager.buffers.get('dirt').count, 1, 'dirt buffer 初始 1');
+
+    manager.stageMeshDataForChunk('0,0', makeMeshData([{ x: 1, y: 2, z: 3 }], 'stone'));
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+    manager.publishPreparedChunk('0,0');
+
+    assertEqual(manager.buffers.get('dirt').count, 0, 'dirt 旧实例应被移除');
+    assertEqual(manager.buffers.get('stone').count, 1, 'stone 新实例应存在');
+    assertEqual(manager.coordToRef.get(coord).renderKey, 'stone', 'ref 应指向 stone');
+  });
+
+  test('空 meshDataArray staging 返回 0', () => {
+    const { manager } = createManager(8);
+    const result = manager.stageMeshDataForChunk('0,0', []);
+    assertEqual(result, 0, '空数据返回 0');
+    assertEqual(manager.getStagedChunkKeys().length, 0, '不进入 staging zone');
+  });
+
+  test('同一 batch 内重复 coord 去重后 publish 无空洞', () => {
+    const { manager } = createManager(8);
+    const coord = encodeCoord(1, 2, 3);
+    const mat = makeMatrix(1, 2, 3);
+    const meshDataDup = [
+      { type: 'stone', count: 1, matrices: new Float32Array(mat),
+        aoLow: new Float32Array([1]), aoHigh: new Float32Array([1]),
+        orientation: new Float32Array([0]), instanceIndexMap: { [coord]: 0 } },
+      { type: 'stone', count: 1, matrices: new Float32Array(mat),
+        aoLow: new Float32Array([1]), aoHigh: new Float32Array([1]),
+        orientation: new Float32Array([0]), instanceIndexMap: { [coord]: 0 } }
+    ];
+    manager.stageMeshDataForChunk('0,0', meshDataDup);
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+    manager.publishPreparedChunk('0,0');
+
+    assertEqual(manager.buffers.get('stone').count, 1, '去重后只有 1 个实例');
+    assertEqual(manager.coordToRef.size, 1, 'coordToRef 只有 1 个');
+  });
+
+  test('publishNextReadyChunk 每次只 publish 1 个', () => {
+    const { manager } = createManager(16);
+    manager.stageMeshDataForChunk('0,0', makeMeshData([{ x: 1, y: 2, z: 3 }]));
+    manager.stageMeshDataForChunk('1,0', makeMeshData([{ x: 17, y: 2, z: 3 }]));
+    manager.prepareStagedBlocks({ maxBlocks: 100, maxMs: 100 });
+
+    assertTrue(manager.isPrepareComplete('0,0'), '0,0 应 prepare 完成');
+    assertTrue(manager.isPrepareComplete('1,0'), '1,0 应 prepare 完成');
+
+    const published = manager.publishNextReadyChunk(0, 0);
+    assertTrue(published !== null, '应 publish 1 个');
+    assertEqual(manager.coordToRef.size, 1, '只有 1 个 chunk 的方块在 coordToRef');
+    assertEqual(manager.getStagedChunkKeys().length, 1, '应剩余 1 个 staged');
+  });
 });

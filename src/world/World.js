@@ -13,6 +13,7 @@ import { ChunkAssemblyScheduler } from './ChunkAssemblyScheduler.js';
 import { RuntimeIdleScheduler } from './RuntimeIdleScheduler.js';
 import { recordChunkPerf, aggregateChunkLoadPerf, printChunkLoadPerfReport } from '../utils/ChunkPerfMonitor.js';
 import { GlobalInstancedMeshManager } from '../core/GlobalInstancedMeshManager.js';
+import { FrameBudgetScheduler } from '../core/FrameBudgetScheduler.js';
 // WorldStore 新架构
 import { WorldRuntime } from './WorldRuntime.js';
 import { WorldAccessLayer } from './WorldAccessLayer.js';
@@ -82,20 +83,20 @@ export class World {
     this.chunks = new Map();
     this.globalInstancedMeshManager = new GlobalInstancedMeshManager(this.scene, {
       typeCapacityHints: new Map([
-        ['leaves', 4096],
-        ['azalea_leaves', 4096],
-        ['azalea_flowers', 2048],
-        ['yellow_leaves', 4096],
-        ['sky_leaves', 4096],
-        ['snow_leaves', 4096],
-        ['swamp_leaves', 4096],
-        ['realistic_oak_leaves', 4096],
-        ['realistic_yellow_leaves', 4096],
-        ['grass_block', 2048],
-        ['dirt', 2048],
-        ['stone', 2048],
-        ['cobblestone', 2048],
-        ['sand', 2048],
+        ['leaves', 8192],
+        ['azalea_leaves', 8192],
+        ['azalea_flowers', 4096],
+        ['yellow_leaves', 8192],
+        ['sky_leaves', 8192],
+        ['snow_leaves', 8192],
+        ['swamp_leaves', 8192],
+        ['realistic_oak_leaves', 8192],
+        ['realistic_yellow_leaves', 8192],
+        ['grass_block', 6144],
+        ['dirt', 4096],
+        ['stone', 4096],
+        ['cobblestone', 4096],
+        ['sand', 4096],
       ])
     });
 
@@ -164,6 +165,8 @@ export class World {
       finalizedChunkKeys: new Set()
     };
     this.chunkAssemblyScheduler = new ChunkAssemblyScheduler(this);
+    this.frameBudgetScheduler = new FrameBudgetScheduler({ targetFps: 100, safetyMarginMs: 2 });
+    this._assemblyPumpActive = false;
     this._pendingChunkInitQueue = [];
     this._chunkInitFrameCounter = 0;
     this.runtimeIdleScheduler = new RuntimeIdleScheduler({
@@ -1037,6 +1040,25 @@ export class World {
     return processed;
   }
 
+  _publishNextReadyChunk() {
+    if (!this.globalInstancedMeshManager) return;
+    const playerCx = Math.floor(this._lastPlayerPos.x / CHUNK_SIZE);
+    const playerCz = Math.floor(this._lastPlayerPos.z / CHUNK_SIZE);
+    const publishedKey = this.globalInstancedMeshManager.publishNextReadyChunk(playerCx, playerCz);
+    if (publishedKey) {
+      const chunk = this.chunks.get(publishedKey);
+      if (chunk && !chunk.disposed) {
+        chunk.renderState = 'published';
+        chunk.loadState = 'entities-built';
+        chunk.finalizeAssemblyPhase();
+        void chunk.finalizeNonDeferredPhase().catch(() => {});
+      }
+      this._lastStreamingActivityAt = globalThis.performance?.now?.() ?? Date.now();
+      this.runtimeIdleScheduler?.markBusy('chunk-published');
+      this.requestShadowMapUpdate('chunk-published');
+    }
+  }
+
   queueDeferredConsolidation(chunk) {
     if (!chunk || chunk.disposed) return;
     this._pendingDeferredConsolidationChunkKeys.add(`${chunk.cx},${chunk.cz}`);
@@ -1165,7 +1187,10 @@ export class World {
         const initIdx = this._pendingChunkInitQueue.indexOf(chunk);
         if (initIdx !== -1) this._pendingChunkInitQueue.splice(initIdx, 1);
 
-        // 7. 释放显存并从活动 chunk 集合移除
+        // 7. 清理 staging 残留
+        this.globalInstancedMeshManager?.removeStagedChunk(key);
+
+        // 8. 释放显存并从活动 chunk 集合移除
         chunk.dispose();
         this.chunks.delete(key);
         chunkTopologyChanged = true;
@@ -1214,34 +1239,71 @@ export class World {
       this.requestShadowMapUpdate('chunk-ready-count-changed');
     }
 
-    this._processChunkInitQueue();
-    this.processAssemblyQueues();
-    const flushBudget = this._computeGlobalInstanceFlushBudget(dt);
-    const flushResult = this.globalInstancedMeshManager?.flushMutationQueue?.({
-      ...flushBudget,
-      playerCx: cx,
-      playerCz: cz
-    }) || { processedBlocks: 0, elapsedMs: 0 };
-    this._recordStreamingPerfFlush(flushResult, flushBudget);
-
-    // 运行期 chunk delta patch（增量网格更新）
     if (this.bootstrapState.phase === 'runtime-streaming') {
-      this._processChunkDeltaPatches();
-    }
+      this.frameBudgetScheduler.beginFrame();
 
-    if (this.bootstrapState.phase === 'runtime-streaming') {
-      this._processDeferredFinalizeQueue();
-      this.runtimeIdleScheduler.process({
-        phase: this.bootstrapState.phase,
-        hasAssemblyWork: this.chunkAssemblyScheduler.hasWork(),
-        playerPosition: this._lastPlayerPos
-      });
-    }
-    if (this.pendingShadowUpdate && this.bootstrapState.phase === 'runtime-streaming') {
-      const now = globalThis.performance?.now?.() ?? Date.now();
-      if (now - this.shadowUpdateScheduledAt >= 200) {
-        this.flushShadowUpdates('batched-world-change');
+      const isStagingBackpressured =
+        (this.globalInstancedMeshManager?.getStagedChunkKeys().length || 0) >= 6;
+
+      if (!isStagingBackpressured) {
+        this._processChunkInitQueue();
       }
+
+      if (!isStagingBackpressured && !this._assemblyPumpActive) {
+        this._assemblyPumpActive = true;
+        const budgetMs = Math.min(this.frameBudgetScheduler.getRemainingMs() * 0.4, 3);
+        void this.chunkAssemblyScheduler
+          .processWithinBudget({ budgetMs, maxTasks: 20 })
+          .catch(() => {})
+          .finally(() => { this._assemblyPumpActive = false; });
+      }
+
+      if (this.frameBudgetScheduler.hasTimeFor(0.5)) {
+        this.globalInstancedMeshManager?.prepareStagedBlocks({
+          maxBlocks: 600,
+          maxMs: Math.min(this.frameBudgetScheduler.getRemainingMs() * 0.5, 2)
+        });
+      }
+
+      this._publishNextReadyChunk();
+
+      const flushBudget = this._computeGlobalInstanceFlushBudget(dt);
+      const flushResult = this.globalInstancedMeshManager?.flushMutationQueue?.({
+        ...flushBudget,
+        playerCx: cx,
+        playerCz: cz
+      }) || { processedBlocks: 0, elapsedMs: 0 };
+      this._recordStreamingPerfFlush(flushResult, flushBudget);
+
+      if (this.frameBudgetScheduler.hasTimeFor(0.5)) {
+        this._processChunkDeltaPatches({ maxMs: Math.min(1.5, this.frameBudgetScheduler.getRemainingMs()) });
+      }
+
+      if (this.frameBudgetScheduler.hasTimeFor(0.3)) {
+        this._processDeferredFinalizeQueue();
+        this.runtimeIdleScheduler.process({
+          phase: this.bootstrapState.phase,
+          hasAssemblyWork: this.chunkAssemblyScheduler.hasWork(),
+          playerPosition: this._lastPlayerPos
+        }, { frameBudgetMs: this.frameBudgetScheduler.getRemainingMs() });
+      }
+
+      if (this.pendingShadowUpdate) {
+        const now = globalThis.performance?.now?.() ?? Date.now();
+        if (now - this.shadowUpdateScheduledAt >= 200) {
+          this.flushShadowUpdates('batched-world-change');
+        }
+      }
+    } else {
+      this._processChunkInitQueue();
+      this.processAssemblyQueues();
+      const flushBudget = this._computeGlobalInstanceFlushBudget(dt);
+      const flushResult = this.globalInstancedMeshManager?.flushMutationQueue?.({
+        ...flushBudget,
+        playerCx: cx,
+        playerCz: cz
+      }) || { processedBlocks: 0, elapsedMs: 0 };
+      this._recordStreamingPerfFlush(flushResult, flushBudget);
     }
 
     // 更新粒子系统逻辑（运动、透明度衰减等）

@@ -234,6 +234,7 @@ export class GlobalInstancedMeshManager {
     };
     this._pendingDisposal = [];
     this._frameCounter = 0;
+    this.stagingZone = new Map();
   }
 
   getRenderKey(type) {
@@ -355,6 +356,7 @@ export class GlobalInstancedMeshManager {
   }
 
   removeChunk(chunkKey) {
+    this.removeStagedChunk(chunkKey);
     this._purgeQueuedChunk(chunkKey);
     const coords = this.chunkToCoords.get(chunkKey);
     if (!coords) return 0;
@@ -392,6 +394,22 @@ export class GlobalInstancedMeshManager {
     if (!Array.isArray(meshDataArray)) return { updated: 0, queued: 0, removed: 0 };
 
     this._purgeQueuedChunk(chunkKey);
+
+    for (const data of meshDataArray) {
+      if (data.blockTypes) continue;
+      const { type, instanceIndexMap } = data;
+      const props = getBlockProperties(type);
+      if (!props.isRendered) continue;
+      let missingCount = 0;
+      for (const coordText of Object.keys(instanceIndexMap || {})) {
+        if (!this.coordToRef.has(Number(coordText))) missingCount++;
+      }
+      if (missingCount > 0) {
+        const buffer = this.getOrCreateBuffer(type);
+        buffer.ensureCapacity(buffer.count + missingCount);
+      }
+    }
+
     const nextCoords = new Set();
     let updated = 0;
     let queued = 0;
@@ -768,6 +786,205 @@ export class GlobalInstancedMeshManager {
     this.mutationStats.queuedBlocks = 0;
   }
 
+  // ==================== Staging Zone ====================
+
+  stageMeshDataForChunk(chunkKey, meshDataArray) {
+    if (!Array.isArray(meshDataArray)) return 0;
+    this._purgeQueuedChunk(chunkKey);
+    this.removeStagedChunk(chunkKey);
+
+    let blockCount = 0;
+    const validData = [];
+    for (const data of meshDataArray) {
+      if (data.blockTypes) continue;
+      const { type, count, instanceIndexMap } = data;
+      const props = getBlockProperties(type);
+      if (!props.isRendered || count === 0) continue;
+      const entries = Object.entries(instanceIndexMap || {});
+      if (entries.length === 0) continue;
+      validData.push(data);
+      blockCount += entries.length;
+    }
+    if (blockCount === 0) return 0;
+    this.stagingZone.set(chunkKey, { meshDataArray: validData, blockCount, prepareState: null });
+    return blockCount;
+  }
+
+  prepareStagedBlocks(options = {}) {
+    const maxBlocks = options.maxBlocks || 600;
+    const maxMs = options.maxMs || 2;
+    const perf = () => globalThis.performance?.now?.() ?? Date.now();
+    const start = perf();
+    let processed = 0;
+
+    for (const [, staged] of this.stagingZone) {
+      if (processed >= maxBlocks || perf() - start >= maxMs) break;
+      if (!staged.prepareState) {
+        this._initPrepareState(staged);
+      }
+      const ps = staged.prepareState;
+      if (ps.complete) continue;
+
+      while (ps.dataCursor < staged.meshDataArray.length && processed < maxBlocks && perf() - start < maxMs) {
+        const data = staged.meshDataArray[ps.dataCursor];
+        const { type, matrices, aoLow, aoHigh, orientation, instanceIndexMap } = data;
+        const renderKey = this.getRenderKey(type);
+        const entries = Object.entries(instanceIndexMap || {});
+        const batch = ps.compactBatch.get(renderKey);
+        if (!batch) { ps.dataCursor++; ps.entryCursor = 0; continue; }
+
+        while (ps.entryCursor < entries.length && processed < maxBlocks && perf() - start < maxMs) {
+          const [coordText, sourceIndex] = entries[ps.entryCursor];
+          const coord = Number(coordText);
+
+          if (ps.seenCoords.has(coord)) { ps.entryCursor++; continue; }
+          ps.seenCoords.add(coord);
+
+          const writePos = batch.cursor;
+          batch.coords[writePos] = coord;
+          batch.matrices.set(
+            matrices.subarray(sourceIndex * MATRIX_STRIDE, sourceIndex * MATRIX_STRIDE + MATRIX_STRIDE),
+            writePos * MATRIX_STRIDE
+          );
+          batch.aoLow[writePos] = aoLow?.[sourceIndex] ?? 1;
+          batch.aoHigh[writePos] = aoHigh?.[sourceIndex] ?? 1;
+          batch.orientation[writePos] = orientation?.[sourceIndex] ?? 0;
+          batch.cursor++;
+
+          ps.entryCursor++;
+          processed++;
+        }
+
+        if (ps.entryCursor >= entries.length) {
+          ps.dataCursor++;
+          ps.entryCursor = 0;
+        }
+      }
+
+      if (ps.dataCursor >= staged.meshDataArray.length) {
+        ps.complete = true;
+        staged.meshDataArray = null;
+      }
+    }
+    return processed;
+  }
+
+  _initPrepareState(staged) {
+    const typeCounts = new Map();
+    for (const data of staged.meshDataArray) {
+      const renderKey = this.getRenderKey(data.type);
+      const entries = Object.entries(data.instanceIndexMap || {});
+      typeCounts.set(renderKey, (typeCounts.get(renderKey) || 0) + entries.length);
+    }
+
+    const compactBatch = new Map();
+    for (const [renderKey, count] of typeCounts) {
+      compactBatch.set(renderKey, {
+        type: renderKey,
+        coords: new Array(count),
+        matrices: new Float32Array(count * MATRIX_STRIDE),
+        aoLow: new Float32Array(count),
+        aoHigh: new Float32Array(count),
+        orientation: new Float32Array(count),
+        count,
+        cursor: 0
+      });
+    }
+
+    staged.prepareState = { compactBatch, dataCursor: 0, entryCursor: 0, complete: false, seenCoords: new Set() };
+  }
+
+  publishPreparedChunk(chunkKey) {
+    const staged = this.stagingZone.get(chunkKey);
+    if (!staged || !staged.prepareState?.complete) return false;
+
+    const ps = staged.prepareState;
+
+    if (!this.chunkToCoords.has(chunkKey)) this.chunkToCoords.set(chunkKey, new Set());
+    const chunkCoords = this.chunkToCoords.get(chunkKey);
+
+    for (const [, batch] of ps.compactBatch) {
+      const batchCount = batch.cursor;
+      if (batchCount === 0) continue;
+
+      const buffer = this.getOrCreateBuffer(batch.type);
+
+      for (let i = 0; i < batchCount; i++) {
+        const coord = batch.coords[i];
+        if (this.coordToRef.has(coord)) {
+          this.removeVisibleBlock(coord, { commit: false });
+        }
+      }
+
+      buffer.ensureCapacity(buffer.count + batchCount);
+
+      const baseIndex = buffer.count;
+
+      buffer.mesh.instanceMatrix.array.set(
+        batch.matrices.subarray(0, batchCount * MATRIX_STRIDE),
+        baseIndex * MATRIX_STRIDE
+      );
+
+      const attrAoLow = buffer.mesh.geometry.getAttribute('aAoLow');
+      const attrAoHigh = buffer.mesh.geometry.getAttribute('aAoHigh');
+      const attrOrientation = buffer.mesh.geometry.getAttribute('aOrientation');
+      if (attrAoLow) attrAoLow.array.set(batch.aoLow.subarray(0, batchCount), baseIndex);
+      if (attrAoHigh) attrAoHigh.array.set(batch.aoHigh.subarray(0, batchCount), baseIndex);
+      if (attrOrientation) attrOrientation.array.set(batch.orientation.subarray(0, batchCount), baseIndex);
+
+      for (let i = 0; i < batchCount; i++) {
+        const coord = batch.coords[i];
+        const writeIndex = baseIndex + i;
+        buffer.coordToIndex.set(coord, writeIndex);
+        buffer.indexToCoord[writeIndex] = coord;
+        this.coordToRef.set(coord, { renderKey: batch.type, index: writeIndex, chunkKey });
+        chunkCoords.add(coord);
+      }
+
+      buffer.count += batchCount;
+      buffer.mesh.count = buffer.count;
+
+      buffer.dirtyStart = Math.min(buffer.dirtyStart, baseIndex);
+      buffer.dirtyEnd = Math.max(buffer.dirtyEnd, baseIndex + batchCount - 1);
+      buffer.dirtyMatrix = true;
+      buffer.dirtyAO = true;
+      buffer.dirtyBounds = true;
+    }
+
+    this.commitDirtyBuffers();
+    this.stagingZone.delete(chunkKey);
+    return true;
+  }
+
+  publishNextReadyChunk(playerCx, playerCz) {
+    let bestKey = null;
+    let bestDist = Infinity;
+    for (const [chunkKey, staged] of this.stagingZone) {
+      if (!staged.prepareState?.complete) continue;
+      const dist = this._getChunkDistance(chunkKey, playerCx, playerCz);
+      if (dist < bestDist) { bestDist = dist; bestKey = chunkKey; }
+    }
+    if (!bestKey) return null;
+    const success = this.publishPreparedChunk(bestKey);
+    return success ? bestKey : null;
+  }
+
+  removeStagedChunk(chunkKey) {
+    this.stagingZone.delete(chunkKey);
+  }
+
+  getStagedChunkKeys() {
+    return Array.from(this.stagingZone.keys());
+  }
+
+  getStagedBlockCount(chunkKey) {
+    return this.stagingZone.get(chunkKey)?.blockCount || 0;
+  }
+
+  isPrepareComplete(chunkKey) {
+    return this.stagingZone.get(chunkKey)?.prepareState?.complete || false;
+  }
+
   getStats() {
     return {
       buffers: this.buffers.size,
@@ -775,6 +992,7 @@ export class GlobalInstancedMeshManager {
       queuedBlocks: this.mutationStats.queuedBlocks,
       queueTasks: this.mutationQueue.length,
       pendingAO: this.pendingAO.size,
+      stagedChunks: this.stagingZone.size,
       lastProcessedBlocks: this.mutationStats.lastProcessedBlocks,
       lastFlushMs: this.mutationStats.lastFlushMs
     };

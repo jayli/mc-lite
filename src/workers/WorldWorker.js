@@ -2897,6 +2897,17 @@ onmessage = async function(e) {
     ? workerReceivedAt - _consolidationRequestSentAt
     : 0;
 
+  // 收集 meshData 中的 TypedArray buffer 用于 Transferable 零拷贝
+  const transferList = [];
+  if (meshData && Array.isArray(meshData)) {
+    for (const group of meshData) {
+      if (group.matrices?.buffer) transferList.push(group.matrices.buffer);
+      if (group.aoLow?.buffer) transferList.push(group.aoLow.buffer);
+      if (group.aoHigh?.buffer) transferList.push(group.aoHigh.buffer);
+      if (group.orientation?.buffer) transferList.push(group.orientation.buffer);
+    }
+  }
+
   // Worker 端子阶段打点
   postMessage({
     cx, cz, callbackKey, taskId,
@@ -2938,7 +2949,7 @@ onmessage = async function(e) {
       workerComputeMs
     },
     isOptimization
-  });
+  }, transferList);
 };
 
 // 复制结构生成逻辑

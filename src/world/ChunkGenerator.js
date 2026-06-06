@@ -132,15 +132,22 @@ export function extendChunk(Chunk) {
     if (this.world?.globalInstancedMeshManager) {
       const chunkKey = `${this.cx},${this.cz}`;
       const isInitialBuild = this.loadState !== 'finalized' && this.loadState !== 'waiting-consolidation';
-      const result = isInitialBuild
-        ? this.world.globalInstancedMeshManager.replaceChunkVisibleBlocks(chunkKey, meshDataArray)
-        : this.world.globalInstancedMeshManager.patchChunkVisibleBlocks(chunkKey, meshDataArray);
+      let result;
+      if (isInitialBuild) {
+        result = this.world.globalInstancedMeshManager.stageMeshDataForChunk(chunkKey, meshDataArray);
+        if (result > 0) {
+          this.renderState = 'staged';
+        }
+      } else {
+        result = this.world.globalInstancedMeshManager.patchChunkVisibleBlocks(chunkKey, meshDataArray);
+      }
       recordChunkPerf('chunk.build-meshes-global', (globalThis.performance?.now?.() ?? Date.now()) - t0, {
         chunkKey,
         meshGroups: meshDataArray.length,
-        instanceCount: typeof result === 'number' ? result : result.queued,
+        instanceCount: typeof result === 'number' ? result : result?.queued || 0,
         patchUpdated: result?.updated || 0,
-        patchRemoved: result?.removed || 0
+        patchRemoved: result?.removed || 0,
+        staged: isInitialBuild
       });
       return;
     }
