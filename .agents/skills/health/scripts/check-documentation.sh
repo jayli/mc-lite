@@ -11,8 +11,8 @@ check_documentation() {
     [ "$readme_lines" -gt 20 ] && score=$((score + 4))
   fi
 
-  # CLAUDE.md 或 GEMINI.md（4分）
-  [ -f "CLAUDE.md" ] && score=$((score + 4))
+  # AGENTS.md（4分）
+  [ -f "AGENTS.md" ] && score=$((score + 4))
 
   # 架构/API文档（4分）
   local doc_count=$(find . -name "README_*.md" -o -name "API.md" -o -name "ARCHITECTURE.md" 2>/dev/null | wc -l)

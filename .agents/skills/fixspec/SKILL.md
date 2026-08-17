@@ -20,7 +20,7 @@ Use this skill when the user runs `/fixspec` to fix duplicate or incorrect spec 
 ### Phase 1: Get Spec Selection
 
 1. **Execute Shell Script**:
-   - Run: `.claude/skills/fixspec/fixspec-interactive.sh [<spec-name>]`
+   - Run: `.agents/skills/fixspec/fixspec-interactive.sh [<spec-name>]`
    - If `DIRECT_MODE:<name>`: jump to Phase 2 with that spec
    - If `LIST_MODE`: start interactive selection below
 

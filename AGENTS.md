@@ -1,22 +1,62 @@
 # AGENTS.md
 
-This file provides guidance to Qoder (qoder.com) when working with code in this repository.
+This file provides guidance to Codex and other compatible AI coding agents when working with code in this repository.
 
 - Always respond in Chinese. 所有解释、说明和对话请使用中文。代码注释也尽量使用中文。
 
 ## 项目简介
 
-基于 Three.js 的 3D 体素游戏（Minecraft 克隆）。纯客户端应用，无后端，无构建步骤（no bundler）。使用 ES Modules + Import Maps 直接从 CDN 加载 Three.js（v0.160.0）。
+基于 Three.js 的 3D 体素游戏（Minecraft 克隆）。纯客户端应用，无后端，无构建步骤（no bundler）。使用 ES Modules + Import Maps 直接从 CDN 加载 Three.js（v0.184.0），自启动一个 HTTP 静态服务器进行开发。
 
 ## 开发命令
 
-- **启动开发服务器**: `npm run start` (端口 8080，Node.js 静态文件服务器)
-- **代码检查**: `npm run lint` (ESLint，修改 `src/**/*.js` 后必须运行)
+- **启动开发服务器**: `npm run start`（端口 8080，Node.js 静态文件服务器，自带热加载）
+- **代码检查**: `npm run lint`（ESLint，修改 `src/**/*.js` 后必须运行）
 - **自动修复**: `npm run lint:fix`
-- **运行测试**: 启动服务器后访问 http://localhost:8080/src/tests/index.html ，点击"运行所有测试"（浏览器内测试，无 CLI 测试命令）
+- **运行测试**: 先启动开发服务器，再运行 `node command/run-tests.js`（Playwright headless 浏览器运行全部测试）
+  - `--verbose`: 显示失败用例的详细错误信息
+  - `--port 3000`: 指定开发服务器端口（默认 8080）
+  - 浏览器内测试备选: 访问 http://localhost:8080/src/tests/index.html ，点击"运行所有测试"
+
+## 代码质量检查
+
+每次修改 JS 文件后，在任务结束前自动运行 lint 检查：
+
+```bash
+npm run lint
+```
+
+**运行时机**:
+- 修改了 `src/**/*.js` 文件后
+- 提交代码前
+- 长任务的关键节点（如重构完成一个模块后）
+
+**处理方式**:
+- 如发现警告，简要报告并在下一步计划中建议修复
+- 不强制要求立即修复所有警告，但应保持新增代码无警告
+
+## TDD 工作流
+
+使用 `superpowers:test-driven-development` 技能进行开发时，遵循 Red-Green-Refactor 循环：
+
+1. **RED（飘红）**: 先写一个失败的测试，证明功能是缺失的
+2. **验证 RED**: 运行 `node command/run-tests.js` 确认测试失败（飘红）
+3. **GREEN（飘绿）**: 写最少量的代码让测试通过
+4. **验证 GREEN**: 运行 `node command/run-tests.js` 确认所有测试通过（飘绿）
+5. **REFACTOR**: 重构代码，保持测试通过
+6. **重复**: 写下一个失败测试
+
+**运行测试的时机**:
+- 刚写好测试用例后 → `node command/run-tests.js` 验证是否按预期失败（飘红）
+- 实现功能代码后 → `node command/run-tests.js` 验证是否通过（飘绿）
+- 重构完成后 → `node command/run-tests.js` 确认没有引入回归
+- 修复 bug 后 → `node command/run-tests.js --verbose` 回归验证
+
+**注意**: 测试必须先失败再实现。如果测试一开始就通过，说明测试写错了或者在测试已有行为。
 
 ## 调试
 
+- 入口文件: `index.html` — 通过 `<script type="module">` 加载 `src/core/Game.js` 并启动游戏
 - 游戏实例暴露在 `window.game`，可在浏览器控制台访问
 - `window.game.world`、`window.game.engine` 等可访问各子系统
 
@@ -34,6 +74,23 @@ This file provides guidance to Qoder (qoder.com) when working with code in this 
 - 业务逻辑层（游戏系统）: `src/core/Game.js`、`src/world/World.js`
 - 数据层（持久化/存储）: `src/services/`、`src/constants/`
 
+### 核心分层详解
+
+| 系统 | 入口文件 | 职责 |
+|------|---------|------|
+| Engine | `src/core/Engine.js` | Three.js 渲染管线、相机、日夜光照、阴影 |
+| Game | `src/core/Game.js` | 游戏主循环、状态管理、持有所有子系统引用 |
+| Player | `src/actors/player/Player.js` | 玩家主类（物理、交互、背包） |
+| World | `src/world/World.js` | 区块动态加载（渲染距离：3）、方块操作入口 |
+| Chunk | `src/world/Chunk.js` | 区块渲染（InstancedMesh）、隐藏面剔除 |
+| Enemy | `src/core/EnemyManager.js` | 敌人生命周期与 EnemyWorker 通信 |
+| Turret | `src/actors/turret/TurretManager.js` | 炮塔自动防御子系统入口 |
+| Minecart | `src/actors/minecart/MinecartManager.js` | 矿车生命周期、移动系统、持久化 |
+| ZombieNest | `src/actors/zombie-nest/ZombieNestManager.js` | 丧尸巢穴创建、刷怪、持久化 |
+| LightSource | `src/core/LightSourceManager.js` | 发光方块的 PointLight 管理 |
+| AO | `src/workers/AOWorker.js` | 专用 AO 计算 Worker，脏集机制异步计算 |
+| FaceCulling | `src/core/FaceCullingSystem.js` | 面剔除系统，协调主线程与 Worker |
+
 ### 文件清单
 
 #### core/ — 核心系统
@@ -45,6 +102,7 @@ This file provides guidance to Qoder (qoder.com) when working with code in this 
 - `EnemyManager.js` — 敌人生命周期管理，与 `EnemyWorker` 通信
 - `FaceCullingSystem.js` — 面剔除系统，协调主线程与 Worker 的面剔除逻辑
 - `FaceCullingSystemDebug.js` — 面剔除调试工具
+- `LightSourceManager.js` — 发光方块（吊灯、萤石、蛙明灯、岩浆）的 PointLight 管理，支持区块加载时批量添加/移除
 
 ### actors/ — 游戏实体
 
@@ -60,6 +118,24 @@ This file provides guidance to Qoder (qoder.com) when working with code in this 
 **敌人** (`src/actors/enemy/`):
 - `Zombie.js` — 丧尸实体（状态、AI行为、受击逻辑）
 - `ZombieInstancedRenderer.js` — 丧尸 InstancedMesh 批量渲染
+
+**矿车** (`src/actors/minecart/`):
+- `MinecartManager.js` — 矿车生命周期管理、位置索引、Chunk 持久化
+- `Minecart.js` — 矿车实体（位置、朝向、运动状态）
+- `MinecartMovementSystem.js` — 轨道检测、方向判定、移动物理
+- `MinecartLinkDetector.js` — 矿车链接检测（串联矿车）
+- `MinecartPlacementHandler.js` — 矿车放置逻辑
+- `MinecartInstancedRenderer.js` — 矿车 InstancedMesh 批量渲染
+- `MinecartCollisionSystem.js` — 矿车碰撞检测
+
+协作链路：`PlayerInteraction` → `MinecartPlacementHandler` → `MinecartManager.createMinecart()` → `MinecartMovementSystem.updateAll()`
+
+**丧尸巢穴** (`src/actors/zombie-nest/`):
+- `ZombieNestManager.js` — 巢穴生命周期、位置索引、Chunk 持久化、刷怪回调
+- `ZombieNest.js` — 巢穴实体（位置、关键方块、刷怪间隔）
+- `ZombieNestPlacementHandler.js` — 巢穴放置逻辑
+
+协作链路：`PlayerInteraction` → `ZombieNestPlacementHandler` → `ZombieNestManager.createNest()` → `handleNestSpawn()` → `EnemyManager.addZombie()`
 
 ### world/ — 世界系统
 
@@ -82,6 +158,7 @@ This file provides guidance to Qoder (qoder.com) when working with code in this 
 
 **特效** (`src/world/effects/`):
 - `ParticleSystem.js` — 粒子效果系统（爆炸、破坏等）
+- `RainEffect.js` — GPU 驱动的雨滴粒子系统（LineSegments + ShaderMaterial），跟随玩家移动，碰撞地面方块
 
 ### services/ — 服务层
 
@@ -106,6 +183,7 @@ This file provides guidance to Qoder (qoder.com) when working with code in this 
 - `MathUtils.js` — 数学工具（seededRandom、角度计算、插值等）
 - `IndexedDBUtils.js` — IndexedDB 通用操作封装
 - `StructureUtils.js` — 结构放置工具
+- `CityPlacementUtils.js` — City 建筑放置算法（哈希随机、边界检查、距离判定）
 
 ### constants/ — 常量配置
 
@@ -158,6 +236,7 @@ This file provides guidance to Qoder (qoder.com) when working with code in this 
 
 位于 `src/workers/maps/`，由 `WorldWorker.js` 调用，每个地图模块负责特定地标的位置计算和方块生成：
 - `RegionCenterUtils.js` — 区域内确定性随机中心计算工具（被所有地图共享）
+- `CityMap.js` — 主城地图生成（建筑配额、确定性排布、城门放置、地形平缓化）
 - `FrozenMountain.js` — 冰封山峰地图生成
 - `Pyramid.js` — 金字塔地图生成（新地图参照此文件实现）
 - `IslandMap.js` — 海岛地图生成
@@ -184,3 +263,11 @@ This file provides guidance to Qoder (qoder.com) when working with code in this 
 ## 代码提交
 
 任何修改都不能自动提交代码，必须等待明确的指令才能提交。
+
+## Active Technologies
+
+- JavaScript (ES Modules, 无构建步骤) + Three.js 0.184.0（CDN via jsdelivr）
+
+## Recent Changes
+
+- 031-upgrade-threejs-r184: Three.js 0.160.0 → 0.184.0 升级

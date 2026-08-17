@@ -208,7 +208,7 @@
 | 检查项 | 状态 | 严重程度 | 详情 | 建议 |
 |--------|------|----------|------|------|
 | README | ❌ 发现问题 | 🔴 高 | 根目录缺少 README.md | 添加项目文档 |
-| 架构文档 | ✅ 通过 | - | `CLAUDE.md` 存在 | 完善内容 |
+| 架构文档 | ✅ 通过 | - | `AGENTS.md` 存在 | 完善内容 |
 | API 文档 | ⚠️ 警告 | 中 | 无 API 文档 | 添加接口文档 |
 | CHANGELOG | ✅ 通过 | - | 通过 git commit 追踪 | - |
 
@@ -216,7 +216,7 @@
 
 | 文件 | 状态 |
 |------|------|
-| `CLAUDE.md` | 简单项目结构说明 |
+| `AGENTS.md` | 简单项目结构说明 |
 | `XHS_INTERACTION_SYSTEM.md` | 小红书互动系统详细文档 ✓ |
 | `client/src/pages/PPT1/README.md` | PPT 组件重构说明 ✓ |
 
@@ -324,7 +324,7 @@ aic-space/
 │   │   ├── service/    # 业务服务
 │   │   └── config/     # 配置文件
 │   └── package.json
-├── CLAUDE.md        # 项目说明
+├── AGENTS.md        # 项目说明
 └── health_check/    # 健康检查报告
 ```
 

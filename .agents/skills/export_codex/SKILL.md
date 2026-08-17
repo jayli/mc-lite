@@ -11,7 +11,7 @@ This skill is only for Codex CLI sessions.
 
 Export current-session dialogue (user + assistant) after the latest `/clear` marker into:
 
-`.codex/logs/YYYY-MM-DD-0001.txt`
+`.agents/logs/YYYY-MM-DD-0001.txt`
 
 `0001` increments automatically per day.
 
@@ -20,13 +20,13 @@ Export current-session dialogue (user + assistant) after the latest `/clear` mar
 From project root:
 
 ```bash
-python3 .codex/skills/export_codex/export_session.py
+python3 .agents/skills/export_codex/export_session.py
 ```
 
 Optional:
 
 ```bash
-python3 .codex/skills/export_codex/export_session.py --session /absolute/path/to/rollout-xxxx.jsonl
+python3 .agents/skills/export_codex/export_session.py --session /absolute/path/to/rollout-xxxx.jsonl
 ```
 
 ## Notes

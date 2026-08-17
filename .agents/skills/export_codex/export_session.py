@@ -14,9 +14,9 @@ Message = Tuple[str, str, str]
 def find_project_root(start: Path) -> Path:
     current = start.resolve()
     for candidate in [current, *current.parents]:
-        if (candidate / ".codex" / "skills" / "export_codex").exists():
+        if (candidate / ".agents" / "skills" / "export_codex").exists():
             return candidate
-    raise FileNotFoundError("Cannot find project root containing .codex/skills/export_codex")
+    raise FileNotFoundError("Cannot find project root containing .agents/skills/export_codex")
 
 
 def latest_session_file() -> Path:
@@ -101,7 +101,7 @@ def write_export(target: Path, session_path: Path, messages: List[Message], used
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Export Codex current-session dialogue into .codex/logs/YYYY-MM-DD-0001.txt"
+        description="Export Codex current-session dialogue into .agents/logs/YYYY-MM-DD-0001.txt"
     )
     parser.add_argument(
         "--session",
@@ -122,7 +122,7 @@ def main() -> int:
         return 1
 
     messages, used_clear = parse_messages(session_path)
-    log_dir = project_root / ".codex" / "logs"
+    log_dir = project_root / ".agents" / "logs"
     target = next_log_path(log_dir)
     write_export(target, session_path, messages, used_clear)
 
